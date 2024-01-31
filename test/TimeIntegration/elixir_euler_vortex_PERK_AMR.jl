@@ -25,8 +25,8 @@ module TrixiExtension
   end
 
   function (indicator_vortex::IndicatorVortex)(u::AbstractArray{<:Any,4},
-                                              mesh, equations, dg, cache;
-                                              t, kwargs...)
+                                               mesh, equations, dg, cache;
+                                               t, kwargs...)
     mesh = indicator_vortex.cache.mesh
     alpha = indicator_vortex.cache.alpha
     indicator_threaded = indicator_vortex.cache.indicator_threaded
