@@ -13,9 +13,9 @@ eta() = 1e-3
 gamma = 5/3
 equations = IdealGlmMhdEquations2D(gamma)
 equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
-                                          Prandtl = prandtl_number(),
-                                          eta = eta(),
-                                          gradient_variables = GradientVariablesPrimitive())
+                                                   Prandtl = prandtl_number(),
+                                                   eta = eta(),
+                                                   gradient_variables = GradientVariablesPrimitive())
 
 """
     initial_condition_orszag_tang(x, t, equations::IdealGlmMhdEquations2D)

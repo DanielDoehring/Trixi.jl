@@ -158,6 +158,7 @@ end
     for j in eachnode(dg), i in eachnode(dg)
         u_local = get_node_vars(u, equations, dg, i, j, element)
         indicator[i, j] = indicator_hg.variable(u_local, equations)
+        # For AD
         #indicator[i, j] = indicator_hg.variable(u_local, equations).value
     end
 
