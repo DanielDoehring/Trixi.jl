@@ -74,14 +74,14 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 t_c = airfoil_cord_length / U_inf
-tspan = (0.0, t_c)
+tspan = (0.0, 0.2 * t_c)
 
 ode = semidiscretize(semi, tspan; split_form = false)
 #ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100000
+analysis_interval = 1000
 
 semi.boundary_conditions.boundary_dictionary
 indices = semi_ -> semi.boundary_conditions.boundary_indices[2]
@@ -102,14 +102,20 @@ stepsize_callback = StepsizeCallback(cfl = 5.4) # PERK_4 Multi E = 5, ..., 16
 
 #stepsize_callback = StepsizeCallback(cfl = 5.6) # PERK_4 Single 14
 
+#stepsize_callback = StepsizeCallback(cfl = 4.4) # PERK_4 Single 8
+stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Single 20
+
 save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
+alive_callback = AliveCallback(alive_interval = 100)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        save_solution,
+                        alive_callback,
+                        #save_solution,
                         stepsize_callback)
 
 ###############################################################################
@@ -143,9 +149,9 @@ dtRatios = [0.249748130716557,
 
 #Stages = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
 Stages = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/", dtRatios)
+#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/", dtRatios)
 
-#ode_algorithm = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/")
+ode_algorithm = PERK4(20, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/")
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
