@@ -7,18 +7,20 @@
 function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::AbstractString)
                                      
   # Use linear increasing timesteps for free timesteps
+  #=
   c = zeros(NumStages)
   for k in 2:NumStages-4
     c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
   end
+  =#
   
   # Current approach: Use ones for simplicity
-  #=
-  c = ones(NumStages)
+  c_const = 1.0
+  c = c_const * ones(NumStages)
   c[1] = 0.0
-  =#
-
-  c[NumStages - 3] = 1.0
+  
+  cS3 = c_const
+  c[NumStages - 3] = cS3
   c[NumStages - 2] = 0.479274057836310
   c[NumStages - 1] =  sqrt(3)/6 + 0.5
   c[NumStages]     = -sqrt(3)/6 + 0.5
@@ -42,9 +44,9 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
   end
 
   # Shared matrix
-  AMatrix = [0.364422246578869 0.114851811257441
-             0.1397682537005989 0.648906880894214
-             0.1830127018922191 0.028312163512968]
+  AMatrix = [0.479274057836310-0.114851811257441/cS3 0.114851811257441/cS3
+             0.1397682537005989                      0.648906880894214
+             0.1830127018922191                      0.028312163512968]
 
   println("Variable portion of A-Matrix:")
   display(AMatrices); println()
