@@ -74,7 +74,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 t_c = airfoil_cord_length / U_inf
-tspan = (0.0, 0.2 * t_c)
+tspan = (0.0, 0.0 * t_c)
 
 ode = semidiscretize(semi, tspan; split_form = false)
 #ode = semidiscretize(semi, tspan)
@@ -151,9 +151,9 @@ dtRatios = [0.249748130716557,
 
 #Stages = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
 Stages = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
-#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/", dtRatios)
 
-ode_algorithm = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/")
+#ode_algorithm = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/")
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
