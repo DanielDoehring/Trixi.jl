@@ -141,7 +141,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000000
+analysis_interval = 10^6
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      extra_analysis_errors=(:conservation_error, :l1_error))
 
@@ -151,14 +151,7 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi)
                                       med_level=Refinement+1, med_threshold=-3.0,
                                       max_level=Refinement+2, max_threshold=-2.0)
 
-#=
-amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
-                                      base_level=Refinement,
-                                      med_level=Refinement+1, med_threshold=-3.0,
-                                      max_level=Refinement+1, max_threshold=-2.0)
-=#
-
-CFL_Convergence = 1.0
+CFL_Convergence = 0.5
 amr_callback = AMRCallback(semi, amr_controller,
                            # For convergence study
                            interval=Int(20/CFL_Convergence), 
@@ -167,7 +160,7 @@ amr_callback = AMRCallback(semi, amr_controller,
 alive_callback = AliveCallback(alive_interval = 200)
 
 callbacksPERK = CallbackSet(summary_callback,
-                            #amr_callback,
+                            amr_callback,
                             alive_callback,
                             analysis_callback)                
 
@@ -244,13 +237,17 @@ ode_algorithm = PERK3_Multi(NumBaseStages, NumMethods,
 # Fourth order: Experimental!
 dtOptMin = 0.004 * CFL_Convergence # For even divisibility AMR intervals
 
-#Stages = [9, 5]
 Stages = [15, 9, 5]
-#Stages = [15, 9]
-#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/2D_CEE_IsentropicVortex/PolyDeg6/")
+
+dtRatios = [0.265479298439419,
+            0.131066470113962,
+            0.041198322397963] / 0.265479298439419
+
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/2D_CEE_IsentropicVortex/PolyDeg6/", dtRatios)
 
 #ode_algorithm = PERK4_Multi([5], "/home/daniel/git/MA/EigenspectraGeneration/2D_CEE_IsentropicVortex/PolyDeg6/")
 
+#=
 # S = 5
 dtRefBase = 0.041198322397963
 CFL_Stab = 0.99
@@ -270,6 +267,7 @@ CFL_Stab = 0.99
 dtOptMin = dtRefBase * 2.0^(BaseRefinement - Refinement) * CFL_Convergence * CFL_Stab
 
 ode_algorithm = PERK4(5, "/home/daniel/git/MA/EigenspectraGeneration/2D_CEE_IsentropicVortex/PolyDeg6/")
+=#
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dtOptMin,
