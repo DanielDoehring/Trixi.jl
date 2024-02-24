@@ -10,7 +10,8 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
   
   c = zeros(NumStages)
   for k in 2:NumStages-4
-    c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
+    #c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
+    c[k] = ((k - 1)/(NumStages - 4))^2 # Quadratically increasing
   end
   
   

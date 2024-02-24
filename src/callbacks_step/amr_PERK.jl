@@ -408,7 +408,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
             
             println("level_info_mortars_acc:")
             display(integrator.level_info_mortars_acc); println()
-            =#            
+            =#
         end
 
         u = wrap_array(u_ode, mesh, equations, solver, cache)
@@ -441,6 +441,8 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
             sort!(integrator.level_u_indices_elements[level])
           end
         end
+
+        #display(integrator.level_u_indices_elements)
         
       end # "PERK stage identifiers update" timing
     end # if has changed

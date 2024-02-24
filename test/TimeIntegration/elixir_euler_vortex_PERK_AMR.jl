@@ -262,13 +262,16 @@ CFL_Stab = 0.99
 
 # S = 18
 dtRefBase = 0.331380840390921
-# Ascending c
+# Linear c
+CFL_Stab = 0.87 # No AMR
+# Quadratic_c
 CFL_Stab = 0.87 # No AMR
 # c1
-CFL_Stab = 0.9 # No AMR
+#CFL_Stab = 0.9 # No AMR
 
-ode_algorithm = PERK4(18, "/home/daniel/git/MA/EigenspectraGeneration/2D_CEE_IsentropicVortex/PolyDeg6/c1/")
-#ode_algorithm = PERK4(18, "/home/daniel/git/MA/EigenspectraGeneration/2D_CEE_IsentropicVortex/PolyDeg6/Ascending_c/")
+#ode_algorithm = PERK4(18, "/home/daniel/git/Paper_PERK4/Data/IsentropicVortex/k6/Linear_c/")
+ode_algorithm = PERK4(18, "/home/daniel/git/Paper_PERK4/Data/IsentropicVortex/k6/Quadratic_c/")
+#ode_algorithm = PERK4(18, "/home/daniel/git/Paper_PERK4/Data/IsentropicVortex/k6/c1/")
 
 # S = 16
 #dtRefBase = 0.758967967608265

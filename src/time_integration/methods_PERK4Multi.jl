@@ -15,10 +15,10 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
   end
   
   # Current approach: Use ones for simplicity
-  #=
+  
   c = ones(NumStages)
   c[1] = 0.0
-  =#
+  
 
   c[NumStages - 3] = 1.0
   c[NumStages - 2] = 0.479274057836310
