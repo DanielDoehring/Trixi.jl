@@ -78,11 +78,11 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
           @assert length(integrator.level_info_elements_acc[end]) == 
             n_elements "highest level should contain all elements"
 
-          #=
+          
           # NOTE: Additional RHS Call computation
           # CARE: Hard-coded for each case 
-          Stages = [6, 4, 3] # VRMHD O-T, Taylor-Green
-          #Stages = [7, 4, 3] # Shearlayer
+          #Stages = [6, 4, 3] # VRMHD O-T, Taylor-Green
+          Stages = [7, 4, 3] # Shearlayer
           #Stages = [11, 6, 4] # Kelvin-Helmholtz
           #Stages = [10, 6, 4] # MHD Rotor
           
@@ -90,6 +90,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
           MinStage = minimum(Stages)
           integrator_levels = length(Stages)
 
+          #=
           # Contribution from non-ideally scaling levels
           for level = 2:min(integrator_levels, integrator.n_levels)
             integrator.AddRHSCalls += amr_callback.interval * 
@@ -104,6 +105,18 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                       length(integrator.level_info_elements[level])
           end
           =#
+
+          ### Compute number of performed (scalar) RHS evals ###
+          for level = 1:min(integrator_levels, integrator.n_levels)
+            integrator.AddRHSCalls += amr_callback.interval * 
+                                      Stages[level] * length(integrator.level_info_elements[level])
+          end
+          
+          # Contribution from non-represented levels
+          for level = integrator_levels+1:integrator.n_levels
+            integrator.AddRHSCalls += amr_callback.interval * MinStage * 
+                                      length(integrator.level_info_elements[level])
+          end
 
           # Determine level for each interface
           for interface_id in 1:n_interfaces
