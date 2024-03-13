@@ -671,8 +671,8 @@ function solve!(integrator::PERK4_Multi_Integrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
       
       # k1: Evaluated on entire domain / all levels
-      #integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
-      integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
+      integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
+      #integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
 
       @threaded for i in eachindex(integrator.du)
         integrator.k1[i] = integrator.du[i] * integrator.dt
@@ -691,7 +691,7 @@ function solve!(integrator::PERK4_Multi_Integrator)
       =#
 
       # CARE: This does not work if we have only one method but more than one grid level
-      #=
+      
       integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                    integrator.level_info_elements_acc[1],
                    integrator.level_info_interfaces_acc[1],
@@ -700,15 +700,15 @@ function solve!(integrator::PERK4_Multi_Integrator)
                    integrator.level_info_mortars_acc[1],
                    integrator.level_u_indices_elements, 1,
                    integrator.du_ode_hyp)
-      =#
       
+      #=
       integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                    integrator.level_info_elements_acc[1],
                    integrator.level_info_interfaces_acc[1],
                    integrator.level_info_boundaries_acc[1],
                    integrator.level_info_boundaries_orientation_acc[1],
                    integrator.level_info_mortars_acc[1])
-      
+      =#
 
       # Update finest level only
       @threaded for u_ind in integrator.level_u_indices_elements[1]
@@ -766,7 +766,7 @@ function solve!(integrator::PERK4_Multi_Integrator)
         end
         =#
       
-        #=
+        
         # Joint RHS evaluation with all elements sharing this timestep
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                      integrator.level_info_elements_acc[integrator.coarsest_lvl],
@@ -776,15 +776,15 @@ function solve!(integrator::PERK4_Multi_Integrator)
                      integrator.level_info_mortars_acc[integrator.coarsest_lvl],
                      integrator.level_u_indices_elements, integrator.coarsest_lvl,
                      integrator.du_ode_hyp)
-        =#
         
+        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                      integrator.level_info_elements_acc[integrator.coarsest_lvl],
                      integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
                      integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
                      integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                      integrator.level_info_mortars_acc[integrator.coarsest_lvl])
-        
+        =#
 
         # Update k_higher of relevant levels
         for level in 1:integrator.coarsest_lvl          
@@ -802,8 +802,8 @@ function solve!(integrator::PERK4_Multi_Integrator)
         end
         integrator.t_stage = integrator.t + alg.c[alg.NumStages - 3 + stage] * integrator.dt
 
-        #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
-        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+        #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
         @threaded for u_ind in eachindex(integrator.u)
           integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
