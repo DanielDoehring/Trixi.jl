@@ -4,15 +4,9 @@ using Trixi
 ###############################################################################
 # semidiscretization of the compressible Euler equations
 
-prandtl_number() = 0.72
-mu() = 1.81 * 1e-5
-
 equations = CompressibleEulerEquations2D(1.4)
-equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
-                                                          Prandtl = prandtl_number(),
-                                                          gradient_variables = GradientVariablesPrimitive())
 
-@inline function initial_condition_freestream(x, t, equations)
+@inline function initial_condition_freestream(x, t, equations::CompressibleEulerEquations2D)
   # set the freestream flow parameters
   rho_freestream = 1.4
   v1 = 0.2
@@ -50,28 +44,15 @@ boundary_conditions = Dict(:b2_symmetry_y_strong => boundary_condition_free_stre
                            :b6_viscous_solid => boundary_condition_slip_wall,
                            :b8_to_stitch_a => boundary_condition_free_stream)
 
-velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0))
-heat_bc = Adiabatic((x, t, equations) -> 0.0)
-boundary_condition_airfoil = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
-
-boundary_conditions_parabolic = Dict(:b2_symmetry_y_strong => boundary_condition_free_stream,
-                                     :b4_farfield_riem => boundary_condition_free_stream,
-                                     :b5_farfield_riem => boundary_condition_free_stream,
-                                     :b7_farfield_riem => boundary_condition_free_stream,
-                                     :b6_viscous_solid => boundary_condition_airfoil,
-                                     :b8_to_stitch_a => boundary_condition_free_stream)
-
-semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                             initial_condition, solver;
-                                             boundary_conditions = (boundary_conditions,
-                                                                    boundary_conditions_parabolic))
+semi = SemidiscretizationHyperbolic(mesh, equations,
+                                    initial_condition, solver;
+                                    boundary_conditions = boundary_conditions)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 0.02)
 ode = semidiscretize(semi, tspan) # ODE Integrators
-#ode = semidiscretize(semi, tspan; split_form = false) # PERK
 
 summary_callback = SummaryCallback()
 
@@ -80,9 +61,9 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 200)
 
-stepsize_callback = StepsizeCallback(cfl = 0.4) # CarpenterKennedy2N54
+stepsize_callback = StepsizeCallback(cfl = 3.4) # CarpenterKennedy2N54
 
-#stepsize_callback = StepsizeCallback(cfl = 1.5) # PERK4
+stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK4
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
@@ -92,7 +73,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-#=
+
 dtRatios = [0.249748130716557,
             0.229743135233184,
             0.148737624222123,
@@ -111,7 +92,7 @@ ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
-=#
+
 
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
