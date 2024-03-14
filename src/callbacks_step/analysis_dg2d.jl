@@ -111,6 +111,59 @@ function calc_error_norms(func, u, t, analyzer,
     return l2_error, linf_error, l1_error
 end
 
+function calc_cell_center_error(u, t,
+                          mesh::TreeMesh{2}, equations, initial_condition,
+                          dg::DGSEM, cache)
+    @unpack node_coordinates = cache.elements
+
+    # Set up data structures
+    cell_center_error = zeros(nvariables(equations))
+
+    @unpack nodes = dg.basis
+    wbary = barycentric_weights(nodes)
+
+    num_nodes = nnodes(dg.basis)
+    interpolating_polynomials = zeros(nnodes(dg), ndims(mesh))
+
+    for d in 1:ndims(mesh)
+        interpolating_polynomials[:, d] .= lagrange_interpolating_polynomials(0.0, nodes, wbary)
+    end
+
+    for element in eachelement(dg, cache)
+        # Calculate interpolating polynomial for each dimension, making use of tensor product structure
+
+        P0 = node_coordinates[:, 1     , 1     , element]
+        P1 = node_coordinates[:, num_nodes, 1     , element]
+        P2 = node_coordinates[:, num_nodes, num_nodes, element]
+        P3 = node_coordinates[:, 1     , num_nodes, element]
+
+        h = P1[1] - P0[1]
+
+        x_center = P0 .+ h/2
+
+        u_exact = initial_condition(x_center, t, equations)
+
+        u_num = zeros(nvariables(equations))
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = cons2cons(get_node_vars(u, equations, dg, i, j,
+                                                      element), equations)
+
+            for v in 1:length(u_node)
+                u_num[v] += (u_node[v] * interpolating_polynomials[i, 1] * interpolating_polynomials[j, 2])
+            end
+        end
+
+        #cell_center_error += (u_num .- u_exact).^2
+        diff = abs.(u_num .- u_exact)
+
+        if diff[1] > cell_center_error[1]
+            cell_center_error = diff
+        end
+    end
+
+    return cell_center_error
+end
+
 function calc_error_norms(func, u, t, analyzer,
                           mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
                                       P4estMesh{2}, T8codeMesh{2}}, equations,

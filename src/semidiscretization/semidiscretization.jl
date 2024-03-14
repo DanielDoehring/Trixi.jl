@@ -64,6 +64,14 @@ function calc_error_norms(u_ode, t, analyzer, semi::AbstractSemidiscretization,
     calc_error_norms(cons2cons, u_ode, t, analyzer, semi, cache_analysis)
 end
 
+function calc_cell_center_error(u_ode, t, semi::AbstractSemidiscretization)
+    @unpack mesh, equations, initial_condition, solver, cache = semi
+    u = wrap_array(u_ode, mesh, equations, solver, cache)
+
+    calc_cell_center_error(u, t, mesh, equations, initial_condition, solver,
+                           cache)
+end
+
 """
     semidiscretize(semi::AbstractSemidiscretization, tspan)
 

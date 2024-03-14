@@ -443,6 +443,17 @@ function (analysis_callback::AnalysisCallback)(io, du, u, u_ode, t, semi)
         end
     end
 
+    if :cell_center_error in analysis_errors
+        cell_center_error = calc_cell_center_error(u_ode, t, semi)
+
+        print(" cell_center_error: ")
+        for v in eachvariable(equations)
+            @printf("  % 10.8e", cell_center_error[v])
+            @printf(io, "  % 10.8e", cell_center_error[v])
+        end
+        println()
+    end
+
     # Residual (defined here as the vector maximum of the absolute values of the time derivatives)
     if :residual in analysis_errors
         mpi_print(" max(|Uₜ|):   ")
