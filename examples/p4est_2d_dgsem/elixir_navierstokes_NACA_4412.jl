@@ -71,7 +71,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 tspan = (0.0, 0.02)
 ode = semidiscretize(semi, tspan) # ODE Integrators
-#ode = semidiscretize(semi, tspan; split_form = false) # PERK
+ode = semidiscretize(semi, tspan; split_form = false) # PERK
 
 summary_callback = SummaryCallback()
 
@@ -82,7 +82,7 @@ alive_callback = AliveCallback(alive_interval = 200)
 
 stepsize_callback = StepsizeCallback(cfl = 0.4) # CarpenterKennedy2N54
 
-#stepsize_callback = StepsizeCallback(cfl = 1.5) # PERK4
+stepsize_callback = StepsizeCallback(cfl = 1.5) # PERK4
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
@@ -92,7 +92,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-#=
+
 dtRatios = [0.249748130716557,
             0.229743135233184,
             0.148737624222123,
@@ -111,7 +111,7 @@ ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
-=#
+
 
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
