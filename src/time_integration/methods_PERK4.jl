@@ -251,6 +251,7 @@ function solve!(integrator::PERK4_Integrator)
     integrator.iter += 1
     integrator.t += integrator.dt
 
+    # TODO: Do other approach (see never approach in other methods)
     # handle callbacks
     if callbacks isa CallbackSet
       for cb in callbacks.discrete_callbacks
