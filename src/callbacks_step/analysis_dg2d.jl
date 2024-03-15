@@ -112,8 +112,8 @@ function calc_error_norms(func, u, t, analyzer,
 end
 
 function calc_cell_center_error(u, t,
-                          mesh::TreeMesh{2}, equations, initial_condition,
-                          dg::DGSEM, cache)
+                                mesh::TreeMesh{2}, equations, initial_condition,
+                                dg::DGSEM, cache)
     @unpack node_coordinates = cache.elements
 
     # Set up data structures
@@ -154,11 +154,9 @@ function calc_cell_center_error(u, t,
         end
 
         #cell_center_error += (u_num .- u_exact).^2
+        
         diff = abs.(u_num .- u_exact)
-
-        if diff[1] > cell_center_error[1]
-            cell_center_error = diff
-        end
+        cell_center_error = @. max(cell_center_error, abs(diff))
     end
 
     return cell_center_error
