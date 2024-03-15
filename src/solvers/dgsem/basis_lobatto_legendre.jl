@@ -715,4 +715,32 @@ function vandermonde_legendre(nodes, N)
     return vandermonde, inverse_vandermonde
 end
 vandermonde_legendre(nodes) = vandermonde_legendre(nodes, length(nodes) - 1)
+
+
+function interpolate_sol(func::Func, x, u, equations, mesh, element, dg::DG)
+    @unpack nodes = dg.basis
+    wbary = barycentric_weights(nodes)
+    n_vars = nvariables(equations)
+    n_dims = ndims(mesh)
+
+    interpolating_polynomials = zeros(n_vars, n_dims)
+    for d in 1:n_dims
+        interpolating_polynomials[:, d] .= lagrange_interpolating_polynomials(x[d], nodes, wbary)
+    end
+
+    # TODO: Make this dimension agnostic
+    u_interpol = zeros(n_vars)
+    # Loop over all nodes to compute their contribution to the interpolated values
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = func(get_node_vars(u, equations, dg, i, j, element), equations)
+
+        for v in 1:n_vars
+            u_interpol[v] += (u_node[v] * interpolating_polynomials[i, 1]
+                                        * interpolating_polynomials[j, 2])
+        end
+    end
+
+    return u_interpol
+end
+
 end # @muladd
