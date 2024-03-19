@@ -466,10 +466,10 @@ function calc_boundary_flux!(cache, t, boundary_condition::BC, boundary_indexing
 end
 
 # TODO: Real specialization for P-ERK required!
-function calc_boundary_flux!(cache, t, boundary_condition, boundary_indexing,
+function calc_boundary_flux!(cache, t, boundary_condition::BC, boundary_indexing,
                              mesh::P4estMesh{2},
                              equations, surface_integral, dg::DG,
-                             level_info_boundaries_orientation_acc::Vector{Vector{Int64}})
+                             level_info_boundaries_orientation_acc::Vector{Vector{Int64}}) where {BC}
     @unpack boundaries = cache
     @unpack surface_flux_values = cache.elements
     index_range = eachnode(dg)
