@@ -140,7 +140,7 @@ lift_coefficient = AnalysisSurfaceIntegral(semi, boundary_condition_slip_wall,
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      analysis_errors = Symbol[], # Turn off expensive error computation
-                                     save_analysis = false,
+                                     save_analysis = true,
                                      analysis_integrals = (drag_coefficient,
                                                            lift_coefficient))
 
