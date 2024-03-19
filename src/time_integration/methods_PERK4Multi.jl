@@ -802,8 +802,8 @@ function solve!(integrator::PERK4_Multi_Integrator)
         end
         integrator.t_stage = integrator.t + alg.c[alg.NumStages - 3 + stage] * integrator.dt
 
-        #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
-        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+        #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
         @threaded for u_ind in eachindex(integrator.u)
           integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
@@ -830,11 +830,14 @@ function solve!(integrator::PERK4_Multi_Integrator)
     integrator.iter += 1
     integrator.t += integrator.dt
 
-    # handle callbacks
-    if callbacks isa CallbackSet
-      for cb in callbacks.discrete_callbacks
-        if cb.condition(integrator.u, integrator.t, integrator)
-          cb.affect!(integrator)
+    @trixi_timeit timer() "Step-Callbacks" begin
+      # handle callbacks
+      if callbacks isa CallbackSet
+        foreach(callbacks.discrete_callbacks) do cb
+            if cb.condition(integrator.u, integrator.t, integrator)
+                cb.affect!(integrator)
+            end
+            return nothing
         end
       end
     end

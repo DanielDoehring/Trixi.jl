@@ -55,10 +55,17 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
 
 @inline function initial_condition_freestream(x, t, equations)
   # set the freestream flow parameters
+  #=
   rho_freestream = rho_Ref
   v1 = u_Ref * cos(angle)
   v2 = u_Ref * sin(angle)
   p_freestream = p_Ref
+  =#
+
+  rho_freestream = 2.126504909489584
+  v1 = 3.0273829677154183
+  v2 = 0.5338092981454919
+  p_freestream = 637.9514728468752
 
   prim = SVector(rho_freestream, v1, v2, p_freestream)
   return prim2cons(prim, equations)
@@ -113,7 +120,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 t_c = L / u_Ref
-tspan = (0.0, 100 * t_c)
+#tspan = (0.0, 100 * t_c)
+tspan = (0.0, 1e-4)
 
 ode = semidiscretize(semi, tspan) # ODE Integrators
 ode = semidiscretize(semi, tspan; split_form = false) # PERK
@@ -178,10 +186,11 @@ sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
 
-
+#=
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
+=#
 
 summary_callback() # print the timer summary
 
