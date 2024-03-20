@@ -34,8 +34,8 @@ mu(T) = mu_0 * (T/T0)^(3/2) * (T0 + S) / (T + S)
 mu_Ref = mu(T_Ref_K)
 
 L = 1.0 # Airfoil chord length
-#rho_Ref = Re * mu_Ref / (u_Ref * L)
-rho_Ref = Re * mu_Ref / (u_Ref * L * sqrt(R_spec_air))
+rho_Ref = Re * mu_Ref / (u_Ref * L)
+#rho_Ref = Re * mu_Ref / (u_Ref * L * sqrt(R_spec_air))
 
 #p_Ref = rho_Ref * R_spec_air * T_Ref_K
 p_Ref = rho_Ref * T_Ref_K
@@ -47,6 +47,10 @@ T = p / cons[1]
 
 prandtl_number() = 0.72
 mu() = 1.81 * 1e-5
+
+# Check values
+Ma_check = u_Ref / sqrt(gamma * T_Ref_K)
+Re_check = rho_Ref * u_Ref * L / mu_Ref
 
 equations = CompressibleEulerEquations2D(gamma)
 equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
