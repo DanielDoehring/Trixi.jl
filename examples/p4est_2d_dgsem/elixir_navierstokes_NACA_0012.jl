@@ -46,7 +46,7 @@ p = (gamma - 1) * (cons[4] - 0.5 * (cons[1]^2 + cons[2]^2) / cons[1])
 T = p / cons[1]
 
 prandtl_number() = 0.72
-mu() = 1.81 * 1e-5
+mu() = 1.8459162511975808e-5
 
 # Check values
 Ma_check = u_Ref / sqrt(gamma * T_Ref_K)
