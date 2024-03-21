@@ -149,9 +149,130 @@ function solve(ode::ODEProblem, alg::PERK4;
   end
 
   # Start actual solve
-  solve!(integrator)
+  #solve!(integrator)
+  solve_steps!(integrator)
 end
 
+function step!(integrator::PERK4_Integrator)
+  @unpack prob = integrator.sol
+  @unpack alg = integrator
+  t_end = last(prob.tspan)
+  callbacks = integrator.opts.callback
+
+  @assert !integrator.finalstep
+  if isnan(integrator.dt)
+    error("time step size `dt` is NaN")
+  end
+
+  # if the next iteration would push the simulation beyond the end time, set dt accordingly
+  if integrator.t + integrator.dt > t_end || isapprox(integrator.t + integrator.dt, t_end)
+    integrator.dt = t_end - integrator.t
+    terminate!(integrator)
+  end
+
+  @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
+      
+    # k1: Evaluated on entire domain / all levels
+    #integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
+    integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
+
+    @threaded for i in eachindex(integrator.du)
+      integrator.k1[i] = integrator.du[i] * integrator.dt
+    end
+
+    # k2
+    integrator.t_stage = integrator.t + alg.c[2] * integrator.dt
+
+    # Construct current state
+    @threaded for i in eachindex(integrator.du)
+      integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.k1[i]
+    end
+
+    #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+    integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+
+    @threaded for u_ind in eachindex(integrator.u)
+      integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+    end
+
+    for stage = 3:alg.NumStages - 3
+
+      # Construct current state
+      @threaded for u_ind in eachindex(integrator.u)
+        integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1] * integrator.k1[u_ind] + 
+                                                        alg.AMatrices[stage - 2, 2] * integrator.k_higher[u_ind]
+      end
+
+      integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
+      
+      #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+      integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+      
+      @threaded for i in eachindex(integrator.du)
+        integrator.k_higher[i] = integrator.du[i] * integrator.dt
+      end
+    end
+
+    # Last three stages: Same Butcher Matrix
+    for stage = 1:3
+      @threaded for u_ind in eachindex(integrator.u)
+        integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrix[stage, 1] * integrator.k1[u_ind] + 
+                                                        alg.AMatrix[stage, 2] * integrator.k_higher[u_ind]
+      end
+      integrator.t_stage = integrator.t + alg.c[alg.NumStages - 3 + stage] * integrator.dt
+
+      #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+      integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+
+      @threaded for u_ind in eachindex(integrator.u)
+        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+      end
+
+      if stage == 2
+        @threaded for u_ind in eachindex(integrator.u)
+          integrator.k_S1[u_ind] = integrator.k_higher[u_ind]
+        end
+      end
+    end
+
+    @threaded for u_ind in eachindex(integrator.u)
+      integrator.u[u_ind] += 0.5 * (integrator.k_S1[u_ind] + integrator.k_higher[u_ind])
+    end
+  end # PERK4 step
+
+  integrator.iter += 1
+  integrator.t += integrator.dt
+
+  # TODO: Do other approach (see never approach in other methods)
+  # handle callbacks
+  if callbacks isa CallbackSet
+    for cb in callbacks.discrete_callbacks
+      if cb.condition(integrator.u, integrator.t, integrator)
+        cb.affect!(integrator)
+      end
+    end
+  end
+
+  # respect maximum number of iterations
+  if integrator.iter >= integrator.opts.maxiters && !integrator.finalstep
+    @warn "Interrupted. Larger maxiters is needed."
+    terminate!(integrator)
+  end
+end
+
+function solve_steps!(integrator::PERK4_Integrator)
+  @unpack prob = integrator.sol
+
+  integrator.finalstep = false
+
+  @trixi_timeit timer() "main loop" while !integrator.finalstep
+    step!(integrator)
+  end # "main loop" timer
+  
+  return TimeIntegratorSolution((first(prob.tspan), integrator.t),
+                                (prob.u0, integrator.u),
+                                integrator.sol.prob)
+end
 
 function solve!(integrator::PERK4_Integrator)
   @unpack prob = integrator.sol
