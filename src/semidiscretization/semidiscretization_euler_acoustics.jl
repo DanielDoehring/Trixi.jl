@@ -179,6 +179,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerAcoustics, t)
 
     time_start = time_ns()
 
+    # Call rhs! of the acoustics semidiscretization `semi_acoustics`
     @trixi_timeit timer() "acoustics rhs!" rhs!(du_ode, u_ode, semi_acoustics, t)
 
     @trixi_timeit timer() "add acoustic source terms" begin

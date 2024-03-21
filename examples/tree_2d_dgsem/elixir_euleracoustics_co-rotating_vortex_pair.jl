@@ -361,6 +361,7 @@ ode_euler = semidiscretize(semi.semi_euler, tspan)
 cfl_acoustics = 0.8
 cfl_euler = 0.8
 euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averaging.h5",
+                                                          # integrator_euler
                                                           CarpenterKennedy2N54(williamson_condition = false),
                                                           cfl_acoustics, cfl_euler,
                                                           callback = SaveRestartCallback(interval = 2300,

@@ -128,6 +128,7 @@ function EulerAcousticsCouplingCallback(ode_euler, mean_values, alg, cfl_acousti
     # Set up ODE Integrator for Euler equations
     integrator_euler = init(ode_euler, alg, save_everystep = false, dt = 1.0; kwargs...) # dt will be overwritten
 
+    # Set up `EulerAcousticsCouplingCallback` struct
     euler_acoustics_coupling = EulerAcousticsCouplingCallback{typeof(cfl_acoustics),
                                                               typeof(mean_values),
                                                               typeof(integrator_euler)}(StepsizeCallback(cfl_acoustics),
@@ -186,6 +187,13 @@ function (euler_acoustics_coupling::EulerAcousticsCouplingCallback)(integrator_a
 
     # Advance the Euler solution by one step and check for errors
     if !isfinished(integrator_euler)
+        # Calls probably 
+        # https://github.com/SciML/OrdinaryDiffEq.jl/blob/258bbbbc7458b66c14fe4a03054252d176c9dea8/src/iterator_interface.jl
+        # which is the required specialization of
+        # https://github.com/SciML/SciMLBase.jl/blob/3746cda651df79e3d9d7af9aa71e78bd9ecd8ecd/src/integrator_interface.jl
+        # Alongside some helper functions, this calls then `perform_step!` of the integrator.
+        # For `CarpenterKennedy2N54` this is 
+        # https://github.com/SciML/OrdinaryDiffEq.jl/blob/258bbbbc7458b66c14fe4a03054252d176c9dea8/src/perform_step/low_storage_rk_perform_step.jl#L48-L73
         @trixi_timeit timer() "Euler solver" step!(integrator_euler)
         return_code = check_error(integrator_euler)
         if !(SciMLBase.successful_retcode(return_code) ||
