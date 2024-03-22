@@ -175,6 +175,7 @@ function (euler_acoustics_coupling::EulerAcousticsCouplingCallback)(integrator_a
     # Use the minimum of the acoustics and Euler stepsizes for both solvers
     stepsize_callback_acoustics(integrator_acoustics)
     stepsize_callback_euler(integrator_euler)
+    # TODO: Revisit when using PERK-Multi!
     dt = min(get_proposed_dt(integrator_acoustics), get_proposed_dt(integrator_euler))
 
     set_proposed_dt!(integrator_acoustics, dt)
@@ -195,11 +196,14 @@ function (euler_acoustics_coupling::EulerAcousticsCouplingCallback)(integrator_a
         # For `CarpenterKennedy2N54` this is 
         # https://github.com/SciML/OrdinaryDiffEq.jl/blob/258bbbbc7458b66c14fe4a03054252d176c9dea8/src/perform_step/low_storage_rk_perform_step.jl#L48-L73
         @trixi_timeit timer() "Euler solver" step!(integrator_euler)
+        # For custom integrators
+        #=
         return_code = check_error(integrator_euler)
         if !(SciMLBase.successful_retcode(return_code) ||
              return_code != SciMLBase.ReturnCode.Default)
             error("Error during compressible Euler time integration. Received return code $(return_code)")
         end
+        =#
     end
 
     # Calculate acoustic sources based on linearized lamb vector

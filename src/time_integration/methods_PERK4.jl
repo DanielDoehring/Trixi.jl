@@ -17,10 +17,10 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
   
   # Current approach: Use ones for simplicity
   c_const = 1.0
-  #=
+  
   c = c_const * ones(NumStages)
   c[1] = 0.0
-  =#
+  
   
   cS3 = c_const
   c[NumStages - 3] = cS3
@@ -102,6 +102,10 @@ mutable struct PERK4_Integrator{RealT<:Real, uType, Params, Sol, F, Alg, PERK_In
   k_S1::uType # Required for third & fourth order
   t_stage::RealT
   du_ode_hyp::uType # TODO: Not best solution since this is not needed for hyperbolic problems
+
+  # TODO uprev, tprev for averaging callback (required for coupled Euler-acoustic simulations)
+  uprev::uType
+  tprev::RealT
 end
 
 # Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
@@ -111,6 +115,47 @@ function Base.getproperty(integrator::PERK4_Integrator, field::Symbol)
   end
   # general fallback
   return getfield(integrator, field)
+end
+
+function init(ode::ODEProblem, alg::PERK4;
+               dt, callback=nothing, kwargs...)
+
+  u0    = copy(ode.u0)
+  du    = zero(u0) # previously: similar(u0)
+  u_tmp = zero(u0)
+
+  # PERK4 stages
+  k1       = zero(u0)
+  k_higher = zero(u0)
+  k_S1     = zero(u0)
+
+  du_ode_hyp = similar(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
+
+  # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
+  uprev = similar(u0)
+  tprev = zero(ode.tspan[1])
+
+  t0 = first(ode.tspan)
+  iter = 0
+
+  integrator = PERK4_Integrator(u0, du, u_tmp, t0, dt, zero(dt), iter, ode.p,
+                                (prob=ode,), ode.f, alg,
+                                PERK_IntegratorOptions(callback, ode.tspan; kwargs...), false,
+                                k1, k_higher, k_S1, t0, du_ode_hyp, uprev, tprev)
+            
+  # initialize callbacks
+  if callback isa CallbackSet
+    for cb in callback.continuous_callbacks
+      error("unsupported")
+    end
+    for cb in callback.discrete_callbacks
+      cb.initialize(cb, integrator.u, integrator.t, integrator)
+    end
+  elseif !isnothing(callback)
+    error("unsupported")
+  end
+
+  return integrator
 end
 
 # Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
@@ -128,13 +173,17 @@ function solve(ode::ODEProblem, alg::PERK4;
 
   du_ode_hyp = similar(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
 
+  # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
+  uprev = similar(u0)
+  tprev = zero(ode.tspan[1])
+
   t0 = first(ode.tspan)
   iter = 0
 
   integrator = PERK4_Integrator(u0, du, u_tmp, t0, dt, zero(dt), iter, ode.p,
                                 (prob=ode,), ode.f, alg,
                                 PERK_IntegratorOptions(callback, ode.tspan; kwargs...), false,
-                                k1, k_higher, k_S1, t0, du_ode_hyp)
+                                k1, k_higher, k_S1, t0, du_ode_hyp, uprev, tprev)
             
   # initialize callbacks
   if callback isa CallbackSet
@@ -266,6 +315,11 @@ function solve_steps!(integrator::PERK4_Integrator)
   integrator.finalstep = false
 
   @trixi_timeit timer() "main loop" while !integrator.finalstep
+    @threaded for u_ind in eachindex(integrator.u)
+      integrator.uprev[u_ind] = integrator.u[u_ind]
+    end
+    integrator.tprev = integrator.t
+
     step!(integrator)
   end # "main loop" timer
   
@@ -434,6 +488,9 @@ function Base.resize!(integrator::PERK4_Integrator, new_size)
 
   # TODO: Move this into parabolic cache or similar
   resize!(integrator.du_ode_hyp, new_size)
+
+  # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
+  resize!(integrator.uprev, new_size)
 end
 
 end # @muladd
