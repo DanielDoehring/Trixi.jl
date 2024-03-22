@@ -14,7 +14,7 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
     c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
   end
   
-  # Current approach: Use ones for simplicity
+  # Current approach: Use ones (best internal stability properties)
   
   c = ones(NumStages)
   c[1] = 0.0

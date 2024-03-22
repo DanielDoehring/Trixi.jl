@@ -91,8 +91,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 
 path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/NASA_meshes/"
 
-mesh = "NACA0012/Familiy_1/113_33/n0012family_1_7_2D_unique.inp"
-#mesh = "NACA0012/Family_2/449_129/n0012familyII_5_2D_unique.inp"
+#mesh = "NACA0012/Family_1/113_33/n0012family_1_7_2D_unique.inp"
+mesh = "NACA0012/Family_1/225_65/n0012familyI_6_2D_unique.inp"
 mesh_file = path * mesh
 
 boundary_symbols = [:b2_symmetry_y_strong,
@@ -163,14 +163,14 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(alive_interval = 1000)
 
-stepsize_callback = StepsizeCallback(cfl = 4.0) # PERK4, Family 1 
+stepsize_callback = StepsizeCallback(cfl = 5.5) # PERK4, Family 1 225_65
 
 save_restart = SaveRestartCallback(interval = 5e4,
                                    save_final_restart = true)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-			                  save_restart,
+			                  #save_restart,
                         alive_callback,
                         stepsize_callback)
 
@@ -178,20 +178,17 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 
-dtRatios = [0.249748130716557,
-            0.229743135233184,
-            0.148737624222123,
-            0.106506037112321,
-            0.092058178144161,
-            0.066218481684170,
-            0.047412460769779,
-            0.027795091314087] / 0.249748130716557
+dtRatios = [8.167437333950148e-04, # 16
+            6.768165362700527e-04, # 14
+            5.439326213454478e-04, # 12
+            4.178899203398032e-04, # 10
+            3.097859435001737e-04, # 8
+            2.360805942444131e-04, # 7
+            1.880221871215326e-04, # 6
+            1.032772630933323e-04] / 8.167437333950148e-04
 
-#Stages = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
-Stages = [16, 15, 11, 9, 8, 7, 6, 5]
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/", dtRatios)
-
-#ode_algorithm = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/")
+Stages = [16, 14, 12, 10, 8, 7, 6, 5]
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/NASA_meshes/NACA0012/Family_1/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
