@@ -165,6 +165,10 @@ mutable struct PERK4_Multi_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     coarsest_lvl::Int64
     n_levels::Int64
     du_ode_hyp::uType # TODO: Not best solution since this is not needed for hyperbolic problems
+
+    # TODO uprev, tprev for averaging callback (required for coupled Euler-acoustic simulations)
+    uprev::uType
+    tprev::RealT
 end
 
 # Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
@@ -178,6 +182,7 @@ end
 
 function init(ode::ODEProblem, alg::PERK4_Multi;
               dt, callback = nothing, kwargs...)
+
     u0 = copy(ode.u0)
     du = zero(u0) # previously: similar(u0)
     u_tmp = zero(u0)
@@ -189,11 +194,15 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
     du_ode_hyp = similar(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
 
+    # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
+    uprev = zero(u0)
+    tprev = zero(ode.tspan[1])
+
     t0 = first(ode.tspan)
     iter = 0
 
     ### Set datastructures for handling of level-dependent integration ###
-    mesh, _, dg, cache = mesh_equations_solver_cache(ode.p)
+    mesh, equations, solver, cache = mesh_equations_solver_cache(ode.p)
     @unpack elements, interfaces, boundaries = cache
 
     if typeof(mesh) <: TreeMesh
@@ -351,7 +360,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         @unpack interfaces, boundaries = cache
 
         nnodes = length(mesh.nodes)
-        n_elements = nelements(dg, cache)
+        n_elements = nelements(solver, cache)
         h_min = 42
         h_max = 0
 
@@ -456,6 +465,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                 push!(level_info_elements_acc[l], element_id)
             end
         end
+
+        #=
         level_info_elements_count = Vector{Int64}(undef, n_levels)
         for i in eachindex(level_info_elements)
             level_info_elements_count[i] = length(level_info_elements[i])
@@ -465,6 +476,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             println("level_info_elements_count[", i, "]: ",
                     level_info_elements_count[i])
         end
+        =#
 
         n_interfaces = last(size(interfaces.u))
 
@@ -563,6 +575,11 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         n_mortars "highest level should contain all mortars"
     end
 
+    for i in 1:n_levels
+        println("#Number Elements integrated with level $i: ", length(level_info_elements[i]))
+    end
+
+    #=
     println("level_info_elements:")
     display(level_info_elements)
     println()
@@ -585,9 +602,9 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     println("level_info_mortars_acc:")
     display(level_info_mortars_acc)
     println()
+    =#
 
     # Set initial distribution of DG Base function coefficients 
-    @unpack equations, solver = ode.p
     u = wrap_array(u0, mesh, equations, solver, cache)
 
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
@@ -633,10 +650,12 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         end
     end
 
+    #=
     println("level_u_indices_elements:")
     display(level_u_indices_elements)
     println()
-
+    =#
+    
     ### Done with setting up for handling of level-dependent integration ###
 
     integrator = PERK4_Multi_Integrator(u0, du, u_tmp, t0, dt, zero(dt), iter, ode.p,
@@ -650,7 +669,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                                         level_info_boundaries_orientation_acc,
                                         level_info_mortars_acc,
                                         level_u_indices_elements,
-                                        t0, -1, n_levels, du_ode_hyp)
+                                        t0, -1, n_levels, du_ode_hyp,
+                                        uprev, tprev)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -683,12 +703,12 @@ function solve_steps!(integrator::PERK4_Multi_Integrator)
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # NOTE: `prev` For EulerAcoustics only
-        #=
+        
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
         integrator.tprev = integrator.t
-        =#
+        
         step!(integrator)
     end # "main loop" timer
 
@@ -717,9 +737,8 @@ function step!(integrator::PERK4_Multi_Integrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
 
         # k1: Evaluated on entire domain / all levels
-        integrator.f(integrator.du, integrator.u, prob.p, integrator.t,
-                     integrator.du_ode_hyp)
-        #integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
+        #integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
+        integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
 
         @threaded for i in eachindex(integrator.du)
             integrator.k1[i] = integrator.du[i] * integrator.dt
@@ -732,7 +751,7 @@ function step!(integrator::PERK4_Multi_Integrator)
         end
 
         # CARE: This does not work if we have only one method but more than one grid level
-
+        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
                      integrator.level_info_elements_acc[1],
                      integrator.level_info_interfaces_acc[1],
@@ -741,15 +760,16 @@ function step!(integrator::PERK4_Multi_Integrator)
                      integrator.level_info_mortars_acc[1],
                      integrator.level_u_indices_elements, 1,
                      integrator.du_ode_hyp)
-
-        #=
+        =#
+        
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                         integrator.level_info_elements_acc[1],
                         integrator.level_info_interfaces_acc[1],
                         integrator.level_info_boundaries_acc[1],
                         integrator.level_info_boundaries_orientation_acc[1],
-                        integrator.level_info_mortars_acc[1])
-        =#
+                        integrator.level_info_mortars_acc[1],
+                        1)
+        
 
         # Update finest level only
         @threaded for u_ind in integrator.level_u_indices_elements[1]
@@ -808,6 +828,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             # For statically refined meshes:
             #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
 
+            #=
             # Joint RHS evaluation with all elements sharing this timestep
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
                          integrator.t_stage,
@@ -819,15 +840,17 @@ function step!(integrator::PERK4_Multi_Integrator)
                          integrator.level_u_indices_elements,
                          integrator.coarsest_lvl,
                          integrator.du_ode_hyp)
+            =#
 
-            #=
+            
             integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                            integrator.level_info_mortars_acc[integrator.coarsest_lvl])
-            =#
+                            integrator.level_info_mortars_acc[integrator.coarsest_lvl],
+                            integrator.coarsest_lvl)
+            
 
             # Update k_higher of relevant levels
             for level in 1:(integrator.coarsest_lvl)
@@ -850,9 +873,8 @@ function step!(integrator::PERK4_Multi_Integrator)
             integrator.t_stage = integrator.t +
                                  alg.c[alg.NumStages - 3 + stage] * integrator.dt
 
-            integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                         integrator.t_stage, integrator.du_ode_hyp)
-            #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+            #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
             @threaded for u_ind in eachindex(integrator.u)
                 integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt

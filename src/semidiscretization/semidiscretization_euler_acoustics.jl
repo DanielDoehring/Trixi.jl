@@ -64,6 +64,25 @@ function SemidiscretizationEulerAcoustics(semi_acoustics::SemiAcoustics,
                                                            cache)
 end
 
+function SemidiscretizationEulerAcoustics(semi_acoustics::SemiAcoustics,
+                                          semi_euler::SemiEuler,
+                                          level_info_elements_acc;
+                                          source_region = x -> true,
+                                          weights = x -> 1.0) where
+         {Mesh,
+          SemiAcoustics <:
+          SemidiscretizationHyperbolic{Mesh, <:AbstractAcousticPerturbationEquations},
+          SemiEuler <:
+          SemidiscretizationHyperbolic{Mesh, <:AbstractCompressibleEulerEquations}}
+    cache = create_cache(SemidiscretizationEulerAcoustics, source_region, weights,
+                         level_info_elements_acc,
+                         mesh_equations_solver_cache(semi_acoustics)...)
+
+    return SemidiscretizationEulerAcoustics{typeof(semi_acoustics), typeof(semi_euler),
+                                            typeof(cache)}(semi_acoustics, semi_euler,
+                                                           cache)
+end
+
 function create_cache(::Type{SemidiscretizationEulerAcoustics}, source_region, weights,
                       mesh, equations::AcousticPerturbationEquations2D, dg::DGSEM,
                       cache)
@@ -76,6 +95,24 @@ function create_cache(::Type{SemidiscretizationEulerAcoustics}, source_region, w
     acoustic_source_weights = precompute_weights(source_region, weights,
                                                  coupled_element_ids,
                                                  equations, dg, cache)
+
+    return (; acoustic_source_terms, acoustic_source_weights, coupled_element_ids)
+end
+
+function create_cache(::Type{SemidiscretizationEulerAcoustics}, source_region, weights,
+                      level_info_elements_acc,
+                      mesh, equations::AcousticPerturbationEquations2D, dg::DGSEM,
+                      cache)
+    coupled_element_ids = get_coupled_element_ids(source_region, equations, dg, cache, level_info_elements_acc)
+
+    acoustic_source_terms = zeros(eltype(cache.elements),
+                                  (ndims(equations), nnodes(dg), nnodes(dg),
+                                   nelements(dg, cache)))
+
+    acoustic_source_weights = precompute_weights(source_region, weights,
+                                                 coupled_element_ids,
+                                                 equations, dg, cache,
+                                                 level_info_elements_acc)
 
     return (; acoustic_source_terms, acoustic_source_weights, coupled_element_ids)
 end
@@ -97,6 +134,27 @@ function get_coupled_element_ids(source_region, equations, dg::DGSEM, cache)
     return coupled_element_ids
 end
 
+function get_coupled_element_ids(source_region, equations, dg::DGSEM, cache, level_info_elements_acc)
+    n_levels = length(level_info_elements_acc)
+    coupled_element_ids = [Vector{Int64}() for _ in 1:n_levels]
+
+    for l in 1:n_levels
+        for element in level_info_elements_acc[l]
+            for j in eachnode(dg), i in eachnode(dg)
+                x = get_node_coords(cache.elements.node_coordinates, equations, dg, i, j,
+                                    element)
+                if source_region(x)
+                    push!(coupled_element_ids[l], element)
+                    break
+                end
+            end
+        end
+        sort!(coupled_element_ids[l])
+    end
+
+    return coupled_element_ids
+end
+
 function precompute_weights(source_region, weights, coupled_element_ids, equations,
                             dg::DGSEM, cache)
     acoustic_source_weights = zeros(eltype(cache.elements),
@@ -110,6 +168,25 @@ function precompute_weights(source_region, weights, coupled_element_ids, equatio
                                 element)
             acoustic_source_weights[i, j, k] = source_region(x) ? weights(x) :
                                                zero(weights(x))
+        end
+    end
+
+    return acoustic_source_weights
+end
+
+function precompute_weights(source_region, weights, coupled_element_ids, equations,
+                            dg::DGSEM, cache, level_info_elements_acc)
+
+    acoustic_source_weights = zeros(eltype(cache.elements),
+                                    (nnodes(dg), nnodes(dg),
+                                    nelements(dg, cache)))
+    
+    @threaded for element in level_info_elements_acc[end]                                      
+        for j in eachnode(dg), i in eachnode(dg)
+            x = get_node_coords(cache.elements.node_coordinates, equations, dg, i, j,
+                                element)
+            acoustic_source_weights[i, j, element] = source_region(x) ? weights(x) :
+                                            zero(weights(x))
         end
     end
 
@@ -194,6 +271,42 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerAcoustics, t)
     return nothing
 end
 
+# RHS for PERK integrator
+function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerAcoustics, t,
+                level_info_elements_acc::Vector{Int64},
+                level_info_interfaces_acc::Vector{Int64},
+                level_info_boundaries_acc::Vector{Int64},
+                level_info_boundaries_orientation_acc::Vector{Vector{Int64}},
+                level_info_mortars_acc::Vector{Int64},
+                level::Int64)
+
+    @unpack semi_acoustics, cache = semi
+    @unpack acoustic_source_terms, acoustic_source_weights, coupled_element_ids = cache
+
+    du_acoustics = wrap_array(du_ode, semi_acoustics)
+
+    time_start = time_ns()
+
+    # Call rhs! of the acoustics semidiscretization `semi_acoustics`
+    @trixi_timeit timer() "acoustics rhs!" rhs!(du_ode, u_ode, semi_acoustics, t,
+                                                level_info_elements_acc, 
+                                                level_info_interfaces_acc, 
+                                                level_info_boundaries_acc, 
+                                                level_info_boundaries_orientation_acc, 
+                                                level_info_mortars_acc)
+
+    @trixi_timeit timer() "add acoustic source terms" begin
+        add_acoustic_source_terms!(du_acoustics, acoustic_source_terms,
+                                   acoustic_source_weights, coupled_element_ids, level,
+                                   mesh_equations_solver_cache(semi_acoustics)...)                          
+    end
+
+    runtime = time_ns() - time_start
+    put!(semi.performance_counter, runtime)
+
+    return nothing
+end
+
 function add_acoustic_source_terms!(du_acoustics, acoustic_source_terms, source_weights,
                                     coupled_element_ids, mesh::TreeMesh{2}, equations,
                                     dg::DGSEM,
@@ -211,4 +324,38 @@ function add_acoustic_source_terms!(du_acoustics, acoustic_source_terms, source_
 
     return nothing
 end
+
+function add_acoustic_source_terms!(du_acoustics, acoustic_source_terms, source_weights,
+                                    coupled_element_ids::Vector{Vector{Int64}}, mesh::TreeMesh{2}, equations,
+                                    dg::DGSEM,
+                                    cache)
+    @threaded for element in coupled_element_ids[end]
+        for j in eachnode(dg), i in eachnode(dg)
+            du_acoustics[1, i, j, element] += source_weights[i, j, element] *
+                                            acoustic_source_terms[1, i, j, element]
+            du_acoustics[2, i, j, element] += source_weights[i, j, element] *
+                                            acoustic_source_terms[2, i, j, element]
+        end
+    end
+
+    return nothing
+end
+
+# `add_acoustic_source_terms!` for PERK integrator
+function add_acoustic_source_terms!(du_acoustics, acoustic_source_terms, source_weights,
+                                    coupled_element_ids, level, mesh::TreeMesh{2}, equations,
+                                    dg::DGSEM,
+                                    cache)
+    @threaded for element in coupled_element_ids[level]
+        for j in eachnode(dg), i in eachnode(dg)
+            du_acoustics[1, i, j, element] += source_weights[i, j, element] *
+                                            acoustic_source_terms[1, i, j, element]
+            du_acoustics[2, i, j, element] += source_weights[i, j, element] *
+                                            acoustic_source_terms[2, i, j, element]
+        end
+    end
+
+    return nothing
+end
+
 end # @muladd
