@@ -374,7 +374,7 @@ semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
 
 # Create ODE problem
 #tspan = (0.0, 7.0 * T_a)
-tspan = (0.0, 6.0 * T_a)
+tspan = (0.0, 5.0 * T_a)
 
 ode = semidiscretize(semi, tspan)
 # We need an additional ODE for the pure flow problem
@@ -417,3 +417,10 @@ sol = Trixi.solve(ode, ode_alg_Acoustic,
 
 # Print the timer summary
 summary_callback()
+
+using Plots
+
+pd = PlotData2D(sol)
+
+# See figure 7.7 from Michaels dissertation
+plot(pd["p_prime"], clims=(-0.0002, 0.0002), xlims=(-100,100), ylims=(-100,100))
