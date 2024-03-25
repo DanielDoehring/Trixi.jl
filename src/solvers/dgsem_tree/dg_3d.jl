@@ -255,18 +255,18 @@ function rhs!(du, u, t,
 
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
-    if typeof(mesh) <: TreeMesh
-        calc_boundary_flux!(cache, t,
-                            boundary_conditions, mesh,
-                            equations,
-                            dg.surface_integral, dg,
-                            level_info_boundaries_orientation_acc)
-      else # TODO: More efficient treatment for non TreeMeshes!
-        calc_boundary_flux!(cache, t,
-                            boundary_conditions, mesh,
-                            equations,
-                            dg.surface_integral, dg)
-      end
+        if typeof(mesh) <: TreeMesh
+            calc_boundary_flux!(cache, t,
+                                boundary_conditions, mesh,
+                                equations,
+                                dg.surface_integral, dg,
+                                level_info_boundaries_orientation_acc)
+        else # TODO: More efficient treatment for non TreeMeshes!
+            calc_boundary_flux!(cache, t,
+                                boundary_conditions, mesh,
+                                equations,
+                                dg.surface_integral, dg)
+        end
     end
 
     # Prolong solution to mortars
@@ -320,8 +320,8 @@ function calc_volume_integral!(du, u,
 end
 
 function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3}
-                                           },
+                               mesh::Union{TreeMesh{3}, StructuredMesh{3},
+                                           P4estMesh{3}},
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralWeakForm,
                                dg::DGSEM, cache,
@@ -382,8 +382,8 @@ function calc_volume_integral!(du, u,
 end
 
 function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3}
-                                           },
+                               mesh::Union{TreeMesh{3}, StructuredMesh{3},
+                                           P4estMesh{3}},
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralFluxDifferencing,
                                dg::DGSEM, cache,
@@ -540,8 +540,8 @@ end
 
 # TODO: Taal dimension agnostic
 function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3}
-                                           },
+                               mesh::Union{TreeMesh{3}, StructuredMesh{3},
+                                           P4estMesh{3}},
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralShockCapturingHG,
                                dg::DGSEM, cache,
@@ -554,7 +554,8 @@ function calc_volume_integral!(du, u,
                                                                cache)
 
     # Determine element ids for DG-only and blended DG-FV volume integral
-    pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg, level_info_elements_acc)
+    pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg,
+                                  level_info_elements_acc)
 
     # Loop over pure DG elements
     @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
@@ -1236,7 +1237,7 @@ function calc_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:A
                                           t,
                                           boundary_condition, equations,
                                           surface_integral, dg::DG, cache,
-                                          direction, 
+                                          direction,
                                           level_info_boundaries_orientation_acc_dim::Vector{Int64})
     @unpack surface_flux = surface_integral
     @unpack u, neighbor_ids, neighbor_sides, node_coordinates, orientations = cache.boundaries

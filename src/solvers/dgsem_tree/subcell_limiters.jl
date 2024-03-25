@@ -120,7 +120,7 @@ function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
             if local_minmax
                 setup = [
                     setup...,
-                    "" => "local maximum/minimum bounds for conservative variables $(limiter.local_minmax_variables_cons)",
+                    "" => "local maximum/minimum bounds for conservative variables $(limiter.local_minmax_variables_cons)"
                 ]
             end
             if positivity
@@ -128,12 +128,12 @@ function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
                 setup = [setup..., "" => string]
                 setup = [
                     setup...,
-                    "" => "   positivity correction factor = $(limiter.positivity_correction_factor)",
+                    "" => "   positivity correction factor = $(limiter.positivity_correction_factor)"
                 ]
             end
             setup = [
                 setup...,
-                "Local bounds" => "FV solution",
+                "Local bounds" => "FV solution"
             ]
         end
         summary_box(io, "SubcellLimiterIDP", setup)

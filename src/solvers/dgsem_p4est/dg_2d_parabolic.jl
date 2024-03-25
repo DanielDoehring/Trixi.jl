@@ -145,7 +145,7 @@ function rhs_parabolic!(du, u, t, mesh::P4estMesh{2},
     @trixi_timeit timer() "calculate gradient" begin
         calc_gradient!(gradients, u_transformed, t, mesh, equations_parabolic,
                        boundary_conditions_parabolic, dg, cache, cache_parabolic,
-                       level_info_elements_acc, level_info_interfaces_acc, 
+                       level_info_elements_acc, level_info_interfaces_acc,
                        level_info_boundaries_acc, level_info_boundaries_orientation_acc,
                        level_info_mortars_acc)
     end
@@ -213,7 +213,8 @@ function rhs_parabolic!(du, u, t, mesh::P4estMesh{2},
     # !!! NOTE: we reuse the hyperbolic cache here since it contains "mortars" and "u_threaded". See https://github.com/trixi-framework/Trixi.jl/issues/1674 for a discussion
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars_divergence!(cache, flux_viscous, mesh, equations_parabolic,
-                                    dg.mortar, dg.surface_integral, dg, level_info_mortars_acc)
+                                    dg.mortar, dg.surface_integral, dg,
+                                    level_info_mortars_acc)
     end
 
     # Calculate mortar fluxes (specialized for AbstractEquationsParabolic)
@@ -912,7 +913,8 @@ function prolong2interfaces!(cache_parabolic, flux_viscous::Vector{Array{uEltype
                              mesh::P4estMesh{2},
                              equations_parabolic::AbstractEquationsParabolic,
                              surface_integral, dg::DG, cache,
-                             level_info_interfaces_acc::Vector{Int64}) where {uEltype <: Real}
+                             level_info_interfaces_acc::Vector{Int64}) where {uEltype <:
+                                                                              Real}
     (; interfaces) = cache_parabolic
     (; contravariant_vectors) = cache_parabolic.elements
     index_range = eachnode(dg)
@@ -1219,7 +1221,8 @@ function prolong2mortars_divergence!(cache, flux_viscous::Vector{Array{uEltype, 
                                      mesh::Union{P4estMesh{2}, T8codeMesh{2}}, equations,
                                      mortar_l2::LobattoLegendreMortarL2,
                                      surface_integral, dg::DGSEM,
-                                     level_info_mortars_acc::Vector{Int64}) where {uEltype <: Real}
+                                     level_info_mortars_acc::Vector{Int64}) where {uEltype <:
+                                                                                   Real}
     @unpack neighbor_ids, node_indices = cache.mortars
     @unpack contravariant_vectors = cache.elements
     index_range = eachnode(dg)
@@ -1461,7 +1464,8 @@ function prolong2boundaries!(cache_parabolic, flux_viscous::Vector{Array{uEltype
                              mesh::P4estMesh{2},
                              equations_parabolic::AbstractEquationsParabolic,
                              surface_integral, dg::DG, cache,
-                             level_info_boundaries_acc::Vector{Int64}) where {uEltype <: Real}
+                             level_info_boundaries_acc::Vector{Int64}) where {uEltype <:
+                                                                              Real}
     (; boundaries) = cache_parabolic
     (; contravariant_vectors) = cache_parabolic.elements
     index_range = eachnode(dg)

@@ -144,69 +144,69 @@ function rhs!(du, u, t,
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
-      calc_volume_integral!(du, u, mesh,
-                            have_nonconservative_terms(equations), equations,
-                            dg.volume_integral,
-                            dg, cache,
-                            level_info_elements_acc)
+        calc_volume_integral!(du, u, mesh,
+                              have_nonconservative_terms(equations), equations,
+                              dg.volume_integral,
+                              dg, cache,
+                              level_info_elements_acc)
     end
 
     # Prolong solution to interfaces, i.e., reconstruct interface/trace values
     @trixi_timeit timer() "prolong2interfaces" begin
-      prolong2interfaces!(cache, u, mesh,
-                          equations,
-                          dg.surface_integral,
-                          dg,
-                          level_info_interfaces_acc)
+        prolong2interfaces!(cache, u, mesh,
+                            equations,
+                            dg.surface_integral,
+                            dg,
+                            level_info_interfaces_acc)
     end
 
     # Calculate interface fluxes
     @trixi_timeit timer() "interface flux" begin
-      calc_interface_flux!(cache.elements.surface_flux_values,
-                           mesh,
-                           have_nonconservative_terms(equations),
-                           equations,
-                           dg.surface_integral, dg,
-                           cache,
-                           level_info_interfaces_acc)
+        calc_interface_flux!(cache.elements.surface_flux_values,
+                             mesh,
+                             have_nonconservative_terms(equations),
+                             equations,
+                             dg.surface_integral, dg,
+                             cache,
+                             level_info_interfaces_acc)
     end
 
     # Prolong solution to boundaries
     @trixi_timeit timer() "prolong2boundaries" begin
-      prolong2boundaries!(cache, u, mesh,
-                          equations,
-                          dg.surface_integral,
-                          dg,
-                          level_info_boundaries_acc)
+        prolong2boundaries!(cache, u, mesh,
+                            equations,
+                            dg.surface_integral,
+                            dg,
+                            level_info_boundaries_acc)
     end
 
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
-      calc_boundary_flux!(cache, t,
-                          boundary_conditions, mesh,
-                          equations,
-                          dg.surface_integral, dg,
-                          level_info_boundaries_orientation_acc)
+        calc_boundary_flux!(cache, t,
+                            boundary_conditions, mesh,
+                            equations,
+                            dg.surface_integral, dg,
+                            level_info_boundaries_orientation_acc)
     end
 
     # Calculate surface integrals
-    @trixi_timeit timer() "surface integral" begin 
-      calc_surface_integral!(du, u, mesh,
-                             equations,
-                             dg.surface_integral,
-                             dg, cache,
-                             level_info_elements_acc)
+    @trixi_timeit timer() "surface integral" begin
+        calc_surface_integral!(du, u, mesh,
+                               equations,
+                               dg.surface_integral,
+                               dg, cache,
+                               level_info_elements_acc)
     end
 
     # Apply Jacobian from mapping to reference element
     @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache,
-                      level_info_elements_acc)
+                                                     level_info_elements_acc)
 
     # Calculate source terms
-    @trixi_timeit timer() "source terms" begin 
-      calc_sources!(du, u, t, source_terms,
-                    equations, dg, cache,
-                    level_info_elements_acc)
+    @trixi_timeit timer() "source terms" begin
+        calc_sources!(du, u, t, source_terms,
+                      equations, dg, cache,
+                      level_info_elements_acc)
     end
 
     return nothing
@@ -281,7 +281,8 @@ function calc_volume_integral!(du, u,
                                dg::DGSEM, cache,
                                level_info_elements_acc::Vector{Int64})
     @threaded for element in level_info_elements_acc
-        flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms, equations,
+        flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms,
+                                  equations,
                                   volume_integral.volume_flux, dg, cache)
     end
 end
@@ -414,7 +415,8 @@ function calc_volume_integral!(du, u,
     # Loop over pure DG elements
     @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
         element = element_ids_dg[idx_element]
-        flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms, equations,
+        flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms,
+                                  equations,
                                   volume_flux_dg, dg, cache)
     end
 
@@ -424,7 +426,8 @@ function calc_volume_integral!(du, u,
         alpha_element = alpha[element]
 
         # Calculate DG volume integral contribution
-        flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms, equations,
+        flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms,
+                                  equations,
                                   volume_flux_dg, dg, cache, 1 - alpha_element)
 
         # Calculate FV volume integral contribution
@@ -817,7 +820,7 @@ end
 function calc_boundary_flux!(cache, t, boundary_conditions::NamedTuple,
                              mesh::TreeMesh{1}, equations, surface_integral, dg::DG,
                              level_info_boundaries_orientation_acc::Vector{Vector{Int64}})
-        @unpack surface_flux_values = cache.elements
+    @unpack surface_flux_values = cache.elements
 
     # Calc boundary fluxes in each direction
     calc_boundary_flux_by_direction!(surface_flux_values, t, boundary_conditions[1],
@@ -869,7 +872,7 @@ function calc_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:A
                                           boundary_condition,
                                           nonconservative_terms::False, equations,
                                           surface_integral, dg::DG, cache,
-                                          direction, 
+                                          direction,
                                           level_info_boundaries_orientation_acc_dim::Vector{Int64})
     @unpack surface_flux = surface_integral
     @unpack u, neighbor_ids, neighbor_sides, node_coordinates, orientations = cache.boundaries

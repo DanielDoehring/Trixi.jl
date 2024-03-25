@@ -49,8 +49,8 @@ Divergence cleaning is done using the `\psi` field.
 For more details see e.g. arXiv:2012.12040.
 """
 struct ViscoResistiveMhdDiffusion2D{GradientVariables, RealT <: Real,
-                            E <: AbstractIdealGlmMhdEquations{2}} <:
-        AbstractViscoResistiveMhdDiffusion{2, 9}
+                                    E <: AbstractIdealGlmMhdEquations{2}} <:
+       AbstractViscoResistiveMhdDiffusion{2, 9}
     gamma::RealT               # ratio of specific heats
     inv_gamma_minus_one::RealT # = inv(gamma - 1); can be used to write slow divisions as fast multiplications
     mu::RealT                  # viscosity
@@ -63,8 +63,8 @@ end
 
 # default to primitive gradient variables
 function ViscoResistiveMhdDiffusion2D(equations::IdealGlmMhdEquations2D;
-                                mu, Prandtl, eta,
-                                gradient_variables = GradientVariablesPrimitive())
+                                      mu, Prandtl, eta,
+                                      gradient_variables = GradientVariablesPrimitive())
     gamma = equations.gamma
     inv_gamma_minus_one = equations.inv_gamma_minus_one
     μ, Pr, eta = promote(mu, Prandtl, eta)
@@ -74,17 +74,18 @@ function ViscoResistiveMhdDiffusion2D(equations::IdealGlmMhdEquations2D;
     # Important note! Factor of μ is accounted for later in `flux`.
     kappa = gamma * inv_gamma_minus_one / Pr
 
-    ViscoResistiveMhdDiffusion2D{typeof(gradient_variables), typeof(gamma), typeof(equations)
-                        }(gamma, inv_gamma_minus_one,
-                            μ, Pr, eta, kappa,
-                            equations, gradient_variables)
+    ViscoResistiveMhdDiffusion2D{typeof(gradient_variables), typeof(gamma),
+                                 typeof(equations)}(gamma, inv_gamma_minus_one,
+                                                    μ, Pr, eta, kappa,
+                                                    equations, gradient_variables)
 end
 
 # Explicit formulas for the diffusive MHD fluxes are available, e.g., in Section 2
 # of the paper by Rueda-Ramírez, Hennemann, Hindenlang, Winters, and Gassner
 # "An Entropy Stable Nodal Discontinuous Galerkin Method for the resistive
 #  MHD Equations. Part II: Subcell Finite Volume Shock Capturing"
-function flux(u, gradients, orientation::Integer, equations::ViscoResistiveMhdDiffusion2D)
+function flux(u, gradients, orientation::Integer,
+              equations::ViscoResistiveMhdDiffusion2D)
     # Here, `u` is assumed to be the "transformed" variables specified by `gradient_variable_transformation`.
     rho, v1, v2, v3, E, B1, B2, B3, psi = convert_transformed_to_primitive(u, equations)
     # Here `gradients` is assumed to contain the gradients of the primitive variables (rho, v1, v2, v3, T)
@@ -94,11 +95,11 @@ function flux(u, gradients, orientation::Integer, equations::ViscoResistiveMhdDi
     @unpack eta = equations
 
     _, dv1dx, dv2dx, dv3dx, dTdx, _, dB2dx, dB3dx, _ = convert_derivative_to_primitive(u,
-                                                                                           gradients[1],
-                                                                                           equations)
+                                                                                       gradients[1],
+                                                                                       equations)
     _, dv1dy, dv2dy, dv3dy, dTdy, dB1dy, _, dB3dy, _ = convert_derivative_to_primitive(u,
-                                                                                           gradients[2],
-                                                                                           equations)
+                                                                                       gradients[2],
+                                                                                       equations)
 
     # Components of viscous stress tensor
 
@@ -164,9 +165,7 @@ end
 # For CNS, it is simplest to formulate the viscous terms in primitive variables, so we transform the transformed
 # variables into primitive variables.
 @inline function convert_transformed_to_primitive(u_transformed,
-                                                    equations::ViscoResistiveMhdDiffusion2D{
-                                                                                    GradientVariablesPrimitive
-                                                                                    })
+                                                  equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
     return u_transformed
 end
 
@@ -176,9 +175,7 @@ end
 # Note, the first component of `gradient_entropy_vars` contains gradient(rho) which is unused.
 # TODO: parabolic; entropy stable viscous terms
 @inline function convert_derivative_to_primitive(u, gradient,
-                                                    ::ViscoResistiveMhdDiffusion2D{
-                                                                        GradientVariablesPrimitive
-                                                                        })
+                                                 ::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
     return gradient
 end
 

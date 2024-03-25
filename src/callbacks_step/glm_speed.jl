@@ -39,7 +39,7 @@ function Base.show(io::IO, ::MIME"text/plain",
 
         setup = [
             "GLM wave speed scaling" => glm_speed_callback.glm_scale,
-            "Expected CFL number" => glm_speed_callback.cfl,
+            "Expected CFL number" => glm_speed_callback.cfl
         ]
         summary_box(io, "GlmSpeedCallback", setup)
     end

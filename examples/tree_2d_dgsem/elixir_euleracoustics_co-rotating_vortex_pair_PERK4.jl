@@ -328,8 +328,8 @@ tspan_averaging = (0.25 * T_a, T_a)
 
 averaging_callback = AveragingCallback(semi_euler, tspan_averaging)
 
-#cfl = 2.0
-cfl = 0.8 # CarpenterKennedy2N54
+cfl = 2.0
+#cfl = 0.8 # CarpenterKennedy2N54
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_callback,
@@ -338,12 +338,12 @@ callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_ca
 ###############################################################################
 # run simulation for averaging the flow field (required for EulerAcousticsCouplingCallback)
 
-#ode_alg = PERK4(16, "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/NASA_meshes/NACA0012/Family_1/")
-ode_alg = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
+ode_alg = PERK4(16, "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/NASA_meshes/NACA0012/Family_1/")
+#ode_alg = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-sol_averaging = #Trixi.solve(ode_averaging, ode_alg,
-                solve(ode_averaging, ode_alg,
+sol_averaging = Trixi.solve(ode_averaging, ode_alg,
+                #solve(ode_averaging, ode_alg,
                             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                             save_everystep = false, callback = callbacks_averaging);
 

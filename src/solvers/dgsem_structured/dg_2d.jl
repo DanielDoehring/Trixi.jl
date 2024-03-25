@@ -74,7 +74,7 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(cache, u, mesh,
                              have_nonconservative_terms(equations), equations,
-                             dg.surface_integral, dg, 
+                             dg.surface_integral, dg,
                              level_info_elements_acc)
     end
 
@@ -93,7 +93,7 @@ function rhs!(du, u, t,
     end
 
     # Apply Jacobian from mapping to reference element
-    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache, 
+    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache,
                                                      level_info_elements_acc)
 
     # Calculate source terms

@@ -235,7 +235,7 @@ macro threaded(expr)
                        end
                    end
                end)
-    =#                 
+    =#
     #
     # However, the code below using `@batch` from Polyester.jl is more efficient,
     # since this packages provides threads with less overhead. Since it is written
@@ -244,11 +244,10 @@ macro threaded(expr)
     # them) available in Julia.
     # !!! danger "Heisenbug"
     #     Look at the comments for `wrap_array` when considering to change this macro.
-    
+
     return esc(quote
                    Trixi.@batch $(expr)
                end)
-    
 end
 
 #     @trixi_timeit timer() "some label" expression
@@ -350,17 +349,17 @@ function register_error_hints()
     return nothing
 end
 
-function read_file(FilePath::AbstractString, DataType::Type=Float64)
+function read_file(FilePath::AbstractString, DataType::Type = Float64)
     @assert isfile(FilePath) "Couldn't find file"
     Data = zeros(DataType, 0)
     open(FilePath, "r") do File
-      while !eof(File)     
-        LineContent = readline(File)     
-        append!(Data, parse(DataType, LineContent))
-      end
+        while !eof(File)
+            LineContent = readline(File)
+            append!(Data, parse(DataType, LineContent))
+        end
     end
     NumLines = length(Data)
-  
+
     return NumLines, Data
-  end
+end
 end # @muladd

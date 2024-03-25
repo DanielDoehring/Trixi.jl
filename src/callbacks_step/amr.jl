@@ -366,10 +366,10 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
 
     u = wrap_array(u_ode, mesh, equations, dg, cache)
     # Indicator kept based on hyperbolic variables
-    
+
     lambda = @trixi_timeit timer() "indicator" controller(u, mesh, equations, dg, cache,
                                                           t = t, iter = iter)
-    
+
     # NOTE: For enstrophy-based AMR
     #=
     lambda = @trixi_timeit timer() "indicator" controller(u, mesh, equations, semi.equations_parabolic, 
@@ -1008,12 +1008,14 @@ function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
 end
 
 function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
-                                            mesh, equations, equations_parabolic, dg::DG, cache, cache_parabolic;
+                                            mesh, equations, equations_parabolic,
+                                            dg::DG, cache, cache_parabolic;
                                             kwargs...)
     @unpack controller_value = controller.cache
     resize!(controller_value, nelements(dg, cache))
 
-    alpha = controller.indicator(u, mesh, equations, equations_parabolic, dg, cache, cache_parabolic; kwargs...)
+    alpha = controller.indicator(u, mesh, equations, equations_parabolic, dg, cache,
+                                 cache_parabolic; kwargs...)
     current_levels = current_element_levels(mesh, dg, cache)
 
     @threaded for element in eachelement(dg, cache)

@@ -273,8 +273,8 @@ The parabolic right-hand side is the first function of the split ODE problem and
 will be used by default by the implicit part of IMEX methods from the
 SciML ecosystem.
 """
-function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan; 
-                        reset_threads = true, split_form::Bool=true)
+function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
+                        reset_threads = true, split_form::Bool = true)
 
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
@@ -295,13 +295,14 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
         return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
     else
         specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
-        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan, semi)
+        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan,
+                                           semi)
     end
 end
 
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
                         restart_file::AbstractString;
-                        reset_threads = true, split_form::Bool=true)
+                        reset_threads = true, split_form::Bool = true)
 
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
@@ -322,7 +323,8 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
         return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
     else
         specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
-        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan, semi)
+        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan,
+                                           semi)
     end
 end
 
@@ -407,8 +409,10 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "rhs! (level-dependent)" rhs!(du, u, t, mesh, equations, initial_condition,
-                                                        boundary_conditions, source_terms, solver, cache,
+    @trixi_timeit timer() "rhs! (level-dependent)" rhs!(du, u, t, mesh, equations,
+                                                        initial_condition,
+                                                        boundary_conditions,
+                                                        source_terms, solver, cache,
                                                         level_info_elements_acc,
                                                         level_info_interfaces_acc,
                                                         level_info_boundaries_acc,
@@ -433,13 +437,16 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "rhs_parabolic! (level-dependent)" rhs_parabolic!(du, u, t, mesh,
+    @trixi_timeit timer() "rhs_parabolic! (level-dependent)" rhs_parabolic!(du, u, t,
+                                                                            mesh,
                                                                             equations_parabolic,
                                                                             initial_condition,
                                                                             boundary_conditions_parabolic,
                                                                             source_terms,
-                                                                            solver, solver_parabolic,
-                                                                            cache, cache_parabolic,
+                                                                            solver,
+                                                                            solver_parabolic,
+                                                                            cache,
+                                                                            cache_parabolic,
                                                                             level_info_elements_acc,
                                                                             level_info_interfaces_acc,
                                                                             level_info_boundaries_acc,
@@ -451,16 +458,18 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     return nothing
 end
 
-function rhs_hyperbolic_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
+function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                   semi::SemidiscretizationHyperbolicParabolic, t,
                                    level_info_elements_acc::Vector{Int64},
                                    level_info_interfaces_acc::Vector{Int64},
                                    level_info_boundaries_acc::Vector{Int64},
                                    level_info_boundaries_orientation_acc::Vector{Vector{Int64}},
                                    level_info_mortars_acc::Vector{Int64},
-                                   level_u_indices_elements_acc::Vector{Vector{Int64}}, max_level::Int64,
+                                   level_u_indices_elements_acc::Vector{Vector{Int64}},
+                                   max_level::Int64,
                                    du_ode_hyp)
-    @trixi_timeit timer() "rhs_hyperbolic-parabolic! (level-dependent)" begin 
-        rhs!(du_ode_hyp, u_ode, semi, t,level_info_elements_acc,
+    @trixi_timeit timer() "rhs_hyperbolic-parabolic! (level-dependent)" begin
+        rhs!(du_ode_hyp, u_ode, semi, t, level_info_elements_acc,
              level_info_interfaces_acc,
              level_info_boundaries_acc,
              level_info_boundaries_orientation_acc,
@@ -470,8 +479,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperb
                        level_info_boundaries_acc,
                        level_info_boundaries_orientation_acc,
                        level_info_mortars_acc)
-        
-        for level in 1:max_level                       
+
+        for level in 1:max_level
             @threaded for u_ind in level_u_indices_elements_acc[level]
                 du_ode[u_ind] += du_ode_hyp[u_ind]
             end

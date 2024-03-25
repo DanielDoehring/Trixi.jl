@@ -213,7 +213,8 @@ function (löhner::IndicatorLöhner)(u::AbstractArray{<:Any, 5},
 end
 
 function (löhner::IndicatorLöhner)(u::AbstractArray{<:Any, 5},
-                                   mesh, equations, equations_parabolic, dg::DGSEM, cache, cache_parabolic;
+                                   mesh, equations, equations_parabolic, dg::DGSEM,
+                                   cache, cache_parabolic;
                                    kwargs...)
     @assert nnodes(dg)>=3 "IndicatorLöhner only works for nnodes >= 3 (polydeg > 1)"
     @unpack alpha, indicator_threaded = löhner.cache
@@ -227,13 +228,19 @@ function (löhner::IndicatorLöhner)(u::AbstractArray{<:Any, 5},
         # Calculate indicator variables at Gauss-Lobatto nodes
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             u_local = get_node_vars(u, equations, dg, i, j, k, element)
-            gradients_1_local = get_node_vars(gradients_x, equations_parabolic, dg, i, j, k,
-            element)
-            gradients_2_local = get_node_vars(gradients_y, equations_parabolic, dg, i, j, k,
-                        element)
-            gradients_3_local = get_node_vars(gradients_z, equations_parabolic, dg, i, j, k,
-                        element)
-            indicator[i, j, k] = löhner.variable(u_local, (gradients_1_local, gradients_2_local, gradients_3_local), equations_parabolic)
+            gradients_1_local = get_node_vars(gradients_x, equations_parabolic, dg, i,
+                                              j, k,
+                                              element)
+            gradients_2_local = get_node_vars(gradients_y, equations_parabolic, dg, i,
+                                              j, k,
+                                              element)
+            gradients_3_local = get_node_vars(gradients_z, equations_parabolic, dg, i,
+                                              j, k,
+                                              element)
+            indicator[i, j, k] = löhner.variable(u_local,
+                                                 (gradients_1_local, gradients_2_local,
+                                                  gradients_3_local),
+                                                 equations_parabolic)
         end
 
         estimate = zero(real(dg))
@@ -310,7 +317,8 @@ end
 
 # NOTE: Quick & Dirty enabler for enstrophy-based AMR
 function (indicator_max::IndicatorMax)(u::AbstractArray{<:Any, 5},
-                                       mesh, equations, equations_parabolic, dg::DGSEM, cache, cache_parabolic;
+                                       mesh, equations, equations_parabolic, dg::DGSEM,
+                                       cache, cache_parabolic;
                                        kwargs...)
     @unpack alpha, indicator_threaded = indicator_max.cache
     resize!(alpha, nelements(dg, cache))
@@ -323,13 +331,20 @@ function (indicator_max::IndicatorMax)(u::AbstractArray{<:Any, 5},
         # Calculate indicator variables at Gauss-Lobatto nodes
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             u_local = get_node_vars(u, equations, dg, i, j, k, element)
-            gradients_1_local = get_node_vars(gradients_x, equations_parabolic, dg, i, j, k,
-            element)
-            gradients_2_local = get_node_vars(gradients_y, equations_parabolic, dg, i, j, k,
-                        element)
-            gradients_3_local = get_node_vars(gradients_z, equations_parabolic, dg, i, j, k,
-                        element)
-            indicator[i, j, k] = indicator_max.variable(u_local, (gradients_1_local, gradients_2_local, gradients_3_local), equations_parabolic)
+            gradients_1_local = get_node_vars(gradients_x, equations_parabolic, dg, i,
+                                              j, k,
+                                              element)
+            gradients_2_local = get_node_vars(gradients_y, equations_parabolic, dg, i,
+                                              j, k,
+                                              element)
+            gradients_3_local = get_node_vars(gradients_z, equations_parabolic, dg, i,
+                                              j, k,
+                                              element)
+            indicator[i, j, k] = indicator_max.variable(u_local,
+                                                        (gradients_1_local,
+                                                         gradients_2_local,
+                                                         gradients_3_local),
+                                                        equations_parabolic)
         end
 
         alpha[element] = maximum(indicator)
@@ -337,5 +352,4 @@ function (indicator_max::IndicatorMax)(u::AbstractArray{<:Any, 5},
 
     return alpha
 end
-
 end # @muladd

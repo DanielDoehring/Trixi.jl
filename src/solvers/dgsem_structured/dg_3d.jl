@@ -819,5 +819,4 @@ function apply_jacobian!(du,
 
     return nothing
 end
-
 end # @muladd

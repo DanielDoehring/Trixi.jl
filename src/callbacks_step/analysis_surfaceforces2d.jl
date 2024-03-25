@@ -27,7 +27,7 @@ struct AnalysisSurfaceIntegral{Semidiscretization, Variable}
         indices = boundary_symbol_indices[boundary_symbol]
 
         return new{typeof(semi), typeof(variable)}(semi, indices,
-                                                    variable)
+                                                   variable)
     end
 
     function AnalysisSurfaceIntegral(semi, boundary_symbols::Vector{Symbol}, variable)
@@ -39,7 +39,7 @@ struct AnalysisSurfaceIntegral{Semidiscretization, Variable}
         sort!(indices)
 
         return new{typeof(semi), typeof(variable)}(semi, indices,
-                                                    variable)
+                                                   variable)
     end
 end
 
@@ -86,8 +86,8 @@ function (drag_coefficient::DragCoefficient)(u, normal_direction, equations)
 end
 
 function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
-                    mesh::P4estMesh{2},
-                    equations, dg::DGSEM, cache)
+                 mesh::P4estMesh{2},
+                 equations, dg::DGSEM, cache)
     @unpack boundaries = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
@@ -108,7 +108,7 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
         j_node = j_node_start
         for node_index in eachnode(dg)
             u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg, node_index,
-                                            boundary)
+                                         boundary)
             normal_direction = get_normal_direction(direction, contravariant_vectors,
                                                     i_node, j_node,
                                                     element)
@@ -126,19 +126,19 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
 end
 
 function pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any,
-                                                        <:LiftCoefficient{<:Any}})
+                                                     <:LiftCoefficient{<:Any}})
     "CL"
 end
 function pretty_form_utf(::AnalysisSurfaceIntegral{<:Any,
-                                                    <:LiftCoefficient{<:Any}})
+                                                   <:LiftCoefficient{<:Any}})
     "CL"
 end
 function pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any,
-                                                        <:DragCoefficient{<:Any}})
+                                                     <:DragCoefficient{<:Any}})
     "CD"
 end
 function pretty_form_utf(::AnalysisSurfaceIntegral{<:Any,
-                                                    <:DragCoefficient{<:Any}})
+                                                   <:DragCoefficient{<:Any}})
     "CD"
 end
 end # muladd

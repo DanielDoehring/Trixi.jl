@@ -34,15 +34,15 @@ function UnstructuredSortedBoundaryTypes(boundary_conditions::Dict, cache)
 
     container = UnstructuredSortedBoundaryTypes{n_boundary_types,
                                                 typeof(boundary_condition_types)}(boundary_condition_types,
-                                                                                    boundary_indices,
-                                                                                    boundary_conditions,
-                                                                                    boundary_symbol_indices)
+                                                                                  boundary_indices,
+                                                                                  boundary_conditions,
+                                                                                  boundary_symbol_indices)
 
     initialize!(container, cache)
 end
 
 function initialize!(boundary_types_container::UnstructuredSortedBoundaryTypes{N},
-                        cache) where {N}
+                     cache) where {N}
     @unpack boundary_dictionary, boundary_condition_types = boundary_types_container
 
     unique_names = unique(cache.boundaries.name)
@@ -55,9 +55,9 @@ function initialize!(boundary_types_container::UnstructuredSortedBoundaryTypes{N
             recv_buffer_length = MPI.Gather(length(send_buffer), mpi_root(), mpi_comm())
             recv_buffer = Vector{UInt8}(undef, sum(recv_buffer_length))
             MPI.Gatherv!(send_buffer, MPI.VBuffer(recv_buffer, recv_buffer_length),
-                            mpi_root(), mpi_comm())
+                         mpi_root(), mpi_comm())
             all_names = unique(Symbol.(split(String(recv_buffer), "\0";
-                                                keepempty = false)))
+                                             keepempty = false)))
             for key in keys(boundary_dictionary)
                 if !(key in all_names)
                     println(stderr,
@@ -74,7 +74,7 @@ function initialize!(boundary_types_container::UnstructuredSortedBoundaryTypes{N
         for key in keys(boundary_dictionary)
             if !(key in unique_names)
                 error("Key $(repr(key)) is not a valid boundary name. " *
-                        "Valid names are $unique_names.")
+                      "Valid names are $unique_names.")
             end
         end
     end
