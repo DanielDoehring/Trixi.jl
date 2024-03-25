@@ -176,9 +176,8 @@ function Base.getproperty(integrator::PERK4_Multi_Integrator, field::Symbol)
     return getfield(integrator, field)
 end
 
-# Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
-function solve(ode::ODEProblem, alg::PERK4_Multi;
-               dt, callback = nothing, kwargs...)
+function init(ode::ODEProblem, alg::PERK4_Multi;
+              dt, callback = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0) # previously: similar(u0)
     u_tmp = zero(u0)
@@ -254,9 +253,9 @@ function solve(ode::ODEProblem, alg::PERK4_Multi;
             # NOTE: For 1D, periodic BC testcase with artificial assignment
             #=
             if element_id in level_info_elements[1]
-              level_id = 1
+            level_id = 1
             elseif element_id in level_info_elements[2]
-              level_id = 2
+            level_id = 2
             end
             =#
 
@@ -415,9 +414,9 @@ function solve(ode::ODEProblem, alg::PERK4_Multi;
         # Assumes linear timestep scaling
         n_levels = Int(log2(round(h_max / h_min))) + 1
         if n_levels == 1
-          h_bins = [h_max]
+        h_bins = [h_max]
         else
-          h_bins = [ceil(h_min, digits = 10) * 2^i for i = 0:n_levels-1]
+        h_bins = [ceil(h_min, digits = 10) * 2^i for i = 0:n_levels-1]
         end
         =#
 
@@ -665,236 +664,233 @@ function solve(ode::ODEProblem, alg::PERK4_Multi;
         error("unsupported")
     end
 
-    # Start actual solve
-    solve!(integrator)
+    return integrator
 end
 
-function solve!(integrator::PERK4_Multi_Integrator)
+# Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
+function solve(ode::ODEProblem, alg::PERK4_Multi;
+               dt, callback = nothing, kwargs...)
+    integrator = init(ode, alg, dt = dt, callback = callback; kwargs...)
+
+    # Start actual solve
+    solve_steps!(integrator)
+end
+
+function solve_steps!(integrator::PERK4_Multi_Integrator)
     @unpack prob = integrator.sol
-    @unpack alg = integrator
-    t_end = last(prob.tspan)
-    callbacks = integrator.opts.callback
 
     integrator.finalstep = false
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
-        if isnan(integrator.dt)
-            error("time step size `dt` is NaN")
-        end
-
-        # if the next iteration would push the simulation beyond the end time, set dt accordingly
-        if integrator.t + integrator.dt > t_end ||
-           isapprox(integrator.t + integrator.dt, t_end)
-            integrator.dt = t_end - integrator.t
-            terminate!(integrator)
-        end
-
-        @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-
-            # k1: Evaluated on entire domain / all levels
-            integrator.f(integrator.du, integrator.u, prob.p, integrator.t,
-                         integrator.du_ode_hyp)
-            #integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
-
-            @threaded for i in eachindex(integrator.du)
-                integrator.k1[i] = integrator.du[i] * integrator.dt
-            end
-
-            integrator.t_stage = integrator.t + alg.c[2] * integrator.dt
-            # k2: Here always evaluated for finest scheme (Allow currently only max. stage evaluations)
-            @threaded for i in eachindex(integrator.u)
-                integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.k1[i]
-            end
-
-            #=
-            for stage_callback in alg.stage_callbacks
-              stage_callback(integrator.u_tmp, integrator, prob.p, integrator.t_stage)
-            end
-            =#
-
-            # CARE: This does not work if we have only one method but more than one grid level
-
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
-                         integrator.level_info_elements_acc[1],
-                         integrator.level_info_interfaces_acc[1],
-                         integrator.level_info_boundaries_acc[1],
-                         integrator.level_info_boundaries_orientation_acc[1],
-                         integrator.level_info_mortars_acc[1],
-                         integrator.level_u_indices_elements, 1,
-                         integrator.du_ode_hyp)
-
-            #=
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                         integrator.level_info_elements_acc[1],
-                         integrator.level_info_interfaces_acc[1],
-                         integrator.level_info_boundaries_acc[1],
-                         integrator.level_info_boundaries_orientation_acc[1],
-                         integrator.level_info_mortars_acc[1])
-            =#
-
-            # Update finest level only
-            @threaded for u_ind in integrator.level_u_indices_elements[1]
-                integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
-            end
-
-            for stage in 3:(alg.NumStages - 3)
-                # Construct current state
-                @threaded for i in eachindex(integrator.u)
-                    integrator.u_tmp[i] = integrator.u[i]
-                end
-
-                # Loop over different methods with own associated level
-                for level in 1:min(alg.NumMethods, integrator.n_levels)
-                    @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.u_tmp[u_ind] += alg.AMatrices[level, stage - 2, 1] *
-                                                   integrator.k1[u_ind]
-                    end
-                end
-                for level in 1:min(alg.HighestEvalLevels[stage], integrator.n_levels)
-                    @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.u_tmp[u_ind] += alg.AMatrices[level, stage - 2, 2] *
-                                                   integrator.k_higher[u_ind]
-                    end
-                end
-
-                # "Remainder": Non-efficiently integrated
-                for level in (alg.NumMethods + 1):(integrator.n_levels)
-                    @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.u_tmp[u_ind] += alg.AMatrices[alg.NumMethods,
-                                                                 stage - 2, 1] *
-                                                   integrator.k1[u_ind]
-                    end
-                end
-                if alg.HighestEvalLevels[stage] == alg.NumMethods
-                    for level in (alg.HighestEvalLevels[stage] + 1):(integrator.n_levels)
-                        @threaded for u_ind in integrator.level_u_indices_elements[level]
-                            integrator.u_tmp[u_ind] += alg.AMatrices[alg.NumMethods,
-                                                                     stage - 2, 2] *
-                                                       integrator.k_higher[u_ind]
-                        end
-                    end
-                end
-
-                integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
-
-                # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-                integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage],
-                                              integrator.n_levels)
-
-                # Check if there are fewer integrators than grid levels (non-optimal method)
-                if integrator.coarsest_lvl == alg.NumMethods
-                    integrator.coarsest_lvl = integrator.n_levels
-                end
-
-                # For statically refined meshes:
-                #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
-
-                #=
-                for stage_callback in alg.stage_callbacks
-                  stage_callback(integrator.u_tmp, integrator, prob.p, integrator.t_stage)
-                end
-                =#
-
-                # Joint RHS evaluation with all elements sharing this timestep
-                integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                             integrator.t_stage,
-                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                             integrator.level_u_indices_elements,
-                             integrator.coarsest_lvl,
-                             integrator.du_ode_hyp)
-
-                #=
-                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                             integrator.level_info_mortars_acc[integrator.coarsest_lvl])
-                =#
-
-                # Update k_higher of relevant levels
-                for level in 1:(integrator.coarsest_lvl)
-                    @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.k_higher[u_ind] = integrator.du[u_ind] *
-                                                     integrator.dt
-                    end
-                end
-            end
-
-            # Last three stages: Same Butcher Matrix
-            for stage in 1:3
-                @threaded for u_ind in eachindex(integrator.u)
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                              alg.AMatrix[stage, 1] *
-                                              integrator.k1[u_ind] +
-                                              alg.AMatrix[stage, 2] *
-                                              integrator.k_higher[u_ind]
-                end
-                integrator.t_stage = integrator.t +
-                                     alg.c[alg.NumStages - 3 + stage] * integrator.dt
-
-                integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                             integrator.t_stage, integrator.du_ode_hyp)
-                #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
-
-                @threaded for u_ind in eachindex(integrator.u)
-                    integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
-                end
-
-                if stage == 2
-                    @threaded for u_ind in eachindex(integrator.u)
-                        integrator.k_S1[u_ind] = integrator.k_higher[u_ind]
-                    end
-                end
-            end
-
-            @threaded for u_ind in eachindex(integrator.u)
-                integrator.u[u_ind] += 0.5 * (integrator.k_S1[u_ind] +
-                                        integrator.k_higher[u_ind])
-            end
-
-            #=
-            for stage_callback in alg.stage_callbacks
-              stage_callback(integrator.u, integrator, prob.p, integrator.t_stage)
-            end
-            =#
-        end # PERK4_Multi step
-
-        integrator.iter += 1
-        integrator.t += integrator.dt
-
-        @trixi_timeit timer() "Step-Callbacks" begin
-            # handle callbacks
-            if callbacks isa CallbackSet
-                foreach(callbacks.discrete_callbacks) do cb
-                    if cb.condition(integrator.u, integrator.t, integrator)
-                        cb.affect!(integrator)
-                    end
-                    return nothing
-                end
-            end
-        end
-
+        # NOTE: `prev` For EulerAcoustics only
         #=
-        for stage_callback in alg.stage_callbacks
-          stage_callback(integrator.u, integrator, prob.p, integrator.t_stage)
+        @threaded for u_ind in eachindex(integrator.u)
+            integrator.uprev[u_ind] = integrator.u[u_ind]
         end
+        integrator.tprev = integrator.t
         =#
-
-        # respect maximum number of iterations
-        if integrator.iter >= integrator.opts.maxiters && !integrator.finalstep
-            @warn "Interrupted. Larger maxiters is needed."
-            terminate!(integrator)
-        end
+        step!(integrator)
     end # "main loop" timer
 
     return TimeIntegratorSolution((first(prob.tspan), integrator.t),
                                   (prob.u0, integrator.u),
                                   integrator.sol.prob)
+end
+
+function step!(integrator::PERK4_Multi_Integrator)
+    @unpack prob = integrator.sol
+    @unpack alg = integrator
+    t_end = last(prob.tspan)
+    callbacks = integrator.opts.callback
+
+    if isnan(integrator.dt)
+        error("time step size `dt` is NaN")
+    end
+
+    # if the next iteration would push the simulation beyond the end time, set dt accordingly
+    if integrator.t + integrator.dt > t_end ||
+       isapprox(integrator.t + integrator.dt, t_end)
+        integrator.dt = t_end - integrator.t
+        terminate!(integrator)
+    end
+
+    @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
+
+        # k1: Evaluated on entire domain / all levels
+        integrator.f(integrator.du, integrator.u, prob.p, integrator.t,
+                     integrator.du_ode_hyp)
+        #integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
+
+        @threaded for i in eachindex(integrator.du)
+            integrator.k1[i] = integrator.du[i] * integrator.dt
+        end
+
+        integrator.t_stage = integrator.t + alg.c[2] * integrator.dt
+        # k2: Here always evaluated for finest scheme (Allow currently only max. stage evaluations)
+        @threaded for i in eachindex(integrator.u)
+            integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.k1[i]
+        end
+
+        # CARE: This does not work if we have only one method but more than one grid level
+
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
+                     integrator.level_info_elements_acc[1],
+                     integrator.level_info_interfaces_acc[1],
+                     integrator.level_info_boundaries_acc[1],
+                     integrator.level_info_boundaries_orientation_acc[1],
+                     integrator.level_info_mortars_acc[1],
+                     integrator.level_u_indices_elements, 1,
+                     integrator.du_ode_hyp)
+
+        #=
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                        integrator.level_info_elements_acc[1],
+                        integrator.level_info_interfaces_acc[1],
+                        integrator.level_info_boundaries_acc[1],
+                        integrator.level_info_boundaries_orientation_acc[1],
+                        integrator.level_info_mortars_acc[1])
+        =#
+
+        # Update finest level only
+        @threaded for u_ind in integrator.level_u_indices_elements[1]
+            integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+        end
+
+        for stage in 3:(alg.NumStages - 3)
+            # Construct current state
+            @threaded for i in eachindex(integrator.u)
+                integrator.u_tmp[i] = integrator.u[i]
+            end
+
+            # Loop over different methods with own associated level
+            for level in 1:min(alg.NumMethods, integrator.n_levels)
+                @threaded for u_ind in integrator.level_u_indices_elements[level]
+                    integrator.u_tmp[u_ind] += alg.AMatrices[level, stage - 2, 1] *
+                                               integrator.k1[u_ind]
+                end
+            end
+            for level in 1:min(alg.HighestEvalLevels[stage], integrator.n_levels)
+                @threaded for u_ind in integrator.level_u_indices_elements[level]
+                    integrator.u_tmp[u_ind] += alg.AMatrices[level, stage - 2, 2] *
+                                               integrator.k_higher[u_ind]
+                end
+            end
+
+            # "Remainder": Non-efficiently integrated
+            for level in (alg.NumMethods + 1):(integrator.n_levels)
+                @threaded for u_ind in integrator.level_u_indices_elements[level]
+                    integrator.u_tmp[u_ind] += alg.AMatrices[alg.NumMethods,
+                                                             stage - 2, 1] *
+                                               integrator.k1[u_ind]
+                end
+            end
+            if alg.HighestEvalLevels[stage] == alg.NumMethods
+                for level in (alg.HighestEvalLevels[stage] + 1):(integrator.n_levels)
+                    @threaded for u_ind in integrator.level_u_indices_elements[level]
+                        integrator.u_tmp[u_ind] += alg.AMatrices[alg.NumMethods,
+                                                                 stage - 2, 2] *
+                                                   integrator.k_higher[u_ind]
+                    end
+                end
+            end
+
+            integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
+
+            # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage],
+                                          integrator.n_levels)
+
+            # Check if there are fewer integrators than grid levels (non-optimal method)
+            if integrator.coarsest_lvl == alg.NumMethods
+                integrator.coarsest_lvl = integrator.n_levels
+            end
+
+            # For statically refined meshes:
+            #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
+
+            # Joint RHS evaluation with all elements sharing this timestep
+            integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                         integrator.t_stage,
+                         integrator.level_info_elements_acc[integrator.coarsest_lvl],
+                         integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
+                         integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
+                         integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
+                         integrator.level_info_mortars_acc[integrator.coarsest_lvl],
+                         integrator.level_u_indices_elements,
+                         integrator.coarsest_lvl,
+                         integrator.du_ode_hyp)
+
+            #=
+            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                            integrator.level_info_elements_acc[integrator.coarsest_lvl],
+                            integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
+                            integrator.level_info_mortars_acc[integrator.coarsest_lvl])
+            =#
+
+            # Update k_higher of relevant levels
+            for level in 1:(integrator.coarsest_lvl)
+                @threaded for u_ind in integrator.level_u_indices_elements[level]
+                    integrator.k_higher[u_ind] = integrator.du[u_ind] *
+                                                 integrator.dt
+                end
+            end
+        end # end loop over different stages
+
+        # Last three stages: Same Butcher Matrix
+        for stage in 1:3
+            @threaded for u_ind in eachindex(integrator.u)
+                integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+                                          alg.AMatrix[stage, 1] *
+                                          integrator.k1[u_ind] +
+                                          alg.AMatrix[stage, 2] *
+                                          integrator.k_higher[u_ind]
+            end
+            integrator.t_stage = integrator.t +
+                                 alg.c[alg.NumStages - 3 + stage] * integrator.dt
+
+            integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                         integrator.t_stage, integrator.du_ode_hyp)
+            #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+
+            @threaded for u_ind in eachindex(integrator.u)
+                integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+            end
+
+            if stage == 2
+                @threaded for u_ind in eachindex(integrator.u)
+                    integrator.k_S1[u_ind] = integrator.k_higher[u_ind]
+                end
+            end
+        end
+
+        @threaded for u_ind in eachindex(integrator.u)
+            integrator.u[u_ind] += 0.5 * (integrator.k_S1[u_ind] +
+                                    integrator.k_higher[u_ind])
+        end
+    end # PERK4_Multi step
+
+    integrator.iter += 1
+    integrator.t += integrator.dt
+
+    @trixi_timeit timer() "Step-Callbacks" begin
+        # handle callbacks
+        if callbacks isa CallbackSet
+            foreach(callbacks.discrete_callbacks) do cb
+                if cb.condition(integrator.u, integrator.t, integrator)
+                    cb.affect!(integrator)
+                end
+                return nothing
+            end
+        end
+    end
+
+    # respect maximum number of iterations
+    if integrator.iter >= integrator.opts.maxiters && !integrator.finalstep
+        @warn "Interrupted. Larger maxiters is needed."
+        terminate!(integrator)
+    end
 end
 
 # get a cache where the RHS can be stored

@@ -175,6 +175,7 @@ function solve_steps!(integrator::PERK4_Integrator)
     integrator.finalstep = false
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
+        # NOTE: `prev` For EulerAcoustics only
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
