@@ -6,15 +6,18 @@ using Trixi
 
 U_inf = 0.2
 c_inf = 1.0
-rho_inf = 1.4
+
+rho_inf = 1.4 # with gamma = 1.4 => p_inf = 1.0
+
 Re = 10000.0
 airfoil_cord_length = 1.0
 
-# TODO: Change angle of attack!
-aoa = 0.0
+aoa = 4 * pi/180
+u_x = U_inf * cos(aoa)
+u_y = U_inf * sin(aoa)
 
 gamma = 1.4
-prandtl_number() = 0.72
+prandtl_number() = 0.71 
 mu() = rho_inf * U_inf * airfoil_cord_length / Re
 
 equations = CompressibleEulerEquations2D(gamma)
@@ -26,8 +29,8 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
 @inline function initial_condition_mach02_flow(x, t, equations)
   # set the freestream flow parameters
   rho_freestream = 1.4
-  v1 = 0.2
-  v2 = 0.0
+  v1 = 0.19951281005196486
+  v2 = 0.01395129474882506
   p_freestream = 1.0
 
   prim = SVector(rho_freestream, v1, v2, p_freestream)
@@ -44,10 +47,14 @@ heat_bc = Adiabatic((x, t, equations) -> 0.0)
 boundary_condition_airfoil = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
 
 polydeg = 3
-volume_flux = flux_ranocha
 
+#=
+volume_flux = flux_ranocha
 solver = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+=#
+
+solver = DGSEM(polydeg = polydeg, surface_flux = flux_hll)
 
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
@@ -73,85 +80,88 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
+restart_file = "restart_017845.h5"
+restart_filename = joinpath("out", restart_file)
+
 t_c = airfoil_cord_length / U_inf
-tspan = (0.0, 0.0 * t_c)
+#tspan = (0.0, 100 * t_c)
+tspan = (0.0, 20 * t_c) # Try to get into a state where initial pressure wave is gone
+
+#tspan = (load_time(restart_filename), 100 * t_c)
 
 ode = semidiscretize(semi, tspan; split_form = false)
 #ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 500
 
-semi.boundary_conditions.boundary_dictionary
-indices = semi_ -> semi.boundary_conditions.boundary_indices[2]
-# TODO: Not sure if airfoil_cord_length = l_inf is correct usage
-my_drag_force = Trixi.AnalysisSurfaceIntegral(indices, Trixi.DragForcePressure(aoa, rho_inf, U_inf, airfoil_cord_length))
+sw_aoa() = aoa
+sw_rho_inf() = rho_inf
+sw_U_inf(equations) = U_inf
+sw_linf() = airfoil_cord_length
 
-my_lift_force = Trixi.AnalysisSurfaceIntegral(indices, Trixi.LiftForcePressure(aoa, rho_inf, U_inf, airfoil_cord_length))
+drag_coefficient = Trixi.AnalysisSurfaceIntegral(semi, :Airfoil,
+                                           Trixi.DragCoefficient(sw_aoa(), sw_rho_inf(),
+                                                           sw_U_inf(equations), sw_linf()))
 
+lift_coefficient = Trixi.AnalysisSurfaceIntegral(semi, :Airfoil,
+                                           Trixi.LiftCoefficient(sw_aoa(), sw_rho_inf(),
+                                                           sw_U_inf(equations), sw_linf()))
 
-analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
-                                     analysis_errors = Symbol[], # Turn errors off
-                                     output_directory = "out", save_analysis = true,
-                                     analysis_integrals = (my_drag_force, my_lift_force))
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     output_directory = "out",
+                                     save_analysis = true,
+                                     analysis_errors = Symbol[],
+                                     analysis_integrals = (drag_coefficient,
+                                                           lift_coefficient))
 
-#stepsize_callback = StepsizeCallback(cfl = 5.1) # PERK_4 Multi E = 5, ..., 14
-stepsize_callback = StepsizeCallback(cfl = 5.4) # PERK_4 Multi E = 5, ..., 16
-#stepsize_callback = StepsizeCallback(cfl = 2.1) # CarpenterKennedy2N54
+stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Multi E = 5, ..., 16
 
-stepsize_callback = StepsizeCallback(cfl = 5.4) # PERK_4 Single 14
-
-stepsize_callback = StepsizeCallback(cfl = 5.5) # PERK_4 Single 14
-
-#stepsize_callback = StepsizeCallback(cfl = 4.4) # PERK_4 Single 8
-#stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Single 20
-
-save_solution = SaveSolutionCallback(interval = analysis_interval,
+save_solution = SaveSolutionCallback(interval = 5000,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
 alive_callback = AliveCallback(alive_interval = 100)
 
+save_restart = SaveRestartCallback(interval = 10^6,
+                                   save_final_restart = true)
+
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback,
+                        #analysis_callback,
                         alive_callback,
                         #save_solution,
+                        save_restart,
                         stepsize_callback)
 
 ###############################################################################
 # run the simulation
 
-#=
-dtRatios = [0.191469431854785, 
-            0.184602899151614,
-            0.169882330226391,
-            0.148737624222123,
-            0.125358798070687,
-            0.106506037112321,
-            0.092058178144161,
-            0.066218481684170,
-            0.047412460769779,
-            0.027795091314087] / 0.191469431854785
-=#
 
-dtRatios = [0.249748130716557,
-            0.229743135233184,
-            0.191469431854785,
-            0.184602899151614,
-            0.169882330226391,
-            0.148737624222123,
-            0.125358798070687,
-            0.106506037112321,
-            0.092058178144161,
-            0.066218481684170,
-            0.047412460769779,
-            0.027795091314087] / 0.249748130716557
+dtRatios = [0.252900854746017, # 16
+            0.234065997367224, # 15
+            0.208310160790890, # 14
+            0.172356930215766, # 12
+            0.129859071602721, # 10
+            0.092778774946394, #  8
+            0.069255720146485, #  7
+            0.049637258180915, #  6
+            0.030629777558366] #= 5 =# / 0.252900854746017
+#Stages = [16, 15, 14, 12, 10, 8, 7, 6, 5]
 
-#Stages = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
-Stages = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/", dtRatios)
+dtRatios = [0.252900854746017, # 16
+            0.208310160790890, # 14
+            0.172356930215766, # 12
+            0.129859071602721, # 10
+            0.092778774946394, #  8
+            0.069255720146485, #  7
+            0.049637258180915, #  6
+            0.030629777558366] #= 5 =# / 0.252900854746017
+Stages = [16, 14, 12, 10, 8, 7, 6, 5]
+
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
 
 #ode_algorithm = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/")
 

@@ -19,16 +19,30 @@ using Trixi: AnalysisSurfaceIntegral, DragCoefficient, LiftCoefficient
 equations = CompressibleEulerEquations2D(1.4)
 
 prandtl_number() = 0.72
-mu() = 0.0031959974968701088
+
+#mu() = 0.0031959974968701088 # Re = 500, Ma = 0.8
+mu() = 0.0001997498435543818 # Re = 5000, Ma = 0.5
+
 equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
                                                           Prandtl = prandtl_number())
 
 sw_rho_inf() = 1.0
 sw_pre_inf() = 2.85
-sw_aoa() = 10.0 * pi / 180.0
+
+#sw_aoa() = 10.0 * pi / 180.0
+sw_aoa() = 0.0
+
 sw_linf() = 1.0
-sw_mach_inf() = 0.8
+
+#sw_mach_inf() = 0.8
+sw_mach_inf() = 0.5
+
 sw_U_inf(equations) = sw_mach_inf() * sqrt(equations.gamma * sw_pre_inf() / sw_rho_inf())
+
+# Control
+Ma = sw_U_inf(equations) / sqrt(equations.gamma * sw_pre_inf() / sw_rho_inf())
+Re = sw_rho_inf() * sw_U_inf(equations) * sw_linf() / mu()
+
 @inline function initial_condition_mach08_flow(x, t, equations)
     # set the freestream flow parameters
     gasGam = equations.gamma
@@ -38,8 +52,11 @@ sw_U_inf(equations) = sw_mach_inf() * sqrt(equations.gamma * sw_pre_inf() / sw_r
     pre_inf = sw_pre_inf()
     U_inf = mach_inf * sqrt(gasGam * pre_inf / rho_inf)
 
-    v1 = U_inf * cos(aoa)
-    v2 = U_inf * sin(aoa)
+    #v1 = U_inf * cos(aoa)
+    v1 = U_inf
+
+    #v2 = U_inf * sin(aoa)
+    v2 = 0.0
 
     prim = SVector(rho_inf, v1, v2, pre_inf)
     return prim2cons(prim, equations)
@@ -117,11 +134,11 @@ restart_file = "restart_250000.h5"
 restart_filename = joinpath("out", restart_file)
 
 # Run for a long time to reach a steady state
-#tspan = (0.0, 1)
-tspan = (load_time(restart_filename), 1.0)
+tspan = (0.0, 1)
+#tspan = (load_time(restart_filename), 1.0)
 
-#ode = semidiscretize(semi, tspan)
-ode = semidiscretize(semi, tspan, restart_filename)
+ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan, restart_filename)
 
 # Callbacks
 
@@ -147,7 +164,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-save_restart = SaveRestartCallback(interval = 1e5,
+save_restart = SaveRestartCallback(interval = 5e4,
                                    save_final_restart = true)
 
 callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback, save_restart)
@@ -160,6 +177,6 @@ sol = solve(ode, RK4(thread = OrdinaryDiffEq.True()); dt = 5e-10, adaptive = tru
             save_everystep = false, callback = callbacks)
 =#
 
-sol = Trixi.solve(ode, Trixi.HypDiffN3Erk3Sstar52(); dt = 1e-9, save_everystep = false, callback = callbacks)
+sol = Trixi.solve(ode, Trixi.HypDiffN3Erk3Sstar52(); dt = 1.9e-8, save_everystep = false, callback = callbacks)
 
 summary_callback() # print the timer summary
