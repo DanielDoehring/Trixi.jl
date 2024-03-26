@@ -703,11 +703,12 @@ function solve_steps!(integrator::PERK4_Multi_Integrator)
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # NOTE: `prev` For EulerAcoustics only
-        
+        #=
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
         integrator.tprev = integrator.t
+        =#
         
         step!(integrator)
     end # "main loop" timer
@@ -949,5 +950,8 @@ function Base.resize!(integrator::PERK4_Multi_Integrator, new_size)
 
     # TODO: Move this into parabolic cache or similar
     resize!(integrator.du_ode_hyp, new_size)
+
+    # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
+    resize!(integrator.uprev, new_size)
 end
 end # @muladd
