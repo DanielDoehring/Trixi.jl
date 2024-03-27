@@ -65,6 +65,12 @@ mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 boundary_symbols = [:Airfoil, :FarField]
 mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
+restart_file = "restart_118444.h5"
+restart_file = "restart_000008.h5"
+
+restart_filename = joinpath("out", restart_file)
+
+mesh = load_mesh(restart_filename)
 
 boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
                            :Airfoil => boundary_condition_slip_wall)
@@ -80,22 +86,22 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-restart_file = "restart_017845.h5"
-restart_filename = joinpath("out", restart_file)
-
 t_c = airfoil_cord_length / U_inf
 #tspan = (0.0, 100 * t_c)
 tspan = (0.0, 20 * t_c) # Try to get into a state where initial pressure wave is gone
 
-#tspan = (load_time(restart_filename), 100 * t_c)
+tspan = (load_time(restart_filename), 100 * t_c)
+#tspan = (load_time(restart_filename), load_time(restart_filename) + 1e-4)
 
-ode = semidiscretize(semi, tspan; split_form = false)
+#ode = semidiscretize(semi, tspan; split_form = false)
 #ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
+
+#ode = semidiscretize(semi, tspan, restart_filename)
+ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 500
+analysis_interval = 100
 
 sw_aoa() = aoa
 sw_rho_inf() = rho_inf
@@ -117,9 +123,12 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_integrals = (drag_coefficient,
                                                            lift_coefficient))
 
-stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Multi E = 5, ..., 16
+stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Multi E = 5, ..., 16, non-refined
+stepsize_callback = StepsizeCallback(cfl = 4.7) # PERK_4 Multi E = 5, ..., 16, refined
 
-save_solution = SaveSolutionCallback(interval = 5000,
+#stepsize_callback = StepsizeCallback(cfl = 0.1) # CarpenterKennedy2N54
+
+save_solution = SaveSolutionCallback(interval = Int(100),
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
@@ -129,11 +138,21 @@ alive_callback = AliveCallback(alive_interval = 100)
 save_restart = SaveRestartCallback(interval = 10^6,
                                    save_final_restart = true)
 
+amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = Trixi.density),
+                                      base_level = 1,
+                                      max_level = 2, max_threshold = 10)
+
+amr_callback = AMRCallback(semi, amr_controller,
+                            interval = 5,
+                            adapt_initial_condition = false,
+                            adapt_initial_condition_only_refine = true)
+
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         alive_callback,
+                        #amr_callback,
                         #save_solution,
-                        save_restart,
+                        #save_restart,
                         stepsize_callback)
 
 ###############################################################################
