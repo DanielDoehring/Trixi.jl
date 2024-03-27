@@ -224,20 +224,23 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         for element_id in 1:n_elements
                             # pull the four corners numbered as right-handed
                             P0 = cache.elements.node_coordinates[:, 1, 1, element_id]
-                            P1 = cache.elements.node_coordinates[:, nnodes, 1,
-                                                                 element_id]
-                            #P2 = cache.elements.node_coordinates[:, nnodes, nnodes, element_id]
-                            #P3 = cache.elements.node_coordinates[:, 1     , nnodes, element_id]
-                            # compute the four side lengths and get the smallest
-                            #L0 = sqrt( sum( (P1-P0).^2 ) )
-                            L0 = abs(P1[1] - P0[1])
+                            P1 = cache.elements.node_coordinates[:, nnodes, 1, element_id]
                             #=
+                            P2 = cache.elements.node_coordinates[:, nnodes, nnodes, element_id]
+                            P3 = cache.elements.node_coordinates[:, 1     , nnodes, element_id]
+                            
+                            # compute the four side lengths and get the smallest
+                            L0 = sqrt( sum( (P1-P0).^2 ) )
                             L1 = sqrt( sum( (P2-P1).^2 ) )
                             L2 = sqrt( sum( (P3-P2).^2 ) )
                             L3 = sqrt( sum( (P0-P3).^2 ) )
+                            
+                            h = min(L0, L1, L2, L3)
                             =#
-                            #h = min(L0, L1, L2, L3)
-                            h = L0
+
+                            #L0 = abs(P1[1] - P0[1])
+                            #h = L0
+
                             h_min_per_element[element_id] = h
                             if h > h_max
                                 h_max = h
