@@ -90,14 +90,14 @@ t_c = airfoil_cord_length / U_inf
 #tspan = (0.0, 100 * t_c)
 tspan = (0.0, 20 * t_c) # Try to get into a state where initial pressure wave is gone
 
-tspan = (load_time(restart_filename), 100 * t_c)
+#tspan = (load_time(restart_filename), 100 * t_c)
 #tspan = (load_time(restart_filename), load_time(restart_filename) + 1e-4)
 
-#ode = semidiscretize(semi, tspan; split_form = false)
+ode = semidiscretize(semi, tspan; split_form = false)
 #ode = semidiscretize(semi, tspan)
 
 #ode = semidiscretize(semi, tspan, restart_filename)
-ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
+#ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
 
 summary_callback = SummaryCallback()
 
@@ -124,7 +124,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            lift_coefficient))
 
 stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Multi E = 5, ..., 16, non-refined
-stepsize_callback = StepsizeCallback(cfl = 4.7) # PERK_4 Multi E = 5, ..., 16, refined
+#stepsize_callback = StepsizeCallback(cfl = 4.7) # PERK_4 Multi E = 5, ..., 16, refined
 
 #stepsize_callback = StepsizeCallback(cfl = 0.1) # CarpenterKennedy2N54
 
