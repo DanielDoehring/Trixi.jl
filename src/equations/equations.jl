@@ -511,4 +511,8 @@ abstract type AbstractEquationsParabolic{NDIMS, NVARS, GradientVariables} <:
 abstract type AbstractTrafficFlowLWREquations{NDIMS, NVARS} <:
               AbstractEquations{NDIMS, NVARS} end
 include("traffic_flow_lwr_1d.jl")
+
+abstract type AbstractConstantSpeedWaveEquation{NDIMS, NVARS} <:
+              AbstractEquations{NDIMS, NVARS} end
+include("constant_speed_wave_equation1D.jl")
 end # @muladd
