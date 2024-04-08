@@ -88,8 +88,8 @@ tspan = (0.0, 20 * t_c) # Try to get into a state where initial pressure wave is
 # Timespan for measurements over 10 * t_c
 #tspan = (load_time(restart_filename), 30 * t_c)
 
-ode = semidiscretize(semi, tspan; split_form = false) # for PERK
-#ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
+#ode = semidiscretize(semi, tspan; split_form = false) # for PERK
+ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
 
 #ode = semidiscretize(semi, tspan, restart_filename)
 #ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
@@ -125,8 +125,8 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
 
-#stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
-stepsize_callback = StepsizeCallback(cfl = 6.3) # PERK_4 Single 16
+stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
+#stepsize_callback = StepsizeCallback(cfl = 6.3) # PERK_4 Single 16
 
 #stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
 #stepsize_callback = StepsizeCallback(cfl = 6.8) # SSPRK104
@@ -143,7 +143,7 @@ save_restart = SaveRestartCallback(interval = 10^6,
                                    save_final_restart = true)
 
 callbacks = CallbackSet(analysis_callback,
-                        stepsize_callback, # Not for methods with error control
+                        #stepsize_callback, # Not for methods with error control
                         alive_callback,
                         #save_solution,
                         #save_restart,
@@ -174,14 +174,14 @@ dtRatios = [0.252900854746017, # 16
             0.030629777558366] #= 5 =# / 0.252900854746017
 Stages = [16, 14, 12, 10, 8, 7, 6, 5]
 
-#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
+#ode_algorithm = PERK4(16, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
 
-ode_algorithm = PERK4(16, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
-
+#=
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
-
+=#
 
 #=
 ode_algorithm = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
@@ -198,6 +198,9 @@ tol = 1.0e-6
 
 ode_algorithm = RDPK3SpFSAL49(thread = OrdinaryDiffEq.True())
 tol = 5.0e-8
+
+ode_algorithm = RK4(thread = OrdinaryDiffEq.True())
+tol = 5.0e-7
 
 sol = solve(ode, ode_algorithm,
             abstol=tol, reltol=tol,
