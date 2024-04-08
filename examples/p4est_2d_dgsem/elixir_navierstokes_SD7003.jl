@@ -48,13 +48,15 @@ boundary_condition_airfoil = BoundaryConditionNavierStokesWall(velocity_bc_airfo
 
 polydeg = 3
 
-#=
+surface_flux = flux_hlle
 volume_flux = flux_ranocha
-solver = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs,
+
+#=
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 =#
 
-solver = DGSEM(polydeg = polydeg, surface_flux = flux_hll)
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
@@ -65,12 +67,14 @@ mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 boundary_symbols = [:Airfoil, :FarField]
 mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
+#=
 restart_file = "restart_118444.h5"
 restart_file = "restart_000008.h5"
 
 restart_filename = joinpath("out", restart_file)
 
 mesh = load_mesh(restart_filename)
+=#
 
 boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
                            :Airfoil => boundary_condition_slip_wall)
@@ -79,9 +83,9 @@ boundary_conditions_parabolic = Dict(:FarField => boundary_condition_free_stream
                                      :Airfoil => boundary_condition_airfoil)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                     initial_condition, solver;
-                                     boundary_conditions = (boundary_conditions,
-                                                            boundary_conditions_parabolic))
+                                             initial_condition, solver;
+                                             boundary_conditions = (boundary_conditions,
+                                                                    boundary_conditions_parabolic))
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -101,26 +105,33 @@ ode = semidiscretize(semi, tspan; split_form = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100
+analysis_interval = 500
 
-sw_aoa() = aoa
-sw_rho_inf() = rho_inf
-sw_U_inf(equations) = U_inf
-sw_linf() = airfoil_cord_length
+f_aoa() = aoa
+f_rho_inf() = rho_inf
+f_U_inf(equations) = U_inf
+f_linf() = airfoil_cord_length
 
-drag_coefficient = Trixi.AnalysisSurfaceIntegral(semi, :Airfoil,
-                                           Trixi.DragCoefficient(sw_aoa(), sw_rho_inf(),
-                                                           sw_U_inf(equations), sw_linf()))
+drag_coefficient = AnalysisSurfaceIntegral(semi, :Airfoil,
+                                           DragCoefficientPressure(f_aoa(), f_rho_inf(),
+                                                                   f_U_inf(equations), f_linf()))
 
-lift_coefficient = Trixi.AnalysisSurfaceIntegral(semi, :Airfoil,
-                                           Trixi.LiftCoefficient(sw_aoa(), sw_rho_inf(),
-                                                           sw_U_inf(equations), sw_linf()))
+drag_coefficient_shear_force = AnalysisSurfaceIntegral(semi, :Airfoil,
+                                                       DragCoefficientShearStress(f_aoa(),
+                                                                                  f_rho_inf(),
+                                                                                  f_U_inf(equations),
+                                                                                  f_linf()))
+
+lift_coefficient = AnalysisSurfaceIntegral(semi, :Airfoil,
+                                           LiftCoefficientPressure(f_aoa(), f_rho_inf(),
+                                                                   f_U_inf(equations), f_linf()))
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (drag_coefficient,
+                                                           drag_coefficient_shear_force,
                                                            lift_coefficient))
 
 stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Multi E = 5, ..., 16, non-refined
@@ -133,24 +144,14 @@ save_solution = SaveSolutionCallback(interval = Int(100),
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-alive_callback = AliveCallback(alive_interval = 100)
+#alive_callback = AliveCallback(alive_interval = 100)
 
 save_restart = SaveRestartCallback(interval = 10^6,
                                    save_final_restart = true)
 
-amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = Trixi.density),
-                                      base_level = 1,
-                                      max_level = 2, max_threshold = 10)
-
-amr_callback = AMRCallback(semi, amr_controller,
-                            interval = 5,
-                            adapt_initial_condition = false,
-                            adapt_initial_condition_only_refine = true)
-
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        alive_callback,
-                        #amr_callback,
+                        #alive_callback,
                         #save_solution,
                         #save_restart,
                         stepsize_callback)
