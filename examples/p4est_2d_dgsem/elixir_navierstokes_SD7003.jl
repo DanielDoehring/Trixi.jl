@@ -49,9 +49,9 @@ boundary_condition_airfoil = BoundaryConditionNavierStokesWall(velocity_bc_airfo
 polydeg = 3
 
 surface_flux = flux_hlle
-volume_flux = flux_ranocha
 
 #=
+volume_flux = flux_ranocha
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 =#
@@ -91,11 +91,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 t_c = airfoil_cord_length / U_inf
-#tspan = (0.0, 100 * t_c)
 tspan = (0.0, 20 * t_c) # Try to get into a state where initial pressure wave is gone
 
-#tspan = (load_time(restart_filename), 100 * t_c)
-#tspan = (load_time(restart_filename), load_time(restart_filename) + 1e-4)
+# Timespan for measurements over 10 * t_c
+#tspan = (load_time(restart_filename), 30 * t_c)
 
 ode = semidiscretize(semi, tspan; split_form = false)
 #ode = semidiscretize(semi, tspan)
@@ -109,22 +108,22 @@ analysis_interval = 500
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
-f_U_inf(equations) = U_inf
+f_U_inf() = U_inf
 f_linf() = airfoil_cord_length
 
 drag_coefficient = AnalysisSurfaceIntegral(semi, :Airfoil,
                                            DragCoefficientPressure(f_aoa(), f_rho_inf(),
-                                                                   f_U_inf(equations), f_linf()))
+                                                                   f_U_inf(), f_linf()))
 
 drag_coefficient_shear_force = AnalysisSurfaceIntegral(semi, :Airfoil,
                                                        DragCoefficientShearStress(f_aoa(),
                                                                                   f_rho_inf(),
-                                                                                  f_U_inf(equations),
+                                                                                  f_U_inf(),
                                                                                   f_linf()))
 
 lift_coefficient = AnalysisSurfaceIntegral(semi, :Airfoil,
                                            LiftCoefficientPressure(f_aoa(), f_rho_inf(),
-                                                                   f_U_inf(equations), f_linf()))
+                                                                   f_U_inf(), f_linf()))
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
