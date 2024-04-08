@@ -49,13 +49,6 @@ boundary_condition_airfoil = BoundaryConditionNavierStokesWall(velocity_bc_airfo
 polydeg = 3
 
 surface_flux = flux_hlle
-
-#=
-volume_flux = flux_ranocha
-solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
-=#
-
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
 ###############################################################################
@@ -69,7 +62,6 @@ mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_sy
 
 #=
 restart_file = "restart_118444.h5"
-restart_file = "restart_000008.h5"
 
 restart_filename = joinpath("out", restart_file)
 
@@ -96,15 +88,15 @@ tspan = (0.0, 20 * t_c) # Try to get into a state where initial pressure wave is
 # Timespan for measurements over 10 * t_c
 #tspan = (load_time(restart_filename), 30 * t_c)
 
-ode = semidiscretize(semi, tspan; split_form = false)
-#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_form = false) # for PERK
+#ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
 
 #ode = semidiscretize(semi, tspan, restart_filename)
 #ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 500
+analysis_interval = 100_000
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
@@ -133,32 +125,34 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
 
-stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Multi E = 5, ..., 16, non-refined
-#stepsize_callback = StepsizeCallback(cfl = 4.7) # PERK_4 Multi E = 5, ..., 16, refined
+#stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
+stepsize_callback = StepsizeCallback(cfl = 6.3) # PERK_4 Single 16
 
-#stepsize_callback = StepsizeCallback(cfl = 0.1) # CarpenterKennedy2N54
+#stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
+#stepsize_callback = StepsizeCallback(cfl = 6.8) # SSPRK104
+#stepsize_callback = StepsizeCallback(cfl = 4.4) # DGLDDRK84_C
 
 save_solution = SaveSolutionCallback(interval = Int(100),
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-#alive_callback = AliveCallback(alive_interval = 100)
+alive_callback = AliveCallback(alive_interval = 500)
 
 save_restart = SaveRestartCallback(interval = 10^6,
                                    save_final_restart = true)
 
-callbacks = CallbackSet(summary_callback,
-                        analysis_callback,
-                        #alive_callback,
+callbacks = CallbackSet(analysis_callback,
+                        stepsize_callback, # Not for methods with error control
+                        alive_callback,
                         #save_solution,
                         #save_restart,
-                        stepsize_callback)
+                        summary_callback)
 
 ###############################################################################
 # run the simulation
 
-
+# For reference, never used
 dtRatios = [0.252900854746017, # 16
             0.234065997367224, # 15
             0.208310160790890, # 14
@@ -180,24 +174,34 @@ dtRatios = [0.252900854746017, # 16
             0.030629777558366] #= 5 =# / 0.252900854746017
 Stages = [16, 14, 12, 10, 8, 7, 6, 5]
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
+#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
 
-#ode_algorithm = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/SD7003/")
+ode_algorithm = PERK4(16, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
 
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-
 #=
-sol = solve(ode, SSPRK104(; thread = OrdinaryDiffEq.True()),
+ode_algorithm = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
+ode_algorithm = SSPRK104(thread = OrdinaryDiffEq.True())
+ode_algorithm = DGLDDRK84_C(thread = OrdinaryDiffEq.True())
+
+sol = solve(ode, ode_algorithm,
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
 =#
+
+ode_algorithm = CKLLSRK54_3C(thread = OrdinaryDiffEq.True()) # There is a zoo of methods of this kind
+tol = 1.0e-6
+
+ode_algorithm = RDPK3SpFSAL49(thread = OrdinaryDiffEq.True())
+tol = 5.0e-8
+
+sol = solve(ode, ode_algorithm,
+            abstol=tol, reltol=tol,
+            save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
 
