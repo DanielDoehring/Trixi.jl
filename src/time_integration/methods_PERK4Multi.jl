@@ -952,6 +952,6 @@ function Base.resize!(integrator::PERK4_Multi_Integrator, new_size)
     resize!(integrator.du_ode_hyp, new_size)
 
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
-    resize!(integrator.uprev, new_size)
+    #resize!(integrator.uprev, new_size)
 end
 end # @muladd
