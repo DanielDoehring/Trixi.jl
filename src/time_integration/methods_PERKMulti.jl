@@ -393,7 +393,6 @@ function solve(ode::ODEProblem, alg::PERK_Multi;
             # Determine level
             level = mesh.tree.levels[elements.cell_ids[element_id]]
 
-            # Higher element's level determines this interfaces' level
             level_id = max_level + 1 - level
 
             # NOTE: For testcase with artificial assignment

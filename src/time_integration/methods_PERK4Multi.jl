@@ -229,6 +229,18 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
         # Determine level for each element
         for element_id in 1:n_elements
+
+            # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+            #=
+            @unpack node_coordinates = cache.elements
+            for k in eachnode(analyzer), j in eachnode(analyzer), i in eachnode(analyzer)
+                x_node = get_node_coords(node_coordinates, equations, dg, i, j, k, element)
+
+                # distance to origin
+                dist = norm(x_node)
+            end
+            =#
+
             # Determine level
             # NOTE: For really different grid sizes
             level = mesh.tree.levels[elements.cell_ids[element_id]]
@@ -256,7 +268,6 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             # Determine level
             level = mesh.tree.levels[elements.cell_ids[element_id]]
 
-            # Higher element's level determines this interfaces' level
             level_id = max_level + 1 - level
 
             # NOTE: For 1D, periodic BC testcase with artificial assignment

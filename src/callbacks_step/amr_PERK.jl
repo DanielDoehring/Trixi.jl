@@ -123,7 +123,6 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         # Determine level
                         level = mesh.tree.levels[elements.cell_ids[element_id]]
 
-                        # Higher element's level determines this interfaces' level
                         level_id = max_level + 1 - level
                         for l in level_id:(integrator.n_levels)
                             push!(integrator.level_info_interfaces_acc[l], interface_id)
