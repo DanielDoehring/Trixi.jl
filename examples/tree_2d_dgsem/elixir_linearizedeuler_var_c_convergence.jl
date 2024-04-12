@@ -12,11 +12,6 @@ function initial_condition_acoustic_wave(x, t, equations::LinearizedEulerEquatio
   alpha = 1.0
   beta = 30.0
 
-  v1_prime = alpha * exp(-beta * (x[1]^2 + x[2]^2))
-  rho_prime = -v1_prime
-  v2_prime = 0.0
-  p_prime = -v1_prime
-
   # Distance from center of domain
   dist = norm(x)
 
@@ -26,6 +21,16 @@ function initial_condition_acoustic_wave(x, t, equations::LinearizedEulerEquatio
   end
 
   c_mean = 5.0 - 4.0 * dist
+
+  v1_prime = alpha * exp(-beta * (x[1]^2 + x[2]^2))
+  
+  #rho_prime = -v1_prime / c_mean
+  rho_prime = -v1_prime
+
+  v2_prime = alpha * exp(-beta * (x[1]^2 + x[2]^2))
+  
+  #p_prime = -c_mean * v1_prime
+  p_prime = -v1_prime
 
   return SVector(rho_prime, v1_prime, v2_prime, p_prime, c_mean)
 end
