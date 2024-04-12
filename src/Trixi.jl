@@ -163,7 +163,7 @@ export AcousticPerturbationEquations2D,
        ShallowWaterEquations1D, ShallowWaterEquations2D,
        ShallowWaterTwoLayerEquations1D, ShallowWaterTwoLayerEquations2D,
        ShallowWaterEquationsQuasi1D,
-       LinearizedEulerEquations2D,
+       LinearizedEulerEquations2D, LinearizedEulerEquationsVarSoS2D,
        PolytropicEulerEquations2D
 
 export LaplaceDiffusion1D, LaplaceDiffusion2D, LaplaceDiffusion3D,

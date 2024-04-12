@@ -498,6 +498,7 @@ include("acoustic_perturbation_2d.jl")
 abstract type AbstractLinearizedEulerEquations{NDIMS, NVARS} <:
               AbstractEquations{NDIMS, NVARS} end
 include("linearized_euler_2d.jl")
+include("linearized_euler_var_c_2d.jl")
 
 abstract type AbstractEquationsParabolic{NDIMS, NVARS, GradientVariables} <:
               AbstractEquations{NDIMS, NVARS} end
