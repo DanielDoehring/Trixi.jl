@@ -221,7 +221,11 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         min_level = 1 # Hard-coded to our convergence study testcase
         max_level = 2 # Hard-coded to our convergence study testcase
         =#
-        n_levels = max_level - min_level + 1
+
+        #n_levels = max_level - min_level + 1
+
+        # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+        n_levels = 10
 
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
@@ -229,7 +233,6 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
         u = Trixi.wrap_array(u0, ode.p)
-        c_max = 5.0 # CARE: Hard-coded, adapt to every case!
 
         # Determine level for each element
         for element_id in 1:n_elements
@@ -244,15 +247,16 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                     c_max_el = c
                 end
             end
-            # As for P4est
-            level = findfirst(x -> x < c_max_el / c_max, alg.dtRatios)
+            # Similar to procedure for P4est
+            level_id = findfirst(x -> x < c_max_el, alg.dtRatios)
             # Catch case that cell is "too coarse" for method with fewest stage evals
-            if level === nothing
-                level = n_levels
+            if level_id === nothing
+                level_id = n_levels
             else # Avoid reduction in timestep: Use next higher level
-                level = level - 1
+                level_id = level_id - 1
             end
 
+            #=
             # Determine level
             # NOTE: For really different grid sizes
             level = mesh.tree.levels[elements.cell_ids[element_id]]
@@ -261,6 +265,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
             # Convert to level id
             level_id = max_level + 1 - level
+            =#
 
             push!(level_info_elements[level_id], element_id)
             # Add to accumulated container
@@ -761,8 +766,8 @@ function step!(integrator::PERK4_Multi_Integrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
 
         # k1: Evaluated on entire domain / all levels
-        integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
-        #integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
+        #integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
+        integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
 
         @threaded for i in eachindex(integrator.du)
             integrator.k1[i] = integrator.du[i] * integrator.dt
@@ -775,7 +780,7 @@ function step!(integrator::PERK4_Multi_Integrator)
         end
 
         # CARE: This does not work if we have only one method but more than one grid level
-        
+        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
                      integrator.level_info_elements_acc[1],
                      integrator.level_info_interfaces_acc[1],
@@ -784,8 +789,8 @@ function step!(integrator::PERK4_Multi_Integrator)
                      integrator.level_info_mortars_acc[1],
                      integrator.level_u_indices_elements, 1,
                      integrator.du_ode_hyp)
+        =#
         
-        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                         integrator.level_info_elements_acc[1],
                         integrator.level_info_interfaces_acc[1],
@@ -793,7 +798,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                         integrator.level_info_boundaries_orientation_acc[1],
                         integrator.level_info_mortars_acc[1],
                         1)
-        =#
+        
 
         # Update finest level only
         @threaded for u_ind in integrator.level_u_indices_elements[1]
@@ -852,7 +857,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             # For statically refined meshes:
             #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
 
-            
+            #=
             # Joint RHS evaluation with all elements sharing this timestep
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
                          integrator.t_stage,
@@ -864,9 +869,9 @@ function step!(integrator::PERK4_Multi_Integrator)
                          integrator.level_u_indices_elements,
                          integrator.coarsest_lvl,
                          integrator.du_ode_hyp)
-            
+            =#
 
-            #=
+            
             integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
@@ -874,7 +879,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
                             integrator.coarsest_lvl)
-            =#
+            
 
             # Update k_higher of relevant levels
             for level in 1:(integrator.coarsest_lvl)
@@ -897,8 +902,8 @@ function step!(integrator::PERK4_Multi_Integrator)
             integrator.t_stage = integrator.t +
                                  alg.c[alg.NumStages - 3 + stage] * integrator.dt
 
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
-            #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+            #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
             @threaded for u_ind in eachindex(integrator.u)
                 integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
