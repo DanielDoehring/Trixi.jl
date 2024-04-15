@@ -54,7 +54,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span from 0.0 to 0.2
-tspan = (0.0, 0.5) 
+tspan = (0.0, 0.0) 
 ode = semidiscretize(semi, tspan)
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
@@ -78,6 +78,10 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback,
 
 ###############################################################################
 # run the simulation
+
+ode_algorithm = PERK4_Multi([13], "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/Euler/", [42.0])
+
+sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks)
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),

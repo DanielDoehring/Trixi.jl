@@ -227,19 +227,31 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
         level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
 
+        # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+        u = Trixi.wrap_array(u0, ode.p)
+        c_max = 5.0 # CARE: Hard-coded, adapt to every case!
+
         # Determine level for each element
         for element_id in 1:n_elements
 
             # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-            #=
-            @unpack node_coordinates = cache.elements
-            for k in eachnode(analyzer), j in eachnode(analyzer), i in eachnode(analyzer)
-                x_node = get_node_coords(node_coordinates, equations, dg, i, j, k, element)
+            c_max_el = 0.0
+            for j in eachnode(solver), i in eachnode(solver)
+                u_node = get_node_vars(u, equations, solver, i, j, element_id)
 
-                # distance to origin
-                dist = norm(x_node)
+                c = u_node[end]
+                if c > c_max_el
+                    c_max_el = c
+                end
             end
-            =#
+            # As for P4est
+            level = findfirst(x -> x < c_max_el / c_max, alg.dtRatios)
+            # Catch case that cell is "too coarse" for method with fewest stage evals
+            if level === nothing
+                level = n_levels
+            else # Avoid reduction in timestep: Use next higher level
+                level = level - 1
+            end
 
             # Determine level
             # NOTE: For really different grid sizes
