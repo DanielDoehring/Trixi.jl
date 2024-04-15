@@ -46,8 +46,8 @@ coordinates_max = (1.0, 1.0, 1.0) # maximum coordinates (max(x), max(y))
 
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 4,
-                n_cells_max = 30_000)
+                initial_refinement_level = 5,
+                n_cells_max = 300_000)
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
@@ -72,14 +72,15 @@ analysis_errors = Symbol[], analysis_integrals = [])
 # The AliveCallback prints short status information in regular intervals
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-# The StepsizeCallback handles the re-calculation of the maximum Δt after each time step
+# Use CFL callback only for finding timestep, then turn off (linear equation)
 stepsize_callback = StepsizeCallback(cfl = 5.9) # PERK4_Multi
 
-stepsize_callback = StepsizeCallback(cfl = 1.7) # CarpenterKennedy2N54
+#stepsize_callback = StepsizeCallback(cfl = 1.7) # CarpenterKennedy2N54
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
-callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback,
-                        stepsize_callback)
+callbacks = CallbackSet(summary_callback, 
+                        #stepsize_callback,
+                        analysis_callback, alive_callback)
 
 ###############################################################################
 # run the simulation
@@ -90,13 +91,26 @@ corr_c = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
 
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/LinEuler2D_var_c/", corr_c)
 
-sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks)
+sol = Trixi.solve(ode, ode_algorithm, 
+                  dt = 2.7936e-03, 
+                  save_everystep = false, callback = callbacks)
 =#
 
-
+#=                  
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+            dt = 8.0492e-04, # solve needs some value here but it will be overwritten by the stepsize_callback
+            save_everystep = false, callback = callbacks);
+=#
+
+### Error-based integrators ###
+
+ode_algorithm = RK4(thread = OrdinaryDiffEq.True())
+tol = 5.0e-7
+
+sol = solve(ode, ode_algorithm,
+            #abstol=tol, reltol=tol,
+            dt = 4.8524e-04, adaptive = false,
             save_everystep = false, callback = callbacks);
 
 

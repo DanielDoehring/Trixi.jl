@@ -239,8 +239,10 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
             # TODO: For case with locally changing mean speed of sound (Lin. Euler)
             c_max_el = 0.0
-            for j in eachnode(solver), i in eachnode(solver)
-                u_node = get_node_vars(u, equations, solver, i, j, element_id)
+            #for j in eachnode(solver), i in eachnode(solver)
+            for k in eachnode(solver), j in eachnode(solver), i in eachnode(solver)
+                #u_node = get_node_vars(u, equations, solver, i, j, element_id)
+                u_node = get_node_vars(u, equations, solver, i, j, k, element_id)
 
                 c = u_node[end]
                 if c > c_max_el
