@@ -385,6 +385,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
     return nothing
 end
 
+# Required for Euler-Acoustic Elixir
 function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
               level_info_elements_acc::Vector{Int64},
               level_info_interfaces_acc::Vector{Int64},
@@ -392,25 +393,13 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
               level_info_boundaries_orientation_acc::Vector{Vector{Int64}},
               level_info_mortars_acc::Vector{Int64}, 
               _)
-    @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
 
-    u = wrap_array(u_ode, mesh, equations, solver, cache)
-    du = wrap_array(du_ode, mesh, equations, solver, cache)
-
-    # TODO: Taal decide, do we need to pass the mesh?
-    time_start = time_ns()
-    # Call "rhs!" of the corresponding solver
-    @trixi_timeit timer() "rhs! (level-dependent)" rhs!(du, u, t, mesh, equations,
-                                                        initial_condition,
-                                                        boundary_conditions,
-                                                        source_terms, solver, cache,
-                                                        level_info_elements_acc,
-                                                        level_info_interfaces_acc,
-                                                        level_info_boundaries_acc,
-                                                        level_info_boundaries_orientation_acc,
-                                                        level_info_mortars_acc)
-    runtime = time_ns() - time_start
-    put!(semi.performance_counter, runtime)
+    rhs!(du_ode, u_ode, semi, t,
+              level_info_elements_acc,
+              level_info_interfaces_acc,
+              level_info_boundaries_acc,
+              level_info_boundaries_orientation_acc,
+              level_info_mortars_acc)
 
     return nothing
 end
