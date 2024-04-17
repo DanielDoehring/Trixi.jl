@@ -830,8 +830,6 @@ function prolong2interfaces!(cache, u,
     interfaces_u = interfaces.u
 
     @threaded for interface in level_info_interfaces_acc
-        # TODO: Check if neighbors are on same level? Update "interfaces.u" only of current level?
-        # NOTE: Not sure if there is still a formal interface when there are mortars, though.
         left_element = neighbor_ids[1, interface]
         right_element = neighbor_ids[2, interface]
 
