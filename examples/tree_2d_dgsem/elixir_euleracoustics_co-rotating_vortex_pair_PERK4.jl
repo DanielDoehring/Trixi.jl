@@ -319,10 +319,12 @@ tspan_averaging = (50.0, 400.0)
 averaging_callback = AveragingCallback(semi_euler, tspan_averaging)
 
 cfl_Euler = 5.0 # PERK4 Multi [5, 6, 8, 13]
+#cfl_Euler = 5.3 # PERK4 Single 13
+
 #cfl = 1.7 # CarpenterKennedy2N54
 stepsize_callback = StepsizeCallback(cfl = cfl_Euler)
 
-analysis_interval = 5000
+analysis_interval = 50000
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
@@ -336,14 +338,14 @@ callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_ca
 # run simulation for averaging the flow field (required for EulerAcousticsCouplingCallback)
 
 Stages_Euler = [13, 8, 6, 5]
-ode_alg_Euler = PERK4_Multi(Stages_Euler, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/Euler/", [42.0])
+ode_alg_Euler = PERK4_Multi(Stages_Euler, "/home/daniel/PERK4/EulerAcoustic/Euler/", [42.0])
 
-#ode_alg_Euler = PERK4(13, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/Euler/")
-#ode_alg_Euler = PERK4_Multi([13], "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/Euler/", [42.0])
+#ode_alg_Euler = PERK4(13, "/home/daniel/PERK4/EulerAcoustic/Euler/")
+#ode_alg_Euler = PERK4_Multi([13], "/home/daniel/PERK4/EulerAcoustic/Euler/", [42.0])
 
 #ode_alg = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
 
-#=
+
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 sol_averaging = Trixi.solve(ode_averaging, ode_alg_Euler,
                 #solve(ode_averaging, ode_alg,
@@ -352,7 +354,7 @@ sol_averaging = Trixi.solve(ode_averaging, ode_alg_Euler,
 
 # Print the timer summary
 summary_callback()
-=#
+
 
 ###############################################################################
 # set up coupled semidiscretization
@@ -365,9 +367,16 @@ Euler_integrator = init(ode_averaging, ode_alg_Euler,
                         dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                         save_everystep = false, callback = callbacks_averaging)
 
+# For PERK4 Multi
+          
 semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
                                         Euler_integrator.level_info_elements_acc,
                                         source_region = source_region, weights = weights)
+
+#=
+semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
+                                        source_region = source_region, weights = weights)
+=#
 
 ###############################################################################
 # ODE solvers, callbacks etc. for the coupled simulation
@@ -384,31 +393,30 @@ ode_euler = semidiscretize(semi.semi_euler, tspan)
 
 # Note never tested how large CFL acoustic can be
 # But overall timestep is for 5.0 already limited by CFL for Euler
-cfl_Acoustics = 5.0
+cfl_Acoustics = 5.0 # PERK4 Multi
+#cfl_Acoustics = 5.3 # PERK4 Single
+
+cfl_Euler_Coupling = 5.0 # PERK Multi
+#cfl_Euler_Coupling = 5.2 # PERK Single
 
 euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averaging.h5",
                                                           ode_alg_Euler,
-                                                          cfl_Acoustics, cfl_Euler)
+                                                          cfl_Acoustics, cfl_Euler_Coupling)
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timer
 
-analysis_interval = 500
+analysis_interval = 5000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-output_directory = "out/"
-save_solution = SaveSolutionCallback(interval = 2300, output_directory = output_directory)
-save_restart = SaveRestartCallback(interval = 2300, output_directory = output_directory)
-
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback, 
-                        #save_solution, save_restart,
                         euler_acoustics_coupling)
 
 Stages_Acoustics = [14, 9, 6, 5]
-ode_alg_Acoustic = PERK4_Multi(Stages_Acoustics, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/Acoustics/", [42.0])
+ode_alg_Acoustic = PERK4_Multi(Stages_Acoustics, "/home/daniel/PERK4/EulerAcoustic/Acoustics/", [42.0])
 
-#ode_alg_Acoustic = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/Acoustics/")
-#ode_alg_Acoustic = PERK4_Multi([14], "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/Acoustics/", [42.0])
+#ode_alg_Acoustic = PERK4(14, "/home/daniel/PERK4/EulerAcoustic/Acoustics/")
+#ode_alg_Acoustic = PERK4_Multi([14], "/home/daniel/PERK4/EulerAcoustic/Acoustics/", [42.0])
 
 sol = Trixi.solve(ode, ode_alg_Acoustic,
       #solve(ode, ode_alg_Acoustic,

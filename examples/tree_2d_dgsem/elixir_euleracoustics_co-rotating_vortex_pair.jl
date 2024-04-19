@@ -316,23 +316,28 @@ ode_averaging = semidiscretize(semi_euler, tspan1)
 # and resets the timers
 summary_callback = SummaryCallback()
 
-analysis_interval = 5000
+analysis_interval = 50000
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
 tspan_averaging = (50.0, 400.0)
 averaging_callback = AveragingCallback(semi_euler, tspan_averaging)
 
-stepsize_callback = StepsizeCallback(cfl = 0.8)
+cfl = 1.7 # CarpenterKennedy2N54
+cfl = 0.9 # RK4()
+stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_callback,
-                                  stepsize_callback)
+                                  stepsize_callback, analysis_callback)
 
 ###############################################################################
 # run simulation for averaging the flow field
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-sol_averaging = solve(ode_averaging, CarpenterKennedy2N54(williamson_condition = false),
+ode_alg = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
+ode_alg = RK4(thread = OrdinaryDiffEq.True())
+sol_averaging = solve(ode_averaging, ode_alg,
                       dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                      adaptive = false,
                       save_everystep = false, callback = callbacks_averaging);
 
 # Print the timer summary
@@ -352,38 +357,35 @@ semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
 # ODE solvers, callbacks etc. for the coupled simulation
 
 # Create ODE problem
-tspan = (0.0, 7.0 * T_a)
+#tspan = (0.0, 7.0 * T_a)
+tspan = (0.0, 5.0 * T_a)
 ode = semidiscretize(semi, tspan)
 # We need an additional ODE for the pure flow problem
 ode_euler = semidiscretize(semi.semi_euler, tspan)
 
 # Set up coupling callback
-cfl_acoustics = 0.8
-cfl_euler = 0.8
+cfl_acoustics = 0.5
+cfl_euler = 0.5 # RK4
+
 euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averaging.h5",
                                                           # integrator_euler
-                                                          CarpenterKennedy2N54(williamson_condition = false),
-                                                          cfl_acoustics, cfl_euler,
-                                                          callback = SaveRestartCallback(interval = 2300,
-                                                                                         output_directory = "out/euler/"))
+                                                          ode_alg,
+                                                          cfl_acoustics, cfl_euler)
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timers
 summary_callback = SummaryCallback()
 
-analysis_interval = 5000
+analysis_interval = 50000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-output_directory = "out/"
-save_solution = SaveSolutionCallback(interval = 2300, output_directory = output_directory)
-save_restart = SaveRestartCallback(interval = 2300, output_directory = output_directory)
+callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback,
+                        euler_acoustics_coupling)
 
-callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback, save_solution,
-                        save_restart, euler_acoustics_coupling)
-
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
+sol = solve(ode, ode_alg,
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+            adaptive = false,
             save_everystep = false, callback = callbacks);
 
 # Print the timer summary
