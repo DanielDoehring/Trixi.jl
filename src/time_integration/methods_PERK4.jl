@@ -90,7 +90,7 @@ mutable struct PERK4_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     u_tmp::uType
     t::RealT
     dt::RealT # current time step
-    dtcache::RealT # ignored
+    dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
@@ -104,14 +104,13 @@ mutable struct PERK4_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     k_S1::uType # Required for third & fourth order
     t_stage::RealT
 
-    #=
+    
     # TODO: Not best solution since this is not needed for hyperbolic problems
     du_ode_hyp::uType 
 
     # TODO uprev, tprev for averaging callback (required for coupled Euler-acoustic simulations)
     uprev::uType
     tprev::RealT
-    =#
 end
 
 # Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
@@ -134,13 +133,13 @@ function init(ode::ODEProblem, alg::PERK4;
     k_higher = zero(u0)
     k_S1 = zero(u0)
 
-    #du_ode_hyp = zero(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
+    du_ode_hyp = zero(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
 
-    #=
+    
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
     uprev = zero(u0)
     tprev = zero(ode.tspan[1])
-    =#
+    
 
     t0 = first(ode.tspan)
     iter = 0
@@ -149,8 +148,9 @@ function init(ode::ODEProblem, alg::PERK4;
                                   (prob = ode,), ode.f, alg,
                                   PERK_IntegratorOptions(callback, ode.tspan;
                                                          kwargs...), false,
-                                  k1, k_higher, k_S1, t0)
-                                  #du_ode_hyp, uprev, tprev)
+                                  k1, k_higher, k_S1, t0,
+                                  du_ode_hyp,
+                                  uprev, tprev)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -183,12 +183,12 @@ function solve_steps!(integrator::PERK4_Integrator)
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # NOTE: `prev` For EulerAcoustics only
-        #=
+        
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
         integrator.tprev = integrator.t
-        =#
+        
 
         step!(integrator)
     end # "main loop" timer
@@ -218,6 +218,7 @@ function step!(integrator::PERK4_Integrator)
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
 
+        @trixi_timeit timer() "k1, k2, identical" begin
         # k1: Evaluated on entire domain / all levels
         #integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
@@ -233,16 +234,18 @@ function step!(integrator::PERK4_Integrator)
         @threaded for i in eachindex(integrator.du)
             integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.k1[i]
         end
+        end
 
+        @trixi_timeit timer() "k1, k2, different" begin
         #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
         @threaded for u_ind in eachindex(integrator.u)
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
+        end
 
         for stage in 3:(alg.NumStages - 3)
-
             # Construct current state
             @threaded for u_ind in eachindex(integrator.u)
                 integrator.u_tmp[u_ind] = integrator.u[u_ind] +
@@ -262,11 +265,14 @@ function step!(integrator::PERK4_Integrator)
             end
         end
 
+        @trixi_timeit timer() "kS-3, u_upd" begin
         # Last three stages: Same Butcher Matrix
         for stage in 1:3
+            # Construct current state
             @threaded for u_ind in eachindex(integrator.u)
                 integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                          alg.AMatrix[stage, 1] * integrator.k1[u_ind] +
+                                          alg.AMatrix[stage, 1] *
+                                          integrator.k1[u_ind] +
                                           alg.AMatrix[stage, 2] *
                                           integrator.k_higher[u_ind]
             end
@@ -280,6 +286,7 @@ function step!(integrator::PERK4_Integrator)
                 integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
             end
 
+            # Store k_{S-1}
             if stage == 2
                 @threaded for u_ind in eachindex(integrator.u)
                     integrator.k_S1[u_ind] = integrator.k_higher[u_ind]
@@ -288,21 +295,23 @@ function step!(integrator::PERK4_Integrator)
         end
 
         @threaded for u_ind in eachindex(integrator.u)
-            integrator.u[u_ind] += 0.5 *
-                                   (integrator.k_S1[u_ind] + integrator.k_higher[u_ind])
+            integrator.u[u_ind] += 0.5 * (integrator.k_S1[u_ind] + integrator.k_higher[u_ind])
+        end
         end
     end # PERK4 step
 
     integrator.iter += 1
     integrator.t += integrator.dt
 
-    # handle callbacks
-    if callbacks isa CallbackSet
-        foreach(callbacks.discrete_callbacks) do cb
-            if cb.condition(integrator.u, integrator.t, integrator)
-                cb.affect!(integrator)
+    @trixi_timeit timer() "Step-Callbacks" begin
+        # handle callbacks
+        if callbacks isa CallbackSet
+            foreach(callbacks.discrete_callbacks) do cb
+                if cb.condition(integrator.u, integrator.t, integrator)
+                    cb.affect!(integrator)
+                end
+                return nothing
             end
-            return nothing
         end
     end
 
@@ -345,12 +354,10 @@ function Base.resize!(integrator::PERK4_Integrator, new_size)
     resize!(integrator.k_higher, new_size)
     resize!(integrator.k_S1, new_size)
 
-    #=
     # TODO: Move this into parabolic cache or similar
     resize!(integrator.du_ode_hyp, new_size)
 
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
-    resize!(integrator.uprev, new_size)
-    =#
+    #resize!(integrator.uprev, new_size)
 end
 end # @muladd

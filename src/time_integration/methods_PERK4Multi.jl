@@ -33,9 +33,9 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
     # For the p = 4 method there are less free coefficients
     CoeffsMax = NumStages - 5
 
-    AMatrices = zeros(length(Stages), CoeffsMax, 2)
+    AMatrices = zeros(CoeffsMax, 2, length(Stages))
     for i in 1:length(Stages)
-        AMatrices[i, :, 1] = c[3:(NumStages - 3)]
+        AMatrices[:, 1, i] = c[3:(NumStages - 3)]
     end
 
     # Datastructure indicating at which stage which level is evaluated
@@ -59,8 +59,8 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
         @assert NumMonCoeffs == NumStageEvals - 5
 
         if NumMonCoeffs > 0
-            AMatrices[level, (CoeffsMax - NumMonCoeffs + 1):end, 1] -= A
-            AMatrices[level, (CoeffsMax - NumMonCoeffs + 1):end, 2] = A
+            AMatrices[(CoeffsMax - NumMonCoeffs + 1):end, 1, level] -= A
+            AMatrices[(CoeffsMax - NumMonCoeffs + 1):end, 2, level] = A
         end
 
         # Add active levels to stages
@@ -83,7 +83,7 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
 
     for i in 1:length(Stages)
         println("A-Matrix of Butcher tableau of level " * string(i))
-        display(AMatrices[i, :, :])
+        display(AMatrices[:, :, i])
         println()
     end
 
@@ -141,7 +141,7 @@ mutable struct PERK4_Multi_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     u_tmp::uType
     t::RealT
     dt::RealT # current time step
-    dtcache::RealT # ignored
+    dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
@@ -165,14 +165,14 @@ mutable struct PERK4_Multi_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     coarsest_lvl::Int64
     n_levels::Int64
 
-    #=
+    
     # TODO: Not best solution since this is not needed for hyperbolic problems
     du_ode_hyp::uType
 
     # TODO uprev, tprev for averaging callback (required for coupled Euler-acoustic simulations)
     uprev::uType
     tprev::RealT
-    =#
+    
 end
 
 # Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
@@ -196,7 +196,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     k_higher = zero(u0)
     k_S1 = zero(u0)
 
-    #du_ode_hyp = similar(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
+    du_ode_hyp = similar(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
 
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
     uprev = zero(u0)
@@ -226,22 +226,22 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         max_level = 2 # Hard-coded to our convergence study testcase
         =#
 
-        #n_levels = max_level - min_level + 1
+        n_levels = max_level - min_level + 1
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-        n_levels = 10
+        #n_levels = 10
+        #u = Trixi.wrap_array(u0, ode.p)
 
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
         level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-        # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-        u = Trixi.wrap_array(u0, ode.p)
 
         # Determine level for each element
         for element_id in 1:n_elements
 
             # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+            #=
             c_max_el = 0.0
             #for j in eachnode(solver), i in eachnode(solver)
             for k in eachnode(solver), j in eachnode(solver), i in eachnode(solver)
@@ -261,8 +261,9 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             else # Avoid reduction in timestep: Use next higher level
                 level_id = level_id - 1
             end
+            =#
 
-            #=
+            
             # Determine level
             # NOTE: For really different grid sizes
             level = mesh.tree.levels[elements.cell_ids[element_id]]
@@ -271,7 +272,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
             # Convert to level id
             level_id = max_level + 1 - level
-            =#
+            
 
             push!(level_info_elements[level_id], element_id)
             # Add to accumulated container
@@ -703,9 +704,9 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                                         level_info_boundaries_orientation_acc,
                                         level_info_mortars_acc,
                                         level_u_indices_elements,
-                                        t0, -1, n_levels)
-                                        #du_ode_hyp,
-                                        #uprev, tprev)
+                                        t0, -1, n_levels,
+                                        du_ode_hyp,
+                                        uprev, tprev)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -738,12 +739,12 @@ function solve_steps!(integrator::PERK4_Multi_Integrator)
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # NOTE: `prev` For EulerAcoustics only
-        #=
+        
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
         integrator.tprev = integrator.t
-        =#
+        
 
         step!(integrator)
     end # "main loop" timer
@@ -772,6 +773,7 @@ function step!(integrator::PERK4_Multi_Integrator)
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
 
+        @trixi_timeit timer() "k1, k2 identical" begin
         # k1: Evaluated on entire domain / all levels
         #integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
@@ -785,7 +787,9 @@ function step!(integrator::PERK4_Multi_Integrator)
         @threaded for i in eachindex(integrator.u)
             integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.k1[i]
         end
-
+        end
+        
+        #@trixi_timeit timer() "k1, k2, different" begin
         # CARE: This does not work if we have only one method but more than one grid level
         #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
@@ -805,32 +809,27 @@ function step!(integrator::PERK4_Multi_Integrator)
                         integrator.level_info_boundaries_orientation_acc[1],
                         integrator.level_info_mortars_acc[1],
                         1)
-        
+
         # Update finest level only
         @threaded for u_ind in integrator.level_u_indices_elements[1]
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
+        #end
 
         for stage in 3:(alg.NumStages - 3)
-
-            #=
-            # Construct current state
-            @threaded for i in eachindex(integrator.u)
-                integrator.u_tmp[i] = integrator.u[i]
-            end
-
             ### General implementation: Not own method for each level ###
-
             # Loop over different methods with own associated level
+            # TODO: Optimize storage layout of AMatrices ? 
             for level in 1:min(alg.NumMethods, integrator.n_levels)
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] += alg.AMatrices[level, stage - 2, 1] *
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + 
+                                              alg.AMatrices[stage - 2, 1, level] *
                                                integrator.k1[u_ind]
                 end
             end
             for level in 1:min(alg.HighestEvalLevels[stage], integrator.n_levels)
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] += alg.AMatrices[level, stage - 2, 2] *
+                    integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] *
                                                integrator.k_higher[u_ind]
                 end
             end
@@ -838,44 +837,44 @@ function step!(integrator::PERK4_Multi_Integrator)
             # "Remainder": Non-efficiently integrated
             for level in (alg.NumMethods + 1):(integrator.n_levels)
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] += alg.AMatrices[alg.NumMethods,
-                                                             stage - 2, 1] *
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + 
+                                        alg.AMatrices[stage - 2, 1, alg.NumMethods] *
                                                integrator.k1[u_ind]
                 end
             end
             if alg.HighestEvalLevels[stage] == alg.NumMethods
                 for level in (alg.HighestEvalLevels[stage] + 1):(integrator.n_levels)
                     @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.u_tmp[u_ind] += alg.AMatrices[alg.NumMethods,
-                                                                 stage - 2, 2] *
+                        integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, alg.NumMethods] *
                                                    integrator.k_higher[u_ind]
                     end
                 end
             end
-            =#
+            
 
             ### Simplified implementation: Own method for each level ###
             #=
             for level in 1:integrator.n_levels
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[level, stage - 2, 1] *
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1, level] *
                                                integrator.k1[u_ind]
                 end
             end
             for level in 1:alg.HighestEvalLevels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] += alg.AMatrices[level, stage - 2, 2] *
+                    integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] *
                                                integrator.k_higher[u_ind]
                 end
             end
             =#
 
-            ### Optimized implementation
+            #=
+            ### Optimized implementation for case: Own method for each level
             for level in 1:alg.HighestEvalLevels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[level, stage - 2, 1] *
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1, level] *
                                                integrator.k1[u_ind] + 
-                                               alg.AMatrices[level, stage - 2, 2] *
+                                               alg.AMatrices[stage - 2, 2, level] *
                                                integrator.k_higher[u_ind]
                 end
             end
@@ -884,10 +883,11 @@ function step!(integrator::PERK4_Multi_Integrator)
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k_higher[u_ind] # * A[level, stage] = c[level] = 1
                 end
             end
+            =#
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
-            #=
+            
             # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
             integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage],
                                           integrator.n_levels)
@@ -896,10 +896,10 @@ function step!(integrator::PERK4_Multi_Integrator)
             if integrator.coarsest_lvl == alg.NumMethods
                 integrator.coarsest_lvl = integrator.n_levels
             end
-            =#
-
-            # For statically refined meshes:
-            integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
+            
+            
+            # For statically refined meshes with method for each level
+            #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
 
             #=
             # Joint RHS evaluation with all elements sharing this timestep
@@ -933,8 +933,10 @@ function step!(integrator::PERK4_Multi_Integrator)
             end
         end # end loop over different stages
 
+        #@trixi_timeit timer() "kS-3, u_upd" begin
         # Last three stages: Same Butcher Matrix
         for stage in 1:3
+            # Construct current state
             @threaded for u_ind in eachindex(integrator.u)
                 integrator.u_tmp[u_ind] = integrator.u[u_ind] + 
                                           alg.AMatrix[stage, 1] *
@@ -963,6 +965,7 @@ function step!(integrator::PERK4_Multi_Integrator)
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u[u_ind] += 0.5 * (integrator.k_S1[u_ind] + integrator.k_higher[u_ind])
         end
+        #end
     end # PERK4_Multi step
 
     integrator.iter += 1
@@ -1020,9 +1023,9 @@ function Base.resize!(integrator::PERK4_Multi_Integrator, new_size)
     resize!(integrator.k_S1, new_size)
 
     # TODO: Move this into parabolic cache or similar
-    #resize!(integrator.du_ode_hyp, new_size)
+    resize!(integrator.du_ode_hyp, new_size)
 
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
-    #resize!(integrator.uprev, new_size)
+    resize!(integrator.uprev, new_size)
 end
 end # @muladd
