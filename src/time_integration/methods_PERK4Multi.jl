@@ -307,14 +307,14 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             level_1 = 0
             level_2 = 0
 
-            for level in 1:10
+            for level in 1:n_levels
                 if el_id_1 in level_info_elements[level]
                     level_1 = level
                     break
                 end
             end
 
-            for level in 1:10
+            for level in 1:n_levels
                 if el_id_2 in level_info_elements[level]
                     level_2 = level
                     break
