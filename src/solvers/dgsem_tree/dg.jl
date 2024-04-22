@@ -17,7 +17,7 @@ end
 
 # du .= zero(eltype(du)) doesn't scale when using multiple threads.
 # See https://github.com/trixi-framework/Trixi.jl/pull/924 for a performance comparison.
-# TODO: Could try passing in level_u_indices_elements
+# TODO: Could try passing in level_u_indices_elements (unwrapped version)
 function reset_du!(du, level_info_elements_acc::Vector{Int64})
     @threaded for element in level_info_elements_acc
         du[.., element] .= zero(eltype(du))
