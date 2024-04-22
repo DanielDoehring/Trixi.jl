@@ -264,9 +264,7 @@ function step!(integrator::PERK4_Integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        @trixi_timeit timer() "k1k2" begin
         k1k2!(integrator, prob.p, alg.c)
-        end
 
         #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
