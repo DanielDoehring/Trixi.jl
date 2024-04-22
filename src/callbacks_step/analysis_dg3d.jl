@@ -159,7 +159,7 @@ function calc_error_norms(func, u, t, analyzer,
             l2_error += diff .^ 2 *
                         (weights[i] * weights[j] * weights[k] * jacobian_local[i, j, k])
             linf_error = @. max(linf_error, abs(diff))
-            l1_error_local += abs.(diff) * (weights[i] * weights[j] * weights[k] *
+            l1_error += abs.(diff) * (weights[i] * weights[j] * weights[k] *
                                              jacobian_local[i, j, k])
             total_volume += weights[i] * weights[j] * weights[k] *
                             jacobian_local[i, j, k]
