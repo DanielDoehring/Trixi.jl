@@ -218,7 +218,7 @@ function step!(integrator::PERK4_Integrator)
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
 
-        @trixi_timeit timer() "k1, k2, identical" begin
+        @trixi_timeit timer() "k1, k2" begin
         # k1: Evaluated on entire domain / all levels
         #integrator.f(integrator.du, integrator.u, prob.p, integrator.t, integrator.du_ode_hyp)
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
@@ -227,24 +227,20 @@ function step!(integrator::PERK4_Integrator)
             integrator.k1[i] = integrator.du[i] * integrator.dt
         end
 
-        # k2
         integrator.t_stage = integrator.t + alg.c[2] * integrator.dt
-
-        # Construct current state
-        @threaded for i in eachindex(integrator.du)
+        @threaded for i in eachindex(integrator.u)
             integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.k1[i]
         end
-        end
 
-        @trixi_timeit timer() "k1, k2, different" begin
         #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
-        @threaded for u_ind in eachindex(integrator.u)
+        @threaded for u_ind in eachindex(integrator.du)
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
         end
 
+        @trixi_timeit timer() "k3, kS3" begin
         for stage in 3:(alg.NumStages - 3)
             # Construct current state
             @threaded for u_ind in eachindex(integrator.u)
@@ -264,11 +260,11 @@ function step!(integrator::PERK4_Integrator)
                 integrator.k_higher[i] = integrator.du[i] * integrator.dt
             end
         end
+        end
 
         @trixi_timeit timer() "kS-3, u_upd" begin
         # Last three stages: Same Butcher Matrix
         for stage in 1:3
-            # Construct current state
             @threaded for u_ind in eachindex(integrator.u)
                 integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                           alg.AMatrix[stage, 1] *
@@ -282,19 +278,21 @@ function step!(integrator::PERK4_Integrator)
             #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
             integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
-            @threaded for u_ind in eachindex(integrator.u)
+            @threaded for u_ind in eachindex(integrator.du)
                 integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
             end
 
             # Store k_{S-1}
             if stage == 2
-                @threaded for u_ind in eachindex(integrator.u)
+                @threaded for u_ind in eachindex(integrator.k_S1)
                     integrator.k_S1[u_ind] = integrator.k_higher[u_ind]
                 end
             end
         end
-
+        
         @threaded for u_ind in eachindex(integrator.u)
+            # Not sure if in a memory-bound situation it would be faster to access only 
+            # one stage at at time, but twice `u`
             integrator.u[u_ind] += 0.5 * (integrator.k_S1[u_ind] + integrator.k_higher[u_ind])
         end
         end
