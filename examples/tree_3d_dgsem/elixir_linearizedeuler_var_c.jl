@@ -56,14 +56,14 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span from 0.0 to 0.2
-tspan = (0.0, 0.3) 
+tspan = (0.0, 1.0) 
 ode = semidiscretize(semi, tspan)
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timers
 summary_callback = SummaryCallback()
 
-analysis_interval = 500 # High enough to just eval at end
+analysis_interval = 5000 # High enough to just eval at end
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
@@ -71,7 +71,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_integrals = [])
 
 # The AliveCallback prints short status information in regular intervals
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 50)
 
 # Use CFL callback only for finding timestep, then turn off (linear equation)
 stepsize_callback = StepsizeCallback(cfl = 6.0) # PERK4_Multi
@@ -94,8 +94,8 @@ callbacks = CallbackSet(summary_callback,
 Stages = [15, 14, 13, 12, 11, 10, 9, 7, 6, 5]
 corr_c = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/PERK4/LinEuler2D_var_c/", corr_c)
-#ode_algorithm = PERK4(15, "/home/daniel/PERK4/LinEuler2D_var_c/")
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/LinEuler2D_var_c/", corr_c)
+#ode_algorithm = PERK4(15, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/LinEuler2D_var_c/")
 
 sol = Trixi.solve(ode, ode_algorithm, 
                   dt = 1.4205e-03, # Multi PERK

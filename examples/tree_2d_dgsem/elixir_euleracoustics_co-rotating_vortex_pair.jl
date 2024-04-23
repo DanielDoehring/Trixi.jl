@@ -390,3 +390,10 @@ sol = solve(ode, ode_alg,
 
 # Print the timer summary
 summary_callback()
+
+using Plots
+
+pd = PlotData2D(sol)
+
+# See figure 7.7 from Michaels dissertation
+plot(pd["p_prime"], clims=(-0.0002, 0.0002), xlims=(-100,100), ylims=(-100,100))
