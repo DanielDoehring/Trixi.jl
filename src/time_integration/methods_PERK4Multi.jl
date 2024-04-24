@@ -233,8 +233,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         n_levels = max_level - min_level + 1
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-        n_levels = 10
-        u = Trixi.wrap_array(u0, ode.p)
+        #n_levels = 10
+        #u = Trixi.wrap_array(u0, ode.p)
 
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
@@ -245,7 +245,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         for element_id in 1:n_elements
 
             # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-            
+            #=
             c_max_el = 0.0
             #for j in eachnode(solver), i in eachnode(solver)
             for k in eachnode(solver), j in eachnode(solver), i in eachnode(solver)
@@ -265,18 +265,20 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             else # Avoid reduction in timestep: Use next higher level
                 level_id = level_id - 1
             end
-            
+            =#
 
-            #=
+            
             # Determine level
             # NOTE: For really different grid sizes
             level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+            
             # NOTE: For 1D, periodic BC testcase with artificial assignment
             #level = rand(min_level:max_level)
 
             # Convert to level id
             level_id = max_level + 1 - level
-            =#
+            
 
             push!(level_info_elements[level_id], element_id)
             # Add to accumulated container
@@ -291,16 +293,17 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         # Determine level for each interface
         for interface_id in 1:n_interfaces
             # Get element id: Interfaces only between elements of same size
-            #=
+            
             element_id = interfaces.neighbor_ids[1, interface_id]
 
             # Determine level
             level = mesh.tree.levels[elements.cell_ids[element_id]]
 
             level_id = max_level + 1 - level
-            =#
+            
 
             # NOTE: For case with varying characteristic speeds
+            #=
             el_id_1 = interfaces.neighbor_ids[1, interface_id]
             el_id_2 = interfaces.neighbor_ids[2, interface_id]
 
@@ -322,6 +325,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             end
 
             level_id = min(level_1, level_2)
+            =#
 
             # NOTE: For 1D, periodic BC testcase with artificial assignment
             #=
@@ -832,7 +836,7 @@ function step!(integrator::PERK4_Multi_Integrator)
         end
 
         for stage in 3:(alg.NumStages - 3)
-            #=
+            
             ### General implementation: Not own method for each grid level ###
             # Loop over different methods with own associated level
             for level in 1:min(alg.NumMethods, integrator.n_levels)
@@ -865,7 +869,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                     end
                 end
             end
-            =#
+            
 
             ### Simplified implementation: Own method for each level ###
             #=
@@ -883,7 +887,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             end
             =#
 
-            
+            #=
             ### Optimized implementation for case: Own method for each level
             for level in 1:alg.HighestEvalLevels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
@@ -898,52 +902,58 @@ function step!(integrator::PERK4_Multi_Integrator)
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k_higher[u_ind] # * A[stage, 1, level] = c[level] = 1
                 end
             end
-            
+            =#
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
-            #=
+            # For statically refined meshes
+            integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
+            
             # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage],
-                                          integrator.n_levels)
+            #integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
 
             # Check if there are fewer integrators than grid levels (non-optimal method)
             if integrator.coarsest_lvl == alg.NumMethods
-                integrator.coarsest_lvl = integrator.n_levels
-            end
-            =#
-            
-            # For statically refined meshes with method for each level
-            integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
+                # NOTE: This is supposedly more efficient than setting
+                #integrator.coarsest_lvl = integrator.n_levels
+                # and then using the level-dependent version
 
-            #=
-            # Joint RHS evaluation with all elements sharing this timestep
-            integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                         integrator.t_stage,
-                         integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                         integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                         integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                         integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                         integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                         integrator.level_u_indices_elements,
-                         integrator.coarsest_lvl,
-                         integrator.du_ode_hyp)
-            =#
+                #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
-            
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                @threaded for u_ind in eachindex(integrator.du)
+                    integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+                end
+            else
+                #=
+                # Joint RHS evaluation with all elements sharing this timestep
+                integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                            integrator.t_stage,
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                            integrator.coarsest_lvl)
-            
-            # Update k_higher of relevant levels
-            for level in 1:(integrator.coarsest_lvl)
-                @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.k_higher[u_ind] = integrator.du[u_ind] *
-                                                 integrator.dt
+                            integrator.level_u_indices_elements,
+                            integrator.coarsest_lvl,
+                            integrator.du_ode_hyp)
+                =#
+
+                
+                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
+                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
+                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
+                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
+                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
+                             integrator.coarsest_lvl)
+                
+                # Update k_higher of relevant levels
+                for level in 1:(integrator.coarsest_lvl)
+                    @threaded for u_ind in integrator.level_u_indices_elements[level]
+                        integrator.k_higher[u_ind] = integrator.du[u_ind] *
+                                                    integrator.dt
+                    end
                 end
             end
         end # end loop over different stages
