@@ -124,7 +124,7 @@ function source_term_sponge_layer(u, x, t, equations::AcousticPerturbationEquati
                     Val(2 * ndims(equations)))
     alpha_square = maximum(alphas)^2
 
-    return SVector(0, 0, -alpha_square * (u[3] - reference_values[1] / u[6]^2), 0, 0, 0, 0)
+    return SVector(0.0, 0.0, -alpha_square * (u[3] - reference_values[1] / u[6]^2), 0.0, 0.0, 0.0, 0.0)
 end
 
 function source_term_sponge_layer(u, x, t, equations::CompressibleEulerEquations2D,
@@ -138,7 +138,7 @@ function source_term_sponge_layer(u, x, t, equations::CompressibleEulerEquations
     alpha_square = maximum(alphas)^2
 
     u_prim = cons2prim(u, equations)
-    s = SVector(-alpha_square * (u_prim[1] - reference_values[1]), 0, 0,
+    s = SVector(-alpha_square * (u_prim[1] - reference_values[1]), 0.0, 0.0,
                 -alpha_square * (u_prim[4] - reference_values[2]))
 
     return prim2cons(s, equations)
@@ -235,8 +235,8 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 n_cells_max = n_cells_max, # set maximum capacity of tree data structure
                 periodicity = false)
 
-# Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
+surf_flux = flux_lax_friedrichs
+solver = DGSEM(polydeg = 3, surface_flux = surf_flux)
 
 ###############################################################################
 # semidiscretization Euler equations
@@ -312,22 +312,23 @@ semi_acoustics = SemidiscretizationHyperbolic(mesh, equations_acoustics,
 
 # Create ODE problem
 tspan1 = (0.0, 400.0)
+#tspan1 = (0.0, 10.0) # For tests
 
 ode_averaging = semidiscretize(semi_euler, tspan1)
 
 tspan_averaging = (50.0, 400.0)
 averaging_callback = AveragingCallback(semi_euler, tspan_averaging)
 
-cfl_Euler = 5.0 # PERK4 Multi [5, 6, 8, 13]
-#cfl_Euler = 5.3 # PERK4 Single 13
+cfl_Euler = 5.0 # PERK4 Multi [5, 6, 8, 13] # Ref_3
 
-#cfl = 1.7 # CarpenterKennedy2N54
+cfl_Euler = 6.2 # PERK4 Single 13
+
 stepsize_callback = StepsizeCallback(cfl = cfl_Euler)
 
 analysis_interval = 50000
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval)
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 100)
 
 summary_callback = SummaryCallback()
 
@@ -338,17 +339,12 @@ callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_ca
 # run simulation for averaging the flow field (required for EulerAcousticsCouplingCallback)
 
 Stages_Euler = [13, 8, 6, 5]
-ode_alg_Euler = PERK4_Multi(Stages_Euler, "/home/daniel/PERK4/EulerAcoustic/Euler/", [42.0])
+#ode_alg_Euler = PERK4_Multi(Stages_Euler, "/home/daniel/PERK4/EulerAcoustic/Euler/Ref_3/", [42.0])
 
-#ode_alg_Euler = PERK4(13, "/home/daniel/PERK4/EulerAcoustic/Euler/")
-#ode_alg_Euler = PERK4_Multi([13], "/home/daniel/PERK4/EulerAcoustic/Euler/", [42.0])
-
-#ode_alg = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
-
+ode_alg_Euler = PERK4(13, "/home/daniel/PERK4/EulerAcoustic/Euler/Ref_4/")
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 sol_averaging = Trixi.solve(ode_averaging, ode_alg_Euler,
-                #solve(ode_averaging, ode_alg,
                             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                             save_everystep = false, callback = callbacks_averaging);
 
@@ -368,15 +364,14 @@ Euler_integrator = init(ode_averaging, ode_alg_Euler,
                         save_everystep = false, callback = callbacks_averaging)
 
 # For PERK4 Multi
-          
+#=     
 semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
                                         Euler_integrator.level_info_elements_acc,
                                         source_region = source_region, weights = weights)
-
-#=
-semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
-                                        source_region = source_region, weights = weights)
 =#
+
+semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
+                                        source_region = source_region, weights = weights)                                        
 
 ###############################################################################
 # ODE solvers, callbacks etc. for the coupled simulation
@@ -394,10 +389,10 @@ ode_euler = semidiscretize(semi.semi_euler, tspan)
 # Note never tested how large CFL acoustic can be
 # But overall timestep is for 5.0 already limited by CFL for Euler
 cfl_Acoustics = 5.0 # PERK4 Multi
-#cfl_Acoustics = 5.3 # PERK4 Single
+cfl_Acoustics = 5.2 # PERK4 Single
 
 cfl_Euler_Coupling = 5.0 # PERK Multi
-#cfl_Euler_Coupling = 5.2 # PERK Single
+cfl_Euler_Coupling = 5.2 # PERK Single
 
 euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averaging.h5",
                                                           ode_alg_Euler,
@@ -406,20 +401,18 @@ euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averag
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timer
 
-analysis_interval = 5000
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback, 
                         euler_acoustics_coupling)
 
 Stages_Acoustics = [14, 9, 6, 5]
-ode_alg_Acoustic = PERK4_Multi(Stages_Acoustics, "/home/daniel/PERK4/EulerAcoustic/Acoustics/", [42.0])
+#ode_alg_Acoustic = PERK4_Multi(Stages_Acoustics, "/home/daniel/PERK4/EulerAcoustic/Acoustics/", [42.0])
 
-#ode_alg_Acoustic = PERK4(14, "/home/daniel/PERK4/EulerAcoustic/Acoustics/")
-#ode_alg_Acoustic = PERK4_Multi([14], "/home/daniel/PERK4/EulerAcoustic/Acoustics/", [42.0])
+ode_alg_Acoustic = PERK4(14, "/home/daniel/PERK4/EulerAcoustic/Acoustics/")
 
 sol = Trixi.solve(ode, ode_alg_Acoustic,
-      #solve(ode, ode_alg_Acoustic,
                   dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                   save_everystep = false, callback = callbacks);
 

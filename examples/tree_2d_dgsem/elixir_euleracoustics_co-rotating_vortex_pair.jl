@@ -124,7 +124,7 @@ function source_term_sponge_layer(u, x, t, equations::AcousticPerturbationEquati
                     Val(2 * ndims(equations)))
     alpha_square = maximum(alphas)^2
 
-    return SVector(0, 0, -alpha_square * (u[3] - reference_values[1] / u[6]^2), 0, 0, 0, 0)
+    return SVector(0.0, 0.0, -alpha_square * (u[3] - reference_values[1] / u[6]^2), 0.0, 0.0, 0.0, 0.0)
 end
 
 function source_term_sponge_layer(u, x, t, equations::CompressibleEulerEquations2D,
@@ -138,7 +138,7 @@ function source_term_sponge_layer(u, x, t, equations::CompressibleEulerEquations
     alpha_square = maximum(alphas)^2
 
     u_prim = cons2prim(u, equations)
-    s = SVector(-alpha_square * (u_prim[1] - reference_values[1]), 0, 0,
+    s = SVector(-alpha_square * (u_prim[1] - reference_values[1]), 0.0, 0.0,
                 -alpha_square * (u_prim[4] - reference_values[2]))
 
     return prim2cons(s, equations)
@@ -233,8 +233,8 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 n_cells_max = n_cells_max, # set maximum capacity of tree data structure
                 periodicity = false)
 
-# Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
+surf_flux = flux_lax_friedrichs
+solver = DGSEM(polydeg = 3, surface_flux = surf_flux)
 
 ###############################################################################
 # semidiscretization Euler equations
@@ -317,13 +317,17 @@ ode_averaging = semidiscretize(semi_euler, tspan1)
 summary_callback = SummaryCallback()
 
 analysis_interval = 50000
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval)
+
+alive_callback = AliveCallback(alive_interval = 100)
 
 tspan_averaging = (50.0, 400.0)
 averaging_callback = AveragingCallback(semi_euler, tspan_averaging)
 
 cfl = 1.7 # CarpenterKennedy2N54
 cfl = 0.9 # RK4()
+cfl = 6.7 # NDBLSRK144
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_callback,
@@ -335,6 +339,8 @@ callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_ca
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 ode_alg = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
 ode_alg = RK4(thread = OrdinaryDiffEq.True())
+ode_alg = NDBLSRK144(williamson_condition = false, thread = OrdinaryDiffEq.True())
+
 sol_averaging = solve(ode_averaging, ode_alg,
                       dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                       adaptive = false,
@@ -364,8 +370,13 @@ ode = semidiscretize(semi, tspan)
 ode_euler = semidiscretize(semi.semi_euler, tspan)
 
 # Set up coupling callback
+# RK4
 cfl_acoustics = 0.5
-cfl_euler = 0.5 # RK4
+cfl_euler = 0.5 
+
+# NDBLSRK144
+cfl_acoustics = 4.2
+cfl_euler = 4.2
 
 euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averaging.h5",
                                                           # integrator_euler
@@ -376,7 +387,7 @@ euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averag
 # and resets the timers
 summary_callback = SummaryCallback()
 
-analysis_interval = 50000
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
