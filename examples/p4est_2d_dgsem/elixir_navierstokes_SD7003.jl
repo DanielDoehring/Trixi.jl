@@ -12,6 +12,8 @@ rho_inf = 1.4 # with gamma = 1.4 => p_inf = 1.0
 Re = 10000.0
 airfoil_cord_length = 1.0
 
+t_c = airfoil_cord_length / U_inf
+
 aoa = 4 * pi/180
 u_x = U_inf * cos(aoa)
 u_y = U_inf * sin(aoa)
@@ -25,12 +27,17 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
                                                           Prandtl = prandtl_number(),
                                                           gradient_variables = GradientVariablesPrimitive())
 
-# TODO: Angle of attack (modify inflow)                                                          
+# TODO: Angle of attack (modify inflow)
 @inline function initial_condition_mach02_flow(x, t, equations)
   # set the freestream flow parameters
   rho_freestream = 1.4
+
+  #v1 = 0.19951281005196486 * t/50.0
   v1 = 0.19951281005196486
+
+  #v2 = 0.01395129474882506 * t/50.0
   v2 = 0.01395129474882506
+  
   p_freestream = 1.0
 
   prim = SVector(rho_freestream, v1, v2, p_freestream)
@@ -48,13 +55,18 @@ boundary_condition_airfoil = BoundaryConditionNavierStokesWall(velocity_bc_airfo
 
 polydeg = 3
 
-surface_flux = flux_hlle
-solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+surface_flux = flux_ranocha
+
+#surface_flux = flux_hlle
+#solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
+               volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
 
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
-path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
+path = "/home/daniel/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
@@ -82,8 +94,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-t_c = airfoil_cord_length / U_inf
-tspan = (0.0, 20 * t_c) # Try to get into a state where initial pressure wave is gone
+
+tspan = (0.0, 1 * t_c) # Try to get into a state where initial pressure wave is gone
 
 # Timespan for measurements over 10 * t_c
 #tspan = (load_time(restart_filename), 30 * t_c)
@@ -96,7 +108,7 @@ ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100_000
+analysis_interval = 10000
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
@@ -116,21 +128,24 @@ drag_coefficient_shear_force = AnalysisSurfaceIntegral(semi, :Airfoil,
 lift_coefficient = AnalysisSurfaceIntegral(semi, :Airfoil,
                                            LiftCoefficientPressure(f_aoa(), f_rho_inf(),
                                                                    f_U_inf(), f_linf()))
-
+#=
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      save_analysis = true,
-                                     analysis_errors = Symbol[],
+                                     #analysis_errors = Symbol[],
                                      analysis_integrals = (drag_coefficient,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
+=#
 
-stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
-#stepsize_callback = StepsizeCallback(cfl = 6.3) # PERK_4 Single 16
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-#stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
-#stepsize_callback = StepsizeCallback(cfl = 6.8) # SSPRK104
-#stepsize_callback = StepsizeCallback(cfl = 4.4) # DGLDDRK84_C
+stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Multi E = 5, ..., 16/14 Ranocha all
+stepsize_callback = StepsizeCallback(cfl = 5.3) # PERK_4 Single 16, 14
+
+#stepsize_callback = StepsizeCallback(cfl = 5.4) # NDBLSRK144
+#stepsize_callback = StepsizeCallback(cfl = 4.0) # SSPRK104
+#stepsize_callback = StepsizeCallback(cfl = 3.6) # DGLDDRK84_C
 
 save_solution = SaveSolutionCallback(interval = Int(100),
                                      save_initial_solution = true,
@@ -143,68 +158,111 @@ save_restart = SaveRestartCallback(interval = 10^6,
                                    save_final_restart = true)
 
 callbacks = CallbackSet(analysis_callback,
-                        #stepsize_callback, # Not for methods with error control
+                        stepsize_callback, # Not for methods with error control
                         alive_callback,
                         #save_solution,
                         #save_restart,
-                        summary_callback)
+                        summary_callback);
 
 ###############################################################################
 # run the simulation
 
-# For reference, never used
-dtRatios = [0.252900854746017, # 16
-            0.234065997367224, # 15
-            0.208310160790890, # 14
-            0.172356930215766, # 12
-            0.129859071602721, # 10
-            0.092778774946394, #  8
-            0.069255720146485, #  7
-            0.049637258180915, #  6
-            0.030629777558366] #= 5 =# / 0.252900854746017
-#Stages = [16, 15, 14, 12, 10, 8, 7, 6, 5]
 
-dtRatios = [0.252900854746017, # 16
-            0.208310160790890, # 14
-            0.172356930215766, # 12
-            0.129859071602721, # 10
-            0.092778774946394, #  8
-            0.069255720146485, #  7
-            0.049637258180915, #  6
-            0.030629777558366] #= 5 =# / 0.252900854746017
-Stages = [16, 14, 12, 10, 8, 7, 6, 5]
+# Flux Ranocha all
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
-#ode_algorithm = PERK4(16, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
+# Reference
+
+dtRatios = [0.115378171283879,
+            0.108129960813506,
+            0.098304475994135,
+            0.091315042118964,
+            0.082373397881888,
+            0.073948591750517,
+            0.067100101496955,
+            0.056517782648825,
+            0.049831714305217,
+            0.042489557212924,
+            0.030315689862707,
+            0.024825346783082] / 0.115378171283879
+
+Stages = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
 
 #=
-sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 42.0,
-                  save_everystep=false, callback=callbacks);
+dtRatios = [0.115378171283879,
+            0.098304475994135,
+            0.082373397881888,
+            0.067100101496955,
+            0.049831714305217,
+            0.042489557212924,
+            0.030315689862707,
+            0.024825346783082] / 0.115378171283879
+
+Stages = [16, 14, 12, 10, 8, 7, 6, 5]  
 =#
 
 #=
-ode_algorithm = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
-ode_algorithm = SSPRK104(thread = OrdinaryDiffEq.True())
-ode_algorithm = DGLDDRK84_C(thread = OrdinaryDiffEq.True())
+dtRatios = [0.115378171283879,
+            0.098304475994135,
+            0.082373397881888,
+            0.067100101496955,
+            0.042489557212924,
+            0.030315689862707,
+            0.024825346783082] / 0.115378171283879
+
+Stages = [16, 14, 12, 10, 7, 6, 5]  
+=#
+
+
+dtRatios = [0.098304475994135,
+            0.082373397881888,
+            0.067100101496955,
+            0.042489557212924,
+            0.030315689862707,
+            0.024825346783082] / 0.098304475994135
+
+Stages = [14, 12, 10, 7, 6, 5]
+
+
+#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/PERK4/SD7003/FluxRanochaAll/", dtRatios)
+ode_algorithm = PERK4(14, "/home/daniel/PERK4/SD7003/FluxRanochaAll/")
+
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = 42.0,
+                  save_everystep=false, callback=callbacks);
+
+summary_callback() # print the timer summary
+
+
+
+ode_algorithm = NDBLSRK144(williamson_condition = false, thread = OrdinaryDiffEq.True())
+#ode_algorithm = SSPRK104(thread = OrdinaryDiffEq.True())
+#ode_algorithm = DGLDDRK84_C(thread = OrdinaryDiffEq.True())
 
 sol = solve(ode, ode_algorithm,
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
-=#
 
-ode_algorithm = CKLLSRK54_3C(thread = OrdinaryDiffEq.True()) # There is a zoo of methods of this kind
-tol = 1.0e-6
+summary_callback() # print the timer summary
+
+
+callbacks_adaptive = CallbackSet(analysis_callback,
+                                alive_callback,
+                                #save_solution,
+                                #save_restart,
+                                summary_callback);
 
 ode_algorithm = RDPK3SpFSAL49(thread = OrdinaryDiffEq.True())
-tol = 5.0e-8
+tol = 7.0e-8 # Max tol before crash
+
 
 ode_algorithm = RK4(thread = OrdinaryDiffEq.True())
-tol = 5.0e-7
+tol = 7.0e-7 # Max tol before crash
+
 
 sol = solve(ode, ode_algorithm,
             abstol=tol, reltol=tol,
-            save_everystep = false, callback = callbacks);
+            save_everystep = false, callback = callbacks_adaptive);
 
 summary_callback() # print the timer summary
 
