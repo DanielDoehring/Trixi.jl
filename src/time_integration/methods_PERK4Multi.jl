@@ -774,12 +774,12 @@ function solve_steps!(integrator::PERK4_Multi_Integrator)
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # NOTE: `prev` For EulerAcoustics only
-        #=
+        
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
         integrator.tprev = integrator.t
-        =#
+        
 
         step!(integrator)
     end # "main loop" timer

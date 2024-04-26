@@ -325,8 +325,12 @@ tspan_averaging = (50.0, 400.0)
 averaging_callback = AveragingCallback(semi_euler, tspan_averaging)
 
 cfl = 1.7 # CarpenterKennedy2N54
+
 cfl = 0.9 # RK4()
-cfl = 6.7 # NDBLSRK144
+#cfl = 6.7 # NDBLSRK144
+#cfl = 1.5 # CFRLDDRK64
+#cfl = 1.8 # TSLDDRK74
+cfl = 2.8 # DGLDDRK84_F
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -338,8 +342,12 @@ callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_ca
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 ode_alg = CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True())
+
 ode_alg = RK4(thread = OrdinaryDiffEq.True())
-ode_alg = NDBLSRK144(williamson_condition = false, thread = OrdinaryDiffEq.True())
+#ode_alg = NDBLSRK144(williamson_condition = false, thread = OrdinaryDiffEq.True())
+#ode_alg = CFRLDDRK64(thread = OrdinaryDiffEq.True())
+#ode_alg = TSLDDRK74(thread = OrdinaryDiffEq.True())
+ode_alg = DGLDDRK84_F(williamson_condition = false, thread = OrdinaryDiffEq.True())
 
 sol_averaging = solve(ode_averaging, ode_alg,
                       dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
@@ -374,11 +382,27 @@ ode_euler = semidiscretize(semi.semi_euler, tspan)
 cfl_acoustics = 0.5
 cfl_euler = 0.5 
 
-# NDBLSRK144
-cfl_acoustics = 4.2
-cfl_euler = 4.2
 
-euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averaging.h5",
+# CFRLDDRK64
+#cfl_acoustics = 0.9
+#cfl_euler = 0.9
+
+# NDBLSRK144
+#cfl_acoustics = 4.1
+#cfl_euler = 4.1
+
+# TSLDDRK74
+#cfl_acoustics = 0.4
+#cfl_euler = 0.4
+
+# DGLDDRK84_F
+cfl_acoustics = 1.7
+cfl_euler = 1.7
+
+euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, 
+                                                          #"out/averaging_RK4.h5",
+                                                          #"out/averaging_CFRLDDRK64.h5",
+                                                          "out/averaging_DGLDDRK84_F.h5",
                                                           # integrator_euler
                                                           ode_alg,
                                                           cfl_acoustics, cfl_euler)
@@ -387,9 +411,8 @@ euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, "out/averag
 # and resets the timers
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 50000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback,
                         euler_acoustics_coupling)
