@@ -66,7 +66,7 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
-path = "/home/daniel/Meshes/PERK_mesh/SD7003Laminar/"
+path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
@@ -95,13 +95,13 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 
-tspan = (0.0, 1 * t_c) # Try to get into a state where initial pressure wave is gone
+tspan = (0.0, 0.1 * t_c) # Try to get into a state where initial pressure wave is gone
 
 # Timespan for measurements over 10 * t_c
 #tspan = (load_time(restart_filename), 30 * t_c)
 
-#ode = semidiscretize(semi, tspan; split_form = false) # for PERK
-ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
+ode = semidiscretize(semi, tspan; split_form = false) # for PERK
+#ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
 
 #ode = semidiscretize(semi, tspan, restart_filename)
 #ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
@@ -223,8 +223,8 @@ dtRatios = [0.098304475994135,
 Stages = [14, 12, 10, 7, 6, 5]
 
 
-#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/PERK4/SD7003/FluxRanochaAll/", dtRatios)
-ode_algorithm = PERK4(14, "/home/daniel/PERK4/SD7003/FluxRanochaAll/")
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/FluxRanochaAll/", dtRatios)
+#ode_algorithm = PERK4(14, "/home/daniel/PERK4/SD7003/FluxRanochaAll/")
 
 
 sol = Trixi.solve(ode, ode_algorithm,
