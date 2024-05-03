@@ -66,7 +66,7 @@ mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 boundary_symbols = [:Airfoil, :FarField]
 
 mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols,
-                    initial_refinement_level = 0)
+                    initial_refinement_level = 1)
 
 
 restart_file = "restart_082359.h5" # t = 30 t_c
@@ -136,13 +136,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-# Pure DGSEM HLLE
-
-stepsize_callback = StepsizeCallback(cfl = 6.3) # PERK_4 Single, 16
-#stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
-
-stepsize_callback = StepsizeCallback(cfl = 8.0) # NDBLSRK144
-stepsize_callback = StepsizeCallback(cfl = 4.4) # DGLDDRK84_C
+### Ref = 0 ###
 
 # Split DGSEM HLLC + Flux Chandrashekar
 stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
@@ -155,6 +149,17 @@ stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
 #stepsize_callback = StepsizeCallback(cfl = 3.2) # CKLLSRK95_4S
 #stepsize_callback = StepsizeCallback(cfl = 1.9) # RK4
 
+### Ref = 1 ###
+
+# Split DGSEM HLLC + Flux Chandrashekar
+stepsize_callback = StepsizeCallback(cfl = 5.0) # PERK_4 Multi E = 5, ..., 16
+stepsize_callback = StepsizeCallback(cfl = 5.2) # PERK_4 Single, 14c
+
+#stepsize_callback = StepsizeCallback(cfl = 6.7) # NDBLSRK144
+#stepsize_callback = StepsizeCallback(cfl = 4.4) # DGLDDRK84_C
+stepsize_callback = StepsizeCallback(cfl = 2.9) # CKLLSRK95_4S
+stepsize_callback = StepsizeCallback(cfl = 1.6) # RK4
+
 # For plots etc
 save_solution = SaveSolutionCallback(interval = 2000,
                                      save_initial_solution = true,
@@ -162,7 +167,7 @@ save_solution = SaveSolutionCallback(interval = 2000,
                                      solution_variables = cons2prim,
                                      output_directory="run/out")
 
-alive_callback = AliveCallback(alive_interval = 200)
+alive_callback = AliveCallback(alive_interval = 100)
 
 save_restart = SaveRestartCallback(interval = analysis_interval, # Only at end
                                    save_final_restart = true)
@@ -177,7 +182,7 @@ callbacks = CallbackSet(analysis_callback,
 ###############################################################################
 # run the simulation
 
-
+#=
 dtRatios = [0.252900854746017, # 16
             0.208310160790890, # 14
             0.172356930215766, # 12
@@ -190,7 +195,7 @@ Stages = [16, 14, 12, 10, 8, 7, 6, 5]
 
 
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
-#ode_algorithm = PERK4(14, "/home/daniel/PERK4/SD7003/")
+ode_algorithm = PERK4(14, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
 
 
 sol = Trixi.solve(ode, ode_algorithm,
@@ -198,7 +203,7 @@ sol = Trixi.solve(ode, ode_algorithm,
                   save_everystep=false, callback=callbacks);
 
 summary_callback() # print the timer summary
-
+=#
 
 #ode_algorithm = NDBLSRK144(williamson_condition = false, thread = OrdinaryDiffEq.True())
 #ode_algorithm = DGLDDRK84_C(williamson_condition = false, thread = OrdinaryDiffEq.True())
