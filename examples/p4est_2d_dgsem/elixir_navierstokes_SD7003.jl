@@ -19,7 +19,6 @@ u_x = U_inf * cos(aoa)
 u_y = U_inf * sin(aoa)
 
 gamma = 1.4
-#prandtl_number() = 0.71
 prandtl_number() = 0.72
 mu() = rho_inf * U_inf * airfoil_cord_length / Re
 
@@ -32,11 +31,8 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
   # set the freestream flow parameters
   rho_freestream = 1.4
 
-  #v1 = 0.19951281005196486 * t/50.0
-  v1 = 0.19951281005196486
-
-  #v2 = 0.01395129474882506 * t/50.0
-  v2 = 0.01395129474882506
+  v1 = 0.19951281005196486 # 0.2 * cos(aoa)
+  v2 = 0.01395129474882506 # 0.2 * sin(aoa)
   
   p_freestream = 1.0
 
@@ -55,18 +51,16 @@ boundary_condition_airfoil = BoundaryConditionNavierStokesWall(velocity_bc_airfo
 
 polydeg = 3
 
-solver = DGSEM(polydeg = polydeg, surface_flux = flux_hlle)
-
-vol_flux = flux_ranocha
-vol_flux = FluxRotated(flux_chandrashekar)
-solver = DGSEM(polydeg = polydeg, surface_flux = flux_hlle,
+surf_flux = flux_hllc
+vol_flux = flux_chandrashekar
+solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
                volume_integral = VolumeIntegralFluxDifferencing(vol_flux))
 
 
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
-path = "/home/daniel/Meshes/PERK_mesh/SD7003Laminar/"
+path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
@@ -75,11 +69,8 @@ mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_sy
                     initial_refinement_level = 0)
 
 
-restart_file = "restart_082525.h5"
+restart_file = "restart_082359.h5" # t = 30 t_c
 restart_filename = joinpath("out", restart_file)
-
-#mesh = load_mesh(restart_filename)
-#mesh.current_filename = "out/mesh.h5"
 
 
 boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
@@ -97,25 +88,24 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 
-tspan = (0.0, 15 * t_c) # Try to get into a state where initial pressure wave is gone
+tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 
-#ode = semidiscretize(semi, tspan; split_form = false) # for PERK
+ode = semidiscretize(semi, tspan; split_form = false) # for PERK
 #ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
 
 # Timespan for measurements over 10 * t_c
-tspan = (load_time(restart_filename), 20 * t_c)
-ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
+#tspan = (load_time(restart_filename), 40 * t_c)
+#ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
 #ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
 
 # Choose analysis interval such that roughly every dt = 0.05 a record is taken
 # This interval is the same as in DOI: 10.1002/nme.3036
-analysis_interval = 714 # PERK Multi 
 # For plots of oscillating coefficients
-analysis_interval = 20
+#analysis_interval = 20
 
-#analysis_interval = 1_000_000
+analysis_interval = 1_000_000
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
@@ -144,7 +134,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
 
-#analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 # Pure DGSEM HLLE
 
@@ -154,13 +144,16 @@ stepsize_callback = StepsizeCallback(cfl = 6.3) # PERK_4 Single, 16
 stepsize_callback = StepsizeCallback(cfl = 8.0) # NDBLSRK144
 stepsize_callback = StepsizeCallback(cfl = 4.4) # DGLDDRK84_C
 
-# Split DGSEM HLLE + Flux Chandrashekar
+# Split DGSEM HLLC + Flux Chandrashekar
 stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
 #stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Single, 16
 #stepsize_callback = StepsizeCallback(cfl = 6.4) # PERK_4 Single, 14
 
-#stepsize_callback = StepsizeCallback(cfl = 7.8) # NDBLSRK144
-#stepsize_callback = StepsizeCallback(cfl = 3.8) # DGLDDRK84_C
+#stepsize_callback = StepsizeCallback(cfl = 7.7) # NDBLSRK144
+#stepsize_callback = StepsizeCallback(cfl = 5.5) # DGLDDRK84_C
+# TODO: Need restart file for this!
+#stepsize_callback = StepsizeCallback(cfl = 3.2) # CKLLSRK95_4S
+#stepsize_callback = StepsizeCallback(cfl = 1.9) # RK4
 
 # For plots etc
 save_solution = SaveSolutionCallback(interval = 2000,
@@ -174,29 +167,16 @@ alive_callback = AliveCallback(alive_interval = 200)
 save_restart = SaveRestartCallback(interval = analysis_interval, # Only at end
                                    save_final_restart = true)
 
-#=
-amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = Trixi.density),
-                                   base_level = 0,
-                                   max_level = 1, max_threshold = 0.1)
-
-amr_callback = AMRCallback(semi, amr_controller,
-                          interval = 10,
-                          adapt_initial_condition = false,
-                          adapt_initial_condition_only_refine = true)                                   
-=#
-
 callbacks = CallbackSet(analysis_callback,
                         stepsize_callback, # Not for methods with error control
-                        #alive_callback, # Not needed for measurement run
+                        alive_callback, # Not needed for measurement run
                         #save_solution,
-                        #save_restart, # For restart with measurements
-                        #amr_callback,
+                        save_restart, # For restart with measurements
                         summary_callback);
 
 ###############################################################################
 # run the simulation
 
-### HLLE ###
 
 dtRatios = [0.252900854746017, # 16
             0.208310160790890, # 14
@@ -209,49 +189,28 @@ dtRatios = [0.252900854746017, # 16
 Stages = [16, 14, 12, 10, 8, 7, 6, 5]
 
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/PERK4/SD7003/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
 #ode_algorithm = PERK4(14, "/home/daniel/PERK4/SD7003/")
 
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 3.5e-4,
+                  dt = 42.0,
                   save_everystep=false, callback=callbacks);
 
 summary_callback() # print the timer summary
 
 
-#=
 #ode_algorithm = NDBLSRK144(williamson_condition = false, thread = OrdinaryDiffEq.True())
-ode_algorithm = DGLDDRK84_C(thread = OrdinaryDiffEq.True())
-# TODO: CKLLSRK95_4S or CKLLSRK95_4C
+#ode_algorithm = DGLDDRK84_C(williamson_condition = false, thread = OrdinaryDiffEq.True())
+#ode_algorithm = CKLLSRK95_4S(thread = OrdinaryDiffEq.True())
+ode_algorithm = RK4(thread = OrdinaryDiffEq.True())
 
 sol = solve(ode, ode_algorithm,
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
+            save_everystep = false, callback = callbacks, 
+            adaptive = false);
 
 summary_callback() # print the timer summary
-=#
-
-callbacks_adaptive = CallbackSet(analysis_callback,
-                                 alive_callback,
-                                 #save_solution,
-                                 #save_restart,
-                                 summary_callback);
-
-ode_algorithm = RDPK3SpFSAL49(thread = OrdinaryDiffEq.True())
-tol = 7.0e-8 # Max tol before crash
-
-
-ode_algorithm = RK4(thread = OrdinaryDiffEq.True())
-tol = 6.0e-7 # Max tol before crash
-
-
-sol = solve(ode, ode_algorithm,
-            abstol=tol, reltol=tol,
-            save_everystep = false, callback = callbacks_adaptive);
-
-summary_callback() # print the timer summary
-
 
 using Plots
 
