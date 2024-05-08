@@ -52,9 +52,11 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
 
     for level in eachindex(Stages)
         NumStageEvals = Stages[level]
-        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" *
-                        string(NumStages) * ".txt"
-        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
+        
+        # If all c = 1.0, the max number of stages does not matter
+        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" * string(NumStages) * ".txt"
+        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
+        
         NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)
         @assert NumMonCoeffs == NumStageEvals - 5
 
@@ -172,8 +174,8 @@ mutable struct PERK4_Multi_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     du_ode_hyp::uType
 
     # TODO uprev, tprev for averaging callback (required for coupled Euler-acoustic simulations)
-    uprev::uType
-    tprev::RealT
+    #uprev::uType
+    #tprev::RealT
     
 end
 
@@ -201,8 +203,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     du_ode_hyp = similar(u0) # TODO: Not best solution since this is not needed for hyperbolic problems
 
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
-    uprev = zero(u0)
-    tprev = zero(ode.tspan[1])
+    #uprev = zero(u0)
+    #tprev = zero(ode.tspan[1])
 
     t0 = first(ode.tspan)
     iter = 0
@@ -233,8 +235,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         n_levels = max_level - min_level + 1
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-        #n_levels = 10
-        #u = Trixi.wrap_array(u0, ode.p)
+        n_levels = 10
+        u = Trixi.wrap_array(u0, ode.p)
 
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
@@ -244,12 +246,22 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         # Determine level for each element
         for element_id in 1:n_elements
 
-            # TODO: For case with locally changing mean speed of sound (Lin. Euler)
             #=
+            # Determine level
+            # NOTE: For really different grid sizes
+            level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+            # NOTE: For 1D, periodic BC testcase with artificial assignment
+            #level = rand(min_level:max_level)
+
+            # Convert to level id
+            level_id = max_level + 1 - level
+            =#
+
+            # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+            
             c_max_el = 0.0
-            #for j in eachnode(solver), i in eachnode(solver)
             for k in eachnode(solver), j in eachnode(solver), i in eachnode(solver)
-                #u_node = get_node_vars(u, equations, solver, i, j, element_id)
                 u_node = get_node_vars(u, equations, solver, i, j, k, element_id)
 
                 c = u_node[end]
@@ -265,19 +277,6 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             else # Avoid reduction in timestep: Use next higher level
                 level_id = level_id - 1
             end
-            =#
-
-            
-            # Determine level
-            # NOTE: For really different grid sizes
-            level = mesh.tree.levels[elements.cell_ids[element_id]]
-
-            
-            # NOTE: For 1D, periodic BC testcase with artificial assignment
-            #level = rand(min_level:max_level)
-
-            # Convert to level id
-            level_id = max_level + 1 - level
             
 
             push!(level_info_elements[level_id], element_id)
@@ -293,17 +292,17 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         # Determine level for each interface
         for interface_id in 1:n_interfaces
             # Get element id: Interfaces only between elements of same size
-            
+            #=
             element_id = interfaces.neighbor_ids[1, interface_id]
 
             # Determine level
             level = mesh.tree.levels[elements.cell_ids[element_id]]
 
             level_id = max_level + 1 - level
-            
+            =#
 
             # NOTE: For case with varying characteristic speeds
-            #=
+            
             el_id_1 = interfaces.neighbor_ids[1, interface_id]
             el_id_2 = interfaces.neighbor_ids[2, interface_id]
 
@@ -325,7 +324,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             end
 
             level_id = min(level_1, level_2)
-            =#
+            
 
             # NOTE: For 1D, periodic BC testcase with artificial assignment
             #=
@@ -740,8 +739,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                                         level_u_indices_elements,
                                         
                                         t0, -1, n_levels,
-                                        du_ode_hyp,
-                                        uprev, tprev)
+                                        du_ode_hyp)
+                                        #uprev, tprev)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -774,12 +773,12 @@ function solve_steps!(integrator::PERK4_Multi_Integrator)
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # NOTE: `prev` For EulerAcoustics only
-        
+        #=
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
         integrator.tprev = integrator.t
-        
+        =#
 
         step!(integrator)
     end # "main loop" timer
@@ -810,7 +809,7 @@ function step!(integrator::PERK4_Multi_Integrator)
         k1k2!(integrator, prob.p, alg.c)
 
         # CARE: This does not work if we have only one method but more than one grid level
-        
+        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
                      integrator.level_info_elements_acc[1],
                      integrator.level_info_interfaces_acc[1],
@@ -819,9 +818,9 @@ function step!(integrator::PERK4_Multi_Integrator)
                      integrator.level_info_mortars_acc[1],
                      integrator.level_u_indices_elements, 1,
                      integrator.du_ode_hyp)
+        =#
         
         
-        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                         integrator.level_info_elements_acc[1],
                         integrator.level_info_interfaces_acc[1],
@@ -829,14 +828,15 @@ function step!(integrator::PERK4_Multi_Integrator)
                         integrator.level_info_boundaries_orientation_acc[1],
                         integrator.level_info_mortars_acc[1],
                         1)
-        =#
+        
+
         # Update finest level only
         @threaded for u_ind in integrator.level_u_indices_elements[1]
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
 
         for stage in 3:(alg.NumStages - 3)
-            #=
+            
             ### General implementation: Not own method for each grid level ###
             # Loop over different methods with own associated level
             for level in 1:min(alg.NumMethods, integrator.n_levels)
@@ -869,7 +869,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                     end
                 end
             end
-            =#
+            
 
             ### Simplified implementation: Own method for each level ###
             #=
@@ -887,7 +887,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             end
             =#
 
-            
+            #=
             ### Optimized implementation for case: Own method for each level
             for level in 1:alg.HighestEvalLevels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
@@ -902,7 +902,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k_higher[u_ind] # * A[stage, 1, level] = c[level] = 1
                 end
             end
-            
+            =#
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
@@ -918,14 +918,14 @@ function step!(integrator::PERK4_Multi_Integrator)
                 #integrator.coarsest_lvl = integrator.n_levels
                 # and then using the level-dependent version
 
-                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
-                #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+                #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
                 @threaded for u_ind in eachindex(integrator.du)
                     integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
                 end
             else
-                
+                #=
                 # Joint RHS evaluation with all elements sharing this timestep
                 integrator.f(integrator.du, integrator.u_tmp, prob.p,
                             integrator.t_stage,
@@ -937,9 +937,9 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_u_indices_elements,
                             integrator.coarsest_lvl,
                             integrator.du_ode_hyp)
-                
+                =#
 
-                #=
+                
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                              integrator.level_info_elements_acc[integrator.coarsest_lvl],
                              integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
@@ -947,7 +947,8 @@ function step!(integrator::PERK4_Multi_Integrator)
                              integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                              integrator.level_info_mortars_acc[integrator.coarsest_lvl],
                              integrator.coarsest_lvl)
-                =#
+                
+
                 # Update k_higher of relevant levels
                 for level in 1:(integrator.coarsest_lvl)
                     @threaded for u_ind in integrator.level_u_indices_elements[level]
@@ -1019,6 +1020,6 @@ function Base.resize!(integrator::PERK4_Multi_Integrator, new_size)
     resize!(integrator.du_ode_hyp, new_size)
 
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
-    resize!(integrator.uprev, new_size)
+    #resize!(integrator.uprev, new_size)
 end
 end # @muladd

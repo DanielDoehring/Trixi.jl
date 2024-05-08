@@ -37,9 +37,8 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
     AMatrices = zeros(CoeffsMax, 2)
     AMatrices[:, 1] = c[3:(NumStages - 3)]
 
-    PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * "_" *
-                    string(NumStages) * ".txt"
-    #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * ".txt"
+    #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * "_" * string(NumStages) * ".txt"
+    PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * ".txt"
     NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)
     @assert NumMonCoeffs == CoeffsMax
 
@@ -109,8 +108,8 @@ mutable struct PERK4_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     du_ode_hyp::uType 
 
     # TODO uprev, tprev for averaging callback (required for coupled Euler-acoustic simulations)
-    uprev::uType
-    tprev::RealT
+    #uprev::uType
+    #tprev::RealT
 end
 
 # Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
@@ -137,8 +136,8 @@ function init(ode::ODEProblem, alg::PERK4;
 
     
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
-    uprev = zero(u0)
-    tprev = zero(ode.tspan[1])
+    #uprev = zero(u0)
+    #tprev = zero(ode.tspan[1])
     
 
     t0 = first(ode.tspan)
@@ -149,8 +148,8 @@ function init(ode::ODEProblem, alg::PERK4;
                                   PERK_IntegratorOptions(callback, ode.tspan;
                                                          kwargs...), false,
                                   k1, k_higher, k_S1, t0,
-                                  du_ode_hyp,
-                                  uprev, tprev)
+                                  du_ode_hyp)
+                                  #uprev, tprev)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -182,11 +181,13 @@ function solve_steps!(integrator::PERK4_Integrator)
     integrator.finalstep = false
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
+        #=
         # NOTE: `prev` For EulerAcoustics only
         @threaded for u_ind in eachindex(integrator.u)
             integrator.uprev[u_ind] = integrator.u[u_ind]
         end
         integrator.tprev = integrator.t
+        =#
 
         step!(integrator)
     end # "main loop" timer
@@ -197,8 +198,8 @@ function solve_steps!(integrator::PERK4_Integrator)
 end
 
 function k1k2!(integrator, p, c)
-    integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_ode_hyp)
-    #integrator.f(integrator.du, integrator.u, p, integrator.t)
+    #integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_ode_hyp)
+    integrator.f(integrator.du, integrator.u, p, integrator.t)
 
     @threaded for i in eachindex(integrator.du)
         integrator.k1[i] = integrator.du[i] * integrator.dt
@@ -222,8 +223,8 @@ function last_three_stages!(integrator, alg, p)
         integrator.t_stage = integrator.t +
                              alg.c[alg.NumStages - 3 + stage] * integrator.dt
 
-        integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage, integrator.du_ode_hyp)
-        #integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage)
+        #integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage, integrator.du_ode_hyp)
+        integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage)
 
         @threaded for u_ind in eachindex(integrator.du)
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt

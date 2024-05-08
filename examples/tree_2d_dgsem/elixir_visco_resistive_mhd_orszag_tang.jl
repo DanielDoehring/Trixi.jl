@@ -63,7 +63,7 @@ coordinates_min = (0.0, 0.0)
 coordinates_max = (2*pi, 2*pi)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=4,
+                initial_refinement_level=5,
                 n_cells_max=100000)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic), initial_condition, solver)
@@ -76,7 +76,7 @@ tspan = (0.0, 2.0)
 #tspan = (0.0, 1.0) # For plotting
 
 ode = semidiscretize(semi, tspan; split_form = false) # For PERK
-ode = semidiscretize(semi, tspan) # For OrdinaryDiffEq
+#ode = semidiscretize(semi, tspan) # For OrdinaryDiffEq
 
 summary_callback = SummaryCallback()
 
@@ -99,14 +99,14 @@ amr_controller = ControllerThreeLevel(semi, amr_indicator,
 
 
 amr_callback = AMRCallback(semi, amr_controller,
-                           #interval= 10, # PERK
-                           interval=5, # SSPRK104
+                           interval= 10, # PERK
+                           #interval=5, # SSPRK104
                            adapt_initial_condition=true,
                            adapt_initial_condition_only_refine=true)
                       
 cfl = 1.8 # PERK 5, 6, 8 (p=4)
 
-cfl = 3.4 # SSPRK104
+#cfl = 3.4 # SSPRK104
 
 stepsize_callback = StepsizeCallback(cfl=cfl)
 
@@ -121,15 +121,17 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+#Stages = [13, 8, 6, 5]
+#dtRatios = [1, 0.5, 0.25, 0.125]
+
 Stages = [8, 6, 5]
 dtRatios = [1, 0.5, 0.25]
 
-#=
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/ViscoRes_OrszagTang/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/ViscoResistiveOrszagTang/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 42.0,
                   save_everystep=false, callback=callbacks);
-=#
+
 
 ode_algorithm = SSPRK104(thread = OrdinaryDiffEq.True())
 #ode_algorithm = DGLDDRK84_C(thread = OrdinaryDiffEq.True())
