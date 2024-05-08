@@ -6,16 +6,7 @@
 #! format: noindent
 
 function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::AbstractString)
-
-    # Use linear increasing timesteps for free timesteps
-
-    c = zeros(NumStages)
-    for k in 2:(NumStages - 4)
-        #c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
-        c[k] = ((k - 1) / (NumStages - 4))^2 # Quadratically increasing
-    end
-
-    # Current approach: Use ones for simplicity
+    # Current approach: Use ones for improved internal stability
     c_const = 1.0
 
     c = c_const * ones(NumStages)
@@ -37,7 +28,7 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
     AMatrices = zeros(CoeffsMax, 2)
     AMatrices[:, 1] = c[3:(NumStages - 3)]
 
-    #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * "_" * string(NumStages) * ".txt"
+    # If all c = 1.0, the max number of stages does not matter
     PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * ".txt"
     NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)
     @assert NumMonCoeffs == CoeffsMax
@@ -197,7 +188,7 @@ function solve_steps!(integrator::PERK4_Integrator)
                                   integrator.sol.prob)
 end
 
-function k1k2!(integrator, p, c)
+function k1!(integrator, p, c)
     #integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_ode_hyp)
     integrator.f(integrator.du, integrator.u, p, integrator.t)
 
@@ -264,7 +255,7 @@ function step!(integrator::PERK4_Integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        k1k2!(integrator, prob.p, alg.c)
+        k1!(integrator, prob.p, alg.c)
 
         #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)

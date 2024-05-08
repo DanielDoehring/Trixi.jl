@@ -10,14 +10,7 @@ using Random # NOTE: Only for tests
 function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int,
                                            BasePathMonCoeffs::AbstractString)
 
-    # Use linear increasing timesteps for free timesteps
-    c = zeros(NumStages)
-    for k in 2:(NumStages - 4)
-        c[k] = (k - 1) / (NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
-    end
-
     # Current approach: Use ones (best internal stability properties)
-
     c = ones(NumStages)
     c[1] = 0.0
 
@@ -54,7 +47,6 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
         NumStageEvals = Stages[level]
         
         # If all c = 1.0, the max number of stages does not matter
-        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" * string(NumStages) * ".txt"
         PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
         
         NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)
@@ -806,7 +798,7 @@ function step!(integrator::PERK4_Multi_Integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        k1k2!(integrator, prob.p, alg.c)
+        k1!(integrator, prob.p, alg.c)
 
         # CARE: This does not work if we have only one method but more than one grid level
         #=
