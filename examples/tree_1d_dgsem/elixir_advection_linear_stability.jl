@@ -17,7 +17,7 @@ solver = DGSEM(polydeg = k, surface_flux = flux_lax_friedrichs)
 coordinates_min = -1.0
 coordinates_max = 1.0
 
-Ref_lvl = 8
+Ref_lvl = 7
 N_cells_uni = 2^Ref_lvl
 N_cells_coarse = N_cells_uni / 2
 
@@ -89,7 +89,8 @@ path = "/home/daniel/git/Paper_PERK4/PlotScripts/LinearStability/"
 NumStagesMax = 16
 AMatrices, AMatrix, c, ActiveLevels, _, _ = Trixi.ComputePERK4_Multi_ButcherTableau(Stages, NumStagesMax, path)
 
-dt = 0.105336966330572 / 2^(Ref_lvl - 4)
+CFL = 0.99
+dt = 0.105336966330572 / 2^(Ref_lvl - 4) * CFL
 
 
 # Build P-ERK linear operator (matrix)
@@ -146,6 +147,7 @@ end
 
 K_Perk = I + 0.5 * (KS1 + K_higher)
 
+
 K_PERK_EigVals = eigvals(K_Perk)
 # Complex conjugate eigenvalues have same modulus
 K_PERK_EigVals = K_PERK_EigVals[imag(K_PERK_EigVals) .>= 0]
@@ -158,7 +160,9 @@ writedlm("K_PERK4_EigVals.txt", K_PERK_EigVals)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-ode = semidiscretize(semi_ref, (0.0, 10));
+t_span = (0.0, 100.0) # For long stability check
+t_span = (0.0, dt) # For comparison of implementations
+ode = semidiscretize(semi_ref, t_span);
 
 summary_callback = SummaryCallback()
 analysis_callback = AnalysisCallback(semi_ref, interval = 100)
@@ -173,6 +177,15 @@ ode_algorithm = PERK4_Multi(Stages, path, [42.0, 42.0])
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
                   save_everystep=false, callback=callbacks);
+
+u_Trixi = sol.u[end]
+u_PERK = K_Perk * sol.u[1]
+
+scatter(u_Trixi, label = "Trixi")
+scatter!(u_PERK, label = "PERK")
+
+scatter(u_PERK - u_Trixi, label = "Difference")
+norm(u_Trixi - u_PERK, Inf)
 
 # Print the timer summary
 summary_callback()
