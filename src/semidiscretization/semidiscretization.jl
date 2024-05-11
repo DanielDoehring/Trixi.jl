@@ -88,6 +88,23 @@ function semidiscretize(semi::AbstractSemidiscretization, tspan;
     return ODEProblem{iip, specialize}(rhs!, u0_ode, tspan, semi)
 end
 
+function semidiscretize(semi::AbstractSemidiscretization, tspan,
+                        u0_ode::AbstractArray; reset_threads = true)
+    # Optionally reset Polyester.jl threads. See
+    # https://github.com/trixi-framework/Trixi.jl/issues/1583
+    # https://github.com/JuliaSIMD/Polyester.jl/issues/30
+    if reset_threads
+        Polyester.reset_threads!()
+    end
+
+    # TODO: MPI, do we want to synchronize loading and print debug statements, e.g. using
+    #       mpi_isparallel() && MPI.Barrier(mpi_comm())
+    #       See https://github.com/trixi-framework/Trixi.jl/issues/328
+    iip = true # is-inplace, i.e., we modify a vector when calling rhs!
+    specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
+    return ODEProblem{iip, specialize}(rhs!, u0_ode, tspan, semi)
+end
+
 """
     semidiscretize(semi::AbstractSemidiscretization, tspan, restart_file::AbstractString)
 

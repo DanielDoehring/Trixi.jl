@@ -74,7 +74,7 @@ A = Matrix(A_map)
 N = size(A, 1)
 
 #=
-# Double-check matrix numbering by printing nonzero entries
+# Double-check matrix ordering by printing nonzero entries
 filtered_A = [row[row .!= 0] for row in eachrow(A)]
 
 open("A_NZ.txt", "w") do io
@@ -89,6 +89,8 @@ path = "/home/daniel/git/Paper_PERK4/PlotScripts/LinearStability/"
 NumStagesMax = 16
 AMatrices, AMatrix, c, ActiveLevels, _, _ = Trixi.ComputePERK4_Multi_ButcherTableau(Stages, NumStagesMax, path)
 
+ActiveLevels
+
 CFL = 0.99
 dt = 0.105336966330572 / 2^(Ref_lvl - 4) * CFL
 
@@ -98,12 +100,12 @@ AFine = copy(A)
 I_Fine = Matrix(1.0*I, N, N)
 
 # Outer sections: Set to zero
-for i = 1:Int(N_cells_coarse/2)
+for i = 1:Int(N_cells_coarse/2 * (k+1))
   AFine[i, :] = zeros(N)
   I_Fine[i, :] = zeros(N)
 end
 
-for i = (N - Int(N_cells_coarse/2)):N
+for i = (N - Int(N_cells_coarse/2) * (k+1) + 1):N
   AFine[i, :] = zeros(N)
   I_Fine[i, :] = zeros(N)
 end
@@ -160,7 +162,7 @@ writedlm("K_PERK4_EigVals.txt", K_PERK_EigVals)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-t_span = (0.0, 100.0) # For long stability check
+#t_span = (0.0, 100.0) # For long stability check
 t_span = (0.0, dt) # For comparison of implementations
 ode = semidiscretize(semi_ref, t_span);
 
@@ -181,14 +183,11 @@ sol = Trixi.solve(ode, ode_algorithm,
 u_Trixi = sol.u[end]
 u_PERK = K_Perk * sol.u[1]
 
-scatter(u_Trixi, label = "Trixi")
-scatter!(u_PERK, label = "PERK")
-
-scatter(u_PERK - u_Trixi, label = "Difference")
 norm(u_Trixi - u_PERK, Inf)
-
-# Print the timer summary
-summary_callback()
+norm(u_Trixi - u_PERK, 2)
 
 plot(sol)
 plot!(getmesh(PlotData1D(sol)))
+
+# Print the timer summary
+summary_callback()
