@@ -11,8 +11,14 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
                                            BasePathMonCoeffs::AbstractString)
 
     # Current approach: Use ones (best internal stability properties)
-    c = ones(NumStages)
-    c[1] = 0.0
+    #c = ones(NumStages)
+    #c[1] = 0.0
+
+    c = zeros(NumStages)
+    for k in 2:(NumStages - 4)
+        c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
+        #c[k] = ((k - 1) / (NumStages - 4))^2 # Quadratically increasing
+    end
 
     c[NumStages - 3] = 1.0
     c[NumStages - 2] = 0.479274057836310
@@ -46,8 +52,9 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
     for level in eachindex(Stages)
         NumStageEvals = Stages[level]
         
+        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" * string(NumStages) * ".txt"
         # If all c = 1.0, the max number of stages does not matter
-        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
+        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
         
         NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)
         @assert NumMonCoeffs == NumStageEvals - 5
@@ -238,7 +245,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         # Determine level for each element
         for element_id in 1:n_elements
 
-            #=
+            
             # Determine level
             # NOTE: For really different grid sizes
             level = mesh.tree.levels[elements.cell_ids[element_id]]
@@ -248,10 +255,10 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
             # Convert to level id
             level_id = max_level + 1 - level
-            =#
+            
 
             # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-            
+            #=
             c_max_el = 0.0
             for k in eachnode(solver), j in eachnode(solver), i in eachnode(solver)
                 u_node = get_node_vars(u, equations, solver, i, j, k, element_id)
@@ -269,7 +276,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             else # Avoid reduction in timestep: Use next higher level
                 level_id = level_id - 1
             end
-            
+            =#
 
             push!(level_info_elements[level_id], element_id)
             # Add to accumulated container
@@ -284,15 +291,15 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         # Determine level for each interface
         for interface_id in 1:n_interfaces
             # Get element id: Interfaces only between elements of same size
-            #=
+            
             element_id = interfaces.neighbor_ids[1, interface_id]
 
             # Determine level
             level = mesh.tree.levels[elements.cell_ids[element_id]]
 
             level_id = max_level + 1 - level
-            =#
-
+            
+            #=
             # NOTE: For case with varying characteristic speeds
             
             el_id_1 = interfaces.neighbor_ids[1, interface_id]
@@ -316,7 +323,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
             end
 
             level_id = min(level_1, level_2)
-            
+            =#
 
             # NOTE: For 1D, periodic BC testcase with artificial assignment
             #=

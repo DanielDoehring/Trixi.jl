@@ -9,8 +9,14 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
     # Current approach: Use ones for improved internal stability
     c_const = 1.0
 
-    c = c_const * ones(NumStages)
-    c[1] = 0.0
+    #c = c_const * ones(NumStages)
+    #c[1] = 0.0
+
+    c = zeros(NumStages)
+    for k in 2:(NumStages - 4)
+        c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
+        #c[k] = ((k - 1) / (NumStages - 4))^2 # Quadratically increasing
+    end
 
     cS3 = c_const
     c[NumStages - 3] = cS3
@@ -28,6 +34,7 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
     AMatrices = zeros(CoeffsMax, 2)
     AMatrices[:, 1] = c[3:(NumStages - 3)]
 
+    PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * "_" * string(NumStages) * ".txt"
     # If all c = 1.0, the max number of stages does not matter
     PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * ".txt"
     NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)
