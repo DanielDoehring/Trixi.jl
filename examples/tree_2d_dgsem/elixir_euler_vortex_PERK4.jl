@@ -154,8 +154,8 @@ amr_interval = 20 # PERK4 Multi
 amr_interval = 10 # PERK4 19
 
 amr_interval = 20 # NDBLSRK144
-amr_interval = 30 # DGLDDRK84_C
-amr_interval = 26 # RDPK3SpFSAL49
+#amr_interval = 30 # DGLDDRK84_C
+#amr_interval = 26 # RDPK3SpFSAL49
 #amr_interval = 75 # RK4
 
 amr_callback = AMRCallback(semi, amr_controller,
@@ -165,16 +165,16 @@ amr_callback = AMRCallback(semi, amr_controller,
 ### AMR, Ref_Lvl = 6, Standard DGSEM ###
 
 # E = 5, 7, 11, 19
-#CFL = 6.0
+CFL = 6.0
 
 # PERK4 Standalone #
 #CFL = 11.5 # S = 19
 
 # OrdinaryDiffEq.jl methods
 
-CFL = 6.4 # NDBLSRK144
-CFL = 3.9 # DGLDDRK84_C
-CFL = 4.6 # RDPK3SpFSAL49
+#CFL = 6.4 # NDBLSRK144
+#CFL = 3.9 # DGLDDRK84_C
+#CFL = 4.6 # RDPK3SpFSAL49
 #CFL = 1.6 # RK4
 
 stepsize_callback = StepsizeCallback(cfl = CFL)
@@ -187,20 +187,18 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-#=
 
-ode_algorithm = PERK4(19, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+#ode_algorithm = PERK4(19, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
 
 dtRatios = [1, 0.5, 0.25, 0.125]
 Stages = [19, 11, 7, 5]
-#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
 
 summary_callback() # print the timer summary
-=#
 
 ###############################################################################
 

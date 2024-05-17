@@ -115,6 +115,13 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                     end
                     =#
 
+                    # RHS computation:
+                    Stages = [19, 11, 7, 5] # Isentropic Vortex with 4Lvl AMR
+                    for level = 1:length(integrator.level_info_elements)
+                        integrator.AddRHSCalls += amr_callback.interval * Stages[level] * 
+                                                  length(integrator.level_info_elements[level])
+                    end
+
                     # Determine level for each interface
                     for interface_id in 1:n_interfaces
                         # Get element id: Interfaces only between elements of same size

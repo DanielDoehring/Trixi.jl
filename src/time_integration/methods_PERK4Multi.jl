@@ -178,6 +178,7 @@ mutable struct PERK4_Multi_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
     #uprev::uType
     #tprev::RealT
     
+    AddRHSCalls::Float64
 end
 
 # Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
@@ -740,7 +741,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                                         level_u_indices_elements,
                                         
                                         t0, -1, n_levels,
-                                        du_ode_hyp)
+                                        du_ode_hyp, 0.0)
                                         #uprev, tprev)
 
     # initialize callbacks
@@ -783,6 +784,8 @@ function solve_steps!(integrator::PERK4_Multi_Integrator)
 
         step!(integrator)
     end # "main loop" timer
+
+    println("Additional RHS Calls: ", integrator.AddRHSCalls)
 
     return TimeIntegratorSolution((first(prob.tspan), integrator.t),
                                   (prob.u0, integrator.u),
