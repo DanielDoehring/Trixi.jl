@@ -11,14 +11,16 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
                                            BasePathMonCoeffs::AbstractString)
 
     # Current approach: Use ones (best internal stability properties)
-    #c = ones(NumStages)
-    #c[1] = 0.0
+    c = ones(NumStages)
+    c[1] = 0.0
 
+    #=
     c = zeros(NumStages)
     for k in 2:(NumStages - 4)
         c[k] = (k - 1)/(NumStages - 4) # Equidistant timestep distribution (similar to PERK2)
         #c[k] = ((k - 1) / (NumStages - 4))^2 # Quadratically increasing
     end
+    =#
 
     c[NumStages - 3] = 1.0
     c[NumStages - 2] = 0.479274057836310
@@ -52,9 +54,9 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, NumStages::Int
     for level in eachindex(Stages)
         NumStageEvals = Stages[level]
         
-        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" * string(NumStages) * ".txt"
+        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" * string(NumStages) * ".txt"
         # If all c = 1.0, the max number of stages does not matter
-        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
+        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
         
         NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)
         @assert NumMonCoeffs == NumStageEvals - 5
@@ -234,8 +236,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         n_levels = max_level - min_level + 1
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-        n_levels = 10
-        u = Trixi.wrap_array(u0, ode.p)
+        #n_levels = 10
+        #u = Trixi.wrap_array(u0, ode.p)
 
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
@@ -835,7 +837,7 @@ function step!(integrator::PERK4_Multi_Integrator)
         end
 
         for stage in 3:(alg.NumStages - 3)
-            
+            #=
             ### General implementation: Not own method for each grid level ###
             # Loop over different methods with own associated level
             for level in 1:min(alg.NumMethods, integrator.n_levels)
@@ -868,7 +870,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                     end
                 end
             end
-            
+            =#
 
             ### Simplified implementation: Own method for each level ###
             #=
@@ -886,8 +888,8 @@ function step!(integrator::PERK4_Multi_Integrator)
             end
             =#
 
-            #=
-            ### Optimized implementation for case: Own method for each level
+            
+            ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
             for level in 1:alg.HighestEvalLevels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1, level] *
@@ -901,7 +903,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k_higher[u_ind] # * A[stage, 1, level] = c[level] = 1
                 end
             end
-            =#
+            
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
