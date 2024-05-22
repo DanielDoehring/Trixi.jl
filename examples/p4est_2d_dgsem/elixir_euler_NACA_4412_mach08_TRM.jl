@@ -1,4 +1,3 @@
-using Downloads: download
 using OrdinaryDiffEq
 using Trixi
 
@@ -6,13 +5,6 @@ using Trixi
 # semidiscretization of the compressible Euler equations
 
 equations = CompressibleEulerEquations2D(1.4)
-
-prandtl_number() = 0.72
-
-mu() = 1e-5 # TODO: Revisit this value
-
-equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
-                                                          Prandtl = prandtl_number())
 
 # This AoA gives shock on airfoil surface for inviscid NACA0012
 # Question: Does this also produce a shock for (viscous) NACA4412?                                                          
@@ -41,24 +33,18 @@ end
 
 initial_condition = initial_condition_mach08_flow
 
-# Boundary conditions for free-stream testing
 boundary_condition_free_stream = BoundaryConditionDirichlet(initial_condition)
 
 polydeg = 3
 
-#surface_flux = flux_lax_friedrichs
-#surface_flux = flux_hll
-#surface_flux = flux_hlle
 surface_flux = flux_hllc
-
-#volume_flux = flux_ranocha
 volume_flux = flux_chandrashekar
 
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
-                                            #alpha_max = 0.5,
-                                            #alpha_min = 0.001,
-                                            #alpha_smooth = true,
+                                            alpha_max = 0.5,
+                                            alpha_min = 0.001,
+                                            alpha_smooth = true,
                                             variable = density_pressure)
 volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
@@ -68,20 +54,14 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/NASA_meshes/"
+path = "/home/daniel/Meshes/NASA_meshes/"
 
-mesh = "NACA4412/NACA4412_1_2D_unique.inp"
-
-#mesh = "NACA0012/Family_1/113_33/n0012family_1_7_2D_unique.inp"
-#mesh = "NACA0012/Family_1/225_65/n0012familyI_6_2D_unique.inp"
+mesh = "NACA4412/225_65/NACA4412_2_2D_unique.inp"
 
 mesh_file = path * mesh
 
-boundary_symbols = [:b2_symmetry_y_strong,
-                    :b4_farfield_riem, :b5_farfield_riem, :b7_farfield_riem, :b6_viscous_solid, :b8_to_stitch_a]
-
-restart_filename = "out/restart_009500.h5"
-#mesh = load_mesh(restart_filename)
+boundary_symbols = [:b2_symmetry_y_strong, :b4_farfield_riem, :b5_farfield_riem, 
+                    :b7_farfield_riem, :b6_viscous_solid, :b8_to_stitch_a]
 mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
 boundary_conditions = Dict(:b2_symmetry_y_strong => boundary_condition_free_stream,
@@ -91,61 +71,30 @@ boundary_conditions = Dict(:b2_symmetry_y_strong => boundary_condition_free_stre
                            :b6_viscous_solid => boundary_condition_slip_wall,
                            :b8_to_stitch_a => boundary_condition_free_stream)
 
-velocity_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0))
-heat_airfoil = Adiabatic((x, t, equations) -> 0.0)
-
-boundary_conditions_airfoil = BoundaryConditionNavierStokesWall(velocity_airfoil,
-                                                                heat_airfoil)
-
-boundary_conditions_parabolic = Dict(:b2_symmetry_y_strong => boundary_condition_free_stream,
-                                      :b4_farfield_riem => boundary_condition_free_stream,
-                                      :b5_farfield_riem => boundary_condition_free_stream,
-                                      :b7_farfield_riem => boundary_condition_free_stream,
-                                      :b6_viscous_solid => boundary_conditions_airfoil,
-                                      :b8_to_stitch_a => boundary_condition_free_stream)
-#=
 semi = SemidiscretizationHyperbolic(mesh, equations,
                                     initial_condition, solver;
                                     boundary_conditions = boundary_conditions)
-=#
-semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                             initial_condition, solver;
-                                             boundary_conditions = (boundary_conditions,
-                                                                    boundary_conditions_parabolic))
+
 
 ###############################################################################
 # ODE solvers
 
 # Run for a long time to reach a steady state
-tspan = (0.0, 1)
-ode = semidiscretize(semi, tspan)
+#tspan = (0.0, 10)
+#ode = semidiscretize(semi, tspan)
+#dt = 1e-6
 
-#tspan = (load_time(restart_filename), 1.0)
-#ode = semidiscretize(semi, tspan, restart_filename)
+restart_filename = "out/restart_602504.h5"
+tspan = (load_time(restart_filename), 10.5)
+ode = semidiscretize(semi, tspan, restart_filename)
+dt = load_dt(restart_filename)
 
 # Callbacks
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 10000
-
-#=
-force_boundary_name = :b6_viscous_solid
-drag_coefficient = AnalysisSurfaceIntegral(semi, force_boundary_name,
-                                           DragCoefficient(sw_aoa(), sw_rho_inf(),
-                                                           sw_U_inf(equations), sw_linf()))
-
-lift_coefficient = AnalysisSurfaceIntegral(semi, force_boundary_name,
-                                           LiftCoefficient(sw_aoa(), sw_rho_inf(),
-                                                           sw_U_inf(equations), sw_linf()))
-
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     output_directory = "out",
-                                     save_analysis = true,
-                                     analysis_errors = Symbol[],
-                                     analysis_integrals = (drag_coefficient,
-                                                           lift_coefficient))
-=#
+analysis_interval = 50000
+analysis_interval = 2000 # For AMR run
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                            analysis_errors = Symbol[],
@@ -153,16 +102,13 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-save_restart = SaveRestartCallback(interval = 9500,
+save_restart = SaveRestartCallback(interval = analysis_interval+1,
                                    save_final_restart = true)
 
-save_solution = SaveSolutionCallback(interval = analysis_interval,
+save_solution = SaveSolutionCallback(interval = Int(10^8), # For AMR run, else = analysis_interval
                                     save_initial_solution = true,
                                     save_final_solution = true,
                                     solution_variables = cons2prim)
-
-stepsize_callback = StepsizeCallback(cfl = 8.5) # 4412
-#stepsize_callback = StepsizeCallback(cfl = 4.0) #0012
 
 amr_controller = ControllerThreeLevel(semi, shock_indicator,
                                       base_level = 0,
@@ -170,28 +116,23 @@ amr_controller = ControllerThreeLevel(semi, shock_indicator,
                                       max_level = 2, max_threshold = 0.1)
 
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 100,
+                           interval = 200,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
 callbacks = CallbackSet(summary_callback, 
-                        alive_callback, 
+                        #alive_callback, # Not needed for AMR run (print analysis_callback more often)
                         save_solution,
                         amr_callback,
-                        #stepsize_callback,
                         #save_restart,
                         analysis_callback)
 
 ###############################################################################
 # run the simulation
-#=
-sol = solve(ode, SSPRK104(thread = OrdinaryDiffEq.True()),
-            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-=#
 
 sol = solve(ode, SSPRK43(thread = OrdinaryDiffEq.True());
-            abstol = 1.0e-7, reltol = 1.0e-7,
+            abstol = 5.0e-7, reltol = 5.0e-7,
+            dt = dt,
             ode_default_options()..., callback = callbacks);
 
 summary_callback() # print the timer summary
