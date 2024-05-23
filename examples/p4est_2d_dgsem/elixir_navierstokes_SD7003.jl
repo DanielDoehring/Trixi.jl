@@ -60,7 +60,7 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
-path = "/home/daniel/Meshes/PERK_mesh/SD7003Laminar/"
+path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
@@ -95,11 +95,11 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 #tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 #ode = semidiscretize(semi, tspan; split_form = false) # for PERK
-#de = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
+#ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
 
 # Timespan for measurements over 5 * t_c
-tspan = (load_time(restart_filename), 35 * t_c)
-ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
+#tspan = (load_time(restart_filename), 35 * t_c)
+#ode = semidiscretize(semi, tspan, restart_filename; split_form = false)
 #ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
@@ -161,7 +161,7 @@ save_solution = SaveSolutionCallback(interval = 2000,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
-                                     output_directory="run/out")
+                                     output_directory="out")
 
 alive_callback = AliveCallback(alive_interval = 200)
 
@@ -171,13 +171,14 @@ save_restart = SaveRestartCallback(interval = analysis_interval, # Only at end
 callbacks = CallbackSet(analysis_callback,
                         #stepsize_callback, # For measurements: Fixed timestep
                         #alive_callback, # Not needed for measurement run
-                        #save_solution,
+                        save_solution,
                         #save_restart, # For restart with measurements
                         summary_callback);
 
 ###############################################################################
 # run the simulation
-#=
+
+# For reference
 dtRatios = [0.252900854746017, # 16
             0.208310160790890, # 14
             0.172356930215766, # 12
@@ -197,9 +198,13 @@ dtRatios = [0.208310160790890, # 14
             0.030629777558366] #= 5 =# / 0.208310160790890
 Stages = [14, 12, 10, 8, 7, 6, 5]
 
+# Plot level distribution for cells
+cache = semi.cache
+include("/home/daniel/git/Trixi2Vtk.jl/src/Trixi2Vtk.jl")
+Trixi2Vtk.trixi2vtk(cache, dtRatios, Stages, joinpath("/home/daniel/git/Paper_PERK4/Data/SD7003/Plot_Level_Distribution/", "solution_*.h5"), output_directory="/home/daniel/git/Paper_PERK4/Data/SD7003/Plot_Level_Distribution/")
 
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/PERK4/SD7003/", dtRatios)
-=#
+
 ode_algorithm = PERK4(12, "/home/daniel/PERK4/SD7003/")
 
 dt = 1e-3 # PERK4, dt_c = 2e-4
