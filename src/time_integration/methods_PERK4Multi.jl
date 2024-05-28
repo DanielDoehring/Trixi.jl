@@ -552,9 +552,12 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
         # Determine level for each interface
         for interface_id in 1:n_interfaces
-            # For interfaces: Elements of same size
-            element_id = interfaces.neighbor_ids[1, interface_id]
-            h = h_min_per_element[element_id]
+            # For p4est: Cells on same level do not necessarily have same size
+            element_id1 = interfaces.neighbor_ids[1, interface_id]
+            element_id2 = interfaces.neighbor_ids[2, interface_id]
+            h1 = h_min_per_element[element_id1]
+            h2 = h_min_per_element[element_id2]
+            h = min(h1, h2)
 
             # Approach for square cells (RTI) & linear timestep scaling
             #level = findfirst(x-> x >= h, h_bins)
@@ -622,6 +625,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
 
             element_id_higher = mortars.neighbor_ids[2, mortar_id]
             h_higher = h_min_per_element[element_id_higher]
+
+            h = min(h_lower, h_higher)
 
             # Approach for square cells (RTI) & linear timestep scaling
             #level = findfirst(x-> x >= h, h_bins)
