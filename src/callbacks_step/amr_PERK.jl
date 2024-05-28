@@ -375,9 +375,12 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
 
                     # Determine level for each interface
                     for interface_id in 1:n_interfaces
-                        # For interfaces: Elements of same size
-                        element_id = interfaces.neighbor_ids[1, interface_id]
-                        h = h_min_per_element[element_id]
+                        # For p4est: Cells on same level do not necessarily have same size
+                        element_id1 = interfaces.neighbor_ids[1, interface_id]
+                        element_id2 = interfaces.neighbor_ids[2, interface_id]
+                        h1 = h_min_per_element[element_id1]
+                        h2 = h_min_per_element[element_id2]
+                        h = min(h1, h2)
 
                         # Determine level
                         level = findfirst(x -> x >= h, h_bins)
@@ -412,10 +415,15 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                     n_mortars = last(size(mortars.u))
 
                     for mortar_id in 1:n_mortars
-                        # This is by convention always one of the finer elements
-                        element_id = mortars.neighbor_ids[1, mortar_id]
-                        h = h_min_per_element[element_id]
+                        # Get element ids
+                        element_id_lower = mortars.neighbor_ids[1, mortar_id]
+                        h_lower = h_min_per_element[element_id_lower]
 
+                        element_id_higher = mortars.neighbor_ids[2, mortar_id]
+                        h_higher = h_min_per_element[element_id_higher]
+
+                        h = min(h_lower, h_higher)
+                        
                         # Determine level
                         level = findfirst(x -> x >= h, h_bins)
 
