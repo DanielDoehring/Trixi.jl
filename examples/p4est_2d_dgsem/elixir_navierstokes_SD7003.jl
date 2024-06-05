@@ -93,8 +93,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 
-#tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
-#ode = semidiscretize(semi, tspan; split_form = false) # for PERK
+tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
+ode = semidiscretize(semi, tspan; split_form = false) # for PERK
 #ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
 
 # Timespan for measurements over 5 * t_c
@@ -199,13 +199,15 @@ dtRatios = [0.208310160790890, # 14
 Stages = [14, 12, 10, 8, 7, 6, 5]
 
 # Plot level distribution for cells
+#=
 cache = semi.cache
 include("/home/daniel/git/Trixi2Vtk.jl/src/Trixi2Vtk.jl")
 Trixi2Vtk.trixi2vtk(cache, dtRatios, Stages, joinpath("/home/daniel/git/Paper_PERK4/Data/SD7003/Plot_Level_Distribution/", "solution_*.h5"), output_directory="/home/daniel/git/Paper_PERK4/Data/SD7003/Plot_Level_Distribution/")
+=#
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/PERK4/SD7003/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
 
-ode_algorithm = PERK4(12, "/home/daniel/PERK4/SD7003/")
+ode_algorithm = PERK4(12, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
 
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
