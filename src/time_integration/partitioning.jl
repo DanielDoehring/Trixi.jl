@@ -1,4 +1,4 @@
-function set_partitioning_variables!(mesh::TreeMesh, dg, cache, alg)
+function partitioning_variables(mesh::TreeMesh, dg, cache, alg)
   @unpack elements, interfaces, boundaries = cache
 
   n_elements = length(elements.cell_ids)
@@ -203,7 +203,7 @@ function set_partitioning_variables!(mesh::TreeMesh, dg, cache, alg)
          level_info_mortars_acc
 end
 
-function set_partitioning_variables!(mesh::P4estMesh, dg, cache, alg)
+function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
   @unpack elements, interfaces, boundaries = cache
 
   nnodes = length(mesh.nodes)
@@ -379,4 +379,50 @@ function set_partitioning_variables!(mesh::P4estMesh, dg, cache, alg)
         level_info_interfaces_acc, 
         level_info_boundaries_acc, level_info_boundaries_orientation_acc, 
         level_info_mortars_acc
+end
+
+function partitioning_u(n_dims, n_levels, level_info_elements, u, equations, dg, mesh)
+  level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
+
+  if n_dims == 1
+    for level in 1:n_levels
+        for element_id in level_info_elements[level]
+            # First dimension of u: nvariables, following: nnodes (per dim) last: nelements                                    
+            indices = vec(transpose(LinearIndices(u)[:, :, element_id]))
+            append!(level_u_indices_elements[level], indices)
+        end
+        sort!(level_u_indices_elements[level])
+        @assert length(level_u_indices_elements[level]) ==
+                nvariables(equations) * Trixi.nnodes(dg)^ndims(mesh) *
+                length(level_info_elements[level])
+    end
+  elseif n_dims == 2
+      for level in 1:n_levels
+          for element_id in level_info_elements[level]
+              # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+              indices = collect(Iterators.flatten(LinearIndices(u)[:, :, :,
+                                                                  element_id]))
+              append!(level_u_indices_elements[level], indices)
+          end
+          sort!(level_u_indices_elements[level])
+          @assert length(level_u_indices_elements[level]) ==
+                  nvariables(equations) * Trixi.nnodes(dg)^ndims(mesh) *
+                  length(level_info_elements[level])
+      end
+  elseif n_dims == 3
+      for level in 1:n_levels
+          for element_id in level_info_elements[level]
+              # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+              indices = collect(Iterators.flatten(LinearIndices(u)[:, :, :, :,
+                                                                  element_id]))
+              append!(level_u_indices_elements[level], indices)
+          end
+          sort!(level_u_indices_elements[level])
+          @assert length(level_u_indices_elements[level]) ==
+                  nvariables(equations) * Trixi.nnodes(dg)^ndims(mesh) *
+                  length(level_info_elements[level])
+      end
+  end
+
+  return level_u_indices_elements
 end

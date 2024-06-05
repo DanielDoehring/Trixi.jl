@@ -141,7 +141,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
 
-#analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 # Split DGSEM HLLC + Flux Chandrashekar
 stepsize_callback = StepsizeCallback(cfl = 5.7) # PERK_4 Multi E = 5, ..., 16
@@ -149,7 +149,7 @@ stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Multi E = 5, ..., 14
 
 #stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Single, 16
 #stepsize_callback = StepsizeCallback(cfl = 6.4) # PERK_4 Single, 14
-stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
+#stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
 
 #stepsize_callback = StepsizeCallback(cfl = 7.7) # NDBLSRK144
 #stepsize_callback = StepsizeCallback(cfl = 5.5) # DGLDDRK84_C
@@ -169,8 +169,8 @@ save_restart = SaveRestartCallback(interval = analysis_interval, # Only at end
                                    save_final_restart = true)
 
 callbacks = CallbackSet(analysis_callback,
-                        #stepsize_callback, # For measurements: Fixed timestep
-                        #alive_callback, # Not needed for measurement run
+                        stepsize_callback, # For measurements: Fixed timestep
+                        alive_callback, # Not needed for measurement run
                         save_solution,
                         #save_restart, # For restart with measurements
                         summary_callback);
@@ -207,7 +207,7 @@ Trixi2Vtk.trixi2vtk(cache, dtRatios, Stages, joinpath("/home/daniel/git/Paper_PE
 
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/", dtRatios)
 
-ode_algorithm = PERK4(12, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
+#ode_algorithm = PERK4(12, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/")
 
 dt = 1e-3 # PERK4, dt_c = 2e-4
 

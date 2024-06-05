@@ -16,7 +16,7 @@ end
 include("methods_2N.jl")
 include("methods_3Sstar.jl")
 
-include("set_partitioning_variables.jl")
+include("partitioning.jl")
 include("methods_PERK.jl")
 include("methods_PERKMulti.jl")
 include("methods_PERK3.jl")
