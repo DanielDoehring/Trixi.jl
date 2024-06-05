@@ -42,7 +42,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                     # Initialize storage for level-wise information
                     if (integrator.n_levels - 1) != length(integrator.level_info_elements_acc)
                         integrator.level_info_elements = [Vector{Int64}()
-                                                          for _ in 1:(integrator.n_levels - 1)]
+                                                          for _ in 1:integrator.n_levels]
                         integrator.level_info_elements_acc = [Vector{Int64}()
                                                               for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_interfaces_acc = [Vector{Int64}()
@@ -56,7 +56,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         integrator.level_info_mortars_acc = [Vector{Int64}()
                                                              for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_u_indices_elements = [Vector{Int64}()
-                                                               for _ in 1:(integrator.n_levels - 1)]
+                                                               for _ in 1:integrator.n_levels]
                         #resize!(integrator.level_info_elements_acc, integrator.n_levels) # TODO: Does unfortunately not work
                     else # Just empty datastructures
                         for level in 1:(integrator.n_levels - 1)
@@ -70,6 +70,8 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                             empty!(integrator.level_info_mortars_acc[level])
                             empty!(integrator.level_u_indices_elements[level])
                         end
+                        empty!(integrator.level_info_elements[integrator.n_levels])
+                        empty!(integrator.level_u_indices_elements[integrator.n_levels])
                     end
 
                     # Determine level for each element
@@ -296,7 +298,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                     # Initialize storage for level-wise information
                     if (integrator.n_levels  - 1) != length(integrator.level_info_elements_acc)
                         integrator.level_info_elements = [Vector{Int64}()
-                                                          for _ in 1:(integrator.n_levels - 1)]
+                                                          for _ in 1:integrator.n_levels]
                         integrator.level_info_elements_acc = [Vector{Int64}()
                                                               for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_interfaces_acc = [Vector{Int64}()
@@ -310,7 +312,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         integrator.level_info_mortars_acc = [Vector{Int64}()
                                                              for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_u_indices_elements = [Vector{Int64}()
-                                                               for _ in 1:(integrator.n_levels - 1)]
+                                                               for _ in 1:integrator.n_levels]
                         #resize!(integrator.level_info_elements_acc, integrator.n_levels) # TODO: Does unfortunately not work
                     else # Just empty datastructures
                         for level in 1:(integrator.n_levels - 1)
@@ -324,6 +326,8 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                             empty!(integrator.level_info_mortars_acc[level])
                             empty!(integrator.level_u_indices_elements[level])
                         end
+                        empty!(integrator.level_info_elements[integrator.n_levels])
+                        empty!(integrator.level_u_indices_elements[integrator.n_levels])
                     end
 
                     for element_id in 1:n_elements
