@@ -240,6 +240,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
         #n_levels = 10
         #u = Trixi.wrap_array(u0, ode.p)
 
+        # TODO: There is actually no need to store the last accumulated level, as we 
+        # use for this just the standard RHS
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
         level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
