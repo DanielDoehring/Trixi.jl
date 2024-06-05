@@ -423,7 +423,8 @@ function solve(ode::ODEProblem, alg::PERK_Multi;
         n_dims = ndims(mesh.tree) # Spatial dimension
         level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                   for _ in 1:(2 * n_dims)]
-                                                 for _ in 1:(n_levels - 1)]
+                                                  # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
+                                                 for _ in 1:n_levels]
 
         # Determine level for each boundary
         for boundary_id in 1:n_boundaries
@@ -631,7 +632,8 @@ function solve(ode::ODEProblem, alg::PERK_Multi;
         # TODO: Not yet adapted for P4est!
         level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                   for _ in 1:(2 * n_dims)]
-                                                 for _ in 1:(n_levels - 1)]
+                                                  # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
+                                                 for _ in 1:n_levels]
 
         # Determine level for each boundary
         for boundary_id in 1:n_boundaries

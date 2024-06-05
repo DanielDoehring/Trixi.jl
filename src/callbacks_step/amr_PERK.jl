@@ -52,7 +52,8 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         # For efficient treatment of boundaries we need additional datastructures
                         integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                                              for _ in 1:(2 * n_dims)]
-                                                                            for _ in 1:(integrator.n_levels - 1)]
+                                                                             # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
+                                                                            for _ in 1:integrator.n_levels]
                         integrator.level_info_mortars_acc = [Vector{Int64}()
                                                              for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_u_indices_elements = [Vector{Int64}()
@@ -308,7 +309,8 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         # For efficient treatment of boundaries we need additional datastructures
                         integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                                              for _ in 1:(2 * n_dims)]
-                                                                            for _ in 1:(integrator.n_levels - 1)]
+                                                                             # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
+                                                                            for _ in 1:integrator.n_levels]
                         integrator.level_info_mortars_acc = [Vector{Int64}()
                                                              for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_u_indices_elements = [Vector{Int64}()
