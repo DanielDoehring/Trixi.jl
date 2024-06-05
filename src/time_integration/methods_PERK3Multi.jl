@@ -337,7 +337,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
 
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-        level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_elements_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
 
         # Determine level for each element
         for element_id in 1:n_elements
@@ -352,14 +352,12 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
 
             push!(level_info_elements[level_id], element_id)
             # Add to accumulated container
-            for l in level_id:n_levels
+            for l in level_id:(n_levels - 1)
                 push!(level_info_elements_acc[l], element_id)
             end
         end
-        @assert length(level_info_elements_acc[end])==
-        n_elements "highest level should contain all elements"
 
-        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
         # Determine level for each interface
         for interface_id in 1:n_interfaces
             # Get element id: Interfaces only between elements of same size
@@ -390,19 +388,17 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             level_id = min(level_id_left, level_id_right)
             =#
 
-            for l in level_id:n_levels
+            for l in level_id:(n_levels - 1)
                 push!(level_info_interfaces_acc[l], interface_id)
             end
         end
-        @assert length(level_info_interfaces_acc[end])==
-        n_interfaces "highest level should contain all interfaces"
 
-        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
         # For efficient treatment of boundaries we need additional datastructures
         n_dims = ndims(mesh.tree) # Spatial dimension
         level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                   for _ in 1:(2 * n_dims)]
-                                                 for _ in 1:n_levels]
+                                                 for _ in 1:(n_levels - 1)]
 
         # Determine level for each boundary
         for boundary_id in 1:n_boundaries
@@ -416,47 +412,45 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             level_id = max_level + 1 - level
 
             # Add to accumulated container
-            for l in level_id:n_levels
+            for l in level_id:(n_levels - 1)
                 push!(level_info_boundaries_acc[l], boundary_id)
             end
 
             # For orientation-side wise specific treatment
             if boundaries.orientations[boundary_id] == 1 # x Boundary
                 if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                    for l in level_id:n_levels
+                    for l in level_id:(n_levels - 1)
                         push!(level_info_boundaries_orientation_acc[l][2], boundary_id)
                     end
                 else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                    for l in level_id:n_levels
+                    for l in level_id:(n_levels - 1)
                         push!(level_info_boundaries_orientation_acc[l][1], boundary_id)
                     end
                 end
             elseif boundaries.orientations[boundary_id] == 2 # y Boundary
                 if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                    for l in level_id:n_levels
+                    for l in level_id:(n_levels - 1)
                         push!(level_info_boundaries_orientation_acc[l][4], boundary_id)
                     end
                 else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                    for l in level_id:n_levels
+                    for l in level_id:(n_levels - 1)
                         push!(level_info_boundaries_orientation_acc[l][3], boundary_id)
                     end
                 end
             elseif boundaries.orientations[boundary_id] == 3 # z Boundary
                 if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                    for l in level_id:n_levels
+                    for l in level_id:(n_levels - 1)
                         push!(level_info_boundaries_orientation_acc[l][6], boundary_id)
                     end
                 else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                    for l in level_id:n_levels
+                    for l in level_id:(n_levels - 1)
                         push!(level_info_boundaries_orientation_acc[l][5], boundary_id)
                     end
                 end
             end
         end
-        @assert length(level_info_boundaries_acc[end])==
-        n_boundaries "highest level should contain all boundaries"
 
-        level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_mortars_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
         if n_dims > 1
             @unpack mortars = cache
             n_mortars = length(mortars.orientations)
@@ -471,12 +465,10 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
                 # Higher element's level determines this mortars' level
                 level_id = max_level + 1 - level
                 # Add to accumulated container
-                for l in level_id:n_levels
+                for l in level_id:(n_levels - 1)
                     push!(level_info_mortars_acc[l], mortar_id)
                 end
             end
-            @assert length(level_info_mortars_acc[end])==
-            n_mortars "highest level should contain all mortars"
         end
     elseif typeof(mesh) <: P4estMesh
         @unpack interfaces, boundaries = cache
@@ -561,7 +553,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
         println("\n")
 
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-        level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_elements_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
         for element_id in 1:n_elements
             h = h_min_per_element[element_id]
 
@@ -575,7 +567,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             =#
             append!(level_info_elements[level], element_id)
 
-            for l in level:n_levels
+            for l in level:(n_levels - 1)
                 push!(level_info_elements_acc[l], element_id)
             end
         end
@@ -586,7 +578,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
 
         n_interfaces = last(size(interfaces.u))
 
-        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
         # Determine level for each interface
         for interface_id in 1:n_interfaces
             # For interfaces: Elements of same size
@@ -606,17 +598,15 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
                 push!(level_info_interfaces_acc[l], interface_id)
             end
         end
-        @assert length(level_info_interfaces_acc[end])==
-        n_interfaces "highest level should contain all interfaces"
 
         n_boundaries = last(size(boundaries.u))
-        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
         # For efficient treatment of boundaries we need additional datastructures
         n_dims = ndims(mesh) # Spatial dimension
         # TODO: Not yet adapted for P4est!
         level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                   for _ in 1:(2 * n_dims)]
-                                                 for _ in 1:n_levels]
+                                                 for _ in 1:(n_levels - 1)]
 
         # Determine level for each boundary
         for boundary_id in 1:n_boundaries
@@ -635,15 +625,13 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             =#
 
             # Add to accumulated container
-            for l in level:n_levels
+            for l in level:(n_levels - 1)
                 push!(level_info_boundaries_acc[l], boundary_id)
             end
         end
-        @assert length(level_info_boundaries_acc[end])==
-        n_boundaries "highest level should contain all boundaries"
 
         @unpack mortars = cache # TODO: Could also make dimensionality check
-        level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_mortars_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
         @unpack mortars = cache
         n_mortars = last(size(mortars.u))
 
@@ -666,12 +654,10 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             =#
 
             # Add to accumulated container
-            for l in level:n_levels
+            for l in level:(n_levels - 1)
                 push!(level_info_mortars_acc[l], mortar_id)
             end
         end
-        @assert length(level_info_mortars_acc[end])==
-        n_mortars "highest level should contain all mortars"
     end
 
     #=
@@ -879,47 +865,55 @@ function solve!(integrator::PERK3_Multi_Integrator)
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
-            # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage],
-                                          integrator.n_levels)
-
-            # Check if there are fewer integrators than grid levels (non-optimal method)
-            if integrator.coarsest_lvl == alg.NumMethods
-                integrator.coarsest_lvl = integrator.n_levels
-            end
-
             # For statically refined meshes:
             #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
 
-            #=
-            for stage_callback in alg.stage_callbacks
-              stage_callback(integrator.u_tmp, integrator, prob.p, integrator.t_stage)
-            end
-            =#
+            # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
 
-            #=
-            # Joint RHS evaluation with all elements sharing this timestep
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                        integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                        integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                        integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                        integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                        integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                        integrator.level_u_indices_elements, integrator.coarsest_lvl,
-                        integrator.du_ode_hyp)
-            =#
+            # Check if there are fewer integrators than grid levels (non-optimal method)
+            if integrator.coarsest_lvl == alg.NumMethods
+                # NOTE: This is supposedly more efficient than setting
+                #integrator.coarsest_lvl = integrator.n_levels
+                # and then using the level-dependent version
 
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
-                         integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                         integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                         integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                         integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                         integrator.level_info_mortars_acc[integrator.coarsest_lvl])
+                #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
-            # Update k_higher of relevant levels
-            for level in 1:(integrator.coarsest_lvl)
-                @threaded for u_ind in integrator.level_u_indices_elements[level]
+                @threaded for u_ind in eachindex(integrator.du)
                     integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+                end
+            else
+                #=
+                # Joint RHS evaluation with all elements sharing this timestep
+                integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                            integrator.t_stage,
+                            integrator.level_info_elements_acc[integrator.coarsest_lvl],
+                            integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
+                            integrator.level_info_mortars_acc[integrator.coarsest_lvl],
+                            integrator.level_u_indices_elements,
+                            integrator.coarsest_lvl,
+                            integrator.du_ode_hyp)
+                =#
+
+                
+                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
+                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
+                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
+                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
+                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
+                             integrator.coarsest_lvl)
+                
+
+                # Update k_higher of relevant levels
+                for level in 1:(integrator.coarsest_lvl)
+                    @threaded for u_ind in integrator.level_u_indices_elements[level]
+                        integrator.k_higher[u_ind] = integrator.du[u_ind] *
+                                                    integrator.dt
+                    end
                 end
             end
 

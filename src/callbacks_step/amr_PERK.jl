@@ -40,26 +40,26 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                     n_dims = ndims(mesh.tree) # Spatial dimension
 
                     # Initialize storage for level-wise information
-                    if integrator.n_levels != length(integrator.level_info_elements_acc)
+                    if (integrator.n_levels - 1) != length(integrator.level_info_elements_acc)
                         integrator.level_info_elements = [Vector{Int64}()
-                                                          for _ in 1:(integrator.n_levels)]
+                                                          for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_elements_acc = [Vector{Int64}()
-                                                              for _ in 1:(integrator.n_levels)]
+                                                              for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_interfaces_acc = [Vector{Int64}()
-                                                                for _ in 1:(integrator.n_levels)]
+                                                                for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_boundaries_acc = [Vector{Int64}()
-                                                                for _ in 1:(integrator.n_levels)]
+                                                                for _ in 1:(integrator.n_levels - 1)]
                         # For efficient treatment of boundaries we need additional datastructures
                         integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                                              for _ in 1:(2 * n_dims)]
-                                                                            for _ in 1:(integrator.n_levels)]
+                                                                            for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_mortars_acc = [Vector{Int64}()
-                                                             for _ in 1:(integrator.n_levels)]
+                                                             for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_u_indices_elements = [Vector{Int64}()
-                                                               for _ in 1:(integrator.n_levels)]
+                                                               for _ in 1:(integrator.n_levels - 1)]
                         #resize!(integrator.level_info_elements_acc, integrator.n_levels) # TODO: Does unfortunately not work
                     else # Just empty datastructures
-                        for level in 1:(integrator.n_levels)
+                        for level in 1:(integrator.n_levels - 1)
                             empty!(integrator.level_info_elements[level])
                             empty!(integrator.level_info_elements_acc[level])
                             empty!(integrator.level_info_interfaces_acc[level])
@@ -81,12 +81,10 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
 
                         push!(integrator.level_info_elements[level_id], element_id)
                         # Add to accumulated container
-                        for l in level_id:(integrator.n_levels)
+                        for l in level_id:(integrator.n_levels - 1)
                             push!(integrator.level_info_elements_acc[l], element_id)
                         end
                     end
-                    @assert length(integrator.level_info_elements_acc[end])==
-                    n_elements "highest level should contain all elements"
 
                     #=
                     # NOTE: Additional RHS Call computation
@@ -131,12 +129,10 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         level = mesh.tree.levels[elements.cell_ids[element_id]]
 
                         level_id = max_level + 1 - level
-                        for l in level_id:(integrator.n_levels)
+                        for l in level_id:(integrator.n_levels - 1)
                             push!(integrator.level_info_interfaces_acc[l], interface_id)
                         end
                     end
-                    @assert length(integrator.level_info_interfaces_acc[end])==
-                    n_interfaces "highest level should contain all interfaces"
 
                     # Determine level for each boundary
                     for boundary_id in 1:n_boundaries
@@ -150,51 +146,49 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         level_id = max_level + 1 - level
 
                         # Add to accumulated container
-                        for l in level_id:(integrator.n_levels)
+                        for l in level_id:(integrator.n_levels - 1)
                             push!(integrator.level_info_boundaries_acc[l], boundary_id)
                         end
 
                         # For orientation-side wise specific treatment
                         if boundaries.orientations[boundary_id] == 1 # x Boundary
                             if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                                for l in level_id:(integrator.n_levels)
+                                for l in level_id:(integrator.n_levels - 1)
                                     push!(integrator.level_info_boundaries_orientation_acc[l][2],
                                           boundary_id)
                                 end
                             else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                                for l in level_id:(integrator.n_levels)
+                                for l in level_id:(integrator.n_levels - 1)
                                     push!(integrator.level_info_boundaries_orientation_acc[l][1],
                                           boundary_id)
                                 end
                             end
                         elseif boundaries.orientations[boundary_id] == 2 # y Boundary
                             if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                                for l in level_id:(integrator.n_levels)
+                                for l in level_id:(integrator.n_levels - 1)
                                     push!(integrator.level_info_boundaries_orientation_acc[l][4],
                                           boundary_id)
                                 end
                             else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                                for l in level_id:(integrator.n_levels)
+                                for l in level_id:(integrator.n_levels - 1)
                                     push!(integrator.level_info_boundaries_orientation_acc[l][3],
                                           boundary_id)
                                 end
                             end
                         elseif boundaries.orientations[boundary_id] == 3 # z Boundary
                             if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                                for l in level_id:(integrator.n_levels)
+                                for l in level_id:(integrator.n_levels - 1)
                                     push!(integrator.level_info_boundaries_orientation_acc[l][6],
                                           boundary_id)
                                 end
                             else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                                for l in level_id:(integrator.n_levels)
+                                for l in level_id:(integrator.n_levels - 1)
                                     push!(integrator.level_info_boundaries_orientation_acc[l][5],
                                           boundary_id)
                                 end
                             end
                         end
                     end # 1:n_boundaries
-                    @assert length(integrator.level_info_boundaries_acc[end])==
-                    n_boundaries "highest level should contain all boundaries"
 
                     if n_dims > 1
                         @unpack mortars = cache
@@ -210,12 +204,10 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                             # Higher element's level determines this mortars' level
                             level_id = max_level + 1 - level
                             # Add to accumulated container
-                            for l in level_id:(integrator.n_levels)
+                            for l in level_id:(integrator.n_levels - 1)
                                 push!(integrator.level_info_mortars_acc[l], mortar_id)
                             end
                         end
-                        @assert length(integrator.level_info_mortars_acc[end])==
-                        n_mortars "highest level should contain all mortars"
                     end
                     #elseif typeof(mesh) <:P4estMesh{2}
                 elseif typeof(mesh) <: P4estMesh
@@ -302,26 +294,26 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                     n_dims = ndims(mesh) # Spatial dimension
 
                     # Initialize storage for level-wise information
-                    if integrator.n_levels != length(integrator.level_info_elements_acc)
+                    if (integrator.n_levels  - 1) != length(integrator.level_info_elements_acc)
                         integrator.level_info_elements = [Vector{Int64}()
-                                                          for _ in 1:(integrator.n_levels)]
+                                                          for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_elements_acc = [Vector{Int64}()
-                                                              for _ in 1:(integrator.n_levels)]
+                                                              for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_interfaces_acc = [Vector{Int64}()
-                                                                for _ in 1:(integrator.n_levels)]
+                                                                for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_boundaries_acc = [Vector{Int64}()
-                                                                for _ in 1:(integrator.n_levels)]
+                                                                for _ in 1:(integrator.n_levels - 1)]
                         # For efficient treatment of boundaries we need additional datastructures
                         integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
                                                                              for _ in 1:(2 * n_dims)]
-                                                                            for _ in 1:(integrator.n_levels)]
+                                                                            for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_info_mortars_acc = [Vector{Int64}()
-                                                             for _ in 1:(integrator.n_levels)]
+                                                             for _ in 1:(integrator.n_levels - 1)]
                         integrator.level_u_indices_elements = [Vector{Int64}()
-                                                               for _ in 1:(integrator.n_levels)]
+                                                               for _ in 1:(integrator.n_levels - 1)]
                         #resize!(integrator.level_info_elements_acc, integrator.n_levels) # TODO: Does unfortunately not work
                     else # Just empty datastructures
-                        for level in 1:(integrator.n_levels)
+                        for level in 1:(integrator.n_levels - 1)
                             empty!(integrator.level_info_elements[level])
                             empty!(integrator.level_info_elements_acc[level])
                             empty!(integrator.level_info_interfaces_acc[level])
@@ -341,12 +333,10 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
 
                         append!(integrator.level_info_elements[level], element_id)
 
-                        for l in level:(integrator.n_levels)
+                        for l in level:(integrator.n_levels - 1)
                             push!(integrator.level_info_elements_acc[l], element_id)
                         end
                     end
-                    @assert length(integrator.level_info_elements_acc[end])==
-                    n_elements "highest level should contain all elements"
 
                     #=
                     # NOTE: Additional RHS Call computation
@@ -385,12 +375,10 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         # Determine level
                         level = findfirst(x -> x >= h, h_bins)
 
-                        for l in level:(integrator.n_levels)
+                        for l in level:(integrator.n_levels - 1)
                             push!(integrator.level_info_interfaces_acc[l], interface_id)
                         end
                     end
-                    @assert length(integrator.level_info_interfaces_acc[end])==
-                    n_interfaces "highest level should contain all interfaces"
 
                     n_boundaries = last(size(boundaries.u))
                     # For efficient treatment of boundaries we need additional datastructures
@@ -404,12 +392,10 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         level = findfirst(x -> x >= h, h_bins)
 
                         # Add to accumulated container
-                        for l in level:(integrator.n_levels)
+                        for l in level:(integrator.n_levels - 1)
                             push!(integrator.level_info_boundaries_acc[l], boundary_id)
                         end
                     end
-                    @assert length(integrator.level_info_boundaries_acc[end])==
-                    n_boundaries "highest level should contain all boundaries"
 
                     @unpack mortars = cache # TODO: Could also make dimensionality check
                     n_mortars = last(size(mortars.u))
@@ -428,12 +414,10 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                         level = findfirst(x -> x >= h, h_bins)
 
                         # Add to accumulated container
-                        for l in level:(integrator.n_levels)
+                        for l in level:(integrator.n_levels - 1)
                             push!(integrator.level_info_mortars_acc[l], mortar_id)
                         end
                     end
-                    @assert length(integrator.level_info_mortars_acc[end])==
-                    n_mortars "highest level should contain all mortars"
 
                     #=
                     println("level_info_elements:")
