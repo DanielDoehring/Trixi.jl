@@ -253,9 +253,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     =#
 
     # Set initial distribution of DG Base function coefficients 
-    u = wrap_array(u0, mesh, equations, dg, cache)
-
-    level_u_indices_elements = partitioning_u(n_dims, n_levels, level_info_elements, u, equations, dg, mesh)
+    level_u_indices_elements = partitioning_u(n_dims, n_levels, level_info_elements, u0, equations, dg, mesh, cache)
 
     #=
     println("level_u_indices_elements:")

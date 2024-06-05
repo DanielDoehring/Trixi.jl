@@ -381,7 +381,8 @@ function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
         level_info_mortars_acc
 end
 
-function partitioning_u(n_dims, n_levels, level_info_elements, u, equations, dg, mesh)
+function partitioning_u(n_dims, n_levels, level_info_elements, u0, equations, dg, mesh, cache)
+  u = wrap_array(u0, mesh, equations, dg, cache)
   level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
 
   if n_dims == 1
