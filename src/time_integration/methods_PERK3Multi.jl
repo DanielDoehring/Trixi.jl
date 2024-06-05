@@ -337,7 +337,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
 
         # Initialize storage for level-wise information
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-        level_info_elements_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
 
         # Determine level for each element
         for element_id in 1:n_elements
@@ -352,12 +352,12 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
 
             push!(level_info_elements[level_id], element_id)
             # Add to accumulated container
-            for l in level_id:(n_levels - 1)
+            for l in level_id:n_levels
                 push!(level_info_elements_acc[l], element_id)
             end
         end
 
-        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
         # Determine level for each interface
         for interface_id in 1:n_interfaces
             # Get element id: Interfaces only between elements of same size
@@ -388,12 +388,12 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             level_id = min(level_id_left, level_id_right)
             =#
 
-            for l in level_id:(n_levels - 1)
+            for l in level_id:n_levels
                 push!(level_info_interfaces_acc[l], interface_id)
             end
         end
 
-        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
         # For efficient treatment of boundaries we need additional datastructures
         n_dims = ndims(mesh.tree) # Spatial dimension
         level_info_boundaries_orientation_acc = [[Vector{Int64}()
@@ -413,45 +413,45 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             level_id = max_level + 1 - level
 
             # Add to accumulated container
-            for l in level_id:(n_levels - 1)
+            for l in level_id:n_levels
                 push!(level_info_boundaries_acc[l], boundary_id)
             end
 
             # For orientation-side wise specific treatment
             if boundaries.orientations[boundary_id] == 1 # x Boundary
                 if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                    for l in level_id:(n_levels - 1)
+                    for l in level_id:n_levels
                         push!(level_info_boundaries_orientation_acc[l][2], boundary_id)
                     end
                 else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                    for l in level_id:(n_levels - 1)
+                    for l in level_id:n_levels
                         push!(level_info_boundaries_orientation_acc[l][1], boundary_id)
                     end
                 end
             elseif boundaries.orientations[boundary_id] == 2 # y Boundary
                 if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                    for l in level_id:(n_levels - 1)
+                    for l in level_id:n_levels
                         push!(level_info_boundaries_orientation_acc[l][4], boundary_id)
                     end
                 else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                    for l in level_id:(n_levels - 1)
+                    for l in level_id:n_levels
                         push!(level_info_boundaries_orientation_acc[l][3], boundary_id)
                     end
                 end
             elseif boundaries.orientations[boundary_id] == 3 # z Boundary
                 if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                    for l in level_id:(n_levels - 1)
+                    for l in level_id:n_levels
                         push!(level_info_boundaries_orientation_acc[l][6], boundary_id)
                     end
                 else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                    for l in level_id:(n_levels - 1)
+                    for l in level_id:n_levels
                         push!(level_info_boundaries_orientation_acc[l][5], boundary_id)
                     end
                 end
             end
         end
 
-        level_info_mortars_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
         if n_dims > 1
             @unpack mortars = cache
             n_mortars = length(mortars.orientations)
@@ -466,7 +466,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
                 # Higher element's level determines this mortars' level
                 level_id = max_level + 1 - level
                 # Add to accumulated container
-                for l in level_id:(n_levels - 1)
+                for l in level_id:n_levels
                     push!(level_info_mortars_acc[l], mortar_id)
                 end
             end
@@ -544,7 +544,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
         if n_levels == 1
             h_bins = [h_max]
         else
-            h_bins = [ceil(h_min, digits = 10) * 2^i for i in 0:(n_levels - 1)]
+            h_bins = [ceil(h_min, digits = 10) * 2^i for i in 0:n_levels]
         end
 
         println("h_min: ", h_min, " h_max: ", h_max)
@@ -554,7 +554,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
         println("\n")
 
         level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-        level_info_elements_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
         for element_id in 1:n_elements
             h = h_min_per_element[element_id]
 
@@ -568,7 +568,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             =#
             append!(level_info_elements[level], element_id)
 
-            for l in level:(n_levels - 1)
+            for l in level:n_levels
                 push!(level_info_elements_acc[l], element_id)
             end
         end
@@ -579,7 +579,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
 
         n_interfaces = last(size(interfaces.u))
 
-        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
         # Determine level for each interface
         for interface_id in 1:n_interfaces
             # For interfaces: Elements of same size
@@ -601,7 +601,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
         end
 
         n_boundaries = last(size(boundaries.u))
-        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
         # For efficient treatment of boundaries we need additional datastructures
         n_dims = ndims(mesh) # Spatial dimension
         # TODO: Not yet adapted for P4est!
@@ -627,13 +627,13 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             =#
 
             # Add to accumulated container
-            for l in level:(n_levels - 1)
+            for l in level:n_levels
                 push!(level_info_boundaries_acc[l], boundary_id)
             end
         end
 
         @unpack mortars = cache # TODO: Could also make dimensionality check
-        level_info_mortars_acc = [Vector{Int64}() for _ in 1:(n_levels - 1)]
+        level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
         @unpack mortars = cache
         n_mortars = last(size(mortars.u))
 
@@ -656,7 +656,7 @@ function solve(ode::ODEProblem, alg::PERK3_Multi;
             =#
 
             # Add to accumulated container
-            for l in level:(n_levels - 1)
+            for l in level:n_levels
                 push!(level_info_mortars_acc[l], mortar_id)
             end
         end
