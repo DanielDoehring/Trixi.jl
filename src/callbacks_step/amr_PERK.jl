@@ -21,466 +21,66 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
             resize!(integrator, length(u_ode))
             u_modified!(integrator, true)
 
-            ### PERK addition ###
+            ### PERK additions ###
             # TODO: Need to make this much less allocating!
             @trixi_timeit timer() "PERK stage identifiers update" begin
-                mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
-                @unpack elements, interfaces, boundaries = cache
+                mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
 
-                if typeof(mesh) <: TreeMesh
-                    n_elements = length(elements.cell_ids)
-                    n_interfaces = length(interfaces.orientations)
-                    n_boundaries = length(boundaries.orientations) # TODO Not sure if adequate
+                integrator.n_levels = get_n_levels(mesh, integrator.alg)
+                n_dims = ndims(mesh) # Spatial dimension
 
-                    # TODO: Not sure if this still returns the correct number of ACTIVE Levels
-                    min_level = minimum_level(mesh.tree)
-                    max_level = maximum_level(mesh.tree)
-                    integrator.n_levels = max_level - min_level + 1
-
-                    n_dims = ndims(mesh.tree) # Spatial dimension
-
-                    # Initialize storage for level-wise information
-                    if integrator.n_levels != length(integrator.level_info_elements_acc)
-                        integrator.level_info_elements = [Vector{Int64}()
-                                                          for _ in 1:integrator.n_levels]
-                        integrator.level_info_elements_acc = [Vector{Int64}()
-                                                              for _ in 1:integrator.n_levels]
-                        integrator.level_info_interfaces_acc = [Vector{Int64}()
-                                                                for _ in 1:integrator.n_levels]
-                        integrator.level_info_boundaries_acc = [Vector{Int64}()
-                                                                for _ in 1:integrator.n_levels]
-                        # For efficient treatment of boundaries we need additional datastructures
-                        integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
-                                                                             for _ in 1:(2 * n_dims)]
-                                                                             # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
-                                                                            for _ in 1:integrator.n_levels]
-                        integrator.level_info_mortars_acc = [Vector{Int64}()
-                                                             for _ in 1:integrator.n_levels]
-                        integrator.level_u_indices_elements = [Vector{Int64}()
-                                                               for _ in 1:integrator.n_levels]
-                        #resize!(integrator.level_info_elements_acc, integrator.n_levels) # TODO: Does unfortunately not work
-                    else # Just empty datastructures
-                        for level in 1:integrator.n_levels
-                            empty!(integrator.level_info_elements[level])
-                            empty!(integrator.level_info_elements_acc[level])
-                            empty!(integrator.level_info_interfaces_acc[level])
-                            empty!(integrator.level_info_boundaries_acc[level])
-                            for dim in 1:(2 * n_dims)
-                                empty!(integrator.level_info_boundaries_orientation_acc[level][dim])
-                            end
-                            empty!(integrator.level_info_mortars_acc[level])
-                            empty!(integrator.level_u_indices_elements[level])
-                        end
-                        empty!(integrator.level_info_elements[integrator.n_levels])
-                        empty!(integrator.level_u_indices_elements[integrator.n_levels])
-                    end
-
-                    # Determine level for each element
-                    for element_id in 1:n_elements
-                        # Determine level
-                        level = mesh.tree.levels[elements.cell_ids[element_id]]
-                        # Convert to level id
-                        level_id = max_level + 1 - level
-
-                        push!(integrator.level_info_elements[level_id], element_id)
-                        # Add to accumulated container
-                        for l in level_id:integrator.n_levels
-                            push!(integrator.level_info_elements_acc[l], element_id)
-                        end
-                    end
-
-                    #=
-                    # NOTE: Additional RHS Call computation
-                    # CARE: Hard-coded for each case 
-                    Stages = [6, 4, 3] # VRMHD O-T, Taylor-Green
-                    #Stages = [7, 4, 3] # Shearlayer
-                    #Stages = [11, 6, 4] # Kelvin-Helmholtz
-                    #Stages = [10, 6, 4] # MHD Rotor
-
-                    MaxStage = maximum(Stages)
-                    MinStage = minimum(Stages)
-                    integrator_levels = length(Stages)
-
-                    # Contribution from non-ideally scaling levels
-                    for level = 2:min(integrator_levels, integrator.n_levels)
-                      integrator.AddRHSCalls += amr_callback.interval * 
-                                                (Stages[level] - MaxStage / (2^(level - 1))) * 
-                                                length(integrator.level_info_elements[level])
-                    end
-
-                    # Contribution from non-represented levels
-                    for level = integrator_levels+1:integrator.n_levels
-                      integrator.AddRHSCalls += amr_callback.interval * 
-                                                (MinStage - MaxStage / (2^(level - 1))) * 
-                                                length(integrator.level_info_elements[level])
-                    end
-                    =#
-
-                    # RHS computation:
-                    Stages = [19, 11, 7, 5] # Isentropic Vortex with 4Lvl AMR
-                    for level = 1:length(integrator.level_info_elements)
-                        integrator.AddRHSCalls += amr_callback.interval * Stages[level] * 
-                                                  length(integrator.level_info_elements[level])
-                    end
-
-                    # Determine level for each interface
-                    for interface_id in 1:n_interfaces
-                        # Get element id: Interfaces only between elements of same size
-                        element_id = interfaces.neighbor_ids[1, interface_id]
-
-                        # Determine level
-                        level = mesh.tree.levels[elements.cell_ids[element_id]]
-
-                        level_id = max_level + 1 - level
-                        for l in level_id:integrator.n_levels
-                            push!(integrator.level_info_interfaces_acc[l], interface_id)
-                        end
-                    end
-
-                    # Determine level for each boundary
-                    for boundary_id in 1:n_boundaries
-                        # Get element id (boundaries have only one unique associated element)
-                        element_id = boundaries.neighbor_ids[boundary_id]
-
-                        # Determine level
-                        level = mesh.tree.levels[elements.cell_ids[element_id]]
-
-                        # Convert to level id
-                        level_id = max_level + 1 - level
-
-                        # Add to accumulated container
-                        for l in level_id:integrator.n_levels
-                            push!(integrator.level_info_boundaries_acc[l], boundary_id)
-                        end
-
-                        # For orientation-side wise specific treatment
-                        if boundaries.orientations[boundary_id] == 1 # x Boundary
-                            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                                for l in level_id:integrator.n_levels
-                                    push!(integrator.level_info_boundaries_orientation_acc[l][2],
-                                          boundary_id)
-                                end
-                            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                                for l in level_id:integrator.n_levels
-                                    push!(integrator.level_info_boundaries_orientation_acc[l][1],
-                                          boundary_id)
-                                end
-                            end
-                        elseif boundaries.orientations[boundary_id] == 2 # y Boundary
-                            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                                for l in level_id:integrator.n_levels
-                                    push!(integrator.level_info_boundaries_orientation_acc[l][4],
-                                          boundary_id)
-                                end
-                            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                                for l in level_id:integrator.n_levels
-                                    push!(integrator.level_info_boundaries_orientation_acc[l][3],
-                                          boundary_id)
-                                end
-                            end
-                        elseif boundaries.orientations[boundary_id] == 3 # z Boundary
-                            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                                for l in level_id:integrator.n_levels
-                                    push!(integrator.level_info_boundaries_orientation_acc[l][6],
-                                          boundary_id)
-                                end
-                            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                                for l in level_id:integrator.n_levels
-                                    push!(integrator.level_info_boundaries_orientation_acc[l][5],
-                                          boundary_id)
-                                end
-                            end
-                        end
-                    end # 1:n_boundaries
-
-                    if n_dims > 1
-                        @unpack mortars = cache
-                        n_mortars = length(mortars.orientations)
-
-                        for mortar_id in 1:n_mortars
-                            # This is by convention always one of the finer elements
-                            element_id = mortars.neighbor_ids[1, mortar_id]
-
-                            # Determine level
-                            level = mesh.tree.levels[elements.cell_ids[element_id]]
-
-                            # Higher element's level determines this mortars' level
-                            level_id = max_level + 1 - level
-                            # Add to accumulated container
-                            for l in level_id:integrator.n_levels
-                                push!(integrator.level_info_mortars_acc[l], mortar_id)
-                            end
-                        end
-                    end
-                    #elseif typeof(mesh) <:P4estMesh{2}
-                elseif typeof(mesh) <: P4estMesh
-                    nnodes = length(mesh.nodes)
-                    n_elements = nelements(solver, cache)
-                    h_min = 42
-                    h_max = 0
-
-                    h_min_per_element = zeros(n_elements)
-
-                    if typeof(mesh) <: P4estMesh{2}
-                        for element_id in 1:n_elements
-                            # pull the four corners numbered as right-handed
-                            P0 = cache.elements.node_coordinates[:, 1, 1, element_id]
-                            P1 = cache.elements.node_coordinates[:, nnodes, 1, element_id]
-                            #=
-                            P2 = cache.elements.node_coordinates[:, nnodes, nnodes, element_id]
-                            P3 = cache.elements.node_coordinates[:, 1     , nnodes, element_id]
-                            
-                            # compute the four side lengths and get the smallest
-                            L0 = sqrt( sum( (P1-P0).^2 ) )
-                            L1 = sqrt( sum( (P2-P1).^2 ) )
-                            L2 = sqrt( sum( (P3-P2).^2 ) )
-                            L3 = sqrt( sum( (P0-P3).^2 ) )
-                            
-                            h = min(L0, L1, L2, L3)
-                            =#
-
-                            #L0 = abs(P1[1] - P0[1])
-                            #h = L0
-
-                            h_min_per_element[element_id] = h
-                            if h > h_max
-                                h_max = h
-                            end
-                            if h < h_min
-                                h_min = h
-                            end
-                        end
-                    else # typeof(mesh) <:P4estMesh{3}
-                        for element_id in 1:n_elements
-                            # pull the four corners numbered as right-handed
-                            P0 = cache.elements.node_coordinates[:, 1, 1, 1, element_id]
-                            P1 = cache.elements.node_coordinates[:, nnodes, 1, 1,
-                                                                 element_id]
-                            #P2 = cache.elements.node_coordinates[:, nnodes, nnodes, element_id]
-                            #P3 = cache.elements.node_coordinates[:, 1     , nnodes, element_id]
-                            # compute the four side lengths and get the smallest
-                            #L0 = sqrt( sum( (P1-P0).^2 ) )
-                            L0 = abs(P1[1] - P0[1])
-                            #=
-                            L1 = sqrt( sum( (P2-P1).^2 ) )
-                            L2 = sqrt( sum( (P3-P2).^2 ) )
-                            L3 = sqrt( sum( (P0-P3).^2 ) )
-                            =#
-                            #h = min(L0, L1, L2, L3)
-                            h = L0
-                            h_min_per_element[element_id] = h
-                            if h > h_max
-                                h_max = h
-                            end
-                            if h < h_min
-                                h_min = h
-                            end
-                        end
-                    end
-
-                    #=
-                    S_min = alg.NumStageEvalsMin
-                    S_max = alg.NumStages
-                    integrator.n_levels = Int((S_max - S_min)/2) + 1 # Linearly increasing levels
-                    h_bins = LinRange(h_min, h_max, integrator.n_levels+1) # These are the intervals
-                    =#
-
-                    integrator.n_levels = Int(log2(round(h_max / h_min))) + 1
-                    if integrator.n_levels == 1
-                        h_bins = [h_max]
-                    else
-                        h_bins = [ceil(h_min, digits = 10) * 2^i
-                                  for i in 0:integrator.n_levels]
-                    end
-                    #println(h_bins)
-
-                    n_dims = ndims(mesh) # Spatial dimension
-
-                    # Initialize storage for level-wise information
-                    if (integrator.n_levels  - 1) != length(integrator.level_info_elements_acc)
-                        integrator.level_info_elements = [Vector{Int64}()
-                                                          for _ in 1:integrator.n_levels]
-                        integrator.level_info_elements_acc = [Vector{Int64}()
-                                                              for _ in 1:integrator.n_levels]
-                        integrator.level_info_interfaces_acc = [Vector{Int64}()
-                                                                for _ in 1:integrator.n_levels]
-                        integrator.level_info_boundaries_acc = [Vector{Int64}()
-                                                                for _ in 1:integrator.n_levels]
-                        # For efficient treatment of boundaries we need additional datastructures
-                        integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
-                                                                             for _ in 1:(2 * n_dims)]
-                                                                             # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
-                                                                            for _ in 1:integrator.n_levels]
-                        integrator.level_info_mortars_acc = [Vector{Int64}()
-                                                             for _ in 1:integrator.n_levels]
-                        integrator.level_u_indices_elements = [Vector{Int64}()
-                                                               for _ in 1:integrator.n_levels]
-                        #resize!(integrator.level_info_elements_acc, integrator.n_levels) # TODO: Does unfortunately not work
-                    else # Just empty datastructures
-                        for level in 1:integrator.n_levels
-                            empty!(integrator.level_info_elements[level])
-                            empty!(integrator.level_info_elements_acc[level])
-                            empty!(integrator.level_info_interfaces_acc[level])
-                            empty!(integrator.level_info_boundaries_acc[level])
-                            for dim in 1:(2 * n_dims)
-                                empty!(integrator.level_info_boundaries_orientation_acc[level][dim])
-                            end
-                            empty!(integrator.level_info_mortars_acc[level])
-                            empty!(integrator.level_u_indices_elements[level])
-                        end
-                        empty!(integrator.level_info_elements[integrator.n_levels])
-                        empty!(integrator.level_u_indices_elements[integrator.n_levels])
-                    end
-
-                    for element_id in 1:n_elements
-                        h = h_min_per_element[element_id]
-
-                        level = findfirst(x -> x >= h, h_bins)
-
-                        append!(integrator.level_info_elements[level], element_id)
-
-                        for l in level:integrator.n_levels
-                            push!(integrator.level_info_elements_acc[l], element_id)
-                        end
-                    end
-
-                    #=
-                    # NOTE: Additional RHS Call computation
-                    # CARE: Hard-coded for each case 
-                    Stages = [6, 4, 3] # Rayleigh-Taylor
-                    MaxStage = maximum(Stages)
-                    MinStage = minimum(Stages)
-                    integrator_levels = length(Stages)
-
-                    # Contribution from non-ideally scaling levels
-                    for level = 2:min(integrator_levels, integrator.n_levels)
-                      integrator.AddRHSCalls += amr_callback.interval * 
-                                                (Stages[level] - MaxStage / (2^(level - 1))) * 
-                                                length(integrator.level_info_elements[level])
-                    end
-
-                    # Contribution from non-represented levels
-                    for level = integrator_levels+1:integrator.n_levels
-                      integrator.AddRHSCalls += amr_callback.interval * 
-                                                (MinStage - MaxStage / (2^(level - 1))) * 
-                                                length(integrator.level_info_elements[level])
-                    end
-                    =#
-
-                    n_interfaces = last(size(interfaces.u))
-
-                    # Determine level for each interface
-                    for interface_id in 1:n_interfaces
-                        # For p4est: Cells on same level do not necessarily have same size
-                        element_id1 = interfaces.neighbor_ids[1, interface_id]
-                        element_id2 = interfaces.neighbor_ids[2, interface_id]
-                        h1 = h_min_per_element[element_id1]
-                        h2 = h_min_per_element[element_id2]
-                        h = min(h1, h2)
-
-                        # Determine level
-                        level = findfirst(x -> x >= h, h_bins)
-
-                        for l in level:integrator.n_levels
-                            push!(integrator.level_info_interfaces_acc[l], interface_id)
-                        end
-                    end
-
-                    n_boundaries = last(size(boundaries.u))
+                # Re-initialize storage for level-wise information
+                if integrator.n_levels != length(integrator.level_info_elements_acc)
+                    integrator.level_info_elements = [Vector{Int64}()
+                                                        for _ in 1:integrator.n_levels]
+                    integrator.level_info_elements_acc = [Vector{Int64}()
+                                                            for _ in 1:integrator.n_levels]
+                    integrator.level_info_interfaces_acc = [Vector{Int64}()
+                                                            for _ in 1:integrator.n_levels]
+                    integrator.level_info_boundaries_acc = [Vector{Int64}()
+                                                            for _ in 1:integrator.n_levels]
                     # For efficient treatment of boundaries we need additional datastructures
-                    # Determine level for each boundary
-                    for boundary_id in 1:n_boundaries
-                        # Get element id (boundaries have only one unique associated element)
-                        element_id = boundaries.neighbor_ids[boundary_id]
-                        h = h_min_per_element[element_id]
-
-                        # Determine level
-                        level = findfirst(x -> x >= h, h_bins)
-
-                        # Add to accumulated container
-                        for l in level:integrator.n_levels
-                            push!(integrator.level_info_boundaries_acc[l], boundary_id)
+                    integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
+                                                                            for _ in 1:(2 * n_dims)]
+                                                                            # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
+                                                                        for _ in 1:integrator.n_levels]
+                    integrator.level_info_mortars_acc = [Vector{Int64}()
+                                                            for _ in 1:integrator.n_levels]
+                    integrator.level_u_indices_elements = [Vector{Int64}()
+                                                            for _ in 1:integrator.n_levels]
+                else # Just empty datastructures
+                    for level in 1:integrator.n_levels
+                        empty!(integrator.level_info_elements[level])
+                        empty!(integrator.level_info_elements_acc[level])
+                        empty!(integrator.level_info_interfaces_acc[level])
+                        empty!(integrator.level_info_boundaries_acc[level])
+                        for dim in 1:(2 * n_dims)
+                            empty!(integrator.level_info_boundaries_orientation_acc[level][dim])
                         end
+                        empty!(integrator.level_info_mortars_acc[level])
+                        empty!(integrator.level_u_indices_elements[level])
                     end
-
-                    @unpack mortars = cache # TODO: Could also make dimensionality check
-                    n_mortars = last(size(mortars.u))
-
-                    for mortar_id in 1:n_mortars
-                        # Get element ids
-                        element_id_lower = mortars.neighbor_ids[1, mortar_id]
-                        h_lower = h_min_per_element[element_id_lower]
-
-                        element_id_higher = mortars.neighbor_ids[2, mortar_id]
-                        h_higher = h_min_per_element[element_id_higher]
-
-                        h = min(h_lower, h_higher)
-                        
-                        # Determine level
-                        level = findfirst(x -> x >= h, h_bins)
-
-                        # Add to accumulated container
-                        for l in level:integrator.n_levels
-                            push!(integrator.level_info_mortars_acc[l], mortar_id)
-                        end
-                    end
-
-                    #=
-                    println("level_info_elements:")
-                    display(integrator.level_info_elements); println()
-                    println("level_info_elements_acc:")
-                    display(integrator.level_info_elements_acc); println()
-
-                    println("level_info_interfaces_acc:")
-                    display(integrator.level_info_interfaces_acc); println()
-
-                    println("level_info_boundaries_acc:")
-                    display(integrator.level_info_boundaries_acc); println()
-                    println("level_info_boundaries_orientation_acc:")
-                    display(integrator.level_info_boundaries_orientation_acc); println()
-
-                    println("level_info_mortars_acc:")
-                    display(integrator.level_info_mortars_acc); println()
-                    =#
+                    empty!(integrator.level_info_elements[integrator.n_levels])
+                    empty!(integrator.level_u_indices_elements[integrator.n_levels])
                 end
 
-                u = wrap_array(u_ode, mesh, equations, solver, cache)
+                partitioning_variables!(integrator.level_info_elements, 
+                                        integrator.level_info_elements_acc, 
+                                        integrator.level_info_interfaces_acc, 
+                                        integrator.level_info_boundaries_acc, 
+                                        integrator.level_info_boundaries_orientation_acc,
+                                        integrator.level_info_mortars_acc,
+                                        integrator.n_levels, n_dims, mesh, dg, cache, integrator.alg)
 
-                if n_dims == 1
-                    for level in 1:(integrator.n_levels)
-                        for element_id in integrator.level_info_elements[level]
-                            # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
-                            indices = vec(transpose(LinearIndices(u)[:, :, element_id]))
-                            append!(integrator.level_u_indices_elements[level], indices)
-                        end
-                        sort!(integrator.level_u_indices_elements[level])
-                    end
-                elseif n_dims == 2
-                    for level in 1:(integrator.n_levels)
-                        for element_id in integrator.level_info_elements[level]
-                            # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
-                            indices = collect(Iterators.flatten(LinearIndices(u)[:, :,
-                                                                                 :,
-                                                                                 element_id]))
-                            append!(integrator.level_u_indices_elements[level], indices)
-                        end
-                        sort!(integrator.level_u_indices_elements[level])
-                    end
-                elseif n_dims == 3
-                    for level in 1:(integrator.n_levels)
-                        for element_id in integrator.level_info_elements[level]
-                            # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
-                            indices = collect(Iterators.flatten(LinearIndices(u)[:, :,
-                                                                                 :, :,
-                                                                                 element_id]))
-                            append!(integrator.level_u_indices_elements[level], indices)
-                        end
-                        sort!(integrator.level_u_indices_elements[level])
-                    end
+                # NOTE: Optional RHS computation (for PERK4 paper)
+                Stages = [19, 11, 7, 5] # Isentropic Vortex with 4Lvl AMR
+                for level = 1:length(integrator.level_info_elements)
+                    integrator.AddRHSCalls += amr_callback.interval * Stages[level] * 
+                                                length(integrator.level_info_elements[level])
                 end
 
-                #display(integrator.level_u_indices_elements)
-
+                partitioning_u!(integrator.level_u_indices_elements, integrator.n_levels, n_dims, integrator.level_info_elements, 
+                                u_ode, mesh, equations, dg, cache)
             end # "PERK stage identifiers update" timing
         end # if has changed
     end # "AMR" timing

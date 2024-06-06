@@ -1,31 +1,40 @@
-function partitioning_variables(mesh::TreeMesh, dg, cache, alg)
+function get_n_levels(mesh::TreeMesh, alg)
+    min_level = minimum_level(mesh.tree)
+    max_level = maximum_level(mesh.tree)
+
+    # NOTE: For 1D, periodic BC testcase with artificial assignment
+    #=
+    Random.seed!(42)
+    min_level = 1 # Hard-coded to our convergence study testcase
+    max_level = 2 # Hard-coded to our convergence study testcase
+    =#
+
+    n_levels = max_level - min_level + 1
+
+    # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+    #n_levels = 10
+
+    return n_levels
+end
+
+function get_n_levels(mesh::P4estMesh, alg)
+    n_levels = alg.NumMethods
+
+    return n_levels
+end
+
+function partitioning_variables!(level_info_elements,
+                                 level_info_elements_acc,
+                                 level_info_interfaces_acc,
+                                 level_info_boundaries_acc,
+                                 level_info_boundaries_orientation_acc,
+                                 level_info_mortars_acc,
+                                 n_levels, n_dims, mesh::TreeMesh, dg, cache, alg)
   @unpack elements, interfaces, boundaries = cache
 
-  n_elements = length(elements.cell_ids)
-  n_interfaces = length(interfaces.orientations)
-  n_boundaries = length(boundaries.orientations) # TODO Not sure if adequate, especially multiple dimensions
-
-  # NOTE: For really different grid sizes
-
-  min_level = minimum_level(mesh.tree)
   max_level = maximum_level(mesh.tree)
 
-  # NOTE: For 1D, periodic BC testcase with artificial assignment
-  #=
-  Random.seed!(42)
-  min_level = 1 # Hard-coded to our convergence study testcase
-  max_level = 2 # Hard-coded to our convergence study testcase
-  =#
-
-  n_levels = max_level - min_level + 1
-
-  # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-  #n_levels = 10
-
-  # Initialize storage for level-wise information
-  level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-  level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
-
+  n_elements = length(elements.cell_ids)
   # Determine level for each element
   for element_id in 1:n_elements
       # Determine level
@@ -67,7 +76,7 @@ function partitioning_variables(mesh::TreeMesh, dg, cache, alg)
       end
   end
 
-  level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+  n_interfaces = length(interfaces.orientations)
   # Determine level for each interface
   for interface_id in 1:n_interfaces
       # Get element id: Interfaces only between elements of same size
@@ -119,13 +128,7 @@ function partitioning_variables(mesh::TreeMesh, dg, cache, alg)
       end
   end
 
-  level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
-  # For efficient treatment of boundaries we need additional datastructures
-  n_dims = ndims(mesh.tree) # Spatial dimension
-  level_info_boundaries_orientation_acc = [[Vector{Int64}()
-                                            for _ in 1:(2 * n_dims)]
-                                           for _ in 1:n_levels] # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
-
+  n_boundaries = length(boundaries.orientations)
   # Determine level for each boundary
   for boundary_id in 1:n_boundaries
       # Get element id (boundaries have only one unique associated element)
@@ -176,7 +179,6 @@ function partitioning_variables(mesh::TreeMesh, dg, cache, alg)
       end
   end
 
-  level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
   if n_dims > 1
       @unpack mortars = cache
       n_mortars = length(mortars.orientations)
@@ -196,14 +198,15 @@ function partitioning_variables(mesh::TreeMesh, dg, cache, alg)
           end
       end
   end
-
-  return n_levels, n_dims, level_info_elements, level_info_elements_acc, 
-         level_info_interfaces_acc, 
-         level_info_boundaries_acc, level_info_boundaries_orientation_acc, 
-         level_info_mortars_acc
 end
 
-function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
+function partitioning_variables!(level_info_elements,
+                                 level_info_elements_acc,
+                                 level_info_interfaces_acc,
+                                 level_info_boundaries_acc,
+                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
+                                 level_info_mortars_acc,
+                                 n_levels, n_dims, mesh::P4estMesh, dg, cache, alg)
   @unpack elements, interfaces, boundaries = cache
 
   nnodes = length(mesh.nodes)
@@ -243,26 +246,16 @@ function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
     # TODO
   end
 
-  n_levels = alg.NumMethods
-
   println("h_min: ", h_min, " h_max: ", h_max)
   println("h_max/h_min: ", h_max / h_min)
-
-  #println("h_bins:")
-  #display(h_bins)
 
   println("dtRatios:")
   display(alg.dtRatios)
 
   println("\n")
 
-  level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-  level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
   for element_id in 1:n_elements
       h = h_min_per_element[element_id]
-
-      # Approach for square cells (RTI) & linear timestep scaling
-      #level = findfirst(x-> x >= h, h_bins)
 
       # Beyond linear scaling of timestep
       level = findfirst(x -> x < h_min / h, alg.dtRatios)
@@ -281,8 +274,6 @@ function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
   end
 
   n_interfaces = last(size(interfaces.u))
-
-  level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
   # Determine level for each interface
   for interface_id in 1:n_interfaces
       # For p4est: Cells on same level do not necessarily have same size
@@ -291,9 +282,6 @@ function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
       h1 = h_min_per_element[element_id1]
       h2 = h_min_per_element[element_id2]
       h = min(h1, h2)
-
-      # Approach for square cells (RTI) & linear timestep scaling
-      #level = findfirst(x-> x >= h, h_bins)
 
       # Beyond linear scaling of timestep
       level = findfirst(x -> x < h_min / h, alg.dtRatios)
@@ -310,23 +298,11 @@ function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
   end
   
   n_boundaries = last(size(boundaries.u))
-  level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
-  # For efficient treatment of boundaries we need additional datastructures
-  n_dims = ndims(mesh) # Spatial dimension
-  # TODO: Not yet adapted for P4est!
-  level_info_boundaries_orientation_acc = [[Vector{Int64}()
-                                            for _ in 1:(2 * n_dims)]
-                                            # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
-                                            for _ in 1:n_levels]
-
   # Determine level for each boundary
   for boundary_id in 1:n_boundaries
       # Get element id (boundaries have only one unique associated element)
       element_id = boundaries.neighbor_ids[boundary_id]
       h = h_min_per_element[element_id]
-
-      # Approach for square cells (RTI) & linear timestep scaling
-      #level = findfirst(x-> x >= h, h_bins)
 
       # Beyond linear scaling of timestep
       level = findfirst(x -> x < h_min / h, alg.dtRatios)
@@ -342,48 +318,41 @@ function partitioning_variables(mesh::P4estMesh, dg, cache, alg)
           push!(level_info_boundaries_acc[l], boundary_id)
       end
   end
-  @unpack mortars = cache # TODO: Could also make dimensionality check
-  level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
-  @unpack mortars = cache
-  n_mortars = last(size(mortars.u))
 
-  for mortar_id in 1:n_mortars
-      # Get element ids
-      element_id_lower = mortars.neighbor_ids[1, mortar_id]
-      h_lower = h_min_per_element[element_id_lower]
+    if n_dims > 1
+        @unpack mortars = cache # TODO: Could also make dimensionality check
+        n_mortars = last(size(mortars.u))
 
-      element_id_higher = mortars.neighbor_ids[2, mortar_id]
-      h_higher = h_min_per_element[element_id_higher]
+        for mortar_id in 1:n_mortars
+            # Get element ids
+            element_id_lower = mortars.neighbor_ids[1, mortar_id]
+            h_lower = h_min_per_element[element_id_lower]
 
-      h = min(h_lower, h_higher)
+            element_id_higher = mortars.neighbor_ids[2, mortar_id]
+            h_higher = h_min_per_element[element_id_higher]
 
-      # Approach for square cells (RTI) & linear timestep scaling
-      #level = findfirst(x-> x >= h, h_bins)
+            h = min(h_lower, h_higher)
 
-      # Beyond linear scaling of timestep
-      level = findfirst(x -> x < h_min / h, alg.dtRatios)
-      # Catch case that cell is "too coarse" for method with fewest stage evals
-      if level === nothing
-          level = n_levels
-      else # Avoid reduction in timestep: Use next higher level
-          level = level - 1
-      end
+            # Beyond linear scaling of timestep
+            level = findfirst(x -> x < h_min / h, alg.dtRatios)
+            # Catch case that cell is "too coarse" for method with fewest stage evals
+            if level === nothing
+                level = n_levels
+            else # Avoid reduction in timestep: Use next higher level
+                level = level - 1
+            end
 
-      # Add to accumulated container
-      for l in level:n_levels
-          push!(level_info_mortars_acc[l], mortar_id)
-      end
-  end
-
-  return n_levels, n_dims, level_info_elements, level_info_elements_acc, 
-        level_info_interfaces_acc, 
-        level_info_boundaries_acc, level_info_boundaries_orientation_acc, 
-        level_info_mortars_acc
+            # Add to accumulated container
+            for l in level:n_levels
+                push!(level_info_mortars_acc[l], mortar_id)
+            end
+        end
+    end
 end
 
-function partitioning_u(n_dims, n_levels, level_info_elements, u0, equations, dg, mesh, cache)
-  u = wrap_array(u0, mesh, equations, dg, cache)
-  level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
+function partitioning_u!(level_u_indices_elements, 
+                         n_levels, n_dims, level_info_elements, u_ode, mesh, equations, dg, cache)
+  u = wrap_array(u_ode, mesh, equations, dg, cache)
 
   if n_dims == 1
     for level in 1:n_levels
@@ -424,6 +393,4 @@ function partitioning_u(n_dims, n_levels, level_info_elements, u0, equations, dg
                   length(level_info_elements[level])
       end
   end
-
-  return level_u_indices_elements
 end
