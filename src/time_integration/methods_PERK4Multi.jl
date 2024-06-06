@@ -246,7 +246,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     # Set initial distribution of DG Base function coefficients
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
     partitioning_u!(level_u_indices_elements, n_levels, n_dims, level_info_elements, u0, mesh, equations, dg, cache)
-    
+
     ### Done with setting up for handling of level-dependent integration ###
 
     integrator = PERK4_Multi_Integrator(u0, du, u_tmp, t0, dt, zero(dt), iter, ode.p,
@@ -335,7 +335,7 @@ function step!(integrator::PERK4_Multi_Integrator)
         k1!(integrator, prob.p, alg.c)
 
         # CARE: This does not work if we have only one method but more than one grid level
-        #=
+        
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
                      integrator.level_info_elements_acc[1],
                      integrator.level_info_interfaces_acc[1],
@@ -344,9 +344,8 @@ function step!(integrator::PERK4_Multi_Integrator)
                      integrator.level_info_mortars_acc[1],
                      integrator.level_u_indices_elements, 1,
                      integrator.du_ode_hyp)
-        =#
         
-        
+        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                         integrator.level_info_elements_acc[1],
                         integrator.level_info_interfaces_acc[1],
@@ -354,7 +353,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                         integrator.level_info_boundaries_orientation_acc[1],
                         integrator.level_info_mortars_acc[1],
                         1)
-        
+        =#
 
         # Update finest level only
         @threaded for u_ind in integrator.level_u_indices_elements[1]
@@ -444,8 +443,8 @@ function step!(integrator::PERK4_Multi_Integrator)
                 #integrator.coarsest_lvl = integrator.n_levels
                 # and then using the level-dependent version
 
-                #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
-                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
+                integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, integrator.du_ode_hyp)
+                #integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
                 @threaded for u_ind in eachindex(integrator.du)
                     integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
@@ -453,7 +452,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             else
                 
                 # Joint RHS evaluation with all elements sharing this timestep
-                #=
+                
                 integrator.f(integrator.du, integrator.u_tmp, prob.p,
                             integrator.t_stage,
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
@@ -464,9 +463,8 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_u_indices_elements,
                             integrator.coarsest_lvl,
                             integrator.du_ode_hyp)
-                =#
-
                 
+                #=
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                              integrator.level_info_elements_acc[integrator.coarsest_lvl],
                              integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
@@ -474,7 +472,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                              integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                              integrator.level_info_mortars_acc[integrator.coarsest_lvl],
                              integrator.coarsest_lvl)
-                
+                =#
 
                 # Update k_higher of relevant levels
                 for level in 1:(integrator.coarsest_lvl)

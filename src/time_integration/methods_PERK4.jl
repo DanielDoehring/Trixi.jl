@@ -198,8 +198,8 @@ function solve_steps!(integrator::PERK4_Integrator)
 end
 
 function k1!(integrator, p, c)
-    #integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_ode_hyp)
-    integrator.f(integrator.du, integrator.u, p, integrator.t)
+    integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_ode_hyp)
+    #integrator.f(integrator.du, integrator.u, p, integrator.t)
 
     @threaded for i in eachindex(integrator.du)
         integrator.k1[i] = integrator.du[i] * integrator.dt
@@ -223,8 +223,8 @@ function last_three_stages!(integrator, alg, p)
         integrator.t_stage = integrator.t +
                              alg.c[alg.NumStages - 3 + stage] * integrator.dt
 
-        #integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage, integrator.du_ode_hyp)
-        integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage)
+        integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage, integrator.du_ode_hyp)
+        #integrator.f(integrator.du, integrator.u_tmp, p, integrator.t_stage)
 
         @threaded for u_ind in eachindex(integrator.du)
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
