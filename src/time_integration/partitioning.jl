@@ -366,6 +366,33 @@ function partitioning_variables!(level_info_elements,
     # No interfaces, boundaries, mortars for structured meshes
 end
 
+function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nnodes, RealT)
+    h_min = floatmax(RealT);
+    h_max = zero(RealT);
+
+    hmin_per_element = zeros(n_elements)
+
+    for element_id in 1:n_elements
+        P0 = elements.node_coordinates[1, 1, element_id]
+        P1 = elements.node_coordinates[1, nnodes, element_id]
+        h = abs(P1 - P0) # Assumes P1 > P0
+
+        hmin_per_element[element_id] = h
+        if h > h_max
+            h_max = h
+        end
+        if h < h_min
+            h_min = h
+        end
+    end
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max/h_min)
+    println("\n")
+
+    return hmin_per_element, h_min, h_max
+end
+
 function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements, n_elements, nnodes, RealT)
     h_min = floatmax(RealT);
     h_max = zero(RealT);
@@ -404,6 +431,9 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
 
     return hmin_per_element, h_min, h_max
 end
+
+# TODO: 3D version of "get_hmin_per_element"
+# TODO: T8Code extensions
 
 function partitioning_u!(level_u_indices_elements, 
                          n_levels, n_dims, level_info_elements, u_ode, mesh, equations, dg, cache)
