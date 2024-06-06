@@ -67,7 +67,7 @@ Add_Levels = 0 # S_max = 4
 #Add_Levels = 3 # S_max = 10
 #Add_Levels = 4 # S_max = 12
 #Add_Levels = 5 # S_max = 14
-#Add_Levels = 6 # S_max = 16
+Add_Levels = 6 # S_max = 16
 
 Stages = [4]
 
@@ -79,7 +79,11 @@ reverse!(Stages) # Require descending order
 b1 = 0.0
 bS = 1 - b1
 cEnd = 0.5/bS
+
+dtRatios = Stages ./ Stages[1]
+
 ode_algorithm = PERK_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
+                           dtRatios,
                            bS, cEnd)
         
 CFL_PERK = ((4 + 2*Add_Levels)/4)
@@ -101,7 +105,7 @@ CFL_Stab = 0.95 # S_max = 4
 #CFL_Stab = 0.94 # S_max = 10
 #CFL_Stab = 0.94 # S_max = 12
 #CFL_Stab = 0.94 # S_max = 14
-#CFL_Stab = 0.93 # S_max = 16
+CFL_Stab = 0.93 # S_max = 16
 
 
 #=

@@ -214,8 +214,9 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     t0 = first(ode.tspan)
     iter = 0
 
-    mesh, equations, dg, cache = mesh_equations_solver_cache(ode.p)
     ### Set datastructures for handling of level-dependent integration ###
+    mesh, equations, dg, cache = mesh_equations_solver_cache(ode.p)
+
     n_levels = get_n_levels(mesh, alg)
     n_dims = ndims(mesh) # Spatial dimension
 

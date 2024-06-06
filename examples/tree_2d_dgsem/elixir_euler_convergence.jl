@@ -193,8 +193,7 @@ bS   = 1.0 - b1
 cEnd = 0.5/bS
 ode_algorithm = PERK_Multi(4, 2, #"/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_NavierStokes_Convergence/Adapted/", 
                            "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_NavierStokes_Convergence/NonAdapted/", 
-                           bS, cEnd, 
-                           LevelCFL, Integrator_Mesh_Level_Dict,
+                           bS, cEnd,
                            stage_callbacks = ())
 
 

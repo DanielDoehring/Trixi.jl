@@ -17,7 +17,7 @@ function get_n_levels(mesh::TreeMesh, alg)
     return n_levels
 end
 
-function get_n_levels(mesh::P4estMesh, alg)
+function get_n_levels(mesh::Union{P4estMesh, StructuredMesh}, alg)
     n_levels = alg.NumMethods
 
     return n_levels
@@ -211,48 +211,8 @@ function partitioning_variables!(level_info_elements,
 
   nnodes = length(mesh.nodes)
   n_elements = nelements(dg, cache)
-  h_min = 42
-  h_max = 0.0
 
-  h_min_per_element = zeros(n_elements)
-
-  if typeof(mesh) <: P4estMesh{2}
-      for element_id in 1:n_elements
-          # pull the four corners numbered as right-handed
-          P0 = elements.node_coordinates[:, 1, 1, element_id]
-          P1 = elements.node_coordinates[:, nnodes, 1, element_id]
-          P2 = elements.node_coordinates[:, nnodes, nnodes, element_id]
-          P3 = elements.node_coordinates[:, 1, nnodes, element_id]
-          # compute the four side lengths and get the smallest
-          L0 = sqrt(sum((P1 - P0) .^ 2))
-          L1 = sqrt(sum((P2 - P1) .^ 2))
-          L2 = sqrt(sum((P3 - P2) .^ 2))
-          L3 = sqrt(sum((P0 - P3) .^ 2))
-          h = min(L0, L1, L2, L3)
-
-          # For square elements (RTI)
-          #L0 = abs(P1[1] - P0[1])
-          #h = L0
-
-          h_min_per_element[element_id] = h
-          if h > h_max
-              h_max = h
-          end
-          if h < h_min
-              h_min = h
-          end
-      end
-  else # typeof(mesh) <:P4estMesh{3}
-    # TODO
-  end
-
-  println("h_min: ", h_min, " h_max: ", h_max)
-  println("h_max/h_min: ", h_max / h_min)
-
-  println("dtRatios:")
-  display(alg.dtRatios)
-
-  println("\n")
+  h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements, n_elements, nnodes, eltype(dg.basis.nodes))
 
   for element_id in 1:n_elements
       h = h_min_per_element[element_id]
@@ -348,6 +308,101 @@ function partitioning_variables!(level_info_elements,
             end
         end
     end
+end
+
+function partitioning_variables!(level_info_elements,
+                                 level_info_elements_acc,
+                                 level_info_interfaces_acc,
+                                 level_info_boundaries_acc,
+                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
+                                 level_info_mortars_acc,
+                                 n_levels, n_dims, mesh::StructuredMesh, dg, cache, alg)
+
+    nnodes = length(dg.basis.nodes)
+    n_elements = nelements(dg, cache)
+
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements, n_elements, nnodes, eltype(dg.basis.nodes))
+
+    # For "grid-based" partitioning approach
+
+    S_min = alg.NumStageEvalsMin
+    S_max = alg.NumStages
+    n_levels = Int((S_max - S_min)/2) + 1 # Linearly increasing levels
+    h_bins = LinRange(h_min, h_max, n_levels+1) # These are the intervals
+    println("h_bins:")
+    display(h_bins)
+
+    for element_id in 1:n_elements
+      h = h_min_per_element[element_id]
+
+      # This approach is "grid-based" in the sense that 
+      # the entire grid range gets mapped linearly onto the available methods
+      level = findfirst(x-> x >= h, h_bins) - 1
+      # Catch case h = h_min
+      if level == 0
+        level = 1
+      end
+      
+
+      #=
+      # This approach is "method-based" in the sense that
+      # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
+      level = findfirst(x -> x < h_min / h, alg.dtRatios)
+      # Catch case that cell is "too coarse" for method with fewest stage evals
+      if level === nothing
+        level = n_levels
+      else # Avoid reduction in timestep: Use next higher level
+        level = level - 1
+      end
+      =#
+
+      append!(level_info_elements[level], element_id)
+
+      for l in level:n_levels
+        push!(level_info_elements_acc[l], element_id)
+      end
+    end
+
+    # No interfaces, boundaries, mortars for structured meshes
+end
+
+function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements, n_elements, nnodes, RealT)
+    h_min = floatmax(RealT);
+    h_max = zero(RealT);
+
+    hmin_per_element = zeros(n_elements)
+
+    for element_id in 1:n_elements
+        # pull the four corners numbered as right-handed
+        P0 = elements.node_coordinates[:, 1, 1, element_id]
+        P1 = elements.node_coordinates[:, nnodes, 1, element_id]
+        P2 = elements.node_coordinates[:, nnodes, nnodes, element_id]
+        P3 = elements.node_coordinates[:, 1, nnodes, element_id]
+        # compute the four side lengths and get the smallest
+        L0 = sqrt(sum((P1 - P0) .^ 2))
+        L1 = sqrt(sum((P2 - P1) .^ 2))
+        L2 = sqrt(sum((P3 - P2) .^ 2))
+        L3 = sqrt(sum((P0 - P3) .^ 2))
+        h = min(L0, L1, L2, L3)
+
+        # For square elements (RTI)
+        #L0 = abs(P1[1] - P0[1])
+        #h = L0
+
+        hmin_per_element[element_id] = h
+        if h > h_max
+            h_max = h
+        end
+        if h < h_min
+            h_min = h
+        end
+    end
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max/h_min)
+    println("\n")
+
+    return hmin_per_element, h_min, h_max
 end
 
 function partitioning_u!(level_u_indices_elements, 
