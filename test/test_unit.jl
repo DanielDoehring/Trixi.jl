@@ -10,6 +10,10 @@ using DelimitedFiles: readdlm
 using Convex: Convex
 using ECOS: Optimizer
 
+# Use NLsolve to load the extension that extends functions for testing
+# PERK Single p3 Constructors
+using NLsolve: nlsolve
+
 include("test_trixi.jl")
 
 # Start with a clean environment: remove Trixi.jl output directory if it exists
@@ -1672,6 +1676,46 @@ end
                     0.20734890429023528 0.20174200480067384
                     0.1913514234997008 0.26319403104575373
                     0.13942836392866081 0.3605716360713392], atol = 1e-13)
+end
+
+@testset "PERK Single p3 Constructors" begin
+    path_coeff_file = mktempdir()
+    Trixi.download("https://gist.githubusercontent.com/warisa-r/0796db36abcd5abe735ac7eebf41b973/raw/32889062fd5dcf7f450748f4f5f0797c8155a18d/a_8_8.txt",
+                   joinpath(path_coeff_file, "a_8_8.txt"))
+
+    ode_algorithm = Trixi.PairedExplicitRK3(8, path_coeff_file)
+
+    #TODO: adjust this value according to the result in the test pipeline
+    println(ode_algorithm.a_matrix) # Value in CI differs slightly from what I get locally
+    @test isapprox(ode_algorithm.a_matrix,
+                   [0.3355167784195604 0.06448322158043965
+                    0.4965349205803965 0.10346507941960345
+                    0.6496890792935297 0.15031092070647037
+                    0.789172498521197 0.21082750147880308
+                    0.7522972036571336 0.2477027963428664
+                    0.31192569908571666 0.18807430091428337], atol = 1e-13)
+
+    Trixi.download("https://gist.githubusercontent.com/warisa-r/8d93f6a3ae0635e13b9f51ee32ab7fff/raw/54dc5b14be9288e186b745facb5bbcb04d1476f8/EigenvalueList_Refined2.txt",
+                   joinpath(path_coeff_file, "spectrum.txt"))
+
+    eig_vals = readdlm(joinpath(path_coeff_file, "spectrum.txt"), ComplexF64)
+    tspan = (0.0, 1.0)
+    ode_algorithm = Trixi.PairedExplicitRK3(13, tspan, vec(eig_vals))
+
+    #TODO: adjust this value according to the result in the test pipeline
+    println(ode_algorithm.a_matrix) # Value in CI differs slightly from what I get locally
+    @test isapprox(ode_algorithm.a_matrix,
+                   [0.19258815209175084 0.007411847908249183
+                    0.287232921421498 0.012767078578501994
+                    0.38017716660879974 0.019822833391200292
+                    0.4706748922245802 0.029325107775419784
+                    0.5575748091858802 0.042425190814119815
+                    0.6390917624593604 0.06090823754063958
+                    0.712487669254592 0.08751233074540807
+                    0.7736370088751211 0.1263629911248789
+                    0.816131548721476 0.18386845127852405
+                    0.7532704353232954 0.24672956467670462
+                    0.3116823911691762 0.18831760883082385], atol = 1e-13)
 end
 
 @testset "Sutherlands Law" begin
