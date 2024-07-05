@@ -151,9 +151,9 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi)
 
 # TODO: Adapt to respective timesteps                                      
 amr_interval = 20 # PERK4 Multi
-amr_interval = 10 # PERK4 19
+#amr_interval = 10 # PERK4 19
 
-amr_interval = 20 # NDBLSRK144
+#amr_interval = 20 # NDBLSRK144
 #amr_interval = 30 # DGLDDRK84_C
 #amr_interval = 26 # RDPK3SpFSAL49
 #amr_interval = 75 # RK4
@@ -165,7 +165,7 @@ amr_callback = AMRCallback(semi, amr_controller,
 ### AMR, Ref_Lvl = 6, Standard DGSEM ###
 
 # E = 5, 7, 11, 19
-CFL = 6.0
+CFL = 5.9
 
 # PERK4 Standalone #
 #CFL = 11.5 # S = 19
