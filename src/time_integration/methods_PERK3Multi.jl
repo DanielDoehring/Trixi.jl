@@ -483,7 +483,7 @@ function solve!(integrator::PERK3_Multi_Integrator)
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
-            # For statically refined meshes:
+            # For statically non-uniform meshes/characteristic speeds:
             #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
 
             # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
