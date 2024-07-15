@@ -206,9 +206,6 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     #uprev = zero(u0)
     #tprev = zero(ode.tspan[1])
 
-    # TODO: For case with locally changing mean speed of sound (Lin. Euler)
-    #u = Trixi.wrap_array(u0, ode.p)
-
     t0 = first(ode.tspan)
     iter = 0
 
@@ -237,6 +234,8 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                             level_info_boundaries_orientation_acc,
                             level_info_mortars_acc,
                             n_levels, n_dims, mesh, dg, cache, alg)
+                            # NOTE: For variable c case:
+                            #Trixi.wrap_array(u0, ode.p), equations)
 
     for i in 1:n_levels
         println("#Number Elements integrated with level $i: ", length(level_info_elements[i]))

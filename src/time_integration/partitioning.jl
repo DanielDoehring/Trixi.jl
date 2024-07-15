@@ -1,13 +1,7 @@
 function get_n_levels(mesh::TreeMesh, alg)
+    # NOTE: Non-uniform mesh case!
     min_level = minimum_level(mesh.tree)
     max_level = maximum_level(mesh.tree)
-
-    # NOTE: For 1D, periodic BC testcase with artificial assignment
-    #=
-    Random.seed!(42)
-    min_level = 1 # Hard-coded to our convergence study testcase
-    max_level = 2 # Hard-coded to our convergence study testcase
-    =#
 
     n_levels = max_level - min_level + 1
 
@@ -23,6 +17,8 @@ function get_n_levels(mesh::Union{P4estMesh, StructuredMesh}, alg)
     return n_levels
 end
 
+# TODO: Try out thread-parallelization of the assignment!
+
 function partitioning_variables!(level_info_elements,
                                  level_info_elements_acc,
                                  level_info_interfaces_acc,
@@ -30,6 +26,17 @@ function partitioning_variables!(level_info_elements,
                                  level_info_boundaries_orientation_acc,
                                  level_info_mortars_acc,
                                  n_levels, n_dims, mesh::TreeMesh, dg, cache, alg)
+# NOTE: Only for case with variable speed of sound
+#=
+function partitioning_variables!(level_info_elements,
+                                 level_info_elements_acc,
+                                 level_info_interfaces_acc,
+                                 level_info_boundaries_acc,
+                                 level_info_boundaries_orientation_acc,
+                                 level_info_mortars_acc,
+                                 n_levels, n_dims, mesh::TreeMesh, dg, cache, alg,
+                                 u, equations)
+=#                                 
   @unpack elements, interfaces, boundaries = cache
 
   max_level = maximum_level(mesh.tree)
@@ -41,12 +48,8 @@ function partitioning_variables!(level_info_elements,
       # NOTE: For really different grid sizes
       level = mesh.tree.levels[elements.cell_ids[element_id]]
 
-      # NOTE: For 1D, periodic BC testcase with artificial assignment
-      #level = rand(min_level:max_level)
-
       # Convert to level id
       level_id = max_level + 1 - level
-      
 
       # TODO: For case with locally changing mean speed of sound (Lin. Euler)
       #=
@@ -80,7 +83,6 @@ function partitioning_variables!(level_info_elements,
   # Determine level for each interface
   for interface_id in 1:n_interfaces
       # Get element id: Interfaces only between elements of same size
-      
       element_id = interfaces.neighbor_ids[1, interface_id]
 
       # Determine level
@@ -88,9 +90,8 @@ function partitioning_variables!(level_info_elements,
 
       level_id = max_level + 1 - level
       
-      #=
       # NOTE: For case with varying characteristic speeds
-      
+      #=
       el_id_1 = interfaces.neighbor_ids[1, interface_id]
       el_id_2 = interfaces.neighbor_ids[2, interface_id]
 
@@ -110,17 +111,7 @@ function partitioning_variables!(level_info_elements,
               break
           end
       end
-
       level_id = min(level_1, level_2)
-      =#
-
-      # NOTE: For 1D, periodic BC testcase with artificial assignment
-      #=
-      if element_id in level_info_elements[1]
-      level_id = 1
-      elseif element_id in level_info_elements[2]
-      level_id = 2
-      end
       =#
 
       for l in level_id:n_levels
