@@ -141,7 +141,7 @@ summary_callback = SummaryCallback()
 
 analysis_interval = 500
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
-                                     analysis_errors = Symbol[],
+                                     #analysis_errors = Symbol[],
                                      analysis_integrals = ())
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
@@ -199,6 +199,8 @@ sol = Trixi.solve(ode, ode_algorithm,
                   save_everystep=false, callback=callbacks);
 
 summary_callback() # print the timer summary
+
+exit()
 
 ###############################################################################
 
