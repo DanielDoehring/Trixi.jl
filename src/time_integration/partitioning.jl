@@ -194,6 +194,156 @@ end
 function partitioning_variables!(level_info_elements,
                                  level_info_elements_acc,
                                  level_info_interfaces_acc,
+                                 level_info_mpi_interfaces_acc,
+                                 level_info_boundaries_acc,
+                                 level_info_boundaries_orientation_acc,
+                                 level_info_mortars_acc,
+                                 level_info_mpi_mortars_acc,
+                                 n_levels, n_dims, mesh::ParallelTreeMesh{2}, dg, cache, alg)
+                               
+  @unpack elements, interfaces, mpi_interfaces, boundaries = cache
+
+  max_level = maximum_level(mesh.tree)
+
+  n_elements = length(elements.cell_ids)
+  # Determine level for each element
+  for element_id in 1:n_elements
+      # Determine level
+      # NOTE: For really different grid sizes
+      level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+      # Convert to level id
+      level_id = max_level + 1 - level
+
+      push!(level_info_elements[level_id], element_id)
+      # Add to accumulated container
+      for l in level_id:n_levels
+          push!(level_info_elements_acc[l], element_id)
+      end
+  end
+
+  n_interfaces = length(interfaces.orientations)
+  # Determine level for each interface
+  for interface_id in 1:n_interfaces
+      # Get element id: Interfaces only between elements of same size
+      element_id = interfaces.neighbor_ids[1, interface_id]
+
+      # Determine level
+      level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+      level_id = max_level + 1 - level
+
+      for l in level_id:n_levels
+          push!(level_info_interfaces_acc[l], interface_id)
+      end
+  end
+
+  n_mpi_interfaces = length(mpi_interfaces.orientations)
+    # Determine level for each interface
+    for interface_id in 1:n_mpi_interfaces
+        # Get element id: Interfaces only between elements of same size
+        element_id = mpi_interfaces.local_neighbor_ids[interface_id]
+  
+        # Determine level
+        level = mesh.tree.levels[elements.cell_ids[element_id]]
+  
+        level_id = max_level + 1 - level
+  
+        for l in level_id:n_levels
+            push!(level_info_mpi_interfaces_acc[l], interface_id)
+        end
+    end
+
+  n_boundaries = length(boundaries.orientations)
+  # Determine level for each boundary
+  for boundary_id in 1:n_boundaries
+      # Get element id (boundaries have only one unique associated element)
+      element_id = boundaries.neighbor_ids[boundary_id]
+
+      # Determine level
+      level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+      # Convert to level id
+      level_id = max_level + 1 - level
+
+      # Add to accumulated container
+      for l in level_id:n_levels
+          push!(level_info_boundaries_acc[l], boundary_id)
+      end
+
+      # For orientation-side wise specific treatment
+      if boundaries.orientations[boundary_id] == 1 # x Boundary
+          if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
+              for l in level_id:n_levels
+                  push!(level_info_boundaries_orientation_acc[l][2], boundary_id)
+              end
+          else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
+              for l in level_id:n_levels
+                  push!(level_info_boundaries_orientation_acc[l][1], boundary_id)
+              end
+          end
+      elseif boundaries.orientations[boundary_id] == 2 # y Boundary
+          if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
+              for l in level_id:n_levels
+                  push!(level_info_boundaries_orientation_acc[l][4], boundary_id)
+              end
+          else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
+              for l in level_id:n_levels
+                  push!(level_info_boundaries_orientation_acc[l][3], boundary_id)
+              end
+          end
+      elseif boundaries.orientations[boundary_id] == 3 # z Boundary
+          if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
+              for l in level_id:n_levels
+                  push!(level_info_boundaries_orientation_acc[l][6], boundary_id)
+              end
+          else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
+              for l in level_id:n_levels
+                  push!(level_info_boundaries_orientation_acc[l][5], boundary_id)
+              end
+          end
+      end
+  end
+
+  if n_dims > 1
+      @unpack mortars, mpi_mortars = cache
+      n_mortars = length(mortars.orientations)
+
+      for mortar_id in 1:n_mortars
+          # This is by convention always one of the finer elements
+          element_id = mortars.neighbor_ids[1, mortar_id]
+
+          # Determine level
+          level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+          # Higher element's level determines this mortars' level
+          level_id = max_level + 1 - level
+          # Add to accumulated container
+          for l in level_id:n_levels
+              push!(level_info_mortars_acc[l], mortar_id)
+          end
+      end
+
+        n_mpi_mortars = length(mpi_mortars.orientations)
+        for mortar_id in 1:n_mpi_mortars
+            # This is by convention always one of the finer elements
+            element_id = mpi_mortars.local_neighbor_ids[mortar_id][1]
+            # Determine level
+            level = mesh.tree.levels[elements.cell_ids[element_id]]
+  
+            # Higher element's level determines this mortars' level
+            level_id = max_level + 1 - level
+            # Add to accumulated container
+            for l in level_id:n_levels
+                push!(level_info_mpi_mortars_acc[l], mortar_id)
+            end
+        end
+  end
+end
+
+function partitioning_variables!(level_info_elements,
+                                 level_info_elements_acc,
+                                 level_info_interfaces_acc,
                                  level_info_boundaries_acc,
                                  level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
                                  level_info_mortars_acc,

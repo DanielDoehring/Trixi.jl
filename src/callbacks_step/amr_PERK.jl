@@ -35,8 +35,12 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                                         for _ in 1:integrator.n_levels]
                     integrator.level_info_elements_acc = [Vector{Int64}()
                                                             for _ in 1:integrator.n_levels]
+
                     integrator.level_info_interfaces_acc = [Vector{Int64}()
                                                             for _ in 1:integrator.n_levels]
+                    integrator.level_info_mpi_interfaces_acc = [Vector{Int64}()
+                                                            for _ in 1:integrator.n_levels]
+
                     integrator.level_info_boundaries_acc = [Vector{Int64}()
                                                             for _ in 1:integrator.n_levels]
                     # For efficient treatment of boundaries we need additional datastructures
@@ -46,24 +50,34 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                                                         for _ in 1:integrator.n_levels]
                     integrator.level_info_mortars_acc = [Vector{Int64}()
                                                             for _ in 1:integrator.n_levels]
+                    integrator.level_info_mpi_mortars_acc = [Vector{Int64}()
+                                                            for _ in 1:integrator.n_levels]  
+                                                          
                     integrator.level_u_indices_elements = [Vector{Int64}()
                                                             for _ in 1:integrator.n_levels]
                 else # Just empty datastructures
                     for level in 1:integrator.n_levels
                         empty!(integrator.level_info_elements[level])
                         empty!(integrator.level_info_elements_acc[level])
+
                         empty!(integrator.level_info_interfaces_acc[level])
+                        empty!(integrator.level_info_mpi_interfaces_acc[level])
+
                         empty!(integrator.level_info_boundaries_acc[level])
                         for dim in 1:(2 * n_dims)
                             empty!(integrator.level_info_boundaries_orientation_acc[level][dim])
                         end
+
                         empty!(integrator.level_info_mortars_acc[level])
+                        empty!(integrator.level_info_mpi_mortars_acc[level])
+
                         empty!(integrator.level_u_indices_elements[level])
                     end
                     empty!(integrator.level_info_elements[integrator.n_levels])
                     empty!(integrator.level_u_indices_elements[integrator.n_levels])
                 end
 
+                #=
                 partitioning_variables!(integrator.level_info_elements, 
                                         integrator.level_info_elements_acc, 
                                         integrator.level_info_interfaces_acc, 
@@ -71,13 +85,26 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                         integrator.level_info_boundaries_orientation_acc,
                                         integrator.level_info_mortars_acc,
                                         integrator.n_levels, n_dims, mesh, dg, cache, integrator.alg)
+                =#
 
+                partitioning_variables!(integrator.level_info_elements, 
+                                        integrator.level_info_elements_acc, 
+                                        integrator.level_info_interfaces_acc,
+                                        integrator.level_info_mpi_interfaces_acc,
+                                        integrator.level_info_boundaries_acc, 
+                                        integrator.level_info_boundaries_orientation_acc,
+                                        integrator.level_info_mortars_acc,
+                                        integrator.level_info_mpi_mortars_acc,
+                                        integrator.n_levels, n_dims, mesh, dg, cache, integrator.alg)
+
+                #=
                 # NOTE: Optional RHS computation (for PERK4 paper)
                 Stages = [19, 11, 7, 5] # Isentropic Vortex with 4Lvl AMR
                 for level = 1:length(integrator.level_info_elements)
                     integrator.AddRHSCalls += amr_callback.interval * Stages[level] * 
                                                 length(integrator.level_info_elements[level])
                 end
+                =#
 
                 partitioning_u!(integrator.level_u_indices_elements, integrator.n_levels, n_dims, integrator.level_info_elements, 
                                 u_ode, mesh, equations, dg, cache)
