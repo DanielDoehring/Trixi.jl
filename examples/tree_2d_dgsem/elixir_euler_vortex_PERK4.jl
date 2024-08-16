@@ -148,15 +148,14 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi)
                                       base_level=Refinement,
                                       med_level=Refinement+1, med_threshold=-3.0,
                                       max_level=Refinement+3, max_threshold=-0.6)
-
-# TODO: Adapt to respective timesteps                                      
-amr_interval = 20 # PERK4 Multi
+                                     
+amr_interval = 16 # PERK4 Multi
 #amr_interval = 10 # PERK4 19
 
-#amr_interval = 20 # NDBLSRK144
+#amr_interval = 18 # NDBLSRK144
 #amr_interval = 30 # DGLDDRK84_C
 #amr_interval = 26 # RDPK3SpFSAL49
-#amr_interval = 75 # RK4
+#amr_interval = 74 # RK4
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval=amr_interval, 
@@ -165,14 +164,14 @@ amr_callback = AMRCallback(semi, amr_controller,
 ### AMR, Ref_Lvl = 6, Standard DGSEM ###
 
 # E = 5, 7, 11, 19
-CFL = 5.9
+CFL = 7.4
 
 # PERK4 Standalone #
 #CFL = 11.5 # S = 19
 
 # OrdinaryDiffEq.jl methods
 
-#CFL = 6.4 # NDBLSRK144
+#CFL = 6.7 # NDBLSRK144
 #CFL = 3.9 # DGLDDRK84_C
 #CFL = 4.6 # RDPK3SpFSAL49
 #CFL = 1.6 # RK4
@@ -200,14 +199,15 @@ sol = Trixi.solve(ode, ode_algorithm,
 
 summary_callback() # print the timer summary
 
-exit()
+
+exit() # For MPI business
 
 ###############################################################################
 
 #ode_algorithm = NDBLSRK144(williamson_condition = false)
 #ode_algorithm = DGLDDRK84_C(williamson_condition = false)
-ode_algorithm = RDPK3SpFSAL49()
-#ode_algorithm = RK4()
+#ode_algorithm = RDPK3SpFSAL49()
+ode_algorithm = RK4()
 
 sol = solve(ode, ode_algorithm,
             dt = 42.0, # solve needs some value here but it will be overwritten by the stepsize_callback
