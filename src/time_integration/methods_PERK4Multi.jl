@@ -246,6 +246,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                             # NOTE: For variable c case:
                             #Trixi.wrap_array(u0, ode.p), equations)
     
+    
     #=
     partitioning_variables!(level_info_elements, 
                             level_info_elements_acc, 
@@ -259,6 +260,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                             # NOTE: For variable c case:
                             #Trixi.wrap_array(u0, ode.p), equations)
     =#
+
     for i in 1:n_levels
         println("#Number Elements integrated with level $i: ", length(level_info_elements[i]))
     end
@@ -360,45 +362,58 @@ function step!(integrator::PERK4_Multi_Integrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
         k1!(integrator, prob.p, alg.c)
 
-        # CARE: This does not work if we have only one method but more than one grid level
+        # CARE: This does not work if we have only one method but more than one grid level!
+        # I.e., for comparing single PERK to PERKMulti we need to exchange this to 
         #=
-        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
-                     integrator.level_info_elements_acc[1],
-                     integrator.level_info_interfaces_acc[1],
-                     integrator.level_info_boundaries_acc[1],
-                     integrator.level_info_boundaries_orientation_acc[1],
-                     integrator.level_info_mortars_acc[1],
-                     integrator.level_u_indices_elements, 1,
-                     integrator.du_ode_hyp)
-        =#
-        
-        
-        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                        integrator.level_info_elements_acc[1],
-                        integrator.level_info_interfaces_acc[1],
-                        integrator.level_info_boundaries_acc[1],
-                        integrator.level_info_boundaries_orientation_acc[1],
-                        integrator.level_info_mortars_acc[1],
-                        1)
-        
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage)
 
-        #=
-        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                        integrator.level_info_elements_acc[1],
-                        integrator.level_info_interfaces_acc[1],
-                        integrator.level_info_mpi_interfaces_acc[1],
-                        integrator.level_info_boundaries_acc[1],
-                        integrator.level_info_boundaries_orientation_acc[1],
-                        integrator.level_info_mortars_acc[1],
-                        integrator.level_info_mpi_mortars_acc[1])
-        =#
-
-        # Update finest level only
-        @threaded for u_ind in integrator.level_u_indices_elements[1]
+        @threaded for u_ind in eachindex(integrator.du)
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
+        =#
 
-        for stage in 3:(alg.NumStages - 3)
+
+        # NOTE: For proof-of-concept version for MPI
+        if integrator.n_levels == 4
+            #=
+            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
+                        integrator.level_info_elements_acc[1],
+                        integrator.level_info_interfaces_acc[1],
+                        integrator.level_info_boundaries_acc[1],
+                        integrator.level_info_boundaries_orientation_acc[1],
+                        integrator.level_info_mortars_acc[1],
+                        integrator.level_u_indices_elements, 1,
+                        integrator.du_ode_hyp)
+            =#
+            
+            
+            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                            integrator.level_info_elements_acc[1],
+                            integrator.level_info_interfaces_acc[1],
+                            integrator.level_info_boundaries_acc[1],
+                            integrator.level_info_boundaries_orientation_acc[1],
+                            integrator.level_info_mortars_acc[1],
+                            1)
+            
+
+            #=
+            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                            integrator.level_info_elements_acc[1],
+                            integrator.level_info_interfaces_acc[1],
+                            integrator.level_info_mpi_interfaces_acc[1],
+                            integrator.level_info_boundaries_acc[1],
+                            integrator.level_info_boundaries_orientation_acc[1],
+                            integrator.level_info_mortars_acc[1],
+                            integrator.level_info_mpi_mortars_acc[1])
+            =#
+
+            # Update finest level only
+            @threaded for u_ind in integrator.level_u_indices_elements[1]
+                integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+            end                            
+        end
+
+        for stage in 3:(alg.NumStages - 3) 
             #=
             ### General implementation: Not own method for each grid level ###
             # Loop over different methods with own associated level
@@ -450,7 +465,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             end
             =#
 
-            
+            #=
             ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
             for level in 1:alg.HighestEvalLevels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
@@ -465,15 +480,39 @@ function step!(integrator::PERK4_Multi_Integrator)
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
                 end
             end
+            =#
+
             
+            ### NOTE: For proof-of-concept version for MPI: ###
+            if alg.HighestEvalLevels[stage] > 4 - integrator.n_levels
+
+            # Problem: Different n_levels for different ranks
+            #for level in (1 - integrator.n_levels + 4):min(alg.NumMethods, integrator.n_levels)
+            for level in (1 - integrator.n_levels + 4):4
+                @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + 
+                                              alg.AMatrices[stage - 2, 1, level] *
+                                               integrator.k1[u_ind]
+                end
+            end
+            #for level in (1 - integrator.n_levels + 4):min(alg.HighestEvalLevels[stage], integrator.n_levels)
+            for level in (1 - integrator.n_levels + 4):alg.HighestEvalLevels[stage]
+                @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
+                    integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] *
+                                               integrator.k_higher[u_ind]
+                end
+            end
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
             # For statically non-uniform meshes/characteristic speeds
             #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
-            
+
             # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
+            #integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
+
+            ### NOTE: For proof-of-concept version for MPI: ###
+            integrator.coarsest_lvl = alg.HighestActiveLevels[stage] + integrator.n_levels - 4
 
             # Check if there are fewer integrators than grid levels (non-optimal method)
             if integrator.coarsest_lvl == alg.NumMethods
@@ -505,31 +544,31 @@ function step!(integrator::PERK4_Multi_Integrator)
                 
                 
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                             integrator.coarsest_lvl)
+                            integrator.level_info_elements_acc[integrator.coarsest_lvl],
+                            integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
+                            integrator.level_info_mortars_acc[integrator.coarsest_lvl],
+                            integrator.coarsest_lvl)
                 
 
                 #=
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                             integrator.level_info_mpi_interfaces_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                             integrator.level_info_mpi_mortars_acc[integrator.coarsest_lvl])
+                            integrator.level_info_elements_acc[integrator.coarsest_lvl],
+                            integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
+                            integrator.level_info_mpi_interfaces_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
+                            integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
+                            integrator.level_info_mortars_acc[integrator.coarsest_lvl],
+                            integrator.level_info_mpi_mortars_acc[integrator.coarsest_lvl])
                 =#
 
                 # Update k_higher of relevant levels
-                for level in 1:(integrator.coarsest_lvl)
+                for level in 1:integrator.coarsest_lvl
                     @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.k_higher[u_ind] = integrator.du[u_ind] *
-                                                    integrator.dt
+                        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
                     end
+                end
                 end
             end
         end # end loop over different stages

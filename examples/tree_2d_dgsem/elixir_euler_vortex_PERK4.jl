@@ -186,12 +186,14 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-
 #ode_algorithm = PERK4(19, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+
 
 dtRatios = [1, 0.5, 0.25, 0.125]
 Stages = [19, 11, 7, 5]
+
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/", dtRatios)
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
