@@ -328,6 +328,20 @@ function partitioning_variables!(level_info_elements,
         for mortar_id in 1:n_mpi_mortars
             # This is by convention always one of the finer elements
             element_id = mpi_mortars.local_neighbor_ids[mortar_id][1]
+
+            #=
+            level = -1
+            for element_id in mpi_mortars.local_neighbor_ids[mortar_id]
+
+                # Determine level
+                level_cand = mesh.tree.levels[elements.cell_ids[element_id]]
+
+                if level_cand > level
+                    level = level_cand
+                end
+            end
+            =#
+
             # Determine level
             level = mesh.tree.levels[elements.cell_ids[element_id]]
   

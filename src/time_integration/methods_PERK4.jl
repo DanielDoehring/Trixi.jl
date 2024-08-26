@@ -203,10 +203,12 @@ function k1!(integrator, p, c)
         integrator.k1[i] = integrator.du[i] * integrator.dt
     end
 
-    integrator.t_stage = integrator.t + c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] + c[2] * integrator.k1[i]
     end
+
+    # TODO: Move away from here, not really belonging to stage 1!
+    integrator.t_stage = integrator.t + c[2] * integrator.dt
 end
 
 function last_three_stages!(integrator, alg, p)

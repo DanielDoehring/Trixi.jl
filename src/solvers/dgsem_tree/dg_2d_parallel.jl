@@ -573,7 +573,7 @@ function rhs!(du, u, t,
               ) where {Source}
     # Start to receive MPI data
     @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
-
+    
     # Prolong solution to MPI interfaces
     @trixi_timeit timer() "prolong2mpiinterfaces" begin
         prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, dg,
@@ -583,9 +583,18 @@ function rhs!(du, u, t,
     # Prolong solution to MPI mortars
     @trixi_timeit timer() "prolong2mpimortars" begin
         prolong2mpimortars!(cache, u, mesh, equations,
+                            dg.mortar, dg.surface_integral, dg)
+    end
+
+    #=
+    # TODO: Something wrong here!
+    # Prolong solution to MPI mortars
+    @trixi_timeit timer() "prolong2mpimortars" begin
+        prolong2mpimortars!(cache, u, mesh, equations,
                             dg.mortar, dg.surface_integral, dg,
                             level_info_mpi_mortars_acc)
     end
+    =#
 
     # Start to send MPI data
     @trixi_timeit timer() "start MPI send" begin
@@ -661,7 +670,7 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "finish MPI receive" begin
         finish_mpi_receive!(cache.mpi_cache, mesh, equations, dg, cache)
     end
-
+    
     # Calculate MPI interface fluxes
     @trixi_timeit timer() "MPI interface flux" begin
         calc_mpi_interface_flux!(cache.elements.surface_flux_values, mesh,
@@ -670,12 +679,11 @@ function rhs!(du, u, t,
                                  level_info_mpi_interfaces_acc)
     end
 
-    # Calculate MPI mortar fluxes
     @trixi_timeit timer() "MPI mortar flux" begin
         calc_mpi_mortar_flux!(cache.elements.surface_flux_values, mesh,
-                              have_nonconservative_terms(equations), equations,
-                              dg.mortar, dg.surface_integral, dg, cache,
-                              level_info_mpi_mortars_acc)
+                            have_nonconservative_terms(equations), equations,
+                            dg.mortar, dg.surface_integral, dg, cache,
+                            level_info_mpi_mortars_acc)
     end
 
     # Calculate surface integrals
@@ -900,6 +908,7 @@ function prolong2mpimortars!(cache, u,
     return nothing
 end
 
+# NOTE: This is still buggy!
 function prolong2mpimortars!(cache, u,
                              mesh::ParallelTreeMesh{2}, equations,
                              mortar_l2::LobattoLegendreMortarL2, surface_integral,
