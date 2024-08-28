@@ -160,8 +160,7 @@ end
 function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations, dg, cache)
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
 
-    # Start receiving and unpack received data until all communication is finished
-    d = MPI.Waitany(mpi_cache.mpi_recv_requests)
+    @trixi_timeit timer() "First Waitany" d = MPI.Waitany(mpi_cache.mpi_recv_requests)
     while d !== nothing
         recv_buffer = mpi_cache.mpi_recv_buffers[d]
 
