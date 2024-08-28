@@ -235,7 +235,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    
+    #=
     partitioning_variables!(level_info_elements, 
                             level_info_elements_acc, 
                             level_info_interfaces_acc, 
@@ -245,9 +245,9 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                             n_levels, n_dims, mesh, dg, cache, alg)
                             # NOTE: For variable c case:
                             #Trixi.wrap_array(u0, ode.p), equations)
+    =#
     
     
-    #=
     partitioning_variables!(level_info_elements, 
                             level_info_elements_acc, 
                             level_info_interfaces_acc,
@@ -259,7 +259,7 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                             n_levels, n_dims, mesh, dg, cache, alg)
                             # NOTE: For variable c case:
                             #Trixi.wrap_array(u0, ode.p), equations)
-    =#
+    
 
     for i in 1:n_levels
         println("#Number Elements integrated with level $i: ", length(level_info_elements[i]))
@@ -386,7 +386,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                         integrator.du_ode_hyp)
             =#
             
-            
+            #=
             integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[1],
                             integrator.level_info_interfaces_acc[1],
@@ -394,9 +394,9 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_info_boundaries_orientation_acc[1],
                             integrator.level_info_mortars_acc[1],
                             1)
-            
+            =#
 
-            #=
+            
             integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[1],
                             integrator.level_info_interfaces_acc[1],
@@ -405,7 +405,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_info_boundaries_orientation_acc[1],
                             integrator.level_info_mortars_acc[1],
                             integrator.level_info_mpi_mortars_acc[1])
-            =#
+            
 
             # Update finest level only
             @threaded for u_ind in integrator.level_u_indices_elements[1]
@@ -486,7 +486,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             ### NOTE: For proof-of-concept version for MPI: ###
             if alg.HighestEvalLevels[stage] > 4 - integrator.n_levels
 
-            # Problem: Different n_levels for different ranks
+            #=
             #for level in (1 - integrator.n_levels + 4):min(alg.NumMethods, integrator.n_levels)
             for level in (1 - integrator.n_levels + 4):4
                 @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
@@ -500,6 +500,23 @@ function step!(integrator::PERK4_Multi_Integrator)
                 @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
                     integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] *
                                                integrator.k_higher[u_ind]
+                end
+            end
+            =#
+
+            for level in (1 - integrator.n_levels + 4):alg.HighestEvalLevels[stage]
+                @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1, level] *
+                                               integrator.k1[u_ind] + 
+                                               alg.AMatrices[stage - 2, 2, level] *
+                                               integrator.k_higher[u_ind]
+                end
+            end
+
+            # TODO: Not sure if this is correct in general!
+            for level in alg.HighestEvalLevels[stage]+1:4
+                @threaded for u_ind in integrator.level_u_indices_elements[level]
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
                 end
             end
 
@@ -542,7 +559,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.du_ode_hyp)
                 =#
                 
-                
+                #=
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
@@ -550,9 +567,9 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
                             integrator.coarsest_lvl)
-                
+                =#
 
-                #=
+                
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
@@ -561,7 +578,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
                             integrator.level_info_mpi_mortars_acc[integrator.coarsest_lvl])
-                =#
+                
 
                 # Update k_higher of relevant levels
                 for level in 1:integrator.coarsest_lvl
