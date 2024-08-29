@@ -346,7 +346,8 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
         @trixi_timeit timer() "dynamic load balancing" begin
             old_mpi_ranks_per_cell = copy(mesh.tree.mpi_ranks)
 
-            partition!(mesh)
+            #partition!(mesh)
+            partition_PERK!(mesh)
 
             rebalance_solver!(u_ode, mesh, equations, dg, cache, old_mpi_ranks_per_cell)
         end
