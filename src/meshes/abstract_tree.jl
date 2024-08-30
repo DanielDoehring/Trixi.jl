@@ -162,6 +162,23 @@ end
 # Return an array with the ids of all leaf cells
 leaf_cells(t::AbstractTree) = filter_leaf_cells((cell_id) -> true, t)
 
+function filter_non_leaf_cells(f, t::AbstractTree)
+    filtered = Vector{Int}(undef, length(t))
+    count = 0
+    for cell_id in 1:length(t)
+        if !is_leaf(t, cell_id) && f(cell_id)
+            count += 1
+            filtered[count] = cell_id
+        end
+    end
+
+    return filtered[1:count]
+end
+
+# Return an array with the ids of all non-leaf cells
+non_leaf_cells(t::AbstractTree) = filter_non_leaf_cells((cell_id) -> true, t)
+#non_leaf_cells(t::AbstractTree) = setdiff(1:length(t), leaf_cells(t))
+
 # Return an array with the ids of all leaf cells for a given rank
 leaf_cells_by_rank(t::AbstractTree, rank) = leaf_cells(t)
 
