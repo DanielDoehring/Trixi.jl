@@ -61,7 +61,7 @@ function partition!(mesh::ParallelTreeMesh; allow_coarsening = true)
         @assert all(n -> n > 0, n_leaves_per_rank) "Too many ranks to properly partition the mesh!"
 
         mesh.n_cells_by_rank[d] = last_id - mesh.first_cell_by_rank[d] + 1
-        mesh.tree.mpi_ranks[mesh.first_cell_by_rank[d]:last_id] .= d
+        mesh.tree.mpi_ranks[mesh.first_cell_by_rank[d]:last_id] .= d # Assign cells to rank
 
         # Set first cell of next rank
         if d < length(n_leaves_per_rank) - 1
@@ -96,7 +96,7 @@ function partition_PERK!(mesh::ParallelTreeMesh; allow_coarsening = true)
         push!(leaves_per_level[level], leaf)
     end
 
-    cells_per_rank = Dict{Int, Set{Int}}(i => Set{Int}() for i in 0:mpi_nranks() - 1)
+    leaves_per_rank = Dict{Int, Set{Int}}(i => Set{Int}() for i in 0:mpi_nranks() - 1)
     # Partition leaf-nodes level-wise equally among ranks
     for (_, leaves) in leaves_per_level
         num_leaves_at_level = length(leaves)
@@ -107,17 +107,34 @@ function partition_PERK!(mesh::ParallelTreeMesh; allow_coarsening = true)
             end_idx = min((rank + 1) * leaves_per_rank_at_level, num_leaves_at_level)
             
             if start_idx <= end_idx
-                union!(cells_per_rank[rank], leaves[start_idx:end_idx])
+                union!(leaves_per_rank[rank], leaves[start_idx:end_idx])
             end
-
-            #println("Leaves of $rank: ", length(leaves_per_rank[rank]))
         end
     end
+
+    # Distribute non leaf cells evenly among ranks
+    cells_per_rank = Dict{Int, Set{Int}}(i => Set{Int}() for i in 0:mpi_nranks() - 1)
+
+    #non_leaves = setdiff(1:num_cells, leaves) # Not sure what is faster
+    non_leaves = non_leaf_cells(mesh.tree)
+
+    n_non_leaves = num_cells - num_leaves
+    n_non_leaves_per_rank = ceil(Int, n_non_leaves / mpi_nranks())
+
+    # Distribute non leaf cells among ranks
+    for rank in 0:(mpi_nranks() - 1)
+        start_idx = rank * n_non_leaves_per_rank + 1
+        end_idx = min((rank + 1) * n_non_leaves_per_rank, n_non_leaves)
+
+        cells = non_leaves[start_idx:end_idx]
+        union!(cells_per_rank[rank], cells)
+    end
+    
 
     # In order to have AMR working we need to keep children of parent together when
     # all children are leaves.
     for rank in 0:(mpi_nranks() - 1)
-        leaves = cells_per_rank[rank]
+        leaves = leaves_per_rank[rank]
         for leaf in leaves
             parent_id = mesh.tree.parent_ids[leaf]
             if allow_coarsening &&
@@ -126,47 +143,73 @@ function partition_PERK!(mesh::ParallelTreeMesh; allow_coarsening = true)
                 additional_leaves = mesh.tree.child_ids[:, parent_id]
                 union!(leaves, additional_leaves)
 
+                # Add parent to same rank
+                union!(cells_per_rank[rank], parent_id)
+
                 # Remove these leaf cells from the other ranks
-                for other_rank in 0:(mpi_nranks() - 1)
-                    if other_rank != rank
-                        for leaf in additional_leaves
-                            delete!(cells_per_rank[other_rank], leaf)
-                        end
+                for other_rank in 0:rank - 1
+                    for leaf in additional_leaves
+                        delete!(leaves_per_rank[other_rank], leaf)
                     end
+                    delete!(cells_per_rank[other_rank], parent_id)
+                end
+                for other_rank in (rank + 1):(mpi_nranks() - 1)
+                    for leaf in additional_leaves
+                        delete!(leaves_per_rank[other_rank], leaf)
+                    end
+                    delete!(cells_per_rank[other_rank], parent_id)
                 end
             end
         end
     end
-    @assert sum(length(cells_per_rank[rank]) for rank in 0:(mpi_nranks() - 1)) == num_leaves
+    sum_assigned_leafs = sum(length(leaves_per_rank[rank]) for rank in 0:(mpi_nranks() - 1))
+    @assert sum_assigned_leafs == num_leaves
+    
+
+    #=
+    # Try to assign non leaf cells as similar as possible to the standard function
+    cells_per_rank = Dict{Int, Set{Int}}(i => Set{Int}() for i in 0:mpi_nranks() - 1)
 
     #non_leaves = setdiff(1:num_cells, leaves) # Not sure what is faster
     non_leaves = non_leaf_cells(mesh.tree)
-    n_non_leaves = num_cells - num_leaves
-    
-    n_non_leaves_per_rank = ceil(Int, n_non_leaves / mpi_nranks())
-    # Distribute non leaf cells among ranks
+
+    first_id = 1
     for rank in 0:(mpi_nranks() - 1)
-        start_idx = rank * n_non_leaves_per_rank + 1
-        end_idx = min((rank + 1) * n_non_leaves_per_rank, n_non_leaves)
-
-        union!(cells_per_rank[rank], non_leaves[start_idx:end_idx])
-        #mesh.tree.mpi_ranks[non_leaves[start_idx:end_idx]] .= rank
+        last_id = maximum(leaves_per_rank[rank])
+        filtered_non_leaves = filter(x -> x >= first_id && x < last_id, non_leaves)
+        
+        union!(cells_per_rank[rank], filtered_non_leaves)
+        first_id = last_id + 1
     end
 
-    for d in 0:(mpi_nranks() - 1)
-        #=
-        count = 0
-        for leaf in cells_per_rank[d]
-            mesh.tree.mpi_ranks[leaf] = d
-            count += 1
+    for rank in 0:(mpi_nranks() - 1)
+        leaves = leaves_per_rank[rank]
+        for leaf in leaves
+            parent_id = mesh.tree.parent_ids[leaf]
+            if allow_coarsening &&
+                all(id -> is_leaf(mesh.tree, id), @view mesh.tree.child_ids[:, parent_id])
+
+                # Add parent to same rank
+                union!(cells_per_rank[rank], parent_id)
+
+                # Remove these leaf cells from the other ranks
+                for other_rank in 0:rank - 1
+                    delete!(cells_per_rank[other_rank], parent_id)
+                end
+                for other_rank in (rank + 1):(mpi_nranks() - 1)
+                    delete!(cells_per_rank[other_rank], parent_id)
+                end
+            end
         end
-        #println("Rank $d: receives ", count, " cells")
-        =#
-        mesh.tree.mpi_ranks[collect(cells_per_rank[d])] .= d
-        # IDEA: Do we need to assign parent cells to the same rank as all their leafs?
     end
-    @assert sum(length(cells_per_rank[rank]) for rank in 0:(mpi_nranks() - 1)) == num_cells
+    =#
     
+    for rank in 0:(mpi_nranks() - 1)
+        mesh.tree.mpi_ranks[collect(leaves_per_rank[rank])] .= rank
+        mesh.tree.mpi_ranks[collect(cells_per_rank[rank])] .= rank
+    end
+    @assert sum(length(cells_per_rank[rank]) for rank in 0:(mpi_nranks() - 1)) + sum_assigned_leafs == num_cells
+
     return nothing
 end
 
