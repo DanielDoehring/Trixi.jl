@@ -36,7 +36,7 @@ function ComputePERK4_ButcherTableau(NumStages::Int, BasePathMonCoeffs::Abstract
     AMatrices = zeros(CoeffsMax, 2)
     AMatrices[:, 1] = c[3:(NumStages - 3)]
 
-    PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * "_" * string(NumStages) * ".txt"
+    #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * "_" * string(NumStages) * ".txt"
     # If all c = 1.0, the max number of stages does not matter
     PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStages) * ".txt"
     NumMonCoeffs, A = read_file(PathMonCoeffs, Float64)

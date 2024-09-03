@@ -141,7 +141,7 @@ summary_callback = SummaryCallback()
 
 analysis_interval = 500
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
-                                     #analysis_errors = Symbol[],
+                                     analysis_errors = Symbol[],
                                      analysis_integrals = ())
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
@@ -206,9 +206,9 @@ exit() # For MPI business
 
 ###############################################################################
 
-#ode_algorithm = NDBLSRK144(williamson_condition = false)
-#ode_algorithm = DGLDDRK84_C(williamson_condition = false)
-#ode_algorithm = RDPK3SpFSAL49()
+ode_algorithm = NDBLSRK144(williamson_condition = false)
+ode_algorithm = DGLDDRK84_C(williamson_condition = false)
+ode_algorithm = RDPK3SpFSAL49()
 ode_algorithm = RK4()
 
 sol = solve(ode, ode_algorithm,
@@ -217,6 +217,8 @@ sol = solve(ode, ode_algorithm,
             adaptive = false);
 
 summary_callback() # print the timer summary
+
+exit() # For MPI business
 
 plot(sol)
 

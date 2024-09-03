@@ -216,7 +216,7 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
     @unpack controller, adaptor = amr_callback
 
     u = wrap_array(u_ode, mesh, equations, dg, cache)
-    lambda = @trixi_timeit timer() "indicator" controller(u, mesh, equations, dg, cache,
+    cell_ids, lambda = @trixi_timeit timer() "indicator" controller(u, mesh, equations, dg, cache,
                                                           t = t, iter = iter)
 
     if mpi_isparallel()
@@ -226,12 +226,20 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
         recvbuf = MPI.VBuffer(lambda_global, parent(cache.mpi_cache.n_elements_by_rank))
         MPI.Allgatherv!(lambda, recvbuf, mpi_comm())
         lambda = lambda_global
+
+        cell_ids_global = Vector{eltype(cell_ids)}(undef, nelementsglobal(dg, cache))
+        recvbuf = MPI.VBuffer(cell_ids_global, parent(cache.mpi_cache.n_elements_by_rank))
+        MPI.Allgatherv!(cell_ids, recvbuf, mpi_comm())
+        cell_ids = cell_ids_global
     end
 
+    #=
     leaf_cell_ids = leaf_cells(mesh.tree)
     @boundscheck begin
         @assert axes(lambda)==axes(leaf_cell_ids) ("Indicator (axes = $(axes(lambda))) and leaf cell (axes = $(axes(leaf_cell_ids))) arrays have different axes")
     end
+    =#
+    @assert axes(cell_ids) == axes(lambda)
 
     @unpack to_refine, to_coarsen = amr_callback.amr_cache
     empty!(to_refine)
@@ -239,9 +247,11 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
     for element in 1:length(lambda)
         controller_value = lambda[element]
         if controller_value > 0
-            push!(to_refine, leaf_cell_ids[element])
+            #push!(to_refine, leaf_cell_ids[element])
+            push!(to_refine, cell_ids[element])
         elseif controller_value < 0
-            push!(to_coarsen, leaf_cell_ids[element])
+            #push!(to_coarsen, leaf_cell_ids[element])
+            push!(to_coarsen, cell_ids[element])
         end
     end
 
@@ -347,7 +357,7 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
             old_mpi_ranks_per_cell = copy(mesh.tree.mpi_ranks)
 
             #partition!(mesh)
-            partition_PERK!(mesh)
+            partition_PERK!(mesh) #
 
             rebalance_solver!(u_ode, mesh, equations, dg, cache, old_mpi_ranks_per_cell)
         end
@@ -809,8 +819,14 @@ end
 # Note: `mesh` is only required to extract ndims
 function original2refined(original_cell_ids, refined_original_cells, mesh)
     # Sanity check
-    @assert issorted(original_cell_ids) "`original_cell_ids` not sorted"
-    @assert issorted(refined_original_cells) "`refined_cell_ids` not sorted"
+    #@assert issorted(original_cell_ids) "`original_cell_ids` not sorted"
+    #@assert issorted(refined_original_cells) "`refined_cell_ids` not sorted"
+    if !issorted(original_cell_ids)
+        sort!(original_cell_ids)
+    end
+    if !issorted(refined_original_cells)
+        sort!(refined_original_cells)
+    end
 
     # Create array with original cell ids (not yet shifted)
     shifted_cell_ids = collect(1:original_cell_ids[end])
@@ -1006,6 +1022,47 @@ function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
     end
 
     return controller_value
+end
+
+function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
+                                            mesh::TreeMesh, equations, dg::DG, cache;
+                                            kwargs...)
+    @unpack controller_value = controller.cache
+    resize!(controller_value, nelements(dg, cache))
+
+    alpha = controller.indicator(u, mesh, equations, dg, cache; kwargs...)
+
+    cell_ids = cache.elements.cell_ids[eachelement(dg, cache)]
+    current_levels = mesh.tree.levels[cell_ids]
+
+    @threaded for element in eachelement(dg, cache)
+        current_level = current_levels[element]
+
+        # set target level
+        target_level = current_level
+        if alpha[element] > controller.max_threshold
+            target_level = controller.max_level
+        elseif alpha[element] > controller.med_threshold
+            if controller.med_level > 0
+                target_level = controller.med_level
+                # otherwise, target_level = current_level
+                # set med_level = -1 to implicitly use med_level = current_level
+            end
+        else
+            target_level = controller.base_level
+        end
+
+        # compare target level with actual level to set controller
+        if current_level < target_level
+            controller_value[element] = 1 # refine!
+        elseif current_level > target_level
+            controller_value[element] = -1 # coarsen!
+        else
+            controller_value[element] = 0 # we're good
+        end
+    end
+
+    return cell_ids, controller_value
 end
 
 function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},

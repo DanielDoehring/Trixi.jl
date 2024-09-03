@@ -31,7 +31,8 @@ function partition!(mesh::ParallelTreeMesh; allow_coarsening = true)
     mesh.n_cells_by_rank = similar(n_leaves_per_rank)
 
     leaf_count = 0
-    mesh.first_cell_by_rank[0] = 1 # Assign first cell to rank 0
+    # Assign first cell to rank 0 (employ depth-first indexing)
+    mesh.first_cell_by_rank[0] = 1
     # Iterate over all ranks
     for d in 0:(mpi_nranks() - 1)
         leaf_count += n_leaves_per_rank[d]
@@ -61,7 +62,8 @@ function partition!(mesh::ParallelTreeMesh; allow_coarsening = true)
         @assert all(n -> n > 0, n_leaves_per_rank) "Too many ranks to properly partition the mesh!"
 
         mesh.n_cells_by_rank[d] = last_id - mesh.first_cell_by_rank[d] + 1
-        mesh.tree.mpi_ranks[mesh.first_cell_by_rank[d]:last_id] .= d # Assign cells to rank
+        # Assign cells to rank following depth-first indexing
+        mesh.tree.mpi_ranks[mesh.first_cell_by_rank[d]:last_id] .= d 
 
         # Set first cell of next rank
         if d < length(n_leaves_per_rank) - 1
@@ -112,14 +114,14 @@ function partition_PERK!(mesh::ParallelTreeMesh; allow_coarsening = true)
         end
     end
 
-    # Distribute non leaf cells evenly among ranks
-    cells_per_rank = Dict{Int, Set{Int}}(i => Set{Int}() for i in 0:mpi_nranks() - 1)
-
     #non_leaves = setdiff(1:num_cells, leaves) # Not sure what is faster
     non_leaves = non_leaf_cells(mesh.tree)
 
     n_non_leaves = num_cells - num_leaves
     n_non_leaves_per_rank = ceil(Int, n_non_leaves / mpi_nranks())
+
+    # Distribute non leaf cells evenly among ranks
+    cells_per_rank = Dict{Int, Set{Int}}(i => Set{Int}() for i in 0:mpi_nranks() - 1)
 
     # Distribute non leaf cells among ranks
     for rank in 0:(mpi_nranks() - 1)
@@ -129,7 +131,6 @@ function partition_PERK!(mesh::ParallelTreeMesh; allow_coarsening = true)
         cells = non_leaves[start_idx:end_idx]
         union!(cells_per_rank[rank], cells)
     end
-    
 
     # In order to have AMR working we need to keep children of parent together when
     # all children are leaves.
@@ -164,46 +165,7 @@ function partition_PERK!(mesh::ParallelTreeMesh; allow_coarsening = true)
     end
     sum_assigned_leafs = sum(length(leaves_per_rank[rank]) for rank in 0:(mpi_nranks() - 1))
     @assert sum_assigned_leafs == num_leaves
-    
 
-    #=
-    # Try to assign non leaf cells as similar as possible to the standard function
-    cells_per_rank = Dict{Int, Set{Int}}(i => Set{Int}() for i in 0:mpi_nranks() - 1)
-
-    #non_leaves = setdiff(1:num_cells, leaves) # Not sure what is faster
-    non_leaves = non_leaf_cells(mesh.tree)
-
-    first_id = 1
-    for rank in 0:(mpi_nranks() - 1)
-        last_id = maximum(leaves_per_rank[rank])
-        filtered_non_leaves = filter(x -> x >= first_id && x < last_id, non_leaves)
-        
-        union!(cells_per_rank[rank], filtered_non_leaves)
-        first_id = last_id + 1
-    end
-
-    for rank in 0:(mpi_nranks() - 1)
-        leaves = leaves_per_rank[rank]
-        for leaf in leaves
-            parent_id = mesh.tree.parent_ids[leaf]
-            if allow_coarsening &&
-                all(id -> is_leaf(mesh.tree, id), @view mesh.tree.child_ids[:, parent_id])
-
-                # Add parent to same rank
-                union!(cells_per_rank[rank], parent_id)
-
-                # Remove these leaf cells from the other ranks
-                for other_rank in 0:rank - 1
-                    delete!(cells_per_rank[other_rank], parent_id)
-                end
-                for other_rank in (rank + 1):(mpi_nranks() - 1)
-                    delete!(cells_per_rank[other_rank], parent_id)
-                end
-            end
-        end
-    end
-    =#
-    
     for rank in 0:(mpi_nranks() - 1)
         mesh.tree.mpi_ranks[collect(leaves_per_rank[rank])] .= rank
         mesh.tree.mpi_ranks[collect(cells_per_rank[rank])] .= rank

@@ -291,8 +291,9 @@ function init(ode::ODEProblem, alg::PERK4_Multi;
                                         level_u_indices_elements,
                                         
                                         t0, -1, n_levels,
-                                        du_ode_hyp, 0.0)
-                                        #uprev, tprev)
+                                        du_ode_hyp,
+                                        #uprev, tprev,
+                                        0.0)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -372,45 +373,41 @@ function step!(integrator::PERK4_Multi_Integrator)
         end
         =#
 
-
-        # NOTE: For proof-of-concept version for MPI
-        if integrator.n_levels == 4
-            #=
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
+        #=
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
+                    integrator.level_info_elements_acc[1],
+                    integrator.level_info_interfaces_acc[1],
+                    integrator.level_info_boundaries_acc[1],
+                    integrator.level_info_boundaries_orientation_acc[1],
+                    integrator.level_info_mortars_acc[1],
+                    integrator.level_u_indices_elements, 1,
+                    integrator.du_ode_hyp)
+        =#
+        
+        #=
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                         integrator.level_info_elements_acc[1],
                         integrator.level_info_interfaces_acc[1],
                         integrator.level_info_boundaries_acc[1],
                         integrator.level_info_boundaries_orientation_acc[1],
                         integrator.level_info_mortars_acc[1],
-                        integrator.level_u_indices_elements, 1,
-                        integrator.du_ode_hyp)
-            =#
-            
-            #=
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                            integrator.level_info_elements_acc[1],
-                            integrator.level_info_interfaces_acc[1],
-                            integrator.level_info_boundaries_acc[1],
-                            integrator.level_info_boundaries_orientation_acc[1],
-                            integrator.level_info_mortars_acc[1],
-                            1)
-            =#
+                        1)
+        =#
 
-            
-            integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                            integrator.level_info_elements_acc[1],
-                            integrator.level_info_interfaces_acc[1],
-                            integrator.level_info_mpi_interfaces_acc[1],
-                            integrator.level_info_boundaries_acc[1],
-                            integrator.level_info_boundaries_orientation_acc[1],
-                            integrator.level_info_mortars_acc[1],
-                            integrator.level_info_mpi_mortars_acc[1])
-            
+        
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                        integrator.level_info_elements_acc[1],
+                        integrator.level_info_interfaces_acc[1],
+                        integrator.level_info_mpi_interfaces_acc[1],
+                        integrator.level_info_boundaries_acc[1],
+                        integrator.level_info_boundaries_orientation_acc[1],
+                        integrator.level_info_mortars_acc[1],
+                        integrator.level_info_mpi_mortars_acc[1])
+        
 
-            # Update finest level only
-            @threaded for u_ind in integrator.level_u_indices_elements[1]
-                integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
-            end                            
+        # Update finest level only
+        @threaded for u_ind in integrator.level_u_indices_elements[1]
+            integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
 
         for stage in 3:(alg.NumStages - 3) 
@@ -465,7 +462,7 @@ function step!(integrator::PERK4_Multi_Integrator)
             end
             =#
 
-            #=
+            
             ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
             for level in 1:alg.HighestEvalLevels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
@@ -480,45 +477,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
                 end
             end
-            =#
 
-            
-            ### NOTE: For proof-of-concept version for MPI: ###
-            if alg.HighestEvalLevels[stage] > 4 - integrator.n_levels
-
-            #=
-            #for level in (1 - integrator.n_levels + 4):min(alg.NumMethods, integrator.n_levels)
-            for level in (1 - integrator.n_levels + 4):4
-                @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + 
-                                              alg.AMatrices[stage - 2, 1, level] *
-                                               integrator.k1[u_ind]
-                end
-            end
-            #for level in (1 - integrator.n_levels + 4):min(alg.HighestEvalLevels[stage], integrator.n_levels)
-            for level in (1 - integrator.n_levels + 4):alg.HighestEvalLevels[stage]
-                @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
-                    integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] *
-                                               integrator.k_higher[u_ind]
-                end
-            end
-            =#
-
-            for level in (1 - integrator.n_levels + 4):alg.HighestEvalLevels[stage]
-                @threaded for u_ind in integrator.level_u_indices_elements[level + integrator.n_levels - 4]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1, level] *
-                                               integrator.k1[u_ind] + 
-                                               alg.AMatrices[stage - 2, 2, level] *
-                                               integrator.k_higher[u_ind]
-                end
-            end
-
-            # TODO: Not sure if this is correct in general!
-            for level in alg.HighestEvalLevels[stage]+1:4
-                @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
-                end
-            end
 
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
@@ -526,10 +485,8 @@ function step!(integrator::PERK4_Multi_Integrator)
             #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
 
             # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-            #integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
+            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
 
-            ### NOTE: For proof-of-concept version for MPI: ###
-            integrator.coarsest_lvl = alg.HighestActiveLevels[stage] + integrator.n_levels - 4
 
             # Check if there are fewer integrators than grid levels (non-optimal method)
             if integrator.coarsest_lvl == alg.NumMethods
@@ -585,7 +542,6 @@ function step!(integrator::PERK4_Multi_Integrator)
                     @threaded for u_ind in integrator.level_u_indices_elements[level]
                         integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
                     end
-                end
                 end
             end
         end # end loop over different stages
