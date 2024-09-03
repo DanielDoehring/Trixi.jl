@@ -482,10 +482,10 @@ function step!(integrator::PERK4_Multi_Integrator)
             integrator.t_stage = integrator.t + alg.c[stage] * integrator.dt
 
             # For statically non-uniform meshes/characteristic speeds
-            #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
+            integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
 
             # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
+            #integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage], integrator.n_levels)
 
 
             # Check if there are fewer integrators than grid levels (non-optimal method)
