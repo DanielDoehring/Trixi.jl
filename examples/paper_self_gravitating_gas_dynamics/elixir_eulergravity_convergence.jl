@@ -53,7 +53,7 @@ ode = semidiscretize(semi, tspan);
 summary_callback = SummaryCallback()
 
 stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
-stepsize_callback = StepsizeCallback(cfl = 2.5) # CarpenterKennedy2N54
+stepsize_callback = StepsizeCallback(cfl = 3.5) # PERK8
 
 save_solution = SaveSolutionCallback(interval = 10,
                                      save_initial_solution = true,
