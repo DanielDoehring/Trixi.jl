@@ -66,7 +66,7 @@ gamma = 5 / 3
 equations_euler = CompressibleEulerEquations2D(gamma)
 
 polydeg = 3
-solver_euler = DGSEM(polydeg, flux_hll)
+solver_euler = DGSEM(polydeg, FluxHLL(min_max_speed_naive))
 
 coordinates_min = (0.0, 0.0)
 coordinates_max = (1.0, 1.0)
@@ -150,7 +150,7 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                                                  Val(:energy_potential)))
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
-                        save_restart, save_solution,
+                        #save_restart, save_solution,
                         analysis_callback, alive_callback)
 
 ###############################################################################
