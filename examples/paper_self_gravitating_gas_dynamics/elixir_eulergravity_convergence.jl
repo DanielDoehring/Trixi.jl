@@ -10,7 +10,7 @@ gamma = 2.0
 equations_euler = CompressibleEulerEquations2D(gamma)
 
 polydeg = 3
-solver_euler = DGSEM(polydeg, flux_hll)
+solver_euler = DGSEM(polydeg, FluxHLL(min_max_speed_naive))
 
 coordinates_min = (0.0, 0.0)
 coordinates_max = (2.0, 2.0)
@@ -52,7 +52,8 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-stepsize_callback = StepsizeCallback(cfl = 0.8)
+stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
+stepsize_callback = StepsizeCallback(cfl = 2.5) # CarpenterKennedy2N54
 
 save_solution = SaveSolutionCallback(interval = 10,
                                      save_initial_solution = true,
@@ -66,13 +67,23 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true)
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
-                        save_solution,
+                        #save_solution,
                         analysis_callback, alive_callback)
 
 ###############################################################################
 # run the simulation
+
+ode_algorithm = PERK4(8, "/home/daniel/git/SSOCs/")
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = 42.0,
+                  save_everystep=false, callback=callbacks);
+
+#=
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
+=#
+
 summary_callback() # print the timer summary
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)
