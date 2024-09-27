@@ -2,6 +2,8 @@
 using OrdinaryDiffEq
 using Trixi
 
+# TODO: Try 3D version to be more expensive!
+
 ###############################################################################
 # semidiscretization of the compressible Euler equations
 gamma = 1.4
@@ -71,7 +73,7 @@ solver_euler = DGSEM(basis, surface_flux, volume_integral)
 coordinates_min = (-4, -4)
 coordinates_max = (4, 4)
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 2, # For Jacobian only
+                initial_refinement_level = 2,
                 n_cells_max = 100_000,
                 periodicity = false)
 
@@ -145,7 +147,13 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
-stepsize_callback = StepsizeCallback(cfl = 1.0)
+# PERK E = 8
+cfl = 3.1
+
+# CarpenterKennedy2N54
+#cfl = 1.7
+
+stepsize_callback = StepsizeCallback(cfl = cfl)
 
 save_solution = SaveSolutionCallback(interval = 100,
                                      save_initial_solution = true,
@@ -167,8 +175,16 @@ callbacks = CallbackSet(summary_callback, amr_callback, stepsize_callback,
 
 ###############################################################################
 # run the simulation
+
+ode_algorithm = PERK4(8, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/")
+
+sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
+
+#=
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
+=#
+
 summary_callback() # print the timer summary
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)

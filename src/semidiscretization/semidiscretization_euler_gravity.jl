@@ -233,6 +233,60 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t)
     @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
 
     # add gravitational source source_terms to the Euler part
+    # Looks like only momentum and energy equations are affected by the gravitational source term
+    if ndims(semi_euler) == 1
+        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
+        @views @. du_euler[3, .., :] -= u_euler[2, .., :] * u_gravity[2, .., :]
+    elseif ndims(semi_euler) == 2
+        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
+        @views @. du_euler[3, .., :] -= u_euler[1, .., :] * u_gravity[3, .., :]
+        @views @. du_euler[4, .., :] -= (u_euler[2, .., :] * u_gravity[2, .., :] +
+                                         u_euler[3, .., :] * u_gravity[3, .., :])
+    elseif ndims(semi_euler) == 3
+        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
+        @views @. du_euler[3, .., :] -= u_euler[1, .., :] * u_gravity[3, .., :]
+        @views @. du_euler[4, .., :] -= u_euler[1, .., :] * u_gravity[4, .., :]
+        @views @. du_euler[5, .., :] -= (u_euler[2, .., :] * u_gravity[2, .., :] +
+                                         u_euler[3, .., :] * u_gravity[3, .., :] +
+                                         u_euler[4, .., :] * u_gravity[4, .., :])
+    else
+        error("Number of dimensions $(ndims(semi_euler)) not supported.")
+    end
+
+    runtime = time_ns() - time_start
+    put!(semi.performance_counter, runtime)
+
+    return nothing
+end
+
+function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
+              level_info_elements_acc::Vector{Int64},
+              level_info_interfaces_acc::Vector{Int64},
+              level_info_boundaries_acc::Vector{Int64},
+              level_info_boundaries_orientation_acc::Vector{Vector{Int64}},
+              level_info_mortars_acc::Vector{Int64},
+              level_u_indices_elements::Vector{Int64})
+    @unpack semi_euler, semi_gravity, cache = semi
+
+    u_euler = wrap_array(u_ode, semi_euler)
+    du_euler = wrap_array(du_ode, semi_euler)
+    u_gravity = wrap_array(cache.u_ode, semi_gravity)
+
+    time_start = time_ns()
+
+    # standard semidiscretization of the compressible Euler equations
+    @trixi_timeit timer() "Euler solver" rhs!(du_ode, u_ode, semi_euler, t,
+                                              level_info_elements_acc,
+                                              level_info_interfaces_acc,
+                                              level_info_boundaries_acc,
+                                              level_info_boundaries_orientation_acc,
+                                              level_info_mortars_acc)
+
+    # compute gravitational potential and forces
+    @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
+
+    # add gravitational source source_terms to the Euler part
+    # Looks like only momentum and energy equations are affected by the gravitational source term
     if ndims(semi_euler) == 1
         @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
         @views @. du_euler[3, .., :] -= u_euler[2, .., :] * u_gravity[2, .., :]
