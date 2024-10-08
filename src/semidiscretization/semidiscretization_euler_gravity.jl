@@ -239,10 +239,20 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t)
         @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
         @views @. du_euler[3, .., :] -= u_euler[2, .., :] * u_gravity[2, .., :]
     elseif ndims(semi_euler) == 2
+        #=
         @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
         @views @. du_euler[3, .., :] -= u_euler[1, .., :] * u_gravity[3, .., :]
         @views @. du_euler[4, .., :] -= (u_euler[2, .., :] * u_gravity[2, .., :] +
                                          u_euler[3, .., :] * u_gravity[3, .., :])
+        =#
+        
+        @threaded for i in 1:size(u_euler, 4)
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
+            @views @. du_euler[4, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
+                                             u_euler[3, .., i] * u_gravity[3, .., i])
+        end                                         
+        
     elseif ndims(semi_euler) == 3
         @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
         @views @. du_euler[3, .., :] -= u_euler[1, .., :] * u_gravity[3, .., :]
