@@ -234,25 +234,29 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t)
     # compute gravitational potential and forces
     @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
 
+    n_elements = size(u_euler)[end]
     # add gravitational source source_terms to the Euler part
     if ndims(semi_euler) == 1
-        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
-        @views @. du_euler[3, .., :] -= u_euler[2, .., :] * u_gravity[2, .., :]
+        @threaded for i in 1:n_elements
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[2, .., i] * u_gravity[2, .., i]
+        end
     elseif ndims(semi_euler) == 2
-        @threaded for i in 1:size(u_euler, 4)
+        @threaded for i in 1:n_elements
             @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
             @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
             @views @. du_euler[4, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
                                              u_euler[3, .., i] * u_gravity[3, .., i])
-        end                                         
-        
+        end
     elseif ndims(semi_euler) == 3
-        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
-        @views @. du_euler[3, .., :] -= u_euler[1, .., :] * u_gravity[3, .., :]
-        @views @. du_euler[4, .., :] -= u_euler[1, .., :] * u_gravity[4, .., :]
-        @views @. du_euler[5, .., :] -= (u_euler[2, .., :] * u_gravity[2, .., :] +
-                                         u_euler[3, .., :] * u_gravity[3, .., :] +
-                                         u_euler[4, .., :] * u_gravity[4, .., :])
+        @threaded for i in 1:n_elements
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
+            @views @. du_euler[4, .., i] -= u_euler[1, .., i] * u_gravity[4, .., i]
+            @views @. du_euler[5, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
+                                             u_euler[3, .., i] * u_gravity[3, .., i] +
+                                             u_euler[4, .., i] * u_gravity[4, .., i])
+        end
     else
         error("Number of dimensions $(ndims(semi_euler)) not supported.")
     end
@@ -290,22 +294,27 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
     @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
 
     # add gravitational source source_terms to the Euler part
-    # Looks like only momentum and energy equations are affected by the gravitational source term
     if ndims(semi_euler) == 1
-        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
-        @views @. du_euler[3, .., :] -= u_euler[2, .., :] * u_gravity[2, .., :]
+        @threaded for i in level_info_elements_acc
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[2, .., i] * u_gravity[2, .., i]
+        end
     elseif ndims(semi_euler) == 2
-        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
-        @views @. du_euler[3, .., :] -= u_euler[1, .., :] * u_gravity[3, .., :]
-        @views @. du_euler[4, .., :] -= (u_euler[2, .., :] * u_gravity[2, .., :] +
-                                         u_euler[3, .., :] * u_gravity[3, .., :])
+        @threaded for i in level_info_elements_acc
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
+            @views @. du_euler[4, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
+                                             u_euler[3, .., i] * u_gravity[3, .., i])
+        end
     elseif ndims(semi_euler) == 3
-        @views @. du_euler[2, .., :] -= u_euler[1, .., :] * u_gravity[2, .., :]
-        @views @. du_euler[3, .., :] -= u_euler[1, .., :] * u_gravity[3, .., :]
-        @views @. du_euler[4, .., :] -= u_euler[1, .., :] * u_gravity[4, .., :]
-        @views @. du_euler[5, .., :] -= (u_euler[2, .., :] * u_gravity[2, .., :] +
-                                         u_euler[3, .., :] * u_gravity[3, .., :] +
-                                         u_euler[4, .., :] * u_gravity[4, .., :])
+        @threaded for i in level_info_elements_acc
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
+            @views @. du_euler[4, .., i] -= u_euler[1, .., i] * u_gravity[4, .., i]
+            @views @. du_euler[5, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
+                                             u_euler[3, .., i] * u_gravity[3, .., i] +
+                                             u_euler[4, .., i] * u_gravity[4, .., i])
+        end
     else
         error("Number of dimensions $(ndims(semi_euler)) not supported.")
     end
