@@ -141,7 +141,7 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           variable = density_pressure)
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 2,
-                                      max_level = 8, max_threshold = 0.00013)
+                                      max_level = 8, max_threshold = 0.00013) # Heavily tailored
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 1,
                            adapt_initial_condition = true,
