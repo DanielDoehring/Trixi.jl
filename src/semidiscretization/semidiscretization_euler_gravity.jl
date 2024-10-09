@@ -273,7 +273,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
               level_info_boundaries_acc::Vector{Int64},
               level_info_boundaries_orientation_acc::Vector{Vector{Int64}},
               level_info_mortars_acc::Vector{Int64},
-              dummy)
+              dummy) # level_u_indices_elements ?
     @unpack semi_euler, semi_gravity, cache = semi
 
     u_euler = wrap_array(u_ode, semi_euler)

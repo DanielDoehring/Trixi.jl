@@ -61,7 +61,7 @@ ode = semidiscretize(semi, tspan);
 summary_callback = SummaryCallback()
 
 stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
-stepsize_callback = StepsizeCallback(cfl = 3.0) # PERK8
+stepsize_callback = StepsizeCallback(cfl = 3.0) # PERK8 NOTE: Needs maybe to reduced further for long convergence study
 
 save_solution = SaveSolutionCallback(interval = 10,
                                      save_initial_solution = true,
