@@ -420,6 +420,7 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
         iter += 1
         tau += dtau
 
+        # TODO: Not sure if convergence check on only the current elements is correct!
         # check if we reached the maximum number of iterations
         if n_iterations_max > 0 && iter >= n_iterations_max
             @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
@@ -519,6 +520,7 @@ function timestep_gravity_3Sstar!(cache, u_euler, tau, dtau, gravity_parameters,
         # put in gravity source term proportional to Euler density
         # OBS! subtract off the background density ρ_0 around which the Jeans instability is perturbed
         n_elements = size(u_euler)[end]
+        # TODO: Not sure if addition of sources to only part of the domain is correct (elliptic equation!)
         @threaded for i in 1:n_elements
             @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end
