@@ -50,7 +50,7 @@ steady_state_callback = SteadyStateCallback(abstol = resid_tol, reltol = 0.0)
 # E = 11
 cfl = 3.5
 
-# Multi
+# Multi, E = [11, 7, 5]
 cfl = 3.3
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -65,8 +65,21 @@ alive_callback = AliveCallback(analysis_interval = analysis_interval)
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      extra_analysis_integrals = (entropy, energy_total))
 
+### Dummy AMR set-up to control non-uniform grid ###
+amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = first),
+                                      base_level = 1,
+                                      med_level = 2, med_threshold = 0.1,
+                                      max_level = 3, max_threshold = 0.6)
+
+amr_callback = AMRCallback(semi, amr_controller,
+                           interval = 500000, # Just for printing the levels
+                           adapt_initial_condition = false,
+                           adapt_initial_condition_only_refine = true)
+
 callbacks = CallbackSet(summary_callback, steady_state_callback, stepsize_callback,
-                        analysis_callback, alive_callback)
+                        analysis_callback, alive_callback,
+                        amr_callback # just for printing the levels
+                        )
 
 ###############################################################################
 # run the simulation
