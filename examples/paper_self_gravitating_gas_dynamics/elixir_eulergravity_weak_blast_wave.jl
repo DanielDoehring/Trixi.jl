@@ -77,7 +77,7 @@ coordinates_min = (-4, -4)
 coordinates_max = (4, 4)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 # Increase initial resolution to stability PERK
-                initial_refinement_level = 2, # 2
+                initial_refinement_level = 7, # 2
                 n_cells_max = 100_000,
                 periodicity = false)
 
@@ -135,8 +135,7 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 # ODE solvers, callbacks etc.
 tspan = (0.0, 2.0)
 
-#ode = semidiscretize(semi, tspan);
-ode = semidiscretize(semi_euler, tspan); # Run euler only (testcase)
+ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
@@ -146,12 +145,12 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_smooth = false,
                                           variable = density_pressure)
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level = 2,
-                                      max_level = 8, max_threshold = 0.00013) # Heavily tailored
+                                      base_level = 4, # 2
+                                      max_level = 8, max_threshold = 0.00013) # Heavily tailored, REVISIT!
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 1,
                            adapt_initial_condition = true,
-                           adapt_initial_condition_only_refine = true)
+                           adapt_initial_condition_only_refine = false #= true =#)
 
 # Single PERK 
 # E = 8
@@ -159,7 +158,7 @@ cfl = 3.1 # Euler only/Combined Euler-Gravity
 
 # PERK Multi
 # E = 8, 6, 5
-cfl = 0.5 # Euler only
+cfl = 3.1 # Euler only
 
 # CarpenterKennedy2N54
 #cfl = 1.7
@@ -187,12 +186,10 @@ callbacks = CallbackSet(summary_callback, amr_callback, stepsize_callback,
 ###############################################################################
 # run the simulation
 
-#=
-Stages = 8
-#Stages = 13
 
-ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/")
-=#
+Stages = 8
+
+#ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/")
 
 
 dtRatios = [1, 0.5, 0.25, 0.125]

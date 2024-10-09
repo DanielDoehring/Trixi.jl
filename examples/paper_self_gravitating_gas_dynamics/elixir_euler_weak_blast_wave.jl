@@ -59,17 +59,6 @@ volume_flux = flux_chandrashekar
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 
-#=
-indicator_sc = IndicatorHennemannGassner(equations_euler, basis,
-                                         alpha_max = 0.5,
-                                         alpha_min = 0.001,
-                                         alpha_smooth = true,
-                                         variable = density_pressure)
-volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
-                                                 volume_flux_dg = volume_flux,
-                                                 volume_flux_fv = surface_flux)
-=#
-
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver_euler = DGSEM(basis, surface_flux, volume_integral)
@@ -114,13 +103,11 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 # Single PERK 
 # E = 8
-cfl = 2.4 # Euler only
-# E = 13
-cfl = 3.1
+cfl = 3.1 # Euler only
 
 # PERK Multi
 # E = 8, 6, 5
-#cfl = 2.3 # Euler only
+cfl = 3.1 # Euler only
 
 # CarpenterKennedy2N54
 #cfl = 1.7
@@ -144,20 +131,14 @@ callbacks = CallbackSet(summary_callback,
 
 
 Stages = 8
-#Stages = 13
-
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/")
 
-
-#=
-dtRatios = [1, 0.5, 0.25, 0.125]
-Stages = [13, 8, 6, 5]
 
 dtRatios = [1, 0.5, 0.25]
 Stages = [8, 6, 5]
 
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/", dtRatios)
-=#
+
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
 

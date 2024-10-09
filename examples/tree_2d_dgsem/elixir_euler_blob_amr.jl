@@ -80,7 +80,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 8.0)
+tspan = (0.0, 4.0) # 8.0
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -113,7 +113,8 @@ amr_callback = AMRCallback(semi, amr_controller,
 stepsize_callback = StepsizeCallback(cfl = 0.25)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback, alive_callback,
+                        #analysis_callback, 
+                        alive_callback,
                         #save_solution,
                         amr_callback, stepsize_callback)
 

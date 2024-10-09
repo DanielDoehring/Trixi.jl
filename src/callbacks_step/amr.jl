@@ -216,7 +216,11 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
     @unpack controller, adaptor = amr_callback
 
     u = wrap_array(u_ode, mesh, equations, dg, cache)
+    #=
     cell_ids, lambda = @trixi_timeit timer() "indicator" controller(u, mesh, equations, dg, cache,
+                                                          t = t, iter = iter)
+    =#
+    lambda = @trixi_timeit timer() "indicator" controller(u, mesh, equations, dg, cache,
                                                           t = t, iter = iter)
 
     if mpi_isparallel()
@@ -233,25 +237,25 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
         cell_ids = cell_ids_global
     end
 
-    #=
+    
     leaf_cell_ids = leaf_cells(mesh.tree)
     @boundscheck begin
         @assert axes(lambda)==axes(leaf_cell_ids) ("Indicator (axes = $(axes(lambda))) and leaf cell (axes = $(axes(leaf_cell_ids))) arrays have different axes")
     end
-    =#
-    @assert axes(cell_ids) == axes(lambda)
+    #@assert axes(cell_ids) == axes(lambda)
 
     @unpack to_refine, to_coarsen = amr_callback.amr_cache
     empty!(to_refine)
     empty!(to_coarsen)
     for element in 1:length(lambda)
         controller_value = lambda[element]
+        # CARE! This is probably some left-over hack due to the custom MPI load-balancing!
         if controller_value > 0
-            #push!(to_refine, leaf_cell_ids[element])
-            push!(to_refine, cell_ids[element])
+            push!(to_refine, leaf_cell_ids[element])
+            #push!(to_refine, cell_ids[element])
         elseif controller_value < 0
-            #push!(to_coarsen, leaf_cell_ids[element])
-            push!(to_coarsen, cell_ids[element])
+            push!(to_coarsen, leaf_cell_ids[element])
+            #push!(to_coarsen, cell_ids[element])
         end
     end
 
@@ -1024,6 +1028,8 @@ function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
     return controller_value
 end
 
+# CARE! This is probably some left-over hack due to the custom MPI load-balancing!
+#=
 function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
                                             mesh::TreeMesh, equations, dg::DG, cache;
                                             kwargs...)
@@ -1064,6 +1070,7 @@ function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
 
     return cell_ids, controller_value
 end
+=#
 
 function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
                                             mesh, equations, equations_parabolic,
