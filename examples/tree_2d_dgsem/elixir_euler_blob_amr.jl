@@ -114,7 +114,7 @@ stepsize_callback = StepsizeCallback(cfl = 0.25)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        save_solution,
+                        #save_solution,
                         amr_callback, stepsize_callback)
 
 ###############################################################################

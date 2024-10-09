@@ -77,7 +77,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                     empty!(integrator.level_u_indices_elements[integrator.n_levels])
                 end
 
-                #=
+                
                 partitioning_variables!(integrator.level_info_elements, 
                                         integrator.level_info_elements_acc, 
                                         integrator.level_info_interfaces_acc, 
@@ -85,9 +85,9 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                         integrator.level_info_boundaries_orientation_acc,
                                         integrator.level_info_mortars_acc,
                                         integrator.n_levels, n_dims, mesh, dg, cache, integrator.alg)
-                =#
                 
                 
+                #=
                 partitioning_variables!(integrator.level_info_elements, 
                                         integrator.level_info_elements_acc, 
                                         integrator.level_info_interfaces_acc,
@@ -97,7 +97,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                         integrator.level_info_mortars_acc,
                                         integrator.level_info_mpi_mortars_acc,
                                         integrator.n_levels, n_dims, mesh, dg, cache, integrator.alg)
-                
+                =#
 
                 #=
                 # NOTE: Optional RHS computation (for PERK4 paper)

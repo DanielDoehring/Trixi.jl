@@ -273,7 +273,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
               level_info_boundaries_acc::Vector{Int64},
               level_info_boundaries_orientation_acc::Vector{Vector{Int64}},
               level_info_mortars_acc::Vector{Int64},
-              level_u_indices_elements::Vector{Int64})
+              dummy)
     @unpack semi_euler, semi_gravity, cache = semi
 
     u_euler = wrap_array(u_ode, semi_euler)
@@ -291,7 +291,8 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                               level_info_mortars_acc)
 
     # compute gravitational potential and forces
-    @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
+    @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode,
+                                                           level_info_elements_acc)
 
     # add gravitational source source_terms to the Euler part
     if ndims(semi_euler) == 1
@@ -374,6 +375,62 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
 
         # this is an absolute tolerance check
         if maximum(abs, @views du_gravity[1, .., :]) <= resid_tol
+            finalstep = true
+        end
+    end
+
+    return nothing
+end
+
+function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
+                         level_info_elements_acc::Vector{Int64})
+    @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
+
+    # Can be changed by AMR
+    resize!(cache.du_ode, length(cache.u_ode))
+    resize!(cache.u_tmp1_ode, length(cache.u_ode))
+    resize!(cache.u_tmp2_ode, length(cache.u_ode))
+
+    u_euler = wrap_array(u_ode, semi_euler)
+    u_gravity = wrap_array(cache.u_ode, semi_gravity)
+    du_gravity = wrap_array(cache.du_ode, semi_gravity)
+
+    # set up main loop
+    finalstep = false
+    @unpack n_iterations_max, cfl, resid_tol, timestep_gravity = parameters
+    iter = 0
+    tau = zero(real(semi_gravity.solver)) # Pseudo-time
+
+    # iterate gravity solver until convergence or maximum number of iterations are reached
+    @unpack equations = semi_gravity
+    while !finalstep
+        dtau = @trixi_timeit timer() "calculate dtau" begin
+            cfl * max_dt(u_gravity, tau, semi_gravity.mesh,
+                   have_constant_speed(equations), equations,
+                   semi_gravity.solver, semi_gravity.cache)
+        end
+
+        # evolve solution by one pseudo-time step
+        time_start = time_ns()
+        timestep_gravity(cache, u_euler, tau, dtau, parameters, semi_gravity)
+        runtime = time_ns() - time_start
+        put!(gravity_counter, runtime)
+
+        # update iteration counter
+        iter += 1
+        tau += dtau
+
+        # check if we reached the maximum number of iterations
+        if n_iterations_max > 0 && iter >= n_iterations_max
+            @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
+                                                                                                @views du_gravity[1,
+                                                                                                                  ..,
+                                                                                                                  level_info_elements_acc]) tau=tau dtau=dtau
+            finalstep = true
+        end
+
+        # this is an absolute tolerance check
+        if maximum(abs, @views du_gravity[1, .., level_info_elements_acc]) <= resid_tol
             finalstep = true
         end
     end
