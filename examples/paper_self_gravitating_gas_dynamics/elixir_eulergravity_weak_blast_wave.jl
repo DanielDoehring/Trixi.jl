@@ -9,7 +9,7 @@ using Trixi
 gamma = 1.4
 equations_euler = CompressibleEulerEquations2D(gamma)
 
-function initial_condition_sedov_self_gravity(x, t,
+function initial_condition_weakblast_self_gravity(x, t,
                                            equations::CompressibleEulerEquations2D)
     # From Hennemann & Gassner JCP paper 2020 (Sec. 6.3) (WEAK Blast wave!)
     # Set up polar coordinates
@@ -28,13 +28,13 @@ function initial_condition_sedov_self_gravity(x, t,
 
     return prim2cons(SVector(rho, v1, v2, p), equations)
 end
-initial_condition = initial_condition_sedov_self_gravity
+initial_condition = initial_condition_weakblast_self_gravity
 
-function boundary_condition_sedov_self_gravity(u_inner, orientation, direction, x, t,
+function boundary_condition_weakblast_self_gravity(u_inner, orientation, direction, x, t,
                                                surface_flux_function,
                                                equations::CompressibleEulerEquations2D)
     # velocities are zero, density/pressure are ambient values according to
-    # initial_condition_sedov_self_gravity
+    # initial_condition_weakblast_self_gravity
     rho = 1.0
     v1 = 0.0
     v2 = 0.0
@@ -51,7 +51,7 @@ function boundary_condition_sedov_self_gravity(u_inner, orientation, direction, 
 
     return flux
 end
-boundary_conditions = boundary_condition_sedov_self_gravity
+boundary_conditions = boundary_condition_weakblast_self_gravity
 
 surface_flux = flux_hll
 volume_flux = flux_chandrashekar
@@ -89,7 +89,7 @@ semi_euler = SemidiscretizationHyperbolic(mesh, equations_euler, initial_conditi
 # semidiscretization of the hyperbolic diffusion equations
 equations_gravity = HyperbolicDiffusionEquations2D()
 
-function initial_condition_sedov_self_gravity(x, t,
+function initial_condition_weakblast_self_gravity(x, t,
                                               equations::HyperbolicDiffusionEquations2D)
     # for now just use constant initial condition for sedov blast wave (can likely be improved)
     phi = 0.0
@@ -98,10 +98,10 @@ function initial_condition_sedov_self_gravity(x, t,
     return SVector(phi, q1, q2)
 end
 
-function boundary_condition_sedov_self_gravity(u_inner, orientation, direction, x, t,
+function boundary_condition_weakblast_self_gravity(u_inner, orientation, direction, x, t,
                                                surface_flux_function,
                                                equations::HyperbolicDiffusionEquations2D)
-    u_boundary = initial_condition_sedov_self_gravity(x, t, equations)
+    u_boundary = initial_condition_weakblast_self_gravity(x, t, equations)
 
     # Calculate boundary flux
     if iseven(direction) # u_inner is "left" of boundary, u_boundary is "right" of boundary
@@ -189,7 +189,7 @@ callbacks = CallbackSet(summary_callback, amr_callback, stepsize_callback,
 
 Stages = 8
 
-#ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/")
+#ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
 
 
 dtRatios = [1, 0.5, 0.25, 0.125]
@@ -198,7 +198,7 @@ Stages = [13, 8, 6, 5]
 dtRatios = [1, 0.5, 0.25]
 Stages = [8, 6, 5]
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/", dtRatios)
 
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
