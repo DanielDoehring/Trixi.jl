@@ -34,6 +34,8 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 
 ###############################################################################
 # combining both semidiscretizations for Euler + self-gravity
+
+#=
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # rho0 is (ab)used to add a "+8π" term to the source terms
                                     # for the manufactured solution
@@ -44,6 +46,21 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     timestep_gravity = timestep_gravity_erk52_3Sstar!)
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
+=#
+
+
+StagesGravity = 7
+alg_gravity = PERK4(StagesGravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/")
+
+parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
+                                    gravitational_constant = 1.0, # aka G
+                                    cfl = 1.5,
+                                    resid_tol = 1.0e-10,
+                                    n_iterations_max = 1000,
+                                    timestep_gravity = timestep_gravity_PERK4!)
+
+semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
+
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -53,7 +70,7 @@ ode = semidiscretize(semi, tspan);
 summary_callback = SummaryCallback()
 
 stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
-stepsize_callback = StepsizeCallback(cfl = 3.5) # PERK8
+stepsize_callback = StepsizeCallback(cfl = 3.0) # PERK8
 
 save_solution = SaveSolutionCallback(interval = 10,
                                      save_initial_solution = true,
@@ -73,7 +90,7 @@ callbacks = CallbackSet(summary_callback, stepsize_callback,
 ###############################################################################
 # run the simulation
 
-ode_algorithm = PERK4(8, "/home/daniel/git/SSOCs/")
+ode_algorithm = PERK4(8, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,

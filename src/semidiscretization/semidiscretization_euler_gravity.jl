@@ -138,7 +138,7 @@ end
 function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
                                         semi_gravity::SemiGravity,
                                         parameters,
-                                        alg) where
+                                        alg::PERK4) where
          {Mesh,
           SemiEuler <:
           SemidiscretizationHyperbolic{Mesh, <:AbstractCompressibleEulerEquations},
@@ -153,7 +153,7 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
     cache = (; alg, u_ode, du_ode, u_ode_tmp, k1, k_higher)
 
     SemidiscretizationEulerGravity{typeof(semi_euler), typeof(semi_gravity),
-                                   typeof(parameters), typeof(integrator)}(semi_euler,
+                                   typeof(parameters), typeof(cache)}(semi_euler,
                                                                       semi_gravity,
                                                                       parameters, cache)
 end
@@ -356,8 +356,26 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
 
     # Can be changed by AMR
     resize!(cache.du_ode, length(cache.u_ode))
-    resize!(cache.u_tmp1_ode, length(cache.u_ode))
-    resize!(cache.u_tmp2_ode, length(cache.u_ode))
+
+    # 2N, 3S* integrators
+    #if hasfield(cache, :u_tmp1_ode)
+    if :u_tmp1_ode in fieldnames(typeof(cache))
+        resize!(cache.u_tmp1_ode, length(cache.u_ode))
+    end
+    if :u_tmp2_ode in fieldnames(typeof(cache))
+        resize!(cache.u_tmp2_ode, length(cache.u_ode))
+    end
+    # PERK integrators
+    if :u_ode_tmp in fieldnames(typeof(cache))
+        resize!(cache.u_ode_tmp, length(cache.u_ode))
+    end
+    if :k1 in fieldnames(typeof(cache))
+        resize!(cache.k1, length(cache.u_ode))
+    end
+    if :k_higher in fieldnames(typeof(cache))
+        resize!(cache.k_higher, length(cache.u_ode))
+    end
+    
 
     u_euler = wrap_array(u_ode, semi_euler)
     u_gravity = wrap_array(cache.u_ode, semi_gravity)
@@ -675,27 +693,28 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau, gravity_parameters,
     @threaded for i in 1:n_elements
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
-    # CARE: Not sure if we want k1 with sources or without!
+    # Stage contains source from other semidiscretization, i.e., Euler.
     @threaded for i in eachindex(du_ode)
         k1[i] = du_ode[i] * dtau
     end
 
+    ### Stage 2 ###
     @threaded for i in eachindex(u_ode)
-        u_ode_tmp[i] = u_ode[i] + c[2] * k1[i]
+        u_ode_tmp[i] = u_ode[i] + alg.c[2] * k1[i]
     end
 
-    tau_stage = tau + c[2] * dtau
+    tau_stage = tau + alg.c[2] * dtau
 
     rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage)
 
     @threaded for i in 1:n_elements
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
-    # CARE: Not sure if we want k_higher with sources or without!
     @threaded for u_ind in eachindex(du_ode)
         k_higher[u_ind] = du_ode[u_ind] * dtau
     end
 
+    ### Stage 3 to S-3 ###
     for stage in 3:(alg.NumStages - 3)
         # Construct current state
         @threaded for u_ind in eachindex(u_ode)
@@ -704,13 +723,12 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau, gravity_parameters,
                                       alg.AMatrices[stage - 2, 2] * k_higher[u_ind]
         end
 
-        tau_stage = tau + c[2] * dtau
+        tau_stage = tau + alg.c[2] * dtau
 
         rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage)
         @threaded for i in 1:n_elements
             @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end
-        # CARE: Not sure if we want k_higher with sources or without!
         @threaded for i in eachindex(du_ode)
             k_higher[i] = du_ode[i] * dtau
         end
@@ -730,7 +748,6 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau, gravity_parameters,
         @threaded for i in 1:n_elements
             @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end
-        # CARE: Not sure if we want k_higher with sources or without!
         @threaded for u_ind in eachindex(u_ode)
             k_higher[u_ind] = du_ode[u_ind] * dtau
         end
