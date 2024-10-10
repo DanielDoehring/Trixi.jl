@@ -73,6 +73,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
 
                         empty!(integrator.level_u_indices_elements[level])
                     end
+                    # TODO: Is this necessary?
                     empty!(integrator.level_info_elements[integrator.n_levels])
                     empty!(integrator.level_u_indices_elements[integrator.n_levels])
                 end

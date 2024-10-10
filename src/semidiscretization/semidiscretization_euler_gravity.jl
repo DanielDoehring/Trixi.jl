@@ -292,12 +292,12 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t)
 end
 
 function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
+              level_info_elements::Vector{Vector{Int64}},
               level_info_elements_acc::Vector{Vector{Int64}},
               level_info_interfaces_acc::Vector{Vector{Int64}},
               level_info_boundaries_acc::Vector{Vector{Int64}},
               level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
               level_info_mortars_acc::Vector{Vector{Int64}},
-              level_u_indices_elements::Vector{Vector{Int64}},
               level, n_levels)
     @unpack semi_euler, semi_gravity, cache = semi
 
@@ -315,30 +315,32 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                               level_info_boundaries_orientation_acc[level],
                                               level_info_mortars_acc[level])
 
+    n_dims = ndims(semi_euler)
+
     # compute gravitational potential and forces
     @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode,
+                                                           level_info_elements,
                                                            level_info_elements_acc,
                                                            level_info_interfaces_acc,
                                                            level_info_boundaries_acc,
                                                            level_info_boundaries_orientation_acc,
                                                            level_info_mortars_acc,
-                                                           level_u_indices_elements,
-                                                           level, n_levels)
+                                                           level, n_levels, n_dims)
 
     # add gravitational source source_terms to the Euler part
-    if ndims(semi_euler) == 1
+    if n_dims == 1
         @threaded for i in level_info_elements_acc[level]
             @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
             @views @. du_euler[3, .., i] -= u_euler[2, .., i] * u_gravity[2, .., i]
         end
-    elseif ndims(semi_euler) == 2
+    elseif n_dims == 2
         @threaded for i in level_info_elements_acc[level]
             @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
             @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
             @views @. du_euler[4, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
                                              u_euler[3, .., i] * u_gravity[3, .., i])
         end
-    elseif ndims(semi_euler) == 3
+    elseif n_dims == 3
         @threaded for i in level_info_elements_acc[level]
             @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
             @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
@@ -348,7 +350,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                              u_euler[4, .., i] * u_gravity[4, .., i])
         end
     else
-        error("Number of dimensions $(ndims(semi_euler)) not supported.")
+        error("Number of dimensions $(n_dims) not supported.")
     end
 
     runtime = time_ns() - time_start
@@ -432,13 +434,13 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
 end
 
 function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
+                         level_info_elements::Vector{Vector{Int64}},
                          level_info_elements_acc::Vector{Vector{Int64}},
                          level_info_interfaces_acc::Vector{Vector{Int64}},
                          level_info_boundaries_acc::Vector{Vector{Int64}},
                          level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
                          level_info_mortars_acc::Vector{Vector{Int64}},
-                         level_u_indices_elements::Vector{Vector{Int64}},
-                         level, n_levels)
+                         level, n_levels, n_dims)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
 
     # Can be changed by AMR
@@ -450,6 +452,40 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
     u_euler = wrap_array(u_ode, semi_euler)
     u_gravity = wrap_array(cache.u_ode, semi_gravity)
     du_gravity = wrap_array(cache.du_ode, semi_gravity)
+
+    # TODO: Ideally, I couple this to the AMR callback to avoid re-init every time
+    level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
+
+    if n_dims == 1
+        for level in 1:n_levels
+            for element_id in level_info_elements[level]
+                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements                                    
+                indices = vec(transpose(LinearIndices(u_gravity)[:, :, element_id]))
+                append!(level_u_indices_elements[level], indices)
+            end
+            sort!(level_u_indices_elements[level])
+        end
+    elseif n_dims == 2
+        for level in 1:n_levels
+            for element_id in level_info_elements[level]
+                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :,
+                                                                    element_id]))
+                append!(level_u_indices_elements[level], indices)
+            end
+            sort!(level_u_indices_elements[level])
+        end
+    elseif n_dims == 3
+        for level in 1:n_levels
+            for element_id in level_info_elements[level]
+                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :, :,
+                                                                    element_id]))
+                append!(level_u_indices_elements[level], indices)
+            end
+            sort!(level_u_indices_elements[level])
+        end
+    end
 
     # set up main loop
     finalstep = false

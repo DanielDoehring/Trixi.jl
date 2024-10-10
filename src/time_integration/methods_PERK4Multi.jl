@@ -395,13 +395,13 @@ function step!(integrator::PERK4_Multi_Integrator)
         =#
 
         # Euler-Gravity
-        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+        integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
+                        integrator.level_info_elements,
                         integrator.level_info_elements_acc,
                         integrator.level_info_interfaces_acc,
                         integrator.level_info_boundaries_acc,
                         integrator.level_info_boundaries_orientation_acc,
                         integrator.level_info_mortars_acc,
-                        integrator.level_u_indices_elements,
                         1, integrator.n_levels)
 
         #=
@@ -538,12 +538,12 @@ function step!(integrator::PERK4_Multi_Integrator)
 
                 # Euler-Gravity
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
+                            integrator.level_info_elements,
                             integrator.level_info_elements_acc,
                             integrator.level_info_interfaces_acc,
                             integrator.level_info_boundaries_acc,
                             integrator.level_info_boundaries_orientation_acc,
                             integrator.level_info_mortars_acc,
-                            integrator.level_u_indices_elements,
                             integrator.coarsest_lvl, integrator.n_levels)
 
                 #=
