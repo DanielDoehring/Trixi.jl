@@ -58,17 +58,6 @@ volume_flux = flux_chandrashekar
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 
-#=
-indicator_sc = IndicatorHennemannGassner(equations_euler, basis,
-                                         alpha_max = 0.5,
-                                         alpha_min = 0.001,
-                                         alpha_smooth = true,
-                                         variable = density_pressure)
-volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
-                                                 volume_flux_dg = volume_flux,
-                                                 volume_flux_fv = surface_flux)
-=#
-
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver_euler = DGSEM(basis, surface_flux, volume_integral)
@@ -135,15 +124,28 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 =#
 
-StagesGravity = 7
+
+StagesGravity = 9
 alg_gravity = PERK4(StagesGravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/")
+
+
+#=
+Stages_Gravity = [9, 7, 5]
+dtRatios = [1, 0.5, 0.25]
+
+alg_gravity = PERK4_Multi(Stages_Gravity, 
+                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/", 
+                          dtRatios)
+=#
 
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = 2.0,
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 100,
-                                    timestep_gravity = timestep_gravity_PERK4!)
+                                    timestep_gravity = timestep_gravity_PERK4!
+                                    #timestep_gravity = timestep_gravity_PERK4_Multi!
+                                    )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
 
@@ -204,8 +206,8 @@ callbacks = CallbackSet(summary_callback, amr_callback, stepsize_callback,
 
 
 Stages = 8
-
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
+
 
 #=
 dtRatios = [1, 0.5, 0.25, 0.125]

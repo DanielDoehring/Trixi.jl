@@ -150,7 +150,9 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
     k1        = similar(u_ode)
     k_higher  = similar(u_ode)
 
-    cache = (; alg, u_ode, du_ode, u_ode_tmp, k1, k_higher)
+    level_u_gravity_indices_elements = [Vector{Int64}() for _ in 1:get_n_levels(semi_euler.mesh, 42)]
+
+    cache = (; alg, u_ode, du_ode, u_ode_tmp, k1, k_higher, level_u_gravity_indices_elements)
 
     SemidiscretizationEulerGravity{typeof(semi_euler), typeof(semi_gravity),
                                    typeof(parameters), typeof(cache)}(semi_euler,
@@ -315,17 +317,62 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                               level_info_boundaries_orientation_acc[level],
                                               level_info_mortars_acc[level])
 
-    n_dims = ndims(semi_euler)
+    @trixi_timeit timer() "level_u_gravity_indices_elements comp" begin
+        n_dims = ndims(semi_euler)
+        @unpack level_u_gravity_indices_elements = cache
+        # NOTE: This is dangerous, as it is possible that the mesh changes such that 
+        # the overall number of elements is the same, but just differently distributed!
+        if length(cache.u_ode) != sum(length, level_u_gravity_indices_elements)
+            if n_levels != length(level_u_gravity_indices_elements)                                   
+                level_u_gravity_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
+            else # Just empty datastructures
+                for level in 1:n_levels
+                    empty!(level_u_gravity_indices_elements[level])
+                end
+            end
+
+            if n_dims == 1
+                for level in 1:n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements                                    
+                        indices = vec(transpose(LinearIndices(u_gravity)[:, :, element_id]))
+                        append!(level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(level_u_gravity_indices_elements[level])
+                end
+            elseif n_dims == 2
+                for level in 1:n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                        indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :,
+                                                                            element_id]))
+                        append!(level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(level_u_gravity_indices_elements[level])
+                end
+            elseif n_dims == 3
+                for level in 1:n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                        indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :, :,
+                                                                            element_id]))
+                        append!(level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(level_u_gravity_indices_elements[level])
+                end
+            end
+        end
+    end
 
     # compute gravitational potential and forces
     @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode,
-                                                           level_info_elements,
                                                            level_info_elements_acc,
                                                            level_info_interfaces_acc,
                                                            level_info_boundaries_acc,
                                                            level_info_boundaries_orientation_acc,
                                                            level_info_mortars_acc,
-                                                           level, n_levels, n_dims)
+                                                           level_u_gravity_indices_elements,
+                                                           level, n_levels)
 
     # add gravitational source source_terms to the Euler part
     if n_dims == 1
@@ -434,13 +481,13 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
 end
 
 function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
-                         level_info_elements::Vector{Vector{Int64}},
                          level_info_elements_acc::Vector{Vector{Int64}},
                          level_info_interfaces_acc::Vector{Vector{Int64}},
                          level_info_boundaries_acc::Vector{Vector{Int64}},
                          level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
                          level_info_mortars_acc::Vector{Vector{Int64}},
-                         level, n_levels, n_dims)
+                         level_u_gravity_indices_elements::Vector{Vector{Int64}},
+                         level, n_levels)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
 
     # Can be changed by AMR
@@ -452,40 +499,6 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
     u_euler = wrap_array(u_ode, semi_euler)
     u_gravity = wrap_array(cache.u_ode, semi_gravity)
     du_gravity = wrap_array(cache.du_ode, semi_gravity)
-
-    # TODO: Ideally, I couple this to the AMR callback to avoid re-init every time
-    level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-
-    if n_dims == 1
-        for level in 1:n_levels
-            for element_id in level_info_elements[level]
-                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements                                    
-                indices = vec(transpose(LinearIndices(u_gravity)[:, :, element_id]))
-                append!(level_u_indices_elements[level], indices)
-            end
-            sort!(level_u_indices_elements[level])
-        end
-    elseif n_dims == 2
-        for level in 1:n_levels
-            for element_id in level_info_elements[level]
-                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
-                indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :,
-                                                                    element_id]))
-                append!(level_u_indices_elements[level], indices)
-            end
-            sort!(level_u_indices_elements[level])
-        end
-    elseif n_dims == 3
-        for level in 1:n_levels
-            for element_id in level_info_elements[level]
-                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
-                indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :, :,
-                                                                    element_id]))
-                append!(level_u_indices_elements[level], indices)
-            end
-            sort!(level_u_indices_elements[level])
-        end
-    end
 
     # set up main loop
     finalstep = false
@@ -510,7 +523,7 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_info_boundaries_acc,
                          level_info_boundaries_orientation_acc,
                          level_info_mortars_acc,
-                         level_u_indices_elements,
+                         level_u_gravity_indices_elements,
                          n_levels)
         
         runtime = time_ns() - time_start
@@ -940,7 +953,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
                                        level_info_boundaries_acc::Vector{Vector{Int64}},
                                        level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
                                        level_info_mortars_acc::Vector{Vector{Int64}},
-                                       level_u_indices_elements::Vector{Vector{Int64}},
+                                       level_u_gravity_indices_elements::Vector{Vector{Int64}},
                                        n_levels)
 
     G = gravity_parameters.gravitational_constant
@@ -978,10 +991,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
     end
 
     # Update finest level only
-    # TODO: Thsi crashes because `level_u_indices_elements` is computed for 
-    # the Euler system, which has one more variable than the 
-    # hpyerbolic diffusion system.
-    @threaded for u_ind in level_u_indices_elements[1]
+    @threaded for u_ind in level_u_gravity_indices_elements[1]
         k_higher[u_ind] = du_ode[u_ind] * dtau
     end
 
@@ -990,25 +1000,25 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
         ### General implementation: Not own method for each grid level ###
         # Loop over different methods with own associated level
         for level in 1:min(alg.NumMethods, n_levels)
-            @threaded for u_ind in level_u_indices_elements[level]
+            @threaded for u_ind in level_u_gravity_indices_elements[level]
                 u_ode_tmp[u_ind] = u_ode[u_ind] + alg.AMatrices[stage - 2, 1, level] * k1[u_ind]
             end
         end
         for level in 1:min(alg.HighestEvalLevels[stage], n_levels)
-            @threaded for u_ind in level_u_indices_elements[level]
+            @threaded for u_ind in level_u_gravity_indices_elements[level]
                 u_ode_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] * k_higher[u_ind]
             end
         end
 
         # "Remainder": Non-efficiently integrated
         for level in (alg.NumMethods + 1):(n_levels)
-            @threaded for u_ind in level_u_indices_elements[level]
+            @threaded for u_ind in level_u_gravity_indices_elements[level]
                 u_ode_tmp[u_ind] = u_ode[u_ind] + alg.AMatrices[stage - 2, 1, alg.NumMethods] * k1[u_ind]
             end
         end
         if alg.HighestEvalLevels[stage] == alg.NumMethods
             for level in (alg.HighestEvalLevels[stage] + 1):(n_levels)
-                @threaded for u_ind in level_u_indices_elements[level]
+                @threaded for u_ind in level_u_gravity_indices_elements[level]
                     u_ode_tmp[u_ind] += alg.AMatrices[stage - 2, 2, alg.NumMethods] * k_higher[u_ind]
                 end
             end
@@ -1018,12 +1028,12 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
         ### Simplified implementation: Own method for each level ###
         #=
         for level in 1:n_levels
-            @threaded for u_ind in level_u_indices_elements[level]
+            @threaded for u_ind in level_u_gravity_indices_elements[level]
                 u_ode_tmp[u_ind] = u_ode[u_ind] + alg.AMatrices[stage - 2, 1, level] * k1[u_ind]
             end
         end
         for level in 1:alg.HighestEvalLevels[stage]
-            @threaded for u_ind in level_u_indices_elements[level]
+            @threaded for u_ind in level_u_gravity_indices_elements[level]
                 u_ode_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] * k_higher[u_ind]
             end
         end
@@ -1032,13 +1042,13 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
         #=
         ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
         for level in 1:alg.HighestEvalLevels[stage]
-            @threaded for u_ind in level_u_indices_elements[level]
+            @threaded for u_ind in level_u_gravity_indices_elements[level]
                 u_ode_tmp[u_ind] = u_ode[u_ind] + alg.AMatrices[stage - 2, 1, level] * k1[u_ind] + 
                                                   alg.AMatrices[stage - 2, 2, level] * k_higher[u_ind]
             end
         end
         for level in alg.HighestEvalLevels[stage]+1:n_levels
-            @threaded for u_ind in level_u_indices_elements[level]
+            @threaded for u_ind in level_u_gravity_indices_elements[level]
                 u_ode_tmp[u_ind] = u_ode[u_ind] + k1[u_ind] # * A[stage, 1, level] = c[level] = 1
             end
         end
@@ -1082,7 +1092,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
             end
             # Update k_higher of relevant levels
             for level in 1:coarsest_lvl
-                @threaded for u_ind in level_u_indices_elements[level]
+                @threaded for u_ind in level_u_gravity_indices_elements[level]
                     k_higher[u_ind] = du_ode[u_ind] * dtau
                 end
             end
