@@ -261,7 +261,7 @@ export SemidiscretizationEulerAcoustics
 
 export SemidiscretizationEulerGravity, ParametersEulerGravity,
        timestep_gravity_erk52_3Sstar!, timestep_gravity_carpenter_kennedy_erk54_2N!,
-       timestep_gravity_PERK4!
+       timestep_gravity_PERK4!, timestep_gravity_PERK4_Multi!
 
 export SemidiscretizationCoupled
 

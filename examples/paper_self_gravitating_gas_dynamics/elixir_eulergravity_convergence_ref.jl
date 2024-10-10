@@ -42,6 +42,8 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 
 ###############################################################################
 # combining both semidiscretizations for Euler + self-gravity
+
+#=
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # rho0 is (ab)used to add a "+8π" term to the source terms
                                     # for the manufactured solution
@@ -52,6 +54,25 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     timestep_gravity = timestep_gravity_erk52_3Sstar!)
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
+=#
+
+Stages_Gravity = [9, 7, 5]
+dtRatios = [1, 0.5, 0.25]
+
+alg_gravity = PERK4_Multi(Stages_Gravity, 
+                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/", 
+                          dtRatios)
+
+parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
+                                    # rho0 is (ab)used to add a "+8π" term to the source terms
+                                    # for the manufactured solution
+                                    gravitational_constant = 1.0, # aka G
+                                    cfl = 1.1,
+                                    resid_tol = 1.0e-5, # 1.0e-10
+                                    n_iterations_max = 1000, # 1000
+                                    timestep_gravity = timestep_gravity_PERK4_Multi!)
+
+semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -87,7 +108,7 @@ Stages = 8
 dtRatios = [1, 0.5, 0.25]
 Stages = [8, 6, 5]
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/", dtRatios)
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
