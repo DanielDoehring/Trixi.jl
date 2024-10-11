@@ -124,15 +124,42 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 =#
 
+b1   = 0.0
+bS   = 1.0 - b1
+cEnd = 0.5/bS
 
+
+StagesGravity = 9
+cfl_gravity = 2.5
+
+alg_gravity = PERK(StagesGravity, 
+                   "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p2/", 
+                   bS, cEnd)
+
+
+#=
+#StagesGravity = [13, 9, 5, 3, 2]
+#dtRatios = [1, 0.5, 0.25, 0.125, 0.0625]
+
+StagesGravity = [9, 5, 3, 2]
+dtRatios = [1, 0.5, 0.25, 0.125]
+cfl_gravity = 2.5
+
+
+alg_gravity = PERK_Multi(StagesGravity, 
+                         "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p2/", 
+                         dtRatios, bS, cEnd)
+=#
+
+#=
 StagesGravity = 9
 cfl_gravity = 3.1
 
 StagesGravity = 14
 cfl_gravity = 4.8
 
-alg_gravity = PERK4(StagesGravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/")
-
+alg_gravity = PERK4(StagesGravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/")
+=#
 
 #=
 Stages_Gravity = [9, 7, 5]
@@ -144,7 +171,7 @@ dtRatios = [1, 0.5, 0.25, 0.125]
 cfl_gravity = 4.8
 
 alg_gravity = PERK4_Multi(Stages_Gravity, 
-                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/", 
+                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/", 
                           dtRatios)
 =#
 
@@ -153,7 +180,11 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     cfl = cfl_gravity,
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 100,
-                                    timestep_gravity = timestep_gravity_PERK4!
+
+                                    timestep_gravity = timestep_gravity_PERK2!
+                                    #timestep_gravity = timestep_gravity_PERK2_Multi!
+                                    
+                                    #timestep_gravity = timestep_gravity_PERK4!
                                     #timestep_gravity = timestep_gravity_PERK4_Multi!
                                     )
 
@@ -220,8 +251,8 @@ ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/
 
 
 #=
-dtRatios = [1, 0.5, 0.25, 0.125]
-Stages = [13, 8, 6, 5]
+#dtRatios = [1, 0.5, 0.25, 0.125]
+#Stages = [13, 8, 6, 5]
 
 dtRatios = [1, 0.5, 0.25]
 Stages = [8, 6, 5]
