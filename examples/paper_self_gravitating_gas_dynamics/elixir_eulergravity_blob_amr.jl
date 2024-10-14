@@ -101,7 +101,7 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 # combining both semidiscretizations for Euler + self-gravity
 parameters = ParametersEulerGravity(background_density = 1.0, # taken from above
                                     gravitational_constant = 6.674e-8, # aka G
-                                    cfl = 1.6,
+                                    cfl = 1.9, # Seems to be stability limit
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
                                     timestep_gravity = timestep_gravity_erk52_3Sstar!)
@@ -111,13 +111,17 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
+# TODO: Run even longer?
 tspan = (0.0, 8.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
 analysis_interval = 1000
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     analysis_errors = Symbol[],
+                                     save_analysis = false,
+                                     analysis_integrals = ())
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
@@ -127,20 +131,20 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_smooth = false,
                                           variable = Trixi.density)
 amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
-                                              base_level = 4, # 4
+                                              base_level = 5, # 4
 
-                                              med_level = 0, 
+                                              med_level = 0, # ignored with 0 ?
                                               med_threshold = 0.0003, # med_level = current level
                                               
                                               max_level = 7, # 7
-                                              max_threshold = 0.003,
+                                              max_threshold = 0.0003, # 0.0003 when max_level = 7
                                               max_threshold_secondary = indicator_sc.alpha_max)
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 1,
+                           interval = 1, # 1
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
-stepsize_callback = StepsizeCallback(cfl = 0.25)
+stepsize_callback = StepsizeCallback(cfl = 0.35)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
