@@ -140,7 +140,7 @@ amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
                                               max_threshold = 0.0003, # 0.0003 when max_level = 7
                                               max_threshold_secondary = indicator_sc.alpha_max)
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 1, # 1
+                           interval = 1, # 1 required here as well, otherwise crash (for interval = 2)
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 

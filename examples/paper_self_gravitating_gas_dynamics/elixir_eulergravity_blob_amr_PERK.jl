@@ -118,12 +118,17 @@ cEnd = 0.5/bS
 
 dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
+
+#=
 cfl_gravity = 1.4
-
-
 alg_gravity = PERK_Multi(StagesGravity, 
                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/HypDiff/p2/", 
                          dtRatios, bS, cEnd)
+=#
+
+cfl_gravity = 1.4
+alg_gravity = PERK(5, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/HypDiff/p2/",
+                   bS, cEnd)                         
 
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
@@ -131,11 +136,8 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
 
-                                    #timestep_gravity = timestep_gravity_PERK2!
-                                    timestep_gravity = timestep_gravity_PERK2_Multi!
-                                    
-                                    #timestep_gravity = timestep_gravity_PERK4!
-                                    #timestep_gravity = timestep_gravity_PERK4_Multi!
+                                    timestep_gravity = timestep_gravity_PERK2!
+                                    #timestep_gravity = timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -178,8 +180,7 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition_only_refine = true)
 
 cfl = 0.75 # PERK 4 Multi, S_max = 9
-
-#cfl = 0.8 # PERK 4 Standalone, S_max = 9
+cfl = 0.7 # PERK 4 Standalone, S_max = 9
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -190,18 +191,18 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-
+#=
 dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
 
 ode_algorithm = PERK4_Multi(Stages, 
                             "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/Euler_only/", dtRatios)
+=#
 
 
-#=
 Stages = 9
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/Euler_only/")
-=#
+
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
 
