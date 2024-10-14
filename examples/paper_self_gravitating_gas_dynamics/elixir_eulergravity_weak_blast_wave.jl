@@ -10,7 +10,7 @@ gamma = 1.4
 equations_euler = CompressibleEulerEquations2D(gamma)
 
 function initial_condition_weakblast_self_gravity(x, t,
-                                           equations::CompressibleEulerEquations2D)
+                                                  equations::CompressibleEulerEquations2D)
     # From Hennemann & Gassner JCP paper 2020 (Sec. 6.3) (WEAK Blast wave!)
     # Set up polar coordinates
     inicenter = SVector(0.0, 0.0)
@@ -31,8 +31,8 @@ end
 initial_condition = initial_condition_weakblast_self_gravity
 
 function boundary_condition_weakblast_self_gravity(u_inner, orientation, direction, x, t,
-                                               surface_flux_function,
-                                               equations::CompressibleEulerEquations2D)
+                                                   surface_flux_function,
+                                                   equations::CompressibleEulerEquations2D)
     # velocities are zero, density/pressure are ambient values according to
     # initial_condition_weakblast_self_gravity
     rho = 1.0
@@ -79,7 +79,7 @@ semi_euler = SemidiscretizationHyperbolic(mesh, equations_euler, initial_conditi
 equations_gravity = HyperbolicDiffusionEquations2D()
 
 function initial_condition_weakblast_self_gravity(x, t,
-                                              equations::HyperbolicDiffusionEquations2D)
+                                                  equations::HyperbolicDiffusionEquations2D)
     # for now just use constant initial condition for sedov blast wave (can likely be improved)
     phi = 0.0
     q1 = 0.0
@@ -88,8 +88,8 @@ function initial_condition_weakblast_self_gravity(x, t,
 end
 
 function boundary_condition_weakblast_self_gravity(u_inner, orientation, direction, x, t,
-                                               surface_flux_function,
-                                               equations::HyperbolicDiffusionEquations2D)
+                                                   surface_flux_function,
+                                                   equations::HyperbolicDiffusionEquations2D)
     u_boundary = initial_condition_weakblast_self_gravity(x, t, equations)
 
     # Calculate boundary flux
