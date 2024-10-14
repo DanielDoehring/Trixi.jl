@@ -315,5 +315,57 @@ function Base.resize!(integrator::PERK_Integrator, new_size)
 
     # TODO: Move this into parabolic cache or similar
     resize!(integrator.du_ode_hyp, new_size)
+
+    # Check if we have Euler-Gravity situation
+    if :semi_gravity in fieldnames(typeof(integrator.p))
+        @unpack level_info_elements = integrator
+        @unpack semi_gravity, cache = integrator.p
+
+        u_gravity = wrap_array(cache.u_ode, semi_gravity)
+
+        @trixi_timeit timer() "level_u_gravity_indices_elements comp" begin
+            n_dims = ndims(semi_gravity)
+            @unpack level_u_gravity_indices_elements = cache
+
+            if n_levels != length(level_u_gravity_indices_elements)                                   
+                level_u_gravity_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
+            else # Just empty datastructures
+                for level in 1:n_levels
+                    empty!(level_u_gravity_indices_elements[level])
+                end
+            end
+
+            if n_dims == 1
+                for level in 1:n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements                                    
+                        indices = vec(transpose(LinearIndices(u_gravity)[:, :, element_id]))
+                        append!(level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(level_u_gravity_indices_elements[level])
+                end
+            elseif n_dims == 2
+                for level in 1:n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                        indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :,
+                                                                            element_id]))
+                        append!(level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(level_u_gravity_indices_elements[level])
+                end
+            elseif n_dims == 3
+                for level in 1:n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                        indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :, :,
+                                                                            element_id]))
+                        append!(level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(level_u_gravity_indices_elements[level])
+                end
+            end
+        end
+    end
 end
 end # @muladd

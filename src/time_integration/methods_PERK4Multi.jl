@@ -396,7 +396,6 @@ function step!(integrator::PERK4_Multi_Integrator)
 
         # Euler-Gravity
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
-                        integrator.level_info_elements,
                         integrator.level_info_elements_acc,
                         integrator.level_info_interfaces_acc,
                         integrator.level_info_boundaries_acc,
@@ -538,7 +537,6 @@ function step!(integrator::PERK4_Multi_Integrator)
 
                 # Euler-Gravity
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
-                            integrator.level_info_elements,
                             integrator.level_info_elements_acc,
                             integrator.level_info_interfaces_acc,
                             integrator.level_info_boundaries_acc,
@@ -627,5 +625,57 @@ function Base.resize!(integrator::PERK4_Multi_Integrator, new_size)
 
     # TODO: Only for averaging callback (required for coupled Euler-acoustic simulations)
     #resize!(integrator.uprev, new_size)
+
+    # Check if we have Euler-Gravity situation
+    if :semi_gravity in fieldnames(typeof(integrator.p))
+        @unpack level_info_elements = integrator
+        @unpack semi_euler, semi_gravity, cache = integrator.p
+
+        u_gravity = wrap_array(cache.u_ode, semi_gravity)
+
+        @trixi_timeit timer() "level_u_gravity_indices_elements comp" begin
+            n_dims = ndims(semi_gravity)
+
+            resize!(cache.level_u_gravity_indices_elements, integrator.n_levels)
+            for level in 1:integrator.n_levels
+                if isassigned(cache.level_u_gravity_indices_elements, level)
+                    empty!(cache.level_u_gravity_indices_elements[level])
+                else
+                    cache.level_u_gravity_indices_elements[level] = []
+                end
+            end
+
+            if n_dims == 1
+                for level in 1:integrator.n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements                                    
+                        indices = vec(transpose(LinearIndices(u_gravity)[:, :, element_id]))
+                        append!(cache.level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(cache.level_u_gravity_indices_elements[level])
+                end
+            elseif n_dims == 2
+                for level in 1:integrator.n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                        indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :,
+                                                                            element_id]))
+                        append!(cache.level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(cache.level_u_gravity_indices_elements[level])
+                end
+            elseif n_dims == 3
+                for level in 1:integrator.n_levels
+                    for element_id in level_info_elements[level]
+                        # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
+                        indices = collect(Iterators.flatten(LinearIndices(u_gravity)[:, :, :, :,
+                                                                            element_id]))
+                        append!(cache.level_u_gravity_indices_elements[level], indices)
+                    end
+                    sort!(cache.level_u_gravity_indices_elements[level])
+                end
+            end
+        end
+    end
 end
 end # @muladd

@@ -18,7 +18,7 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                    integrator.t, integrator.iter; kwargs...)
 
         if has_changed
-            resize!(integrator, length(u_ode))
+            #resize!(integrator, length(u_ode))
             u_modified!(integrator, true)
 
             ### PERK additions ###
@@ -73,9 +73,6 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
 
                         empty!(integrator.level_u_indices_elements[level])
                     end
-                    # TODO: Is this necessary?
-                    empty!(integrator.level_info_elements[integrator.n_levels])
-                    empty!(integrator.level_u_indices_elements[integrator.n_levels])
                 end
 
                 
@@ -111,6 +108,8 @@ function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
 
                 partitioning_u!(integrator.level_u_indices_elements, integrator.n_levels, n_dims, integrator.level_info_elements, 
                                 u_ode, mesh, equations, dg, cache)
+
+                resize!(integrator, length(u_ode)) # `resize!` integrator after PERK partitioning data structures
             end # "PERK stage identifiers update" timing
         end # if has changed
     end # "AMR" timing

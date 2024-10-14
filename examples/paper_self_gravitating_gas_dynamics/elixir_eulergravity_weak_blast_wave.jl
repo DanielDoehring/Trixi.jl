@@ -128,14 +128,14 @@ b1   = 0.0
 bS   = 1.0 - b1
 cEnd = 0.5/bS
 
-
+#=
 StagesGravity = 9
 cfl_gravity = 2.5
 
 alg_gravity = PERK(StagesGravity, 
                    "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p2/", 
                    bS, cEnd)
-
+=#
 
 #=
 #StagesGravity = [13, 9, 5, 3, 2]
@@ -151,20 +151,20 @@ alg_gravity = PERK_Multi(StagesGravity,
                          dtRatios, bS, cEnd)
 =#
 
-#=
-StagesGravity = 9
-cfl_gravity = 3.1
+
+#StagesGravity = 9
+#cfl_gravity = 3.1
 
 StagesGravity = 14
 cfl_gravity = 4.8
 
 alg_gravity = PERK4(StagesGravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/")
-=#
 
-#=
-Stages_Gravity = [9, 7, 5]
-dtRatios = [1, 0.5, 0.25]
-cfl_gravity = 2.6
+
+
+#Stages_Gravity = [9, 7, 5]
+#dtRatios = [1, 0.5, 0.25]
+#cfl_gravity = 2.6
 
 Stages_Gravity = [14, 9, 7, 5]
 dtRatios = [1, 0.5, 0.25, 0.125]
@@ -173,7 +173,7 @@ cfl_gravity = 4.8
 alg_gravity = PERK4_Multi(Stages_Gravity, 
                           "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/", 
                           dtRatios)
-=#
+
 
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
@@ -181,11 +181,11 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 100,
 
-                                    timestep_gravity = timestep_gravity_PERK2!
+                                    #timestep_gravity = timestep_gravity_PERK2!
                                     #timestep_gravity = timestep_gravity_PERK2_Multi!
                                     
                                     #timestep_gravity = timestep_gravity_PERK4!
-                                    #timestep_gravity = timestep_gravity_PERK4_Multi!
+                                    timestep_gravity = timestep_gravity_PERK4_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -245,12 +245,12 @@ callbacks = CallbackSet(summary_callback, amr_callback, stepsize_callback,
 ###############################################################################
 # run the simulation
 
-
+#=
 Stages = 8
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
+=#
 
 
-#=
 #dtRatios = [1, 0.5, 0.25, 0.125]
 #Stages = [13, 8, 6, 5]
 
@@ -258,7 +258,7 @@ dtRatios = [1, 0.5, 0.25]
 Stages = [8, 6, 5]
 
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/", dtRatios)
-=#
+
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
 
