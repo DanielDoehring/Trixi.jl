@@ -26,7 +26,7 @@ function initial_condition_blob(x, t, equations::CompressibleEulerEquations2D)
     R = 1.0 # radius of the blob
     # background density
     dens0 = 1.0
-    Chi = 10.0 # density contrast
+    Chi = 10.0 # density contrast (initial)
     # reference time of characteristic growth of KH instability equal to 1.0
     tau_kh = 1.0
     tau_cr = tau_kh / 1.6 # crushing time
@@ -119,16 +119,17 @@ cEnd = 0.5/bS
 dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
 
-#=
+
 cfl_gravity = 1.4
 alg_gravity = PERK_Multi(StagesGravity, 
                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/HypDiff/p2/", 
                          dtRatios, bS, cEnd)
-=#
 
+#=
 cfl_gravity = 1.4
 alg_gravity = PERK(5, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/HypDiff/p2/",
                    bS, cEnd)                         
+=#
 
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
@@ -136,8 +137,8 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
 
-                                    timestep_gravity = timestep_gravity_PERK2!
-                                    #timestep_gravity = timestep_gravity_PERK2_Multi!
+                                    #timestep_gravity = timestep_gravity_PERK2!
+                                    timestep_gravity = timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -147,7 +148,8 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_
 # ODE solvers, callbacks etc.
 
 # TODO: Run even longer?
-tspan = (0.0, 8.0)
+tspan = (0.0, 1.0) # As tau_KH = 1.0, this is "nondimensional" time
+
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -180,7 +182,7 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition_only_refine = true)
 
 cfl = 0.75 # PERK 4 Multi, S_max = 9
-cfl = 0.7 # PERK 4 Standalone, S_max = 9
+#cfl = 0.7 # PERK 4 Standalone, S_max = 9
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -191,18 +193,18 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-#=
+
 dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
 
 ode_algorithm = PERK4_Multi(Stages, 
-                            "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/Euler_only/", dtRatios)
-=#
+                            "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/Euler_only/", 
+                            dtRatios)
 
-
+#=
 Stages = 9
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/Euler_only/")
-
+=#
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
 
