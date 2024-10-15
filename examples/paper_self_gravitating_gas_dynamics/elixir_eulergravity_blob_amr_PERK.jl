@@ -134,7 +134,7 @@ alg_gravity = PERK(5, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGra
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-4,
+                                    resid_tol = 1.0e-4, # TODO: Investigate effect on spped-up of P-ERK!
                                     n_iterations_max = 500,
 
                                     #timestep_gravity = timestep_gravity_PERK2!
@@ -147,8 +147,8 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-# TODO: Run even longer?
-tspan = (0.0, 1.0) # As tau_KH = 1.0, this is "nondimensional" time
+# t_f = 8.0
+tspan = (0.0, 2.5) # As tau_KH = 1.0, this is "nondimensional" time
 
 ode = semidiscretize(semi, tspan)
 

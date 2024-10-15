@@ -111,7 +111,7 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-# TODO: Run even longer?
+# t_f = 8.0
 tspan = (0.0, 8.0)
 ode = semidiscretize(semi, tspan)
 
