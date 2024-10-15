@@ -554,7 +554,7 @@ function calc_volume_integral!(du, u,
                                                                cache)
 
     # Determine element ids for DG-only and blended DG-FV volume integral
-    pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg,
+    pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg, cache,
                                   level_info_elements_acc)
 
     # Loop over pure DG elements
