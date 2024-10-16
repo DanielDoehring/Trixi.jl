@@ -26,7 +26,7 @@ function initial_condition_blob(x, t, equations::CompressibleEulerEquations2D)
     R = 1.0 # radius of the blob
     # background density
     dens0 = 1.0
-    Chi = 10.0 # density contrast
+    Chi = 10.0 # density contrast (initial)
     # reference time of characteristic growth of KH instability equal to 1.0
     tau_kh = 1.0
     tau_cr = tau_kh / 1.6 # crushing time
@@ -37,8 +37,14 @@ function initial_condition_blob(x, t, equations::CompressibleEulerEquations2D)
     c = velx0 / Ma0 # sound speed
     # use perfect gas assumption to compute background pressure via the sound speed c^2 = gamma * pressure/density
     p0 = c * c * dens0 / equations.gamma
-    # initial center of the blob
+
+    # initial center of the blob (Trixi style)
     inicenter = [-15, 0]
+    # Paper setup:
+    #inicenter = [5, 5]
+    # Try some middle ground:
+    #inicenter = [-5, 0]
+
     x_rel = x - inicenter
     r = sqrt(x_rel[1]^2 + x_rel[2]^2)
     # steepness of the tanh transition zone
@@ -61,7 +67,9 @@ indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 0.4,
                                          alpha_min = 0.0001,
                                          alpha_smooth = true,
-                                         variable = pressure)
+                                         #variable = pressure
+                                         variable = density_pressure
+                                         )
 
 volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
                                                  volume_flux_dg = volume_flux,
@@ -69,8 +77,17 @@ volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
 
 solver = DGSEM(basis, surface_flux, volume_integral)
 
+# Domain size as present in Trixi
 coordinates_min = (-20.0, -20.0)
 coordinates_max = (20.0, 20.0)
+
+# Paper suggestion:
+#coordinates_min = (0.0, 0.0)
+#coordinates_max = (10.0, 10.0)
+
+# Try some middle-ground:
+#coordinates_min = (-10.0, -10.0)
+#coordinates_max = (10.0, 10.0)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 6,
@@ -99,25 +116,28 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 
 ###############################################################################
 # combining both semidiscretizations for Euler + self-gravity
+
 parameters = ParametersEulerGravity(background_density = 1.0, # taken from above
                                     gravitational_constant = 6.674e-8, # aka G
-                                    cfl = 1.9, # Seems to be stability limit
+                                    cfl = 1.8, # Seems to be stability limit # cfl = 1.9 except for 1.0e-6
                                     resid_tol = 1.0e-4,
-                                    n_iterations_max = 500,
+                                    n_iterations_max = 1000,
                                     timestep_gravity = timestep_gravity_erk52_3Sstar!)
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
+
 
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 # t_f = 8.0
-tspan = (0.0, 8.0)
+tspan = (0.0, 8.0) # As tau_KH = 1.0, this is "nondimensional" time
+
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 200
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      save_analysis = false,
@@ -129,31 +149,49 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_max = 1.0,
                                           alpha_min = 0.0001,
                                           alpha_smooth = false,
-                                          variable = Trixi.density)
+                                          #variable = Trixi.density
+                                          variable = Trixi.density_pressure
+                                          )
 amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
-                                              base_level = 5, # 4
+                                              base_level = 4, # 5
 
-                                              med_level = 0, # ignored with 0 ?
-                                              med_threshold = 0.0003, # med_level = current level
+                                              med_level = 0, # 0
+                                              med_threshold = 0.0003,
                                               
-                                              max_level = 7, # 7
+                                              max_level = 8, # 7
                                               max_threshold = 0.0003, # 0.0003 when max_level = 7
                                               max_threshold_secondary = indicator_sc.alpha_max)
+
+###############################################################################
+# run the simulation
+
+#cfl = 0.8 # CarpenterKennedy2N54 # tested
+cfl = 3.2 # SSPRK104 # tested
+#cfl = 1.2  # SSPRK54 # tested 
+#cfl = 0.9 # DGLDDRK84_F # tested
+#cfl = 0.6 # ParsaniKetchesonDeconinck3S94 # tested
+#cfl = 0.6 # NDBLSRK124 # tested
+
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 1, # 1 required here as well, otherwise crash (for interval = 2)
+                           interval = Int(floor(15 * 1.1/cfl)),
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
-stepsize_callback = StepsizeCallback(cfl = 0.35)
+stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         amr_callback, stepsize_callback)
 
-###############################################################################
-# run the simulation
+ode_alg = CarpenterKennedy2N54(thread = OrdinaryDiffEq.True())
+ode_alg = SSPRK104(thread = OrdinaryDiffEq.True())
+#ode_alg = SSPRK54(thread = OrdinaryDiffEq.True())
+#ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
+#ode_alg = ParsaniKetchesonDeconinck3S94(thread = OrdinaryDiffEq.True())
+#ode_alg = NDBLSRK124(thread = OrdinaryDiffEq.True())
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
+sol = solve(ode, ode_alg,
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
+
 summary_callback() # print the timer summary

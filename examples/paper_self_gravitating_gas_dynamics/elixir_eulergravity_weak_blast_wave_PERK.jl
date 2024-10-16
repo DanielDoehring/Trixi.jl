@@ -113,51 +113,77 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 
 # combining both semidiscretizations for Euler + self-gravity
 
-cfl_gravity = 2.4 # p = 2
-
-parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
-                                    gravitational_constant = 6.674e-8, # aka G
-                                    cfl = cfl_gravity,
-                                    resid_tol = 1.0e-4,
-                                    n_iterations_max = 100,
-                                    timestep_gravity = timestep_gravity_erk52_3Sstar!)
-
-semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
-
-
-#=
 b1   = 0.0
 bS   = 1.0 - b1
 cEnd = 0.5/bS
 
-StagesGravity = 5
-cfl_gravity = 2.1
+#=
+StagesGravity = 9
+cfl_gravity = 2.5
 
 alg_gravity = PERK(StagesGravity, 
                    "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p2/", 
                    bS, cEnd)
 =#
 
+
+#StagesGravity = [13, 9, 5, 3, 2]
+#dtRatios = [1, 0.5, 0.25, 0.125, 0.0625]
+
+StagesGravity = [9, 5, 3, 2]
+dtRatios = [1, 0.5, 0.25, 0.125]
+cfl_gravity = 2.5
+
+StagesGravity = [5, 3, 2]
+dtRatios = [1, 0.5, 0.25, 0.125]
+cfl_gravity = 2.1
+
+alg_gravity = PERK_Multi(StagesGravity, 
+                         "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p2/", 
+                         dtRatios, bS, cEnd)
+
+
 #=
+#StagesGravity = 9
+#cfl_gravity = 3.1
+
 StagesGravity = 14
-cfl_gravity = 4.7
+cfl_gravity = 4.8
 
 alg_gravity = PERK4(StagesGravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/")
+
 =#
 
 #=
+#Stages_Gravity = [9, 7, 5]
+#dtRatios = [1, 0.5, 0.25]
+#cfl_gravity = 2.6
+
+Stages_Gravity = [14, 9, 7, 5]
+dtRatios = [1, 0.5, 0.25, 0.125]
+cfl_gravity = 4.8
+
+alg_gravity = PERK4_Multi(Stages_Gravity, 
+                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/", 
+                          dtRatios)
+=#
+
+
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 100,
 
-                                    timestep_gravity = timestep_gravity_PERK2!
+                                    #timestep_gravity = timestep_gravity_PERK2!
+                                    timestep_gravity = timestep_gravity_PERK2_Multi!
+                                    
                                     #timestep_gravity = timestep_gravity_PERK4!
+                                    #timestep_gravity = timestep_gravity_PERK4_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
-=#
+
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -176,17 +202,17 @@ amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 4, # 2
                                       max_level = 8, max_threshold = 0.00013) # Heavily tailored, REVISIT!
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 1,
+                           interval = 2, # 1
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = false #= true =#)
 
-# CFL values for 4th order gravity solver!                           
-#cfl = 1.7 # CarpenterKennedy2N54
-cfl = 4.5 # SSPRK104 5.0 stable, but artifacts in solution
-#cfl = 1.6 # SSPRK54 1.7 stable, but artifacts in solution
-#cfl = 3.2 # DGLDDRK84_F
-#cfl = 2.1 # ParsaniKetchesonDeconinck3S94
-#cfl = 1.8 # NDBLSRK124
+# Single PERK 
+# E = 8
+cfl = 3.1 # Euler only/Combined Euler-Gravity
+
+# PERK Multi
+# E = 8, 6, 5
+cfl = 3.1 # Euler only
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -211,17 +237,22 @@ callbacks = CallbackSet(summary_callback, amr_callback, stepsize_callback,
 ###############################################################################
 # run the simulation
 
-#ode_alg = CarpenterKennedy2N54(thread = OrdinaryDiffEq.True())
-ode_alg = SSPRK104(thread = OrdinaryDiffEq.True())
-#ode_alg = SSPRK54(thread = OrdinaryDiffEq.True())
-#ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
-#ode_alg = ParsaniKetchesonDeconinck3S94(thread = OrdinaryDiffEq.True())
-#ode_alg = NDBLSRK124(thread = OrdinaryDiffEq.True())
+#=
+Stages = 8
+ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
+=#
 
-sol = solve(ode, ode_alg,
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
 
+#dtRatios = [1, 0.5, 0.25, 0.125]
+#Stages = [13, 8, 6, 5]
+
+dtRatios = [1, 0.5, 0.25]
+Stages = [8, 6, 5]
+
+ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/", dtRatios)
+
+
+sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)

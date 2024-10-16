@@ -37,8 +37,14 @@ function initial_condition_blob(x, t, equations::CompressibleEulerEquations2D)
     c = velx0 / Ma0 # sound speed
     # use perfect gas assumption to compute background pressure via the sound speed c^2 = gamma * pressure/density
     p0 = c * c * dens0 / equations.gamma
-    # initial center of the blob
+
+    # initial center of the blob (Trixi style)
     inicenter = [-15, 0]
+    # Paper setup:
+    #inicenter = [5, 5]
+    # Try some middle ground:
+    #inicenter = [-5, 0]
+
     x_rel = x - inicenter
     r = sqrt(x_rel[1]^2 + x_rel[2]^2)
     # steepness of the tanh transition zone
@@ -61,7 +67,9 @@ indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 0.4,
                                          alpha_min = 0.0001,
                                          alpha_smooth = true,
-                                         variable = pressure)
+                                         #variable = pressure
+                                         variable = density_pressure
+                                         )
 
 volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
                                                  volume_flux_dg = volume_flux,
@@ -69,8 +77,17 @@ volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
 
 solver = DGSEM(basis, surface_flux, volume_integral)
 
+# Domain size as present in Trixi
 coordinates_min = (-20.0, -20.0)
 coordinates_max = (20.0, 20.0)
+
+# Paper suggestion:
+#coordinates_min = (0.0, 0.0)
+#coordinates_max = (10.0, 10.0)
+
+# Try some middle-ground:
+#coordinates_min = (-10.0, -10.0)
+#coordinates_max = (10.0, 10.0)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 6,
@@ -100,18 +117,6 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 ###############################################################################
 # combining both semidiscretizations for Euler + self-gravity
 
-#=
-parameters = ParametersEulerGravity(background_density = 1.0, # taken from above
-                                    gravitational_constant = 6.674e-8, # aka G
-                                    cfl = 1.9,
-                                    resid_tol = 1.0e-4,
-                                    n_iterations_max = 500,
-                                    timestep_gravity = timestep_gravity_erk52_3Sstar!)
-
-semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
-=#
-
-
 b1   = 0.0
 bS   = 1.0 - b1
 cEnd = 0.5/bS
@@ -122,19 +127,20 @@ StagesGravity = [5, 3, 2]
 
 cfl_gravity = 1.4
 alg_gravity = PERK_Multi(StagesGravity, 
-                         "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/HypDiff/p2/", 
+                         "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/HypDiff/p2/", 
                          dtRatios, bS, cEnd)
+
 
 #=
 cfl_gravity = 1.4
-alg_gravity = PERK(5, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/HypDiff/p2/",
+alg_gravity = PERK(5, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/HypDiff/p2/",
                    bS, cEnd)                         
 =#
 
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-4, # TODO: Investigate effect on spped-up of P-ERK!
+                                    resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
 
                                     #timestep_gravity = timestep_gravity_PERK2!
@@ -148,13 +154,13 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_
 # ODE solvers, callbacks etc.
 
 # t_f = 8.0
-tspan = (0.0, 2.5) # As tau_KH = 1.0, this is "nondimensional" time
+tspan = (0.0, 8.0) # As tau_KH = 1.0, this is "nondimensional" time
 
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 200
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      save_analysis = false,
@@ -166,23 +172,26 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_max = 1.0,
                                           alpha_min = 0.0001,
                                           alpha_smooth = false,
-                                          variable = Trixi.density)
+                                          #variable = Trixi.density
+                                          variable = Trixi.density_pressure
+                                          )
 amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
-                                              base_level = 5, # 4
+                                              base_level = 4, # 5
 
-                                              med_level = 0, # ignored with 0 ?
-                                              med_threshold = 0.0003, # med_level = current level
+                                              med_level = 0, # 0
+                                              med_threshold = 0.0003,
                                               
-                                              max_level = 7, # 7
+                                              max_level = 8, # 7
                                               max_threshold = 0.0003, # 0.0003 when max_level = 7
                                               max_threshold_secondary = indicator_sc.alpha_max)
+
+cfl = 1.1 # PERK 4 Multi, S_max = 9
+#cfl = 1.1 # PERK 4 Standalone, S_max = 9
+
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 1, # 1
+                           interval = Int(floor(15 * 1.1/cfl)),
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
-
-cfl = 0.75 # PERK 4 Multi, S_max = 9
-#cfl = 0.7 # PERK 4 Standalone, S_max = 9
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -198,12 +207,12 @@ dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
 
 ode_algorithm = PERK4_Multi(Stages, 
-                            "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/Euler_only/", 
+                            "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/Euler_only/", 
                             dtRatios)
 
 #=
 Stages = 9
-ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/Euler_only/")
+ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/Euler_only/")
 =#
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
