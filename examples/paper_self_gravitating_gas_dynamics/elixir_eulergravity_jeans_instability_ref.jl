@@ -109,7 +109,7 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 
 Stages_Gravity = [10, 7, 5]
 dtRatios = [1, 0.5, 0.25]
-cfl_gravity = 0.9
+cfl_gravity = 0.9 # Seems to be stability limit
 
 alg_gravity = PERK4_Multi(Stages_Gravity, 
                           "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Jeans_Instab/HypDiff/", 
@@ -118,7 +118,7 @@ alg_gravity = PERK4_Multi(Stages_Gravity,
 parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-4,
+                                    resid_tol = 1.0e-4, # 1.0e-4
                                     n_iterations_max = 1000,
                                     timestep_gravity = timestep_gravity_PERK4_Multi!)
 
@@ -131,15 +131,11 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-cfl_euler = 1.0
+# Use same CFL as in paper (maybe avoid overshoots)
+cfl_euler = 0.5 # Can stable run with cfl = 3.0
 stepsize_callback = StepsizeCallback(cfl = cfl_euler)
 
-save_solution = SaveSolutionCallback(interval = 10,
-                                     save_initial_solution = true,
-                                     save_final_solution = true,
-                                     solution_variables = cons2prim)
-
-analysis_interval = 10
+analysis_interval = 6
 
 Trixi.pretty_form_utf(::Val{:energy_potential}) = "∑e_potential"
 Trixi.pretty_form_ascii(::Val{:energy_potential}) = "e_potential"
@@ -168,10 +164,10 @@ end
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = (energy_total,
-                                                                 energy_kinetic,
-                                                                 energy_internal,
-                                                                 Val(:energy_potential)))
+                                     analysis_integrals = (energy_total, # Pretty much only sanity check
+                                                           energy_kinetic,
+                                                           energy_internal,
+                                                           Val(:energy_potential)))
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
                         analysis_callback)
