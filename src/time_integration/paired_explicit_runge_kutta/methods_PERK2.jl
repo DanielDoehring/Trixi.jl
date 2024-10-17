@@ -400,10 +400,12 @@ function step!(integrator::PairedExplicitRK2Integrator)
             end
         end
 
+        
         @threaded for i in eachindex(integrator.u)
             integrator.u[i] += alg.b1 * integrator.k1[i] +
                                alg.bS * integrator.k_higher[i]
         end
+        
     end # PairedExplicitRK2 step
 
     integrator.iter += 1
