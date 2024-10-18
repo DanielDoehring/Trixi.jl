@@ -342,11 +342,28 @@ function solve!(integrator::PairedExplicitRK2Integrator)
                                   integrator.sol.prob)
 end
 
+function entropy_der(stage, u_i,
+                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations, dg::DG, cache)
+    # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
+    integrate_via_indices(u_i, mesh, equations, dg, cache,
+                          stage) do u_i, i, element, equations, dg, stage
+        w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, element), equations)
+        stage_node = get_node_vars(stage, equations, dg, i, element)
+        dot(w_node, stage_node)
+    end
+end
+
+function r(gamma, S_old, dS, u, dir, mesh, equations, dg, cache)
+    return integrate(entropy_math, u + gamma * dir, mesh, equations, dg, cache) - S_old - gamma * dS
+end
+
 function step!(integrator::PairedExplicitRK2Integrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
     callbacks = integrator.opts.callback
+
+    mesh, equations, dg, cache = mesh_equations_solver_cache(integrator.p)
 
     @assert !integrator.finalstep
     if isnan(integrator.dt)
@@ -400,16 +417,67 @@ function step!(integrator::PairedExplicitRK2Integrator)
             end
         end
 
+        u_wrapped = wrap_array(integrator.u, integrator.p)
+        u_tmp_wrapped = wrap_array(integrator.u_tmp, integrator.p)
+        k1_wrapped = wrap_array(integrator.k1, integrator.p)
+        k_higher_wrapped = wrap_array(integrator.k_higher, integrator.p)
+    
+        # Check if there exists a root for `r` in the interval [0, 1]
+        S_old = integrate(entropy_math, u_wrapped, mesh, equations, dg, cache)
+        dS = (alg.b1 * entropy_der(k1_wrapped, u_wrapped, mesh, equations, dg, cache) + 
+              # u_tmp corresponds to input leading to last k_higher
+              alg.bS * entropy_der(k_higher_wrapped, u_tmp_wrapped, mesh, equations, dg, cache) )
         
+        dir = alg.b1 * integrator.k1 + alg.bS * integrator.k_higher
+
+        dir_wrapped = wrap_array(dir, integrator.p)
+
+        gamma_min = 0.1
+        gamma_max = 1.0
+    
+        if r(gamma_max, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) > 0 && 
+           r(gamma_min, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) < 0 &&
+           integrator.finalstep == false # Avoid last-step shenanigans for now
+           
+          # Init with gamma_0
+          gamma_eps = 1e-9
+          gamma = 0.5 * (gamma_max + gamma_min)
+    
+          while gamma_max - gamma_min > gamma_eps
+            r_gamma = r(gamma, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache)
+    
+            if r_gamma < 0
+              gamma_min = gamma
+            else
+              gamma_max = gamma
+            end
+            gamma = 0.5 * (gamma_max + gamma_min)
+          end
+    
+          println("Found gamma: ", gamma)
+        else # Entropy relaxation methodology not applicable, do standard RK step
+          gamma = 1
+        end
+
+        #=
+        if integrator.t + gamma * integrator.dt > t_end || isapprox(integrator.t + gamma * integrator.dt, t_end)
+            integrator.t = t_end
+            gamma = (t_end - integrator.t) / integrator.dt
+            integrator.finalstep = true
+        else
+            integrator.t += gamma * integrator.dt
+        end
+        =#
+        integrator.t += gamma * integrator.dt
+
         @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += alg.b1 * integrator.k1[i] +
-                               alg.bS * integrator.k_higher[i]
+            integrator.u[i] += gamma * (alg.b1 * integrator.k1[i] + alg.bS * integrator.k_higher[i])
         end
         
     end # PairedExplicitRK2 step
 
     integrator.iter += 1
-    integrator.t += integrator.dt
+    #integrator.t += integrator.dt
 
     @trixi_timeit timer() "Step-Callbacks" begin
         # handle callbacks
