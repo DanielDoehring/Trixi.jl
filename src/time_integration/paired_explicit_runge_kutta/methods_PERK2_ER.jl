@@ -52,8 +52,8 @@ end # struct PairedExplicitRK2_ER
 
 # Constructor that reads the coefficients from a file
 function PairedExplicitRK2_ER(num_stages, base_path_monomial_coeffs::AbstractString,
-                           dt_opt,
-                           bS = 1.0, cS = 0.5)
+                              dt_opt,
+                              bS = 1.0, cS = 0.5)
     # If the user has the monomial coefficients, they also must have the optimal time step
     a_matrix, c = compute_PairedExplicitRK2_butcher_tableau(num_stages,
                                                             base_path_monomial_coeffs,
@@ -65,8 +65,8 @@ end
 # Constructor that calculates the coefficients with polynomial optimizer from a
 # semidiscretization
 function PairedExplicitRK2_ER(num_stages, tspan, semi::AbstractSemidiscretization;
-                           verbose = false,
-                           bS = 1.0, cS = 0.5)
+                              verbose = false,
+                              bS = 1.0, cS = 0.5)
     eig_vals = eigvals(jacobian_ad_forward(semi))
 
     return PairedExplicitRK2_ER(num_stages, tspan, eig_vals; verbose, bS, cS)
@@ -75,8 +75,8 @@ end
 # Constructor that calculates the coefficients with polynomial optimizer from a
 # list of eigenvalues
 function PairedExplicitRK2_ER(num_stages, tspan, eig_vals::Vector{ComplexF64};
-                           verbose = false,
-                           bS = 1.0, cS = 0.5)
+                              verbose = false,
+                              bS = 1.0, cS = 0.5)
     a_matrix, c, dt_opt = compute_PairedExplicitRK2_butcher_tableau(num_stages,
                                                                     eig_vals, tspan,
                                                                     bS, cS;
@@ -90,7 +90,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 mutable struct PairedExplicitRK2_ERIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
-                                           PairedExplicitRKOptions} <:
+                                              PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSingleIntegrator
     u::uType
     du::uType
@@ -167,13 +167,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2_ER;
     iter = 0
 
     integrator = PairedExplicitRK2_ERIntegrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
-                                             ode.p,
-                                             (prob = ode,), ode.f, alg,
-                                             PairedExplicitRKOptions(callback,
-                                                                     ode.tspan;
-                                                                     kwargs...),
-                                             false, true, false,
-                                             k1, k_higher)
+                                                ode.p,
+                                                (prob = ode,), ode.f, alg,
+                                                PairedExplicitRKOptions(callback,
+                                                                        ode.tspan;
+                                                                        kwargs...),
+                                                false, true, false,
+                                                k1, k_higher)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -212,7 +212,8 @@ function solve!(integrator::PairedExplicitRK2_ERIntegrator)
 end
 
 function entropy_der(stage, u_i,
-                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations, dg::DG, cache)
+                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations, dg::DG,
+                     cache)
     # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
     integrate_via_indices(u_i, mesh, equations, dg, cache,
                           stage) do u_i, i, element, equations, dg, stage
@@ -223,7 +224,8 @@ function entropy_der(stage, u_i,
 end
 
 function r(gamma, S_old, dS, u, dir, mesh, equations, dg, cache)
-    return integrate(entropy_math, u + gamma * dir, mesh, equations, dg, cache) - S_old - gamma * dS
+    return integrate(entropy_math, u + gamma * dir, mesh, equations, dg, cache) -
+           S_old - gamma * dS
 end
 
 function step!(integrator::PairedExplicitRK2_ERIntegrator)
@@ -290,13 +292,14 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
         u_tmp_wrapped = wrap_array(integrator.u_tmp, integrator.p)
         k1_wrapped = wrap_array(integrator.k1, integrator.p)
         k_higher_wrapped = wrap_array(integrator.k_higher, integrator.p)
-    
+
         # Check if there exists a root for `r` in the interval [0, 1]
         S_old = integrate(entropy_math, u_wrapped, mesh, equations, dg, cache)
-        dS = (alg.b1 * entropy_der(k1_wrapped, u_wrapped, mesh, equations, dg, cache) + 
+        dS = (alg.b1 * entropy_der(k1_wrapped, u_wrapped, mesh, equations, dg, cache) +
               # u_tmp corresponds to input leading to last k_higher
-              alg.bS * entropy_der(k_higher_wrapped, u_tmp_wrapped, mesh, equations, dg, cache) )
-        
+              alg.bS *
+              entropy_der(k_higher_wrapped, u_tmp_wrapped, mesh, equations, dg, cache))
+
         dir = alg.b1 * integrator.k1 + alg.bS * integrator.k_higher
 
         dir_wrapped = wrap_array(dir, integrator.p)
@@ -306,26 +309,29 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
         # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
         gamma_min = 0.5
         gamma_max = 1.0
-        
-        if r(gamma_max, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) > 0 && 
-           r(gamma_min, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) < 0 #&&
-           #integrator.finalstep == false # Avoid last-step shenanigans for now
-        
-          # Init with gamma_0
-          gamma_eps = 1e-13
-    
-          while gamma_max - gamma_min > gamma_eps
-            gamma = 0.5 * (gamma_max + gamma_min)
-            r_gamma = r(gamma, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache)
-    
-            if r_gamma < 0
-              gamma_min = gamma
-            else
-              gamma_max = gamma
+
+        if r(gamma_max, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) >
+           0 &&
+           r(gamma_min, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) <
+           0 #&&
+            #integrator.finalstep == false # Avoid last-step shenanigans for now
+
+            # Init with gamma_0
+            gamma_eps = 1e-13
+
+            while gamma_max - gamma_min > gamma_eps
+                gamma = 0.5 * (gamma_max + gamma_min)
+                r_gamma = r(gamma, S_old, dS, u_wrapped, dir_wrapped, mesh, equations,
+                            dg, cache)
+
+                if r_gamma < 0
+                    gamma_min = gamma
+                else
+                    gamma_max = gamma
+                end
             end
-          end
         end
-        
+
         #=
         # Sanity check: Condition for desired order of convergence
         if integrator.finalstep == false
@@ -337,7 +343,8 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
         =#
 
         # Last timestep shenanigans
-        if integrator.t + gamma * integrator.dt > t_end || isapprox(integrator.t + gamma * integrator.dt, t_end)
+        if integrator.t + gamma * integrator.dt > t_end ||
+           isapprox(integrator.t + gamma * integrator.dt, t_end)
             integrator.t = t_end
             gamma = (t_end - integrator.t) / integrator.dt
             terminate!(integrator)
@@ -346,9 +353,9 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
         end
 
         @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += gamma * (alg.b1 * integrator.k1[i] + alg.bS * integrator.k_higher[i])
+            integrator.u[i] += gamma * (alg.b1 * integrator.k1[i] +
+                                alg.bS * integrator.k_higher[i])
         end
-        
     end # PairedExplicitRK2_ER step
 
     integrator.iter += 1
