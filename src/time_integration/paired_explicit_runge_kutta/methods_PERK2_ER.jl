@@ -111,6 +111,8 @@ mutable struct PairedExplicitRK2_ERIntegrator{RealT <: Real, uType, Params, Sol,
     # PairedExplicitRK2_ER stages:
     k1::uType
     k_higher::uType
+    # Naive implementation for entropy relaxation:
+    direction::uType
 end
 
 """
@@ -162,6 +164,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2_ER;
     k1 = zero(u0)
     k_higher = zero(u0)
 
+    # Naive implementation for entropy relaxation
+    direction = zero(u0)
+
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
@@ -173,7 +178,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2_ER;
                                                                         ode.tspan;
                                                                         kwargs...),
                                                 false, true, false,
-                                                k1, k_higher)
+                                                k1, k_higher,
+                                                direction)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -223,8 +229,8 @@ function entropy_der(stage, u_i,
     end
 end
 
-function r(gamma, S_old, dS, u, dir, mesh, equations, dg, cache)
-    return integrate(entropy_math, u + gamma * dir, mesh, equations, dg, cache) -
+function r(gamma, S_old, dS, u_gamma_dir, mesh, equations, dg, cache)
+    return integrate(entropy_math, u_gamma_dir, mesh, equations, dg, cache) -
            S_old - gamma * dS
 end
 
@@ -288,21 +294,24 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
             end
         end
 
-        u_wrapped = wrap_array(integrator.u, integrator.p)
-        u_tmp_wrapped = wrap_array(integrator.u_tmp, integrator.p)
-        k1_wrapped = wrap_array(integrator.k1, integrator.p)
-        k_higher_wrapped = wrap_array(integrator.k_higher, integrator.p)
+        @threaded for i in eachindex(integrator.u)
+            integrator.direction[i] = alg.b1 * integrator.k1[i] +
+                                      alg.bS * integrator.k_higher[i]
+        end
 
-        # Check if there exists a root for `r` in the interval [0, 1]
-        S_old = integrate(entropy_math, u_wrapped, mesh, equations, dg, cache)
-        dS = (alg.b1 * entropy_der(k1_wrapped, u_wrapped, mesh, equations, dg, cache) +
+        u_wrap = wrap_array(integrator.u, integrator.p)
+        u_tmp_wrap = wrap_array(integrator.u_tmp, integrator.p)
+        k1_wrap = wrap_array(integrator.k1, integrator.p)
+        k_higher_wrap = wrap_array(integrator.k_higher, integrator.p)
+        dir_wrap = wrap_array(integrator.direction, integrator.p)
+        # Re-use du as helper data structure (not needed anymore)
+        u_gamma_dir_wrap = wrap_array(integrator.du, integrator.p)
+
+        S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+        dS = (alg.b1 * entropy_der(k1_wrap, u_wrap, mesh, equations, dg, cache) +
               # u_tmp corresponds to input leading to last k_higher
               alg.bS *
-              entropy_der(k_higher_wrapped, u_tmp_wrapped, mesh, equations, dg, cache))
-
-        dir = alg.b1 * integrator.k1 + alg.bS * integrator.k_higher
-
-        dir_wrapped = wrap_array(dir, integrator.p)
+              entropy_der(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache))
 
         gamma = 1.0 # Default value if entropy relaxation methodology not applicable
 
@@ -310,19 +319,35 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
         gamma_min = 0.5
         gamma_max = 1.0
 
-        if r(gamma_max, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) >
-           0 &&
-           r(gamma_min, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) <
-           0 #&&
-            #integrator.finalstep == false # Avoid last-step shenanigans for now
+        @threaded for element in eachelement(dg, cache)
+            @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                      gamma_max * dir_wrap[.., element]
+        end
+        r_max = r(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh, equations, dg, cache)
+
+        @threaded for element in eachelement(dg, cache)
+            @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                      gamma_min * dir_wrap[.., element]
+        end
+        r_min = r(gamma_min, S_old, dS, u_gamma_dir_wrap, mesh, equations, dg, cache)
+
+        # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
+        if r_max > 0 && r_min < 0 # && 
+            # integrator.finalstep == false # Avoid last-step shenanigans for now
 
             # Init with gamma_0
             gamma_eps = 1e-13
 
             while gamma_max - gamma_min > gamma_eps
                 gamma = 0.5 * (gamma_max + gamma_min)
-                r_gamma = r(gamma, S_old, dS, u_wrapped, dir_wrapped, mesh, equations,
-                            dg, cache)
+
+                @threaded for element in eachelement(dg, cache)
+                    @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                              gamma *
+                                                              dir_wrap[.., element]
+                end
+                r_gamma = r(gamma, S_old, dS, u_gamma_dir_wrap, mesh, equations, dg,
+                            cache)
 
                 if r_gamma < 0
                     gamma_min = gamma
@@ -353,8 +378,7 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
         end
 
         @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += gamma * (alg.b1 * integrator.k1[i] +
-                                alg.bS * integrator.k_higher[i])
+            integrator.u[i] += gamma * integrator.direction[i]
         end
     end # PairedExplicitRK2_ER step
 
@@ -387,5 +411,7 @@ function Base.resize!(integrator::PairedExplicitRK2_ERIntegrator, new_size)
 
     resize!(integrator.k1, new_size)
     resize!(integrator.k_higher, new_size)
+
+    resize!(integrator.direction, new_size)
 end
 end # @muladd
