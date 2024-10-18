@@ -127,12 +127,10 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = analysis_interval)
 
-ode_algorithm = Trixi.PairedExplicitRK2(6, tspan, semi)
+ode_algorithm = Trixi.PairedExplicitRK2_ER(6, tspan, semi)
 
 cfl_number = Trixi.calculate_cfl(ode_algorithm, ode)
 stepsize_callback = StepsizeCallback(cfl = 0.5 * cfl_number)
-
-entropy_relaxation_callback = EntropyRelaxationCallback()
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
 callbacks = CallbackSet(summary_callback,

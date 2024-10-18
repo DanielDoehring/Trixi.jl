@@ -8,109 +8,12 @@ using LinearAlgebra: eigvals
 @muladd begin
 #! format: noindent
 
-# Abstract base type for both single/standalone and multi-level 
-# PERK (Paired-Explicit Runge-Kutta) time integration schemes
-abstract type AbstractPairedExplicitRK end
-# Abstract base type for single/standalone PERK time integration schemes
-abstract type AbstractPairedExplicitRKSingle <: AbstractPairedExplicitRK end
-
-# Compute the coefficients of the A matrix in the Butcher tableau using
-# stage scaling factors and monomial coefficients
-function compute_a_coeffs(num_stage_evals, stage_scaling_factors, monomial_coeffs)
-    a_coeffs = copy(monomial_coeffs)
-
-    for stage in 1:(num_stage_evals - 2)
-        a_coeffs[stage] /= stage_scaling_factors[stage]
-        for prev_stage in 1:(stage - 1)
-            a_coeffs[stage] /= a_coeffs[prev_stage]
-        end
-    end
-
-    return reverse(a_coeffs)
-end
-
-# Compute the Butcher tableau for a paired explicit Runge-Kutta method order 2
-# using a list of eigenvalues
-function compute_PairedExplicitRK2_butcher_tableau(num_stages, eig_vals, tspan,
-                                                   bS, cS; verbose = false)
-    # c Vector from Butcher Tableau (defines timestep per stage)
-    c = zeros(num_stages)
-    for k in 2:num_stages
-        c[k] = cS * (k - 1) / (num_stages - 1)
-    end
-    stage_scaling_factors = bS * reverse(c[2:(end - 1)])
-
-    # - 2 Since first entry of A is always zero (explicit method) and second is given by c_2 (consistency)
-    coeffs_max = num_stages - 2
-
-    a_matrix = zeros(coeffs_max, 2)
-    a_matrix[:, 1] = c[3:end]
-
-    consistency_order = 2
-
-    dtmax = tspan[2] - tspan[1]
-    dteps = 1e-9 # Hyperparameter of the optimization, might be too large for systems requiring very small timesteps
-
-    num_eig_vals, eig_vals = filter_eig_vals(eig_vals; verbose)
-
-    monomial_coeffs, dt_opt = bisect_stability_polynomial(consistency_order,
-                                                          num_eig_vals, num_stages,
-                                                          dtmax,
-                                                          dteps,
-                                                          eig_vals; verbose)
-    monomial_coeffs = undo_normalization!(monomial_coeffs, consistency_order,
-                                          num_stages)
-
-    num_monomial_coeffs = length(monomial_coeffs)
-    @assert num_monomial_coeffs == coeffs_max
-    A = compute_a_coeffs(num_stages, stage_scaling_factors, monomial_coeffs)
-
-    a_matrix[:, 1] -= A
-    a_matrix[:, 2] = A
-
-    return a_matrix, c, dt_opt
-end
-
-# Compute the Butcher tableau for a paired explicit Runge-Kutta method order 2
-# using provided monomial coefficients file
-function compute_PairedExplicitRK2_butcher_tableau(num_stages,
-                                                   base_path_monomial_coeffs::AbstractString,
-                                                   bS, cS)
-    # c Vector form Butcher Tableau (defines timestep per stage)
-    c = zeros(num_stages)
-    for k in 2:num_stages
-        c[k] = cS * (k - 1) / (num_stages - 1)
-    end
-    stage_scaling_factors = bS * reverse(c[2:(end - 1)])
-
-    # - 2 Since first entry of A is always zero (explicit method) and second is given by c_2 (consistency)
-    coeffs_max = num_stages - 2
-
-    a_matrix = zeros(coeffs_max, 2)
-    a_matrix[:, 1] = c[3:end]
-
-    path_monomial_coeffs = joinpath(base_path_monomial_coeffs,
-                                    "gamma_" * string(num_stages) * ".txt")
-
-    @assert isfile(path_monomial_coeffs) "Couldn't find file"
-    monomial_coeffs = readdlm(path_monomial_coeffs, Float64)
-    num_monomial_coeffs = size(monomial_coeffs, 1)
-
-    @assert num_monomial_coeffs == coeffs_max
-    A = compute_a_coeffs(num_stages, stage_scaling_factors, monomial_coeffs)
-
-    a_matrix[:, 1] -= A
-    a_matrix[:, 2] = A
-
-    return a_matrix, c
-end
-
 @doc raw"""
-    PairedExplicitRK2(num_stages, base_path_monomial_coeffs::AbstractString, dt_opt,
+    PairedExplicitRK2_ER(num_stages, base_path_monomial_coeffs::AbstractString, dt_opt,
                       bS = 1.0, cS = 0.5)
-    PairedExplicitRK2(num_stages, tspan, semi::AbstractSemidiscretization;
+    PairedExplicitRK2_ER(num_stages, tspan, semi::AbstractSemidiscretization;
                       verbose = false, bS = 1.0, cS = 0.5)
-    PairedExplicitRK2(num_stages, tspan, eig_vals::Vector{ComplexF64};
+    PairedExplicitRK2_ER(num_stages, tspan, eig_vals::Vector{ComplexF64};
                       verbose = false, bS = 1.0, cS = 0.5)
     Parameters:
     - `num_stages` (`Int`): Number of stages in the PERK method.
@@ -136,7 +39,7 @@ optimized for a certain simulation setup (PDE, IC & BC, Riemann Solver, DG Solve
   Paired explicit Runge-Kutta schemes for stiff systems of equations
   [DOI: 10.1016/j.jcp.2019.05.014](https://doi.org/10.1016/j.jcp.2019.05.014)
 """
-mutable struct PairedExplicitRK2 <: AbstractPairedExplicitRKSingle
+mutable struct PairedExplicitRK2_ER <: AbstractPairedExplicitRKSingle
     const num_stages::Int
 
     a_matrix::Matrix{Float64}
@@ -145,10 +48,10 @@ mutable struct PairedExplicitRK2 <: AbstractPairedExplicitRKSingle
     bS::Float64
     cS::Float64
     dt_opt::Float64
-end # struct PairedExplicitRK2
+end # struct PairedExplicitRK2_ER
 
 # Constructor that reads the coefficients from a file
-function PairedExplicitRK2(num_stages, base_path_monomial_coeffs::AbstractString,
+function PairedExplicitRK2_ER(num_stages, base_path_monomial_coeffs::AbstractString,
                            dt_opt,
                            bS = 1.0, cS = 0.5)
     # If the user has the monomial coefficients, they also must have the optimal time step
@@ -156,22 +59,22 @@ function PairedExplicitRK2(num_stages, base_path_monomial_coeffs::AbstractString
                                                             base_path_monomial_coeffs,
                                                             bS, cS)
 
-    return PairedExplicitRK2(num_stages, a_matrix, c, 1 - bS, bS, cS, dt_opt)
+    return PairedExplicitRK2_ER(num_stages, a_matrix, c, 1 - bS, bS, cS, dt_opt)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a
 # semidiscretization
-function PairedExplicitRK2(num_stages, tspan, semi::AbstractSemidiscretization;
+function PairedExplicitRK2_ER(num_stages, tspan, semi::AbstractSemidiscretization;
                            verbose = false,
                            bS = 1.0, cS = 0.5)
     eig_vals = eigvals(jacobian_ad_forward(semi))
 
-    return PairedExplicitRK2(num_stages, tspan, eig_vals; verbose, bS, cS)
+    return PairedExplicitRK2_ER(num_stages, tspan, eig_vals; verbose, bS, cS)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a
 # list of eigenvalues
-function PairedExplicitRK2(num_stages, tspan, eig_vals::Vector{ComplexF64};
+function PairedExplicitRK2_ER(num_stages, tspan, eig_vals::Vector{ComplexF64};
                            verbose = false,
                            bS = 1.0, cS = 0.5)
     a_matrix, c, dt_opt = compute_PairedExplicitRK2_butcher_tableau(num_stages,
@@ -179,39 +82,14 @@ function PairedExplicitRK2(num_stages, tspan, eig_vals::Vector{ComplexF64};
                                                                     bS, cS;
                                                                     verbose)
 
-    return PairedExplicitRK2(num_stages, a_matrix, c, 1 - bS, bS, cS, dt_opt)
+    return PairedExplicitRK2_ER(num_stages, a_matrix, c, 1 - bS, bS, cS, dt_opt)
 end
-
-# This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
-mutable struct PairedExplicitRKOptions{Callback, TStops}
-    callback::Callback # callbacks; used in Trixi
-    adaptive::Bool # whether the algorithm is adaptive
-    dtmax::Float64 # ignored
-    maxiters::Int # maximal number of time steps
-    tstops::TStops # tstops from https://diffeq.sciml.ai/v6.8/basics/common_solver_opts/#Output-Control-1; ignored
-end
-
-function PairedExplicitRKOptions(callback, tspan; maxiters = typemax(Int), kwargs...)
-    tstops_internal = BinaryHeap{eltype(tspan)}(FasterForward())
-    # We add last(tspan) to make sure that the time integration stops at the end time
-    push!(tstops_internal, last(tspan))
-    # We add 2 * last(tspan) because add_tstop!(integrator, t) is only called by DiffEqCallbacks.jl if tstops contains a time that is larger than t
-    # (https://github.com/SciML/DiffEqCallbacks.jl/blob/025dfe99029bd0f30a2e027582744528eb92cd24/src/iterative_and_periodic.jl#L92)
-    push!(tstops_internal, 2 * last(tspan))
-    PairedExplicitRKOptions{typeof(callback), typeof(tstops_internal)}(callback,
-                                                                       false, Inf,
-                                                                       maxiters,
-                                                                       tstops_internal)
-end
-
-abstract type PairedExplicitRK end
-abstract type AbstractPairedExplicitRKSingleIntegrator <: PairedExplicitRK end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK2Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
+mutable struct PairedExplicitRK2_ERIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                            PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSingleIntegrator
     u::uType
@@ -230,7 +108,7 @@ mutable struct PairedExplicitRK2Integrator{RealT <: Real, uType, Params, Sol, F,
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # PairedExplicitRK2 stages:
+    # PairedExplicitRK2_ER stages:
     k1::uType
     k_higher::uType
 end
@@ -256,11 +134,11 @@ function calculate_cfl(ode_algorithm::AbstractPairedExplicitRKSingle, ode)
 end
 
 """
-    add_tstop!(integrator::PairedExplicitRK2Integrator, t)
+    add_tstop!(integrator::PairedExplicitRK2_ERIntegrator, t)
 Add a time stop during the time integration process.
 This function is called after the periodic SaveSolutionCallback to specify the next stop to save the solution.
 """
-function add_tstop!(integrator::PairedExplicitRK2Integrator, t)
+function add_tstop!(integrator::PairedExplicitRK2_ERIntegrator, t)
     integrator.tdir * (t - integrator.t) < zero(integrator.t) &&
         error("Tried to add a tstop that is behind the current time. This is strictly forbidden")
     # We need to remove the first entry of tstops when a new entry is added.
@@ -271,25 +149,16 @@ function add_tstop!(integrator::PairedExplicitRK2Integrator, t)
     push!(integrator.opts.tstops, integrator.tdir * t)
 end
 
-has_tstop(integrator::PairedExplicitRK2Integrator) = !isempty(integrator.opts.tstops)
-first_tstop(integrator::PairedExplicitRK2Integrator) = first(integrator.opts.tstops)
+has_tstop(integrator::PairedExplicitRK2_ERIntegrator) = !isempty(integrator.opts.tstops)
+first_tstop(integrator::PairedExplicitRK2_ERIntegrator) = first(integrator.opts.tstops)
 
-# Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
-function Base.getproperty(integrator::PairedExplicitRK, field::Symbol)
-    if field === :stats
-        return (naccept = getfield(integrator, :iter),)
-    end
-    # general fallback
-    return getfield(integrator, field)
-end
-
-function init(ode::ODEProblem, alg::PairedExplicitRK2;
+function init(ode::ODEProblem, alg::PairedExplicitRK2_ER;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # PairedExplicitRK2 stages
+    # PairedExplicitRK2_ER stages
     k1 = zero(u0)
     k_higher = zero(u0)
 
@@ -297,7 +166,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRK2Integrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
+    integrator = PairedExplicitRK2_ERIntegrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
                                              ode.p,
                                              (prob = ode,), ode.f, alg,
                                              PairedExplicitRKOptions(callback,
@@ -320,7 +189,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2;
 end
 
 # Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
-function solve(ode::ODEProblem, alg::PairedExplicitRK2;
+function solve(ode::ODEProblem, alg::PairedExplicitRK2_ER;
                dt, callback = nothing, kwargs...)
     integrator = init(ode, alg, dt = dt, callback = callback; kwargs...)
 
@@ -328,7 +197,7 @@ function solve(ode::ODEProblem, alg::PairedExplicitRK2;
     solve!(integrator)
 end
 
-function solve!(integrator::PairedExplicitRK2Integrator)
+function solve!(integrator::PairedExplicitRK2_ERIntegrator)
     @unpack prob = integrator.sol
 
     integrator.finalstep = false
@@ -342,11 +211,28 @@ function solve!(integrator::PairedExplicitRK2Integrator)
                                   integrator.sol.prob)
 end
 
-function step!(integrator::PairedExplicitRK2Integrator)
+function entropy_der(stage, u_i,
+                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations, dg::DG, cache)
+    # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
+    integrate_via_indices(u_i, mesh, equations, dg, cache,
+                          stage) do u_i, i, element, equations, dg, stage
+        w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, element), equations)
+        stage_node = get_node_vars(stage, equations, dg, i, element)
+        dot(w_node, stage_node)
+    end
+end
+
+function r(gamma, S_old, dS, u, dir, mesh, equations, dg, cache)
+    return integrate(entropy_math, u + gamma * dir, mesh, equations, dg, cache) - S_old - gamma * dS
+end
+
+function step!(integrator::PairedExplicitRK2_ERIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
     callbacks = integrator.opts.callback
+
+    mesh, equations, dg, cache = mesh_equations_solver_cache(integrator.p)
 
     @assert !integrator.finalstep
     if isnan(integrator.dt)
@@ -355,11 +241,11 @@ function step!(integrator::PairedExplicitRK2Integrator)
 
     modify_dt_for_tstops!(integrator)
 
-    # if the next iteration would push the simulation beyond the end time, set dt accordingly
+    # if the next iteration would push the simulation beyond the end time, 
+    # set dt accordingly to avoid overshoots
     if integrator.t + integrator.dt > t_end ||
        isapprox(integrator.t + integrator.dt, t_end)
         integrator.dt = t_end - integrator.t
-        terminate!(integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
@@ -400,14 +286,72 @@ function step!(integrator::PairedExplicitRK2Integrator)
             end
         end
 
-        @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += alg.b1 * integrator.k1[i] +
-                               alg.bS * integrator.k_higher[i]
+        u_wrapped = wrap_array(integrator.u, integrator.p)
+        u_tmp_wrapped = wrap_array(integrator.u_tmp, integrator.p)
+        k1_wrapped = wrap_array(integrator.k1, integrator.p)
+        k_higher_wrapped = wrap_array(integrator.k_higher, integrator.p)
+    
+        # Check if there exists a root for `r` in the interval [0, 1]
+        S_old = integrate(entropy_math, u_wrapped, mesh, equations, dg, cache)
+        dS = (alg.b1 * entropy_der(k1_wrapped, u_wrapped, mesh, equations, dg, cache) + 
+              # u_tmp corresponds to input leading to last k_higher
+              alg.bS * entropy_der(k_higher_wrapped, u_tmp_wrapped, mesh, equations, dg, cache) )
+        
+        dir = alg.b1 * integrator.k1 + alg.bS * integrator.k_higher
+
+        dir_wrapped = wrap_array(dir, integrator.p)
+
+        gamma = 1.0 # Default value if entropy relaxation methodology not applicable
+
+        # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
+        gamma_min = 0.5
+        gamma_max = 1.0
+        
+        if r(gamma_max, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) > 0 && 
+           r(gamma_min, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache) < 0 #&&
+           #integrator.finalstep == false # Avoid last-step shenanigans for now
+        
+          # Init with gamma_0
+          gamma_eps = 1e-13
+    
+          while gamma_max - gamma_min > gamma_eps
+            gamma = 0.5 * (gamma_max + gamma_min)
+            r_gamma = r(gamma, S_old, dS, u_wrapped, dir_wrapped, mesh, equations, dg, cache)
+    
+            if r_gamma < 0
+              gamma_min = gamma
+            else
+              gamma_max = gamma
+            end
+          end
         end
-    end # PairedExplicitRK2 step
+        
+        #=
+        # Sanity check: Condition for desired order of convergence
+        if integrator.finalstep == false
+            # Condition for convergence: gamma = 1 + O[dt^(p-1)] = 1 + O(dt)
+            gamma = 1.0 - integrator.dt
+        else
+            gamma = 1.0
+        end
+        =#
+
+        # Last timestep shenanigans
+        if integrator.t + gamma * integrator.dt > t_end || isapprox(integrator.t + gamma * integrator.dt, t_end)
+            integrator.t = t_end
+            gamma = (t_end - integrator.t) / integrator.dt
+            terminate!(integrator)
+        else
+            integrator.t += gamma * integrator.dt
+        end
+
+        @threaded for i in eachindex(integrator.u)
+            integrator.u[i] += gamma * (alg.b1 * integrator.k1[i] + alg.bS * integrator.k_higher[i])
+        end
+        
+    end # PairedExplicitRK2_ER step
 
     integrator.iter += 1
-    integrator.t += integrator.dt
 
     @trixi_timeit timer() "Step-Callbacks" begin
         # handle callbacks
@@ -428,53 +372,8 @@ function step!(integrator::PairedExplicitRK2Integrator)
     end
 end
 
-# get a cache where the RHS can be stored
-get_du(integrator::PairedExplicitRK) = integrator.du
-get_tmp_cache(integrator::PairedExplicitRK) = (integrator.u_tmp,)
-
-# some algorithms from DiffEq like FSAL-ones need to be informed when a callback has modified u
-u_modified!(integrator::PairedExplicitRK, ::Bool) = false
-
-# used by adaptive timestepping algorithms in DiffEq
-function set_proposed_dt!(integrator::PairedExplicitRK, dt)
-    (integrator.dt = dt; integrator.dtcache = dt)
-end
-
-function get_proposed_dt(integrator::PairedExplicitRK)
-    return ifelse(integrator.opts.adaptive, integrator.dt, integrator.dtcache)
-end
-
-# stop the time integration
-function terminate!(integrator::PairedExplicitRK)
-    integrator.finalstep = true
-end
-
-"""
-    modify_dt_for_tstops!(integrator::PairedExplicitRK)
-Modify the time-step size to match the time stops specified in integrator.opts.tstops.
-To avoid adding OrdinaryDiffEq to Trixi's dependencies, this routine is a copy of
-https://github.com/SciML/OrdinaryDiffEq.jl/blob/d76335281c540ee5a6d1bd8bb634713e004f62ee/src/integrators/integrator_utils.jl#L38-L54
-"""
-function modify_dt_for_tstops!(integrator::PairedExplicitRK)
-    if has_tstop(integrator)
-        tdir_t = integrator.tdir * integrator.t
-        tdir_tstop = first_tstop(integrator)
-        if integrator.opts.adaptive
-            integrator.dt = integrator.tdir *
-                            min(abs(integrator.dt), abs(tdir_tstop - tdir_t)) # step! to the end
-        elseif iszero(integrator.dtcache) && integrator.dtchangeable
-            integrator.dt = integrator.tdir * abs(tdir_tstop - tdir_t)
-        elseif integrator.dtchangeable && !integrator.force_stepfail
-            # always try to step! with dtcache, but lower if a tstop
-            # however, if force_stepfail then don't set to dtcache, and no tstop worry
-            integrator.dt = integrator.tdir *
-                            min(abs(integrator.dtcache), abs(tdir_tstop - tdir_t)) # step! to the end
-        end
-    end
-end
-
 # used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::PairedExplicitRK2Integrator, new_size)
+function Base.resize!(integrator::PairedExplicitRK2_ERIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
