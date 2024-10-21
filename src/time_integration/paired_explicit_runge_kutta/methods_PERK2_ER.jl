@@ -229,7 +229,7 @@ function entropy_der(stage, u_i,
     end
 end
 
-function r(gamma, S_old, dS, u_gamma_dir, mesh, equations, dg, cache)
+function entropy_change(gamma, S_old, dS, u_gamma_dir, mesh, equations, dg, cache)
     return integrate(entropy_math, u_gamma_dir, mesh, equations, dg, cache) -
            S_old - gamma * dS
 end
@@ -294,87 +294,97 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
             end
         end
 
-        @threaded for i in eachindex(integrator.u)
-            integrator.direction[i] = alg.b1 * integrator.k1[i] +
-                                      alg.bS * integrator.k_higher[i]
-        end
+        @trixi_timeit timer() "Entropy Relaxation: Gamma Bisection" begin
+            @threaded for i in eachindex(integrator.u)
+                integrator.direction[i] = alg.b1 * integrator.k1[i] +
+                                          alg.bS * integrator.k_higher[i]
+            end
 
-        u_wrap = wrap_array(integrator.u, integrator.p)
-        u_tmp_wrap = wrap_array(integrator.u_tmp, integrator.p)
-        k1_wrap = wrap_array(integrator.k1, integrator.p)
-        k_higher_wrap = wrap_array(integrator.k_higher, integrator.p)
-        dir_wrap = wrap_array(integrator.direction, integrator.p)
-        # Re-use du as helper data structure (not needed anymore)
-        u_gamma_dir_wrap = wrap_array(integrator.du, integrator.p)
+            u_wrap = wrap_array(integrator.u, integrator.p)
+            u_tmp_wrap = wrap_array(integrator.u_tmp, integrator.p)
+            k1_wrap = wrap_array(integrator.k1, integrator.p)
+            k_higher_wrap = wrap_array(integrator.k_higher, integrator.p)
+            dir_wrap = wrap_array(integrator.direction, integrator.p)
+            # Re-use du as helper data structure (not needed anymore)
+            u_gamma_dir_wrap = wrap_array(integrator.du, integrator.p)
 
-        S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
-        dS = (alg.b1 * entropy_der(k1_wrap, u_wrap, mesh, equations, dg, cache) +
-              # u_tmp corresponds to input leading to last k_higher
-              alg.bS *
-              entropy_der(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache))
+            S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+            dS = (alg.b1 * entropy_der(k1_wrap, u_wrap, mesh, equations, dg, cache) +
+                  # u_tmp corresponds to input leading to last k_higher
+                  alg.bS *
+                  entropy_der(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache))
 
-        gamma = 1.0 # Default value if entropy relaxation methodology not applicable
+            gamma = 1.0 # Default value if entropy relaxation methodology not applicable
 
-        # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-        gamma_min = 0.5
-        gamma_max = 1.0
+            # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
+            gamma_min = 0.5
+            gamma_max = 1.0
+            bisection_its_max = 100
 
-        @threaded for element in eachelement(dg, cache)
-            @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
-                                                      gamma_max * dir_wrap[.., element]
-        end
-        r_max = r(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh, equations, dg, cache)
+            @threaded for element in eachelement(dg, cache)
+                @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                          gamma_max *
+                                                          dir_wrap[.., element]
+            end
+            r_max = entropy_change(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh,
+                                   equations, dg, cache)
 
-        @threaded for element in eachelement(dg, cache)
-            @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
-                                                      gamma_min * dir_wrap[.., element]
-        end
-        r_min = r(gamma_min, S_old, dS, u_gamma_dir_wrap, mesh, equations, dg, cache)
+            @threaded for element in eachelement(dg, cache)
+                @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                          gamma_min *
+                                                          dir_wrap[.., element]
+            end
+            r_min = entropy_change(gamma_min, S_old, dS, u_gamma_dir_wrap,
+                                   mesh, equations, dg, cache)
 
-        # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
-        if r_max > 0 && r_min < 0 # && 
-            # integrator.finalstep == false # Avoid last-step shenanigans for now
+            # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
+            if r_max > 0 && r_min < 0 # && 
+                # integrator.finalstep == false # Avoid last-step shenanigans for now
 
-            # Init with gamma_0
-            gamma_eps = 1e-13
+                # Init with gamma_0
+                gamma_eps = 1e-13
 
-            while gamma_max - gamma_min > gamma_eps
-                gamma = 0.5 * (gamma_max + gamma_min)
+                bisect_its = 0
+                while gamma_max - gamma_min > gamma_eps &&
+                    bisect_its < bisection_its_max
+                    gamma = 0.5 * (gamma_max + gamma_min)
 
-                @threaded for element in eachelement(dg, cache)
-                    @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
-                                                              gamma *
-                                                              dir_wrap[.., element]
-                end
-                r_gamma = r(gamma, S_old, dS, u_gamma_dir_wrap, mesh, equations, dg,
-                            cache)
+                    @threaded for element in eachelement(dg, cache)
+                        @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                                  gamma *
+                                                                  dir_wrap[.., element]
+                    end
+                    r_gamma = entropy_change(gamma, S_old, dS, u_gamma_dir_wrap,
+                                             mesh, equations, dg, cache)
 
-                if r_gamma < 0
-                    gamma_min = gamma
-                else
-                    gamma_max = gamma
+                    if r_gamma < 0
+                        gamma_min = gamma
+                    else
+                        gamma_max = gamma
+                    end
+                    bisect_its += 1
                 end
             end
-        end
 
-        #=
-        # Sanity check: Condition for desired order of convergence
-        if integrator.finalstep == false
-            # Condition for convergence: gamma = 1 + O[dt^(p-1)] = 1 + O(dt)
-            gamma = 1.0 - integrator.dt
-        else
-            gamma = 1.0
-        end
-        =#
+            #=
+            # Sanity check: Condition for desired order of convergence
+            if integrator.finalstep == false
+                # Condition for convergence: gamma = 1 + O[dt^(p-1)] = 1 + O(dt)
+                gamma = 1.0 - integrator.dt
+            else
+                gamma = 1.0
+            end
+            =#
 
-        # Last timestep shenanigans
-        if integrator.t + gamma * integrator.dt > t_end ||
-           isapprox(integrator.t + gamma * integrator.dt, t_end)
-            integrator.t = t_end
-            gamma = (t_end - integrator.t) / integrator.dt
-            terminate!(integrator)
-        else
-            integrator.t += gamma * integrator.dt
+            # Last timestep shenanigans
+            if integrator.t + gamma * integrator.dt > t_end ||
+               isapprox(integrator.t + gamma * integrator.dt, t_end)
+                integrator.t = t_end
+                gamma = (t_end - integrator.t) / integrator.dt
+                terminate!(integrator)
+            else
+                integrator.t += gamma * integrator.dt
+            end
         end
 
         @threaded for i in eachindex(integrator.u)
