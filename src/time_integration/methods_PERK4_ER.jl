@@ -14,8 +14,13 @@ mutable struct PERK4_ER{StageCallbacks}
     c::Vector{Float64}
 
     function PERK4_ER(NumStages_::Int, BasePathMonCoeffs_::AbstractString,
-                   stage_callbacks = ())
-        PERK4(NumStages_, BasePathMonCoeffs_, stage_callbacks)
+                stage_callbacks = ())
+    newPERK4 = new{typeof(stage_callbacks)}(NumStages_, stage_callbacks)
+
+    newPERK4.AMatrices, newPERK4.AMatrix, newPERK4.c = ComputePERK4_ButcherTableau(NumStages_,
+                                                                                    BasePathMonCoeffs_)
+
+    return newPERK4
     end
 end # struct PERK4
 
@@ -53,7 +58,6 @@ mutable struct PERK4_ER_Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
 
     # Entropy Relaxation additions
     direction::uType
-    entropy_change::uType
     num_timestep_relaxations::Int
 end
 
@@ -85,8 +89,6 @@ function init(ode::ODEProblem, alg::PERK4_ER;
     
     # For entropy relaxation
     direction = zero(u0)
-    entropy_change = zero(u0)
-    entropy_change = wrap_array(entropy_change, ode.p)
 
     t0 = first(ode.tspan)
     iter = 0
@@ -98,7 +100,7 @@ function init(ode::ODEProblem, alg::PERK4_ER;
                                   k1, k_higher, t0,
                                   du_ode_hyp,
                                   #uprev, tprev)
-                                  direction, entropy_change, 0)
+                                  direction, 0)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -129,7 +131,7 @@ function int_w_dot_stage(stage, u_i,
 end
 
 function int_w_dot_stage(stage, u_i,
-                     mesh::Union{TreeMesh{2}, StructuredMesh{2}, StructuredMeshView{2},
+                     mesh::Union{TreeMesh{2}, StructuredMesh{2},
                                  UnstructuredMesh2D, P4estMesh{2}, T8codeMesh{2}},
                      equations, dg::DG, cache)
     # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
@@ -247,8 +249,8 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
 
   k_higher_wrap = wrap_array(integrator.k_higher, p)
   u_tmp_wrap = wrap_array(integrator.u_tmp, p)
-  # TODO: Not sure if this causes allocations
-  dS = int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+  # 0.5 = b_{S-1}
+  dS = 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
   # S
   @threaded for i in eachindex(integrator.du)
@@ -262,28 +264,22 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
   #integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + alg.c[alg.NumStages] * integrator.dt, integrator.du_ode_hyp)
   integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + alg.c[alg.NumStages] * integrator.dt)
   
-  entropy_change = int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
-  @threaded for element in eachelement(dg, cache)
-    #@views @. entropy_change[.., element] *= 0.5 # b_{S}
-    #@views @. entropy_change[.., element] += 0.5 * dS[.., element] # b_{S-1}
-    @views @. entropy_change[.., element] = 0.5 * (entropy_change[.., element] + dS[.., element])
-  end
-
-  @threaded for u_ind in eachindex(integrator.u)
-      # Note that 'k_higher' carries the values of K_{S-1}
-      # and that we construct 'K_S' "in-place" from 'integrator.du'
-      integrator.direction[u_ind] += 0.5 * (integrator.k_higher[u_ind] + integrator.du[u_ind] * integrator.dt)
-  end
+  #k_higher_wrap = wrap_array(integrator.k_higher, p)
+  #u_tmp_wrap = wrap_array(integrator.u_tmp, p)
+  # 0.5 = b_{S}
+  dS += 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
   u_wrap = wrap_array(integrator.u, integrator.p)
   dir_wrap = wrap_array(integrator.direction, p)
+  # Re-use `du` as helper data structure (not needed anymore)
+  u_gamma_dir_wrap = wrap_array(integrator.du, integrator.p)
   
   S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
   gamma = 1.0 # Default value if entropy relaxation methodology not applicable
 
   # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-  gamma_min = 0.5
+  gamma_min = 1e-3 # Cannot be 0, as then r(0) = 0
   gamma_max = 1.0
   bisection_its_max = 100
 
@@ -292,7 +288,7 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
                                                 gamma_max *
                                                 dir_wrap[.., element]
   end
-  r_max = entropy_diff(gamma_max, S_old, entropy_change, u_gamma_dir_wrap, mesh,
+  r_max = entropy_diff(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh,
                          equations, dg, cache)
 
   @threaded for element in eachelement(dg, cache)
@@ -300,10 +296,10 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
                                                 gamma_min *
                                                 dir_wrap[.., element]
   end
-  r_min = entropy_diff(gamma_min, S_old, entropy_change, u_gamma_dir_wrap,
+  r_min = entropy_diff(gamma_min, S_old, dS, u_gamma_dir_wrap,
                          mesh, equations, dg, cache)
 
-                                     # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
+  # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
   if r_max > 0 && r_min < 0 # && 
     # integrator.finalstep == false # Avoid last-step shenanigans for now
 
@@ -323,7 +319,7 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
                                                       gamma *
                                                       dir_wrap[.., element]
         end
-        r_gamma = entropy_diff(gamma, S_old, entropy_change, u_gamma_dir_wrap,
+        r_gamma = entropy_diff(gamma, S_old, dS, u_gamma_dir_wrap,
                                   mesh, equations, dg, cache)
 
         if r_gamma < 0
@@ -335,6 +331,7 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
       end
   end
 
+  t_end = last(integrator.sol.prob.tspan)
   integrator.iter += 1
   # Last timestep shenanigans
   if integrator.t + gamma * integrator.dt > t_end ||
@@ -355,19 +352,11 @@ end
 function step!(integrator::PERK4_ER_Integrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
-    t_end = last(prob.tspan)
     callbacks = integrator.opts.callback
 
     @assert !integrator.finalstep
     if isnan(integrator.dt)
         error("time step size `dt` is NaN")
-    end
-
-    # if the next iteration would push the simulation beyond the end time, set dt accordingly
-    if integrator.t + integrator.dt > t_end ||
-       isapprox(integrator.t + integrator.dt, t_end)
-        integrator.dt = t_end - integrator.t
-        terminate!(integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
