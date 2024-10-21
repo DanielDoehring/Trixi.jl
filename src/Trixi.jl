@@ -290,7 +290,8 @@ export trixi_include, examples_dir, get_examples, default_example,
 
 export ode_norm, ode_unstable_check
 
-export PERK, PERK_Multi, PERK3, PERK3_Multi, PERK4, PERK4_Multi
+export PERK, PERK_Multi, PERK3, PERK3_Multi, PERK4, PERK4_Multi,
+       PERK4_ER
 
 export convergence_test, jacobian_fd, jacobian_ad_forward, linear_structure
 
