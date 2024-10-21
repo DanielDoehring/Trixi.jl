@@ -2,6 +2,8 @@
 using OrdinaryDiffEq, Plots
 using Trixi
 
+#using DoubleFloats
+
 ###############################################################################
 # semidiscretization of the compressible Euler equations
 
@@ -120,7 +122,13 @@ initial_condition = initial_condition_isentropic_vortex
 
 surf_flux = flux_hllc # Better flux, allows much larger timesteps
 PolyDeg = 3
-solver = DGSEM(polydeg=PolyDeg, surface_flux=surf_flux)
+solver = DGSEM(RealT = Float64, polydeg=PolyDeg, surface_flux=surf_flux)
+
+#=
+volume_flux = flux_ranocha
+solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
+               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+=#
 
 coordinates_min = (-EdgeLength, -EdgeLength)
 coordinates_max = ( EdgeLength,  EdgeLength)
@@ -139,18 +147,19 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 500
+analysis_interval = 20
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = ())
+                                     analysis_integrals = (entropy,),
+                                     save_analysis = true)
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
                                       base_level=Refinement,
                                       med_level=Refinement+1, med_threshold=-3.0,
                                       max_level=Refinement+3, max_threshold=-0.6)
                                      
-amr_interval = 16 # PERK4 Multi
-#amr_interval = 10 # PERK4 19
+#amr_interval = 16 # PERK4 Multi
+amr_interval = 10 # PERK4 19
 
 #amr_interval = 18 # NDBLSRK144
 #amr_interval = 30 # DGLDDRK84_C
@@ -167,7 +176,7 @@ amr_callback = AMRCallback(semi, amr_controller,
 CFL = 7.4
 
 # PERK4 Standalone #
-#CFL = 11.5 # S = 19
+CFL = 11.5 # S = 19
 
 # OrdinaryDiffEq.jl methods
 
@@ -176,7 +185,7 @@ CFL = 7.4
 #CFL = 4.6 # RDPK3SpFSAL49
 #CFL = 1.6 # RK4
 
-stepsize_callback = StepsizeCallback(cfl = CFL)
+stepsize_callback = StepsizeCallback(cfl = CFL * 0.9) # Reduction: Flux Ranocha and/or ER
 
 callbacks = CallbackSet(summary_callback,
                         amr_callback,
@@ -186,14 +195,14 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-#ode_algorithm = PERK4(19, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+ode_algorithm = PERK4(19, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
 
-
+#=
 dtRatios = [1, 0.5, 0.25, 0.125]
 Stages = [19, 11, 7, 5]
 
 ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/", dtRatios)
-
+=#
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,

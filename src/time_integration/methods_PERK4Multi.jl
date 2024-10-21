@@ -384,7 +384,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                     integrator.du_ode_hyp)
         =#
         
-        #=
+        
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                         integrator.level_info_elements_acc[1],
                         integrator.level_info_interfaces_acc[1],
@@ -392,9 +392,10 @@ function step!(integrator::PERK4_Multi_Integrator)
                         integrator.level_info_boundaries_orientation_acc[1],
                         integrator.level_info_mortars_acc[1],
                         1)
-        =#
+        
 
         # Euler-Gravity
+        #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage,
                         integrator.level_info_elements_acc,
                         integrator.level_info_interfaces_acc,
@@ -402,7 +403,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                         integrator.level_info_boundaries_orientation_acc,
                         integrator.level_info_mortars_acc,
                         1, integrator.n_levels)
-
+        =#
         #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                         integrator.level_info_elements_acc[1],
@@ -525,7 +526,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.du_ode_hyp)
                 =#
                 
-                #=
+                
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
@@ -533,9 +534,10 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                             integrator.level_info_mortars_acc[integrator.coarsest_lvl],
                             integrator.coarsest_lvl)
-                =#
+                
 
                 # Euler-Gravity
+                #=
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc,
                             integrator.level_info_interfaces_acc,
@@ -543,7 +545,7 @@ function step!(integrator::PERK4_Multi_Integrator)
                             integrator.level_info_boundaries_orientation_acc,
                             integrator.level_info_mortars_acc,
                             integrator.coarsest_lvl, integrator.n_levels)
-
+                =#
                 #=
                 integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t_stage, 
                             integrator.level_info_elements_acc[integrator.coarsest_lvl],

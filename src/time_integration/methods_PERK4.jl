@@ -242,7 +242,7 @@ function last_three_stages!(integrator, alg, p)
 
     #integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + alg.c[alg.NumStages] * integrator.dt, integrator.du_ode_hyp)
     integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + alg.c[alg.NumStages] * integrator.dt)
-    
+
     @threaded for u_ind in eachindex(integrator.u)
         # Note that 'k_higher' carries the values of K_{S-1}
         # and that we construct 'K_S' "in-place" from 'integrator.du'
