@@ -252,8 +252,6 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
     integrator.direction[i] = 0.5 * (integrator.k_higher[i] + integrator.du[i] * integrator.dt)
   end
 
-  #k_higher_wrap = wrap_array(integrator.k_higher, p)
-  #u_tmp_wrap = wrap_array(integrator.u_tmp, p)
   # 0.5 = b_{S}
   dS += 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
@@ -267,7 +265,7 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
   gamma = 1.0 # Default value if entropy relaxation methodology not applicable
 
   # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-  gamma_min = 0.5 # Cannot be 0, as then r(0) = 0
+  gamma_min = 0.4 # Cannot be 0, as then r(0) = 0
   gamma_max = 1.0
   bisection_its_max = 100
 
@@ -286,20 +284,16 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
   end
   r_min = entropy_diff(gamma_min, S_old, dS, u_gamma_dir_wrap,
                          mesh, equations, dg, cache)
-
+                    
   # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
   if r_max > 0 && r_min < 0 # && 
     # integrator.finalstep == false # Avoid last-step shenanigans for now
 
     integrator.num_timestep_relaxations += 1
-    # Init with gamma_0
-    gamma_eps = 1e-13
+    gamma_eps = 1e-15
 
     bisect_its = 0
-    @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min >
-                                                gamma_eps &&
-                                                bisect_its <
-                                                bisection_its_max
+    @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min > gamma_eps && bisect_its < bisection_its_max
         gamma = 0.5 * (gamma_max + gamma_min)
 
         @threaded for element in eachelement(dg, cache)

@@ -124,11 +124,11 @@ surf_flux = flux_hllc # Better flux, allows much larger timesteps
 PolyDeg = 3
 solver = DGSEM(RealT = Float64, polydeg=PolyDeg, surface_flux=surf_flux)
 
-#=
+# For real entropy conservation!
 volume_flux = flux_ranocha
-solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
+solver = DGSEM(RealT = Float64, polydeg = 3, surface_flux = flux_ranocha,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
-=#
+
 
 coordinates_min = (-EdgeLength, -EdgeLength)
 coordinates_max = ( EdgeLength,  EdgeLength)
@@ -185,17 +185,17 @@ CFL = 11.5 # S = 19
 #CFL = 4.6 # RDPK3SpFSAL49
 #CFL = 1.6 # RK4
 
-stepsize_callback = StepsizeCallback(cfl = CFL * 0.9) # Reduction: Flux Ranocha and/or ER
+stepsize_callback = StepsizeCallback(cfl = CFL * 0.35) # Reduction: Flux Ranocha and/or ER
 
 callbacks = CallbackSet(summary_callback,
-                        amr_callback,
+                        #amr_callback,
                         stepsize_callback,
                         analysis_callback)                
 
 ###############################################################################
 # run the simulation
 
-ode_algorithm = PERK4(19, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+ode_algorithm = PERK4_ER(19, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
 
 #=
 dtRatios = [1, 0.5, 0.25, 0.125]
