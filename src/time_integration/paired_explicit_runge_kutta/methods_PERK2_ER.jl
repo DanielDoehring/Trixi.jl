@@ -218,9 +218,9 @@ function solve!(integrator::PairedExplicitRK2_ERIntegrator)
                                   integrator.sol.prob)
 end
 
-function entropy_der(stage, u_i,
-                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations, dg::DG,
-                     cache)
+function int_w_dot_stage(stage, u_i,
+                         mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations, dg::DG,
+                         cache)
     # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
     integrate_via_indices(u_i, mesh, equations, dg, cache,
                           stage) do u_i, i, element, equations, dg, stage
@@ -231,10 +231,11 @@ function entropy_der(stage, u_i,
     end
 end
 
-function entropy_der(stage, u_i,
-                     mesh::Union{TreeMesh{2}, StructuredMesh{2}, StructuredMeshView{2},
-                                 UnstructuredMesh2D, P4estMesh{2}, T8codeMesh{2}},
-                     equations, dg::DG, cache)
+function int_w_dot_stage(stage, u_i,
+                         mesh::Union{TreeMesh{2}, StructuredMesh{2},
+                                     StructuredMeshView{2},
+                                     UnstructuredMesh2D, P4estMesh{2}, T8codeMesh{2}},
+                         equations, dg::DG, cache)
     # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
     integrate_via_indices(u_i, mesh, equations, dg, cache,
                           stage) do u_i, i, j, element, equations, dg, stage
@@ -245,10 +246,10 @@ function entropy_der(stage, u_i,
     end
 end
 
-function entropy_der(stage, u_i,
-                     mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
-                                 T8codeMesh{3}},
-                     equations, dg::DG, cache)
+function int_w_dot_stage(stage, u_i,
+                         mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
+                                     T8codeMesh{3}},
+                         equations, dg::DG, cache)
     # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
     integrate_via_indices(u_i, mesh, equations, dg, cache,
                           stage) do u_i, i, j, k, element, equations, dg, stage
@@ -259,7 +260,7 @@ function entropy_der(stage, u_i,
     end
 end
 
-function entropy_change(gamma, S_old, dS, u_gamma_dir, mesh, equations, dg, cache)
+function entropy_diff(gamma, S_old, dS, u_gamma_dir, mesh, equations, dg, cache)
     return integrate(entropy_math, u_gamma_dir, mesh, equations, dg, cache) -
            S_old - gamma * dS
 end
@@ -341,11 +342,11 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
 
                 S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
                 dS = (alg.b1 *
-                      entropy_der(k1_wrap, u_wrap, mesh, equations, dg, cache) +
+                      int_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache) +
                       # u_tmp corresponds to input leading to last k_higher
                       alg.bS *
-                      entropy_der(k_higher_wrap, u_tmp_wrap, mesh, equations, dg,
-                                  cache))
+                      int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg,
+                                      cache))
 
                 gamma = 1.0 # Default value if entropy relaxation methodology not applicable
 
@@ -359,16 +360,16 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
                                                               gamma_max *
                                                               dir_wrap[.., element]
                 end
-                r_max = entropy_change(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh,
-                                       equations, dg, cache)
+                r_max = entropy_diff(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh,
+                                     equations, dg, cache)
 
                 @threaded for element in eachelement(dg, cache)
                     @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
                                                               gamma_min *
                                                               dir_wrap[.., element]
                 end
-                r_min = entropy_change(gamma_min, S_old, dS, u_gamma_dir_wrap,
-                                       mesh, equations, dg, cache)
+                r_min = entropy_diff(gamma_min, S_old, dS, u_gamma_dir_wrap,
+                                     mesh, equations, dg, cache)
             end
 
             # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
@@ -391,8 +392,8 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
                                                                   gamma *
                                                                   dir_wrap[.., element]
                     end
-                    r_gamma = entropy_change(gamma, S_old, dS, u_gamma_dir_wrap,
-                                             mesh, equations, dg, cache)
+                    r_gamma = entropy_diff(gamma, S_old, dS, u_gamma_dir_wrap,
+                                           mesh, equations, dg, cache)
 
                     if r_gamma < 0
                         gamma_min = gamma
