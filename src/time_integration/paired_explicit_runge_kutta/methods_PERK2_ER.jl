@@ -113,6 +113,7 @@ mutable struct PairedExplicitRK2_ERIntegrator{RealT <: Real, uType, Params, Sol,
     k_higher::uType
     # Naive implementation for entropy relaxation:
     direction::uType
+    num_timestep_relaxations::Int
 end
 
 """
@@ -179,7 +180,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2_ER;
                                                                         kwargs...),
                                                 false, true, false,
                                                 k1, k_higher,
-                                                direction)
+                                                direction, 0)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -223,8 +224,37 @@ function entropy_der(stage, u_i,
     # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
     integrate_via_indices(u_i, mesh, equations, dg, cache,
                           stage) do u_i, i, element, equations, dg, stage
-        w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, element), equations)
+        w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, element),
+                              equations)
         stage_node = get_node_vars(stage, equations, dg, i, element)
+        dot(w_node, stage_node)
+    end
+end
+
+function entropy_der(stage, u_i,
+                     mesh::Union{TreeMesh{2}, StructuredMesh{2}, StructuredMeshView{2},
+                                 UnstructuredMesh2D, P4estMesh{2}, T8codeMesh{2}},
+                     equations, dg::DG, cache)
+    # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
+    integrate_via_indices(u_i, mesh, equations, dg, cache,
+                          stage) do u_i, i, j, element, equations, dg, stage
+        w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, j, element),
+                              equations)
+        stage_node = get_node_vars(stage, equations, dg, i, j, element)
+        dot(w_node, stage_node)
+    end
+end
+
+function entropy_der(stage, u_i,
+                     mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
+                                 T8codeMesh{3}},
+                     equations, dg::DG, cache)
+    # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
+    integrate_via_indices(u_i, mesh, equations, dg, cache,
+                          stage) do u_i, i, j, k, element, equations, dg, stage
+        w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, j, k, element),
+                              equations)
+        stage_node = get_node_vars(stage, equations, dg, i, j, k, element)
         dot(w_node, stage_node)
     end
 end
@@ -294,59 +324,66 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
             end
         end
 
-        @trixi_timeit timer() "Entropy Relaxation: Gamma Bisection" begin
-            @threaded for i in eachindex(integrator.u)
-                integrator.direction[i] = alg.b1 * integrator.k1[i] +
-                                          alg.bS * integrator.k_higher[i]
+        @threaded for i in eachindex(integrator.u)
+            integrator.direction[i] = alg.b1 * integrator.k1[i] +
+                                      alg.bS * integrator.k_higher[i]
+        end
+
+        @trixi_timeit timer() "Entropy Relaxation" begin
+            @trixi_timeit timer() "ER: Initial check" begin
+                u_wrap = wrap_array(integrator.u, integrator.p)
+                u_tmp_wrap = wrap_array(integrator.u_tmp, integrator.p)
+                k1_wrap = wrap_array(integrator.k1, integrator.p)
+                k_higher_wrap = wrap_array(integrator.k_higher, integrator.p)
+                dir_wrap = wrap_array(integrator.direction, integrator.p)
+                # Re-use du as helper data structure (not needed anymore)
+                u_gamma_dir_wrap = wrap_array(integrator.du, integrator.p)
+
+                S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+                dS = (alg.b1 *
+                      entropy_der(k1_wrap, u_wrap, mesh, equations, dg, cache) +
+                      # u_tmp corresponds to input leading to last k_higher
+                      alg.bS *
+                      entropy_der(k_higher_wrap, u_tmp_wrap, mesh, equations, dg,
+                                  cache))
+
+                gamma = 1.0 # Default value if entropy relaxation methodology not applicable
+
+                # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
+                gamma_min = 0.5
+                gamma_max = 1.0
+                bisection_its_max = 100
+
+                @threaded for element in eachelement(dg, cache)
+                    @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                              gamma_max *
+                                                              dir_wrap[.., element]
+                end
+                r_max = entropy_change(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh,
+                                       equations, dg, cache)
+
+                @threaded for element in eachelement(dg, cache)
+                    @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+                                                              gamma_min *
+                                                              dir_wrap[.., element]
+                end
+                r_min = entropy_change(gamma_min, S_old, dS, u_gamma_dir_wrap,
+                                       mesh, equations, dg, cache)
             end
-
-            u_wrap = wrap_array(integrator.u, integrator.p)
-            u_tmp_wrap = wrap_array(integrator.u_tmp, integrator.p)
-            k1_wrap = wrap_array(integrator.k1, integrator.p)
-            k_higher_wrap = wrap_array(integrator.k_higher, integrator.p)
-            dir_wrap = wrap_array(integrator.direction, integrator.p)
-            # Re-use du as helper data structure (not needed anymore)
-            u_gamma_dir_wrap = wrap_array(integrator.du, integrator.p)
-
-            S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
-            dS = (alg.b1 * entropy_der(k1_wrap, u_wrap, mesh, equations, dg, cache) +
-                  # u_tmp corresponds to input leading to last k_higher
-                  alg.bS *
-                  entropy_der(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache))
-
-            gamma = 1.0 # Default value if entropy relaxation methodology not applicable
-
-            # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-            gamma_min = 0.5
-            gamma_max = 1.0
-            bisection_its_max = 100
-
-            @threaded for element in eachelement(dg, cache)
-                @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
-                                                          gamma_max *
-                                                          dir_wrap[.., element]
-            end
-            r_max = entropy_change(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh,
-                                   equations, dg, cache)
-
-            @threaded for element in eachelement(dg, cache)
-                @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
-                                                          gamma_min *
-                                                          dir_wrap[.., element]
-            end
-            r_min = entropy_change(gamma_min, S_old, dS, u_gamma_dir_wrap,
-                                   mesh, equations, dg, cache)
 
             # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
             if r_max > 0 && r_min < 0 # && 
                 # integrator.finalstep == false # Avoid last-step shenanigans for now
 
+                integrator.num_timestep_relaxations += 1
                 # Init with gamma_0
                 gamma_eps = 1e-13
 
                 bisect_its = 0
-                while gamma_max - gamma_min > gamma_eps &&
-                    bisect_its < bisection_its_max
+                @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min >
+                                                            gamma_eps &&
+                                                            bisect_its <
+                                                            bisection_its_max
                     gamma = 0.5 * (gamma_max + gamma_min)
 
                     @threaded for element in eachelement(dg, cache)
@@ -382,6 +419,7 @@ function step!(integrator::PairedExplicitRK2_ERIntegrator)
                 integrator.t = t_end
                 gamma = (t_end - integrator.t) / integrator.dt
                 terminate!(integrator)
+                println("# Relaxed timesteps: ", integrator.num_timestep_relaxations)
             else
                 integrator.t += gamma * integrator.dt
             end
