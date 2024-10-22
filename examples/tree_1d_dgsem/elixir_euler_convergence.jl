@@ -37,12 +37,10 @@ analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      analysis_integrals = (entropy,),
                                      save_analysis = true)
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
-
 stepsize_callback = StepsizeCallback(cfl = 0.8)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback, alive_callback,
+                        analysis_callback,
                         stepsize_callback)
 
 ###############################################################################

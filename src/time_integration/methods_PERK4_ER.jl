@@ -194,7 +194,7 @@ function solve_steps!(integrator::PERK4_ER_Integrator)
                                   integrator.sol.prob)
 end
 
-function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
+function last_three_stages_ER!(integrator, alg, p)
   mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
   # S - 2
@@ -371,7 +371,7 @@ function step!(integrator::PERK4_ER_Integrator)
             end
         end
 
-        last_three_stages!(integrator, alg, prob.p)
+        last_three_stages_ER!(integrator, alg, prob.p)
     end # PERK4 step
 
     @trixi_timeit timer() "Step-Callbacks" begin
