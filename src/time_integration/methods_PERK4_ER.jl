@@ -252,37 +252,37 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
     integrator.direction[i] = 0.5 * (integrator.k_higher[i] + integrator.du[i] * integrator.dt)
   end
 
+  du_wrap = wrap_array(integrator.du, integrator.p)
   # 0.5 = b_{S}
-  dS += 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+  dS += 0.5 * integrator.dt * int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
   u_wrap = wrap_array(integrator.u, integrator.p)
   dir_wrap = wrap_array(integrator.direction, p)
-  # Re-use `du` as helper data structure (not needed anymore)
-  u_gamma_dir_wrap = wrap_array(integrator.du, integrator.p)
   
   S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
   gamma = 1.0 # Default value if entropy relaxation methodology not applicable
 
   # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-  gamma_min = 0.4 # Cannot be 0, as then r(0) = 0
+  gamma_min = 0.1 # Cannot be 0, as then r(0) = 0
   gamma_max = 1.0
   bisection_its_max = 100
 
+  # Re-use `du_wrap` as helper data structure (not needed anymore)
   @threaded for element in eachelement(dg, cache)
-      @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+      @views @. du_wrap[.., element] = u_wrap[.., element] +
                                                 gamma_max *
                                                 dir_wrap[.., element]
   end
-  r_max = entropy_diff(gamma_max, S_old, dS, u_gamma_dir_wrap, mesh,
+  r_max = entropy_diff(gamma_max, S_old, dS, du_wrap, mesh,
                          equations, dg, cache)
 
   @threaded for element in eachelement(dg, cache)
-      @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+      @views @. du_wrap[.., element] = u_wrap[.., element] +
                                                 gamma_min *
                                                 dir_wrap[.., element]
   end
-  r_min = entropy_diff(gamma_min, S_old, dS, u_gamma_dir_wrap,
+  r_min = entropy_diff(gamma_min, S_old, dS, du_wrap,
                          mesh, equations, dg, cache)
                     
   # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
@@ -293,15 +293,15 @@ function last_three_stages!(integrator::PERK4_ER_Integrator, alg, p)
     gamma_eps = 1e-15
 
     bisect_its = 0
-    @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min > gamma_eps && bisect_its < bisection_its_max
+    @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min > gamma_eps #&& bisect_its < bisection_its_max
         gamma = 0.5 * (gamma_max + gamma_min)
 
         @threaded for element in eachelement(dg, cache)
-            @views @. u_gamma_dir_wrap[.., element] = u_wrap[.., element] +
+            @views @. du_wrap[.., element] = u_wrap[.., element] +
                                                       gamma *
                                                       dir_wrap[.., element]
         end
-        r_gamma = entropy_diff(gamma, S_old, dS, u_gamma_dir_wrap,
+        r_gamma = entropy_diff(gamma, S_old, dS, du_wrap,
                                   mesh, equations, dg, cache)
 
         if r_gamma < 0
