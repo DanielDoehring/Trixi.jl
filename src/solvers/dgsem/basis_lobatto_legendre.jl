@@ -12,6 +12,7 @@ Create a nodal Lobatto-Legendre basis for polynomials of degree `polydeg`.
 
 For the special case `polydeg=0` the DG method reduces to a finite volume method.
 Therefore, this function sets the center point of the cell as single node.
+This exceptional case is currently only supported for TreeMesh!
 """
 struct LobattoLegendreBasis{RealT <: Real, NNODES,
                             VectorT <: AbstractVector{RealT},
@@ -36,15 +37,14 @@ end
 function LobattoLegendreBasis(RealT, polydeg::Integer)
     nnodes_ = polydeg + 1
 
-    # compute everything using `Float64` by default
-    nodes_, weights_ = gauss_lobatto_nodes_weights(nnodes_)
+    nodes_, weights_ = gauss_lobatto_nodes_weights(RealT, nnodes_)
     inverse_weights_ = inv.(weights_)
 
-    _, inverse_vandermonde_legendre_ = vandermonde_legendre(nodes_)
+    _, inverse_vandermonde_legendre_ = vandermonde_legendre(RealT, nodes_)
 
-    boundary_interpolation_ = zeros(nnodes_, 2)
-    boundary_interpolation_[:, 1] = calc_lhat(-1.0, nodes_, weights_)
-    boundary_interpolation_[:, 2] = calc_lhat(1.0, nodes_, weights_)
+    boundary_interpolation_ = zeros(RealT, nnodes_, 2)
+    boundary_interpolation_[:, 1] = calc_lhat(-one(RealT), nodes_, weights_)
+    boundary_interpolation_[:, 2] = calc_lhat(one(RealT), nodes_, weights_)
 
     derivative_matrix_ = polynomial_derivative_matrix(nodes_)
     derivative_split_ = calc_dsplit(nodes_, weights_)
@@ -263,7 +263,7 @@ function SolutionAnalyzer(basis::LobattoLegendreBasis;
     nnodes_ = analysis_polydeg + 1
 
     # compute everything using `Float64` by default
-    nodes_, weights_ = gauss_lobatto_nodes_weights(nnodes_)
+    nodes_, weights_ = gauss_lobatto_nodes_weights(RealT, nnodes_)
     vandermonde_ = polynomial_interpolation_matrix(get_nodes(basis), nodes_)
 
     # type conversions to get the requested real type and enable possible
@@ -403,10 +403,11 @@ function calc_dsplit(nodes, weights)
     return dsplit
 end
 
-# Calculate the polynomial derivative matrix D
+# Calculate the polynomial derivative matrix D.
+# This implements algorithm 37 "PolynomialDerivativeMatrix" from Kopriva's book.
 function polynomial_derivative_matrix(nodes)
     n_nodes = length(nodes)
-    d = zeros(n_nodes, n_nodes)
+    d = zeros(eltype(nodes), n_nodes, n_nodes)
     wbary = barycentric_weights(nodes)
 
     for i in 1:n_nodes, j in 1:n_nodes
@@ -420,6 +421,7 @@ function polynomial_derivative_matrix(nodes)
 end
 
 # Calculate and interpolation matrix (Vandermonde matrix) between two given sets of nodes
+# See algorithm 32 "PolynomialInterpolationMatrix" from Kopriva's book.
 function polynomial_interpolation_matrix(nodes_in, nodes_out,
                                          baryweights_in = barycentric_weights(nodes_in))
     n_nodes_in = length(nodes_in)
@@ -432,6 +434,7 @@ function polynomial_interpolation_matrix(nodes_in, nodes_out,
     return vandermonde
 end
 
+# This implements algorithm 32 "PolynomialInterpolationMatrix" from Kopriva's book.
 function polynomial_interpolation_matrix!(vandermonde,
                                           nodes_in, nodes_out,
                                           baryweights_in)
@@ -462,10 +465,22 @@ function polynomial_interpolation_matrix!(vandermonde,
     return vandermonde
 end
 
-# Calculate the barycentric weights for a given node distribution.
+"""
+    barycentric_weights(nodes)
+
+Calculate the barycentric weights for a given node distribution, i.e.,
+```math
+w_j = \\frac{1}{ \\prod_{k \\neq j} \\left( x_j - x_k \\right ) }
+```
+
+For details, see (especially Section 3)
+- Jean-Paul Berrut and Lloyd N. Trefethen (2004).
+    Barycentric Lagrange Interpolation.
+    [DOI:10.1137/S0036144502417715](https://doi.org/10.1137/S0036144502417715)
+"""
 function barycentric_weights(nodes)
     n_nodes = length(nodes)
-    weights = ones(n_nodes)
+    weights = ones(eltype(nodes), n_nodes)
 
     for j in 2:n_nodes, k in 1:(j - 1)
         weights[k] *= nodes[k] - nodes[j]
@@ -493,12 +508,31 @@ function calc_lhat(x, nodes, weights)
     return lhat
 end
 
-# Calculate Lagrange polynomials for a given node distribution.
+""" 
+    lagrange_interpolating_polynomials(x, nodes, wbary)
+
+Calculate Lagrange polynomials for a given node distribution with
+associated barycentric weights `wbary` at a given point `x` on the 
+reference interval ``[-1, 1]``.
+
+This returns all ``l_j(x)``, i.e., the Lagrange polynomials for each node ``x_j``.
+Thus, to obtain the interpolating polynomial ``p(x)`` at ``x``, one has to 
+multiply the Lagrange polynomials with the nodal values ``u_j`` and sum them up:
+``p(x) = \\sum_{j=1}^{n} u_j l_j(x)``.
+
+For details, see e.g. Section 2 of 
+- Jean-Paul Berrut and Lloyd N. Trefethen (2004).
+    Barycentric Lagrange Interpolation.
+    [DOI:10.1137/S0036144502417715](https://doi.org/10.1137/S0036144502417715)
+"""
 function lagrange_interpolating_polynomials(x, nodes, wbary)
     n_nodes = length(nodes)
-    polynomials = zeros(n_nodes)
+    polynomials = zeros(eltype(nodes), n_nodes)
 
     for i in 1:n_nodes
+        # Avoid division by zero when `x` is close to node by using 
+        # the Kronecker-delta property at nodes
+        # of the Lagrange interpolation polynomials.
         if isapprox(x, nodes[i], rtol = eps(x))
             polynomials[i] = 1
             return polynomials
@@ -517,20 +551,35 @@ function lagrange_interpolating_polynomials(x, nodes, wbary)
     return polynomials
 end
 
+"""
+    gauss_lobatto_nodes_weights(RealT, n_nodes::Integer)
+
+Computes nodes ``x_j`` and weights ``w_j`` for the (Legendre-)Gauss-Lobatto quadrature.
+This implements algorithm 25 "GaussLobattoNodesAndWeights" from the book
+
+- David A. Kopriva, (2009). 
+    Implementing spectral methods for partial differential equations:
+    Algorithms for scientists and engineers. 
+    [DOI:10.1007/978-90-481-2261-5](https://doi.org/10.1007/978-90-481-2261-5)
+"""
 # From FLUXO (but really from blue book by Kopriva)
-function gauss_lobatto_nodes_weights(n_nodes::Integer)
+function gauss_lobatto_nodes_weights(RealT, n_nodes::Integer)
     # From Kopriva's book
     n_iterations = 10
-    tolerance = 1e-15
+
+    tolerance = 10 * eps(RealT)
+    if RealT == Float64
+        tolerance = 1e-15
+    end
 
     # Initialize output
-    nodes = zeros(n_nodes)
-    weights = zeros(n_nodes)
+    nodes = zeros(RealT, n_nodes)
+    weights = zeros(RealT, n_nodes)
 
     # Special case for polynomial degree zero (first order finite volume)
     if n_nodes == 1
-        nodes[1] = 0
-        weights[1] = 2
+        nodes[1] = zero(RealT)
+        weights[1] = RealT(2)
         return nodes, weights
     end
 
@@ -538,15 +587,15 @@ function gauss_lobatto_nodes_weights(n_nodes::Integer)
     N = n_nodes - 1
 
     # Calculate values at boundary
-    nodes[1] = -1.0
-    nodes[end] = 1.0
-    weights[1] = 2 / (N * (N + 1))
+    nodes[1] = -one(RealT)
+    nodes[end] = one(RealT)
+    weights[1] = RealT(2) / (N * (N + 1))
     weights[end] = weights[1]
 
     # Calculate interior values
     if N > 1
-        cont1 = pi / N
-        cont2 = 3 / (8 * N * pi)
+        cont1 = RealT(pi) / N
+        cont2 = 3 / (8 * N * RealT(pi))
 
         # Use symmetry -> only left side is computed
         for i in 1:(div(N + 1, 2) - 1)
@@ -559,8 +608,13 @@ function gauss_lobatto_nodes_weights(n_nodes::Integer)
                 q, qder, _ = calc_q_and_l(N, nodes[i + 1])
                 dx = -q / qder
                 nodes[i + 1] += dx
+
                 if abs(dx) < tolerance * abs(nodes[i + 1])
                     break
+                end
+
+                if k == n_iterations
+                    error("`gauss_lobatto_nodes_weights` Newton iteration did not converge")
                 end
             end
 
@@ -576,20 +630,26 @@ function gauss_lobatto_nodes_weights(n_nodes::Integer)
 
     # If odd number of nodes, set center node to origin (= 0.0) and calculate weight
     if n_nodes % 2 == 1
-        _, _, L = calc_q_and_l(N, 0)
-        nodes[div(N, 2) + 1] = 0.0
+        _, _, L = calc_q_and_l(N, zero(RealT))
+        nodes[div(N, 2) + 1] = zero(RealT)
         weights[div(N, 2) + 1] = weights[1] / L^2
     end
 
     return nodes, weights
 end
 
-# From FLUXO (but really from blue book by Kopriva)
-function calc_q_and_l(N::Integer, x::Float64)
-    L_Nm2 = 1.0
+# Default version for `Float64` for mortars etc.
+gauss_lobatto_nodes_weights(n_nodes::Integer) = gauss_lobatto_nodes_weights(Float64,
+                                                                            n_nodes)
+
+# From FLUXO (but really from blue book by Kopriva, algorithm 24)
+function calc_q_and_l(N::Integer, x)
+    RealT = typeof(x)
+
+    L_Nm2 = one(RealT)
     L_Nm1 = x
-    Lder_Nm2 = 0.0
-    Lder_Nm1 = 1.0
+    Lder_Nm2 = zero(RealT)
+    Lder_Nm1 = one(RealT)
 
     local L
     for i in 2:N
@@ -606,34 +666,47 @@ function calc_q_and_l(N::Integer, x::Float64)
 
     return q, qder, L
 end
-calc_q_and_l(N::Integer, x::Real) = calc_q_and_l(N, convert(Float64, x))
 
-# From FLUXO (but really from blue book by Kopriva)
-function gauss_nodes_weights(n_nodes::Integer)
+"""
+    gauss_nodes_weights(RealT, n_nodes::Integer)
+
+Computes nodes ``x_j`` and weights ``w_j`` for the Gauss-Legendre quadrature.
+This implements algorithm 23 "LegendreGaussNodesAndWeights" from the book
+
+- David A. Kopriva, (2009). 
+    Implementing spectral methods for partial differential equations:
+    Algorithms for scientists and engineers. 
+    [DOI:10.1007/978-90-481-2261-5](https://doi.org/10.1007/978-90-481-2261-5)
+"""
+function gauss_nodes_weights(RealT, n_nodes::Integer)
     # From Kopriva's book
     n_iterations = 10
-    tolerance = 1e-15
+
+    tolerance = 10 * eps(RealT)
+    if RealT == Float64
+        tolerance = 1e-15
+    end
 
     # Initialize output
-    nodes = ones(n_nodes) * 1000
-    weights = zeros(n_nodes)
+    nodes = ones(RealT, n_nodes) * 1000
+    weights = zeros(RealT, n_nodes)
 
     # Get polynomial degree for convenience
     N = n_nodes - 1
     if N == 0
-        nodes .= 0.0
-        weights .= 2.0
+        nodes .= zero(RealT)
+        weights .= RealT(2)
         return nodes, weights
     elseif N == 1
-        nodes[1] = -sqrt(1 / 3)
+        nodes[1] = -sqrt(one(RealT) / 3)
         nodes[end] = -nodes[1]
-        weights .= 1.0
+        weights .= one(RealT)
         return nodes, weights
     else # N > 1
         # Use symmetry property of the roots of the Legendre polynomials
         for i in 0:(div(N + 1, 2) - 1)
             # Starting guess for Newton method
-            nodes[i + 1] = -cos(pi / (2 * N + 2) * (2 * i + 1))
+            nodes[i + 1] = -cos(RealT(pi) / (2 * N + 2) * (2 * i + 1))
 
             # Newton iteration to find root of Legendre polynomial (= integration node)
             for k in 0:n_iterations
@@ -642,6 +715,10 @@ function gauss_nodes_weights(n_nodes::Integer)
                 nodes[i + 1] += dx
                 if abs(dx) < tolerance * abs(nodes[i + 1])
                     break
+                end
+
+                if k == n_iterations
+                    error("`gauss_nodes_weights` Newton iteration did not converge")
                 end
             end
 
@@ -656,8 +733,8 @@ function gauss_nodes_weights(n_nodes::Integer)
 
         # If odd number of nodes, set center node to origin (= 0.0) and calculate weight
         if n_nodes % 2 == 1
-            poly, deriv = legendre_polynomial_and_derivative(N + 1, 0.0)
-            nodes[div(N, 2) + 1] = 0.0
+            poly, deriv = legendre_polynomial_and_derivative(N + 1, zero(RealT))
+            nodes[div(N, 2) + 1] = zero(RealT)
             weights[div(N, 2) + 1] = (2 * N + 3) / deriv^2
         end
 
@@ -665,22 +742,36 @@ function gauss_nodes_weights(n_nodes::Integer)
     end
 end
 
-# From FLUXO (but really from blue book by Kopriva)
-function legendre_polynomial_and_derivative(N::Int, x::Real)
-    if N == 0
-        poly = 1.0
-        deriv = 0.0
-    elseif N == 1
-        poly = convert(Float64, x)
-        deriv = 1.0
-    else
-        poly_Nm2 = 1.0
-        poly_Nm1 = convert(Float64, x)
-        deriv_Nm2 = 0.0
-        deriv_Nm1 = 1.0
+# Default version for `Float64` for mortars etc.
+gauss_nodes_weights(n_nodes::Integer) = gauss_nodes_weights(Float64, n_nodes)
 
-        poly = 0.0
-        deriv = 0.0
+"""
+    legendre_polynomial_and_derivative(N::Int, x::Real)
+
+Computes the Legendre polynomial of degree `N` and its derivative at `x`.
+This implements algorithm 22 "LegendrePolynomialAndDerivative" from the book
+
+- David A. Kopriva, (2009). 
+    Implementing spectral methods for partial differential equations:
+    Algorithms for scientists and engineers. 
+    [DOI:10.1007/978-90-481-2261-5](https://doi.org/10.1007/978-90-481-2261-5)
+"""
+function legendre_polynomial_and_derivative(N::Int, x::Real)
+    RealT = typeof(x)
+    if N == 0
+        poly = one(RealT)
+        deriv = zero(RealT)
+    elseif N == 1
+        poly = x
+        deriv = one(RealT)
+    else
+        poly_Nm2 = one(RealT)
+        poly_Nm1 = copy(x)
+        deriv_Nm2 = zero(RealT)
+        deriv_Nm1 = one(RealT)
+
+        poly = zero(RealT)
+        deriv = zero(RealT)
         for i in 2:N
             poly = ((2 * i - 1) * x * poly_Nm1 - (i - 1) * poly_Nm2) / i
             deriv = deriv_Nm2 + (2 * i - 1) * poly_Nm1
@@ -699,10 +790,10 @@ function legendre_polynomial_and_derivative(N::Int, x::Real)
 end
 
 # Calculate Legendre vandermonde matrix and its inverse
-function vandermonde_legendre(nodes, N)
+function vandermonde_legendre(RealT, nodes, N)
     n_nodes = length(nodes)
     n_modes = N + 1
-    vandermonde = zeros(n_nodes, n_modes)
+    vandermonde = zeros(RealT, n_nodes, n_modes)
 
     for i in 1:n_nodes
         for m in 1:n_modes
@@ -713,5 +804,8 @@ function vandermonde_legendre(nodes, N)
     inverse_vandermonde = inv(vandermonde)
     return vandermonde, inverse_vandermonde
 end
-vandermonde_legendre(nodes) = vandermonde_legendre(nodes, length(nodes) - 1)
+vandermonde_legendre(RealT, nodes) = vandermonde_legendre(RealT, nodes,
+                                                          length(nodes) - 1)
+# Default version for `Float64` for precompilation
+vandermonde_legendre(nodes) = vandermonde_legendre(Float64, nodes)
 end # @muladd

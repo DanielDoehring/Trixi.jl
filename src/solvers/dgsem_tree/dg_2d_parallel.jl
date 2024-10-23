@@ -560,19 +560,15 @@ function rhs!(du, u, t,
               initial_condition, boundary_conditions, source_terms::Source,
               dg::DG, cache,
               level_info_elements_acc::Vector{Int64},
-
               level_info_interfaces_acc::Vector{Int64},
               level_info_mpi_interfaces_acc::Vector{Int64},
-
               level_info_boundaries_acc::Vector{Int64},
               level_info_boundaries_orientation_acc::Vector{Vector{Int64}},
-
               level_info_mortars_acc::Vector{Int64},
-              level_info_mpi_mortars_acc::Vector{Int64},
-              ) where {Source}
+              level_info_mpi_mortars_acc::Vector{Int64}) where {Source}
     # Start to receive MPI data
     @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
-    
+
     # Prolong solution to MPI interfaces
     @trixi_timeit timer() "prolong2mpiinterfaces" begin
         prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, dg,
@@ -607,7 +603,7 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, u, mesh,
                               have_nonconservative_terms(equations), equations,
-                              dg.volume_integral, dg, cache, 
+                              dg.volume_integral, dg, cache,
                               level_info_elements_acc)
     end
 
@@ -615,7 +611,7 @@ function rhs!(du, u, t,
     # TODO: Taal decide order of arguments, consistent vs. modified cache first?
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache, u, mesh, equations,
-                            dg.surface_integral, dg, 
+                            dg.surface_integral, dg,
                             level_info_interfaces_acc)
     end
 
@@ -623,7 +619,7 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(cache.elements.surface_flux_values, mesh,
                              have_nonconservative_terms(equations), equations,
-                             dg.surface_integral, dg, cache, 
+                             dg.surface_integral, dg, cache,
                              level_info_interfaces_acc)
     end
 
@@ -669,7 +665,7 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "finish MPI receive" begin
         finish_mpi_receive!(cache.mpi_cache, mesh, equations, dg, cache)
     end
-    
+
     # Calculate MPI interface fluxes
     @trixi_timeit timer() "MPI interface flux" begin
         calc_mpi_interface_flux!(cache.elements.surface_flux_values, mesh,
@@ -680,9 +676,9 @@ function rhs!(du, u, t,
 
     @trixi_timeit timer() "MPI mortar flux" begin
         calc_mpi_mortar_flux!(cache.elements.surface_flux_values, mesh,
-                            have_nonconservative_terms(equations), equations,
-                            dg.mortar, dg.surface_integral, dg, cache,
-                            level_info_mpi_mortars_acc)
+                              have_nonconservative_terms(equations), equations,
+                              dg.mortar, dg.surface_integral, dg, cache,
+                              level_info_mpi_mortars_acc)
     end
 
     # Calculate surface integrals
