@@ -43,7 +43,6 @@ analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 # The StepsizeCallback handles the re-calculation of the maximum Δt after each time step
-stepsize_callback = StepsizeCallback(cfl = 2.5)
 
 alive_callback = AliveCallback(alive_interval = analysis_interval)
 
@@ -53,6 +52,18 @@ save_solution = SaveSolutionCallback(dt = 0.1,
                                      solution_variables = cons2prim)
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
+
+# Construct embedded order paired explicit Runge-Kutta method with 10 stages and 7 evaluation stages for given simulation setup.
+# Pass `tspan` to calculate maximum time step allowed for the bisection algorithm used 
+# in calculating the polynomial coefficients in the ODE algorithm.
+ode_algorithm = Trixi.EmbeddedPairedRK3(16, 5, tspan, semi)
+
+# Calculate the CFL number for the given ODE algorithm and ODE problem (cfl_number calculate from dt_opt of the optimization of
+# b values in the Butcher tableau of the ODE algorithm).
+#cfl_number = Trixi.calculate_cfl(ode_algorithm, ode)
+stepsize_callback = StepsizeCallback() # Warisa: This number is quite small in contrast the other one from optimizing A
+# I've tried using cfl of 1.5 and the error is very similar.
+
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         save_solution,
@@ -61,15 +72,30 @@ callbacks = CallbackSet(summary_callback,
 
 ###############################################################################
 # run the simulation
-
-# Construct second order paired explicit Runge-Kutta method with 6 stages for given simulation setup.
-# Pass `tspan` to calculate maximum time step allowed for the bisection algorithm used 
-# in calculating the polynomial coefficients in the ODE algorithm.
-ode_algorithm = Trixi.PairedExplicitRK2(6, tspan, semi)
-
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 1.0, # Manual time step value, will be overwritten by the stepsize_callback when it is specified.
                   save_everystep = false, callback = callbacks);
 
 # Print the timer summary
 summary_callback()
+
+# Some function defined so that I can check if the second order condition is met. This will be removed later.
+function construct_b_vector(b_unknown, num_stages_embedded, num_stage_evals_embedded)
+    # Construct the b vector
+    b = [
+        b_unknown[1],
+        zeros(Float64, num_stages_embedded - num_stage_evals_embedded)...,
+        b_unknown[2:end]...,
+        0
+    ]
+    return b
+end
+
+b = construct_b_vector(ode_algorithm.b, ode_algorithm.num_stages - 1,
+                       ode_algorithm.num_stage_evals - 1)
+println("dot(b, c) = ", dot(b, ode_algorithm.c))
+println("sum(b) = ", sum(b))
+
+println("dt_opt_a = ", ode_algorithm.dt_opt_a)
+println("dt_opt_b = ", ode_algorithm.dt_opt_b)
+println("ratio = ", ode_algorithm.dt_opt_b / ode_algorithm.dt_opt_a * 100)

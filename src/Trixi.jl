@@ -317,6 +317,15 @@ function __init__()
             @require ECOS="e2685f51-7e38-5353-a97d-a921fd2c8199" begin
                 include("../ext/TrixiConvexECOSExt.jl")
             end
+            @require Clarabel="61c947e1-3e6d-4ee4-985a-eec8c727bd6e" begin
+                include("../ext/TrixiConvexClarabelExt.jl")
+            end
+        end
+    end
+
+    @static if !isdefined(Base, :get_extension)
+        @require NLsolve="2774e3e8-f4cf-5e23-947b-6d7e65073b56" begin
+            include("../ext/TrixiNLsolveExt.jl")
         end
     end
 
