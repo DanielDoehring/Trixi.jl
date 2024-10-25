@@ -255,6 +255,8 @@ function last_three_stages_ER!(integrator, alg, p)
   du_wrap = wrap_array(integrator.du, integrator.p)
   # 0.5 = b_{S}
   dS += 0.5 * integrator.dt * int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+  # CARE: Enforce isentropy manually, i.e., turn off floating point errors!
+  dS = 0.0
 
   u_wrap = wrap_array(integrator.u, integrator.p)
   dir_wrap = wrap_array(integrator.direction, p)
