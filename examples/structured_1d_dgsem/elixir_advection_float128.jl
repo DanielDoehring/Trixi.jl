@@ -10,7 +10,7 @@ using Quadmath
 # See https://github.com/JuliaMath/Quadmath.jl
 RealT = Float128
 
-advection_velocity = RealT(4) / 3 # Does not need to be in higher precision
+advection_velocity = 4 / 3 # Does not need to be in higher precision
 equations = LinearScalarAdvectionEquation1D(advection_velocity)
 
 solver = DGSEM(RealT = RealT, polydeg = 7, surface_flux = flux_lax_friedrichs)
@@ -37,21 +37,24 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-analysis_callback = AnalysisCallback(semi, interval = 1000,
+analysis_callback = AnalysisCallback(semi, interval = 1,
                                      extra_analysis_errors = (:conservation_error,))
 
 # cfl does not need to be in higher precision
-stepsize_callback = StepsizeCallback(cfl = RealT(8)/10)
+stepsize_callback = StepsizeCallback(cfl = 0.8)
+
+save_solution = SaveSolutionCallback(interval = 1)
 
 callbacks = CallbackSet(summary_callback,
                         stepsize_callback,
+                        #save_solution,
                         analysis_callback)
 
 ###############################################################################
 # run the simulation
 
 sol = solve(ode, CarpenterKennedy2N54(),
-            dt = RealT(42), # `dt` does not need to be in higher precision
+            dt = 42.0, # `dt` does not need to be in higher precision
             save_everystep = false, callback = callbacks);
 
 # Print the timer summary

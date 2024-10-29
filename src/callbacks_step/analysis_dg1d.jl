@@ -70,6 +70,7 @@ function calc_error_norms(func, u, t, analyzer,
         for i in eachnode(analyzer)
             u_exact = initial_condition(get_node_coords(x_local, equations, dg, i), t,
                                         equations)
+            println("@i: ", i, " u_exact: ", u_exact, " u_node: ", get_node_vars(u_local, equations, dg, i))
             diff = func(u_exact, equations) -
                    func(get_node_vars(u_local, equations, dg, i), equations)
             l2_error += diff .^ 2 * (weights[i] * jacobian_local[i])
