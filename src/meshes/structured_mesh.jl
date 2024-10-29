@@ -142,7 +142,7 @@ end
 
 # Extract a string of the code that defines the mapping function
 function mapping2string(mapping, ndims)
-    string(code_string(mapping, ntuple(_ -> RealT, ndims)))
+    string(code_string(mapping, ntuple(_ -> Float64, ndims)))
 end
 
 # An internal function wrapping `CodeTracking.code_string` with additional
