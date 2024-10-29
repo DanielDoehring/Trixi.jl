@@ -171,8 +171,8 @@ function analyze_convergence(errors, iterations,
     return eoc_mean_values
 end
 
-function convergence_test(elixir::AbstractString, iterations; kwargs...)
-    convergence_test(Main, elixir::AbstractString, iterations; kwargs...)
+function convergence_test(elixir::AbstractString, iterations, RealT = Float64; kwargs...)
+    convergence_test(Main, elixir::AbstractString, iterations, RealT; kwargs...)
 end
 
 # Helper methods used in the functions defined above
