@@ -548,7 +548,7 @@ end
 
 function prolong2interfaces!(cache, u,
                              mesh::TreeMesh{2}, equations, surface_integral, dg::DG,
-                             interface_indices = eachinterface(dg, cache))
+                             interface_indices = eachinterface(dg, cache)::Union{Base.OneTo{Int}, Vector{Int}})
     @unpack interfaces = cache
     @unpack orientations, neighbor_ids = interfaces
     interfaces_u = interfaces.u
@@ -659,7 +659,7 @@ end
 
 function prolong2boundaries!(cache, u,
                              mesh::TreeMesh{2}, equations, surface_integral, dg::DG,
-                             boundary_indices = eachboundary(dg, cache))
+                             boundary_indices = eachboundary(dg, cache)::Union{Base.OneTo{Int}, Vector{Int}})
     @unpack boundaries = cache
     @unpack orientations, neighbor_sides = boundaries
 
