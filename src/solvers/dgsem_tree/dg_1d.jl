@@ -395,7 +395,9 @@ end
 # We pass the `surface_integral` argument solely for dispatch
 function prolong2interfaces!(cache, u,
                              mesh::TreeMesh{1}, equations, surface_integral, dg::DG,
-                             interface_indices = eachinterface(dg, cache)::Union{Base.OneTo{Int}, Vector{Int}})
+                             interface_indices = eachinterface(dg,
+                                                               cache)::Union{Base.OneTo{Int},
+                                                                             Vector{Int}})
     @unpack interfaces = cache
     @unpack neighbor_ids = interfaces
     interfaces_u = interfaces.u
@@ -489,7 +491,9 @@ end
 
 function prolong2boundaries!(cache, u,
                              mesh::TreeMesh{1}, equations, surface_integral, dg::DG,
-                             boundary_indices = eachboundary(dg, cache)::Union{Base.OneTo{Int}, Vector{Int}})
+                             boundary_indices = eachboundary(dg,
+                                                             cache)::Union{Base.OneTo{Int},
+                                                                           Vector{Int}})
     @unpack boundaries = cache
     @unpack neighbor_sides = boundaries
 
