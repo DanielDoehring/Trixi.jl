@@ -94,11 +94,12 @@ end
 # We pass the `surface_integral` argument solely for dispatch
 function prolong2interfaces!(cache, u,
                              mesh::Union{P4estMesh{3}, T8codeMesh{3}},
-                             equations, surface_integral, dg::DG)
+                             equations, surface_integral, dg::DG,
+                             interface_indices = eachinterface(dg, cache))
     @unpack interfaces = cache
     index_range = eachnode(dg)
 
-    @threaded for interface in eachinterface(dg, cache)
+    @threaded for interface in interface_indices
         # Copy solution data from the primary element using "delayed indexing" with
         # a start value and two step sizes to get the correct face and orientation.
         # Note that in the current implementation, the interface will be
@@ -170,12 +171,13 @@ end
 function calc_interface_flux!(surface_flux_values,
                               mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                               nonconservative_terms,
-                              equations, surface_integral, dg::DG, cache)
+                              equations, surface_integral, dg::DG, cache,
+                              interface_indices = eachinterface(dg, cache))
     @unpack neighbor_ids, node_indices = cache.interfaces
     @unpack contravariant_vectors = cache.elements
     index_range = eachnode(dg)
 
-    @threaded for interface in eachinterface(dg, cache)
+    @threaded for interface in interface_indices
         # Get element and side information on the primary element
         primary_element = neighbor_ids[1, interface]
         primary_indices = node_indices[1, interface]
@@ -314,11 +316,12 @@ end
 
 function prolong2boundaries!(cache, u,
                              mesh::Union{P4estMesh{3}, T8codeMesh{3}},
-                             equations, surface_integral, dg::DG)
+                             equations, surface_integral, dg::DG,
+                             boundary_indices = eachboundary(dg, cache))
     @unpack boundaries = cache
     index_range = eachnode(dg)
 
-    @threaded for boundary in eachboundary(dg, cache)
+    @threaded for boundary in boundary_indices
         # Copy solution data from the element using "delayed indexing" with
         # a start value and two step sizes to get the correct face and orientation.
         element = boundaries.neighbor_ids[boundary]
@@ -418,12 +421,13 @@ end
 function prolong2mortars!(cache, u,
                           mesh::Union{P4estMesh{3}, T8codeMesh{3}}, equations,
                           mortar_l2::LobattoLegendreMortarL2,
-                          surface_integral, dg::DGSEM)
+                          surface_integral, dg::DGSEM,
+                          mortar_indices = eachmortar(dg, cache))
     @unpack fstar_tmp_threaded = cache
     @unpack neighbor_ids, node_indices = cache.mortars
     index_range = eachnode(dg)
 
-    @threaded for mortar in eachmortar(dg, cache)
+    @threaded for mortar in mortar_indices
         # Copy solution data from the small elements using "delayed indexing" with
         # a start value and two step sizes to get the correct face and orientation.
         small_indices = node_indices[1, mortar]
@@ -523,13 +527,14 @@ function calc_mortar_flux!(surface_flux_values,
                            mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                            nonconservative_terms, equations,
                            mortar_l2::LobattoLegendreMortarL2,
-                           surface_integral, dg::DG, cache)
+                           surface_integral, dg::DG, cache,
+                           mortar_indices = eachmortar(dg, cache))
     @unpack neighbor_ids, node_indices = cache.mortars
     @unpack contravariant_vectors = cache.elements
     @unpack fstar_primary_threaded, fstar_secondary_threaded, fstar_tmp_threaded = cache
     index_range = eachnode(dg)
 
-    @threaded for mortar in eachmortar(dg, cache)
+    @threaded for mortar in mortar_indices
         # Choose thread-specific pre-allocated container
         fstar_primary = fstar_primary_threaded[Threads.threadid()]
         fstar_secondary = fstar_secondary_threaded[Threads.threadid()]
@@ -744,7 +749,8 @@ function calc_surface_integral!(du, u,
                                 mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                 equations,
                                 surface_integral::SurfaceIntegralWeakForm,
-                                dg::DGSEM, cache)
+                                dg::DGSEM, cache,
+                                element_indices = eachelement(dg, cache))
     @unpack boundary_interpolation = dg.basis
     @unpack surface_flux_values = cache.elements
 
@@ -754,7 +760,7 @@ function calc_surface_integral!(du, u,
     # into FMAs (see comment at the top of the file).
     factor_1 = boundary_interpolation[1, 1]
     factor_2 = boundary_interpolation[nnodes(dg), 2]
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         for m in eachnode(dg), l in eachnode(dg)
             for v in eachvariable(equations)
                 # surface at -x

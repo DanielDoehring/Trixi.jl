@@ -37,36 +37,41 @@ end
 function rhs!(du, u, t,
               mesh::UnstructuredMesh2D, equations,
               boundary_conditions, source_terms::Source,
-              dg::DG, cache) where {Source}
+              dg::DG, cache,
+              element_indices = eachelement(dg, cache),
+              interface_indices = eachinterface(dg, cache),
+              boundary_indices = eachboundary(dg, cache),
+              mortar_indices = nothing) where {Source}
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache, element_indices)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, u, mesh,
                               have_nonconservative_terms(equations), equations,
-                              dg.volume_integral, dg, cache)
+                              dg.volume_integral, dg, cache, element_indices)
     end
 
     # Prolong solution to interfaces
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache, u, mesh, equations,
-                            dg.surface_integral, dg)
+                            dg.surface_integral, dg, interface_indices)
     end
 
     # Calculate interface fluxes
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(cache.elements.surface_flux_values, mesh,
                              have_nonconservative_terms(equations), equations,
-                             dg.surface_integral, dg, cache)
+                             dg.surface_integral, dg, cache, interface_indices)
     end
 
     # Prolong solution to boundaries
     @trixi_timeit timer() "prolong2boundaries" begin
         prolong2boundaries!(cache, u, mesh, equations,
-                            dg.surface_integral, dg)
+                            dg.surface_integral, dg, boundary_indices)
     end
 
+    # TODO: Boundary Orientations?
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
         calc_boundary_flux!(cache, t, boundary_conditions, mesh, equations,
@@ -76,16 +81,18 @@ function rhs!(du, u, t,
     # Calculate surface integrals
     @trixi_timeit timer() "surface integral" begin
         calc_surface_integral!(du, u, mesh, equations,
-                               dg.surface_integral, dg, cache)
+                               dg.surface_integral, dg, cache, element_indices)
     end
 
     # Apply Jacobian from mapping to reference element
     #  Note! this routine is reused from dgsem_structured/dg_2d.jl
-    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache)
+    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache,
+                                                     element_indices)
 
     # Calculate source terms
     @trixi_timeit timer() "source terms" begin
-        calc_sources!(du, u, t, source_terms, equations, dg, cache)
+        calc_sources!(du, u, t, source_terms, equations, dg, cache,
+                      element_indices)
     end
 
     return nothing
@@ -96,12 +103,13 @@ end
 # Note! this routine is for quadrilateral elements with "right-handed" orientation
 function prolong2interfaces!(cache, u,
                              mesh::UnstructuredMesh2D,
-                             equations, surface_integral, dg::DG)
+                             equations, surface_integral, dg::DG,
+                             interface_indices = eachinterface(dg, cache))
     @unpack interfaces = cache
     @unpack element_ids, element_side_ids = interfaces
     interfaces_u = interfaces.u
 
-    @threaded for interface in eachinterface(dg, cache)
+    @threaded for interface in interface_indices
         primary_element = element_ids[1, interface]
         secondary_element = element_ids[2, interface]
 
@@ -155,12 +163,13 @@ end
 function calc_interface_flux!(surface_flux_values,
                               mesh::UnstructuredMesh2D,
                               nonconservative_terms::False, equations,
-                              surface_integral, dg::DG, cache)
+                              surface_integral, dg::DG, cache,
+                              interface_indices = eachinterface(dg, cache))
     @unpack surface_flux = surface_integral
     @unpack u, start_index, index_increment, element_ids, element_side_ids = cache.interfaces
     @unpack normal_directions = cache.elements
 
-    @threaded for interface in eachinterface(dg, cache)
+    @threaded for interface in interface_indices
         # Get neighboring elements
         primary_element = element_ids[1, interface]
         secondary_element = element_ids[2, interface]
@@ -210,12 +219,13 @@ end
 function calc_interface_flux!(surface_flux_values,
                               mesh::UnstructuredMesh2D,
                               nonconservative_terms::True, equations,
-                              surface_integral, dg::DG, cache)
+                              surface_integral, dg::DG, cache,
+                              interface_indices = eachinterface(dg, cache))
     surface_flux, nonconservative_flux = surface_integral.surface_flux
     @unpack u, start_index, index_increment, element_ids, element_side_ids = cache.interfaces
     @unpack normal_directions = cache.elements
 
-    @threaded for interface in eachinterface(dg, cache)
+    @threaded for interface in interface_indices
         # Get the primary element index and local side index
         primary_element = element_ids[1, interface]
         primary_side = element_side_ids[1, interface]
@@ -277,12 +287,13 @@ end
 # move the approximate solution onto physical boundaries within a "right-handed" element
 function prolong2boundaries!(cache, u,
                              mesh::UnstructuredMesh2D,
-                             equations, surface_integral, dg::DG)
+                             equations, surface_integral, dg::DG,
+                             boundary_indices = eachboundary(dg, cache))
     @unpack boundaries = cache
     @unpack element_id, element_side_id = boundaries
     boundaries_u = boundaries.u
 
-    @threaded for boundary in eachboundary(dg, cache)
+    @threaded for boundary in boundary_indices
         element = element_id[boundary]
         side = element_side_id[boundary]
 
@@ -473,11 +484,12 @@ end
 #                  3                                  1
 # Therefore, we require a different surface integral routine here despite their similar structure.
 function calc_surface_integral!(du, u, mesh::UnstructuredMesh2D,
-                                equations, surface_integral, dg::DGSEM, cache)
+                                equations, surface_integral, dg::DGSEM, cache,
+                                element_indices = eachelement(dg, cache))
     @unpack boundary_interpolation = dg.basis
     @unpack surface_flux_values = cache.elements
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         for l in eachnode(dg), v in eachvariable(equations)
             # surface contribution along local sides 2 and 4 (fixed x and y varies)
             du[v, 1, l, element] += (surface_flux_values[v, l, 4, element]
@@ -504,7 +516,8 @@ end
 # on a curvilinear mesh.
 #   Note! Independent of the equation system and is only a check on the discrete mapping terms.
 #         Can be used for a metric identities check on StructuredMesh{2} or UnstructuredMesh2D
-function max_discrete_metric_identities(dg::DGSEM, cache)
+function max_discrete_metric_identities(dg::DGSEM, cache,
+                                        element_indices = eachelement(dg, cache))
     @unpack derivative_matrix = dg.basis
     @unpack contravariant_vectors = cache.elements
 
@@ -515,7 +528,7 @@ function max_discrete_metric_identities(dg::DGSEM, cache)
 
     max_metric_ids = zero(eltype(contravariant_vectors))
 
-    for i in 1:ndims_, element in eachelement(dg, cache)
+    for i in 1:ndims_, element in element_indices
         # compute D*Ja_1^i + Ja_2^i*D^T
         @views mul!(metric_id_dx, derivative_matrix,
                     contravariant_vectors[i, 1, :, :, element])

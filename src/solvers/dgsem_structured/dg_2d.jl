@@ -8,24 +8,29 @@
 function rhs!(du, u, t,
               mesh::Union{StructuredMesh{2}, StructuredMeshView{2}}, equations,
               boundary_conditions, source_terms::Source,
-              dg::DG, cache) where {Source}
+              dg::DG, cache,
+              element_indices = eachelement(dg, cache),
+              interface_indices = nothing,
+              boundary_indices = nothing,
+              mortar_indices = nothing) where {Source}
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache, element_indices)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, u, mesh,
                               have_nonconservative_terms(equations), equations,
-                              dg.volume_integral, dg, cache)
+                              dg.volume_integral, dg, cache, element_indices)
     end
 
     # Calculate interface fluxes
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(cache, u, mesh,
                              have_nonconservative_terms(equations), equations,
-                             dg.surface_integral, dg)
+                             dg.surface_integral, dg, element_indices)
     end
 
+    # TODO: Boundary Orientations?
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
         calc_boundary_flux!(cache, u, t, boundary_conditions, mesh, equations,
@@ -35,15 +40,16 @@ function rhs!(du, u, t,
     # Calculate surface integrals
     @trixi_timeit timer() "surface integral" begin
         calc_surface_integral!(du, u, mesh, equations,
-                               dg.surface_integral, dg, cache)
+                               dg.surface_integral, dg, cache, element_indices)
     end
 
     # Apply Jacobian from mapping to reference element
-    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache)
+    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache,
+                                                     element_indices)
 
     # Calculate source terms
     @trixi_timeit timer() "source terms" begin
-        calc_sources!(du, u, t, source_terms, equations, dg, cache)
+        calc_sources!(du, u, t, source_terms, equations, dg, cache, element_indices)
     end
 
     return nothing
@@ -394,10 +400,11 @@ end
 function calc_interface_flux!(cache, u,
                               mesh::Union{StructuredMesh{2}, StructuredMeshView{2}},
                               nonconservative_terms, # can be True/False
-                              equations, surface_integral, dg::DG)
+                              equations, surface_integral, dg::DG,
+                              element_indices = eachelement(dg, cache))
     @unpack elements = cache
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         # Interfaces in negative directions
         # Faster version of "for orientation in (1, 2)"
 
@@ -620,10 +627,11 @@ end
 function apply_jacobian!(du,
                          mesh::Union{StructuredMesh{2}, StructuredMeshView{2},
                                      UnstructuredMesh2D, P4estMesh{2}, T8codeMesh{2}},
-                         equations, dg::DG, cache)
+                         equations, dg::DG, cache,
+                         element_indices = eachelement(dg, cache))
     @unpack inverse_jacobian = cache.elements
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         for j in eachnode(dg), i in eachnode(dg)
             factor = -inverse_jacobian[i, j, element]
 

@@ -32,7 +32,8 @@ function calc_volume_integral!(du, u,
                                mesh::UnstructuredMesh2D,
                                nonconservative_terms::False, equations,
                                volume_integral::VolumeIntegralStrongForm,
-                               dg::FDSBP, cache)
+                               dg::FDSBP, cache,
+                               element_indices = eachelement(dg, cache))
     D = dg.basis # SBP derivative operator
     @unpack f_threaded = cache
     @unpack contravariant_vectors = cache.elements
@@ -56,7 +57,7 @@ function calc_volume_integral!(du, u,
 
     # Use the tensor product structure to compute the discrete derivatives of
     # the contravariant fluxes line-by-line and add them to `du` for each element.
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         f_element = f_threaded[Threads.threadid()]
         u_element = view(u_vectors, :, :, element)
 
@@ -95,7 +96,8 @@ function calc_volume_integral!(du, u,
                                mesh::UnstructuredMesh2D,
                                nonconservative_terms::False, equations,
                                volume_integral::VolumeIntegralUpwind,
-                               dg::FDSBP, cache)
+                               dg::FDSBP, cache,
+                               element_indices = eachelement(dg, cache))
     # Assume that
     # dg.basis isa SummationByPartsOperators.UpwindOperators
     D_minus = dg.basis.minus # Upwind SBP D^- derivative operator
@@ -123,7 +125,7 @@ function calc_volume_integral!(du, u,
 
     # Use the tensor product structure to compute the discrete derivatives of
     # the fluxes line-by-line and add them to `du` for each element.
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         # f_minus_plus_element wraps the storage provided by f_minus_element and
         # f_plus_element such that we can use a single assignment below.
         # f_minus_element and f_plus_element are updated whenever we update
@@ -187,12 +189,13 @@ end
 # surface contributions are added.
 function calc_surface_integral!(du, u, mesh::UnstructuredMesh2D,
                                 equations, surface_integral::SurfaceIntegralStrongForm,
-                                dg::DG, cache)
+                                dg::DG, cache,
+                                element_indices = eachelement(dg, cache))
     inv_weight_left = inv(left_boundary_weight(dg.basis))
     inv_weight_right = inv(right_boundary_weight(dg.basis))
     @unpack normal_directions, surface_flux_values = cache.elements
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         for l in eachnode(dg)
             # surface at -x
             u_node = get_node_vars(u, equations, dg, 1, l, element)

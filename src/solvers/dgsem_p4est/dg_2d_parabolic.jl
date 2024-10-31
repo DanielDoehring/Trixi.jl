@@ -153,7 +153,8 @@ end
 function calc_gradient!(gradients, u_transformed, t,
                         mesh::P4estMesh{2}, equations_parabolic,
                         boundary_conditions_parabolic, dg::DG,
-                        cache, cache_parabolic)
+                        cache, cache_parabolic,
+                        element_indices = eachelement(dg, cache))
     gradients_x, gradients_y = gradients
 
     # Reset du
@@ -167,7 +168,7 @@ function calc_gradient!(gradients, u_transformed, t,
         (; derivative_dhat) = dg.basis
         (; contravariant_vectors) = cache.elements
 
-        @threaded for element in eachelement(dg, cache)
+        @threaded for element in element_indices
 
             # Calculate gradients with respect to reference coordinates in one element
             for j in eachnode(dg), i in eachnode(dg)
@@ -277,7 +278,7 @@ function calc_gradient!(gradients, u_transformed, t,
         # into FMAs (see comment at the top of the file).
         factor_1 = boundary_interpolation[1, 1]
         factor_2 = boundary_interpolation[nnodes(dg), 2]
-        @threaded for element in eachelement(dg, cache)
+        @threaded for element in element_indices
             for l in eachnode(dg)
                 for v in eachvariable(equations_parabolic)
 
@@ -476,12 +477,13 @@ end
 function calc_volume_integral!(du, flux_viscous,
                                mesh::P4estMesh{2},
                                equations_parabolic::AbstractEquationsParabolic,
-                               dg::DGSEM, cache)
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache))
     (; derivative_dhat) = dg.basis
     (; contravariant_vectors) = cache.elements
     flux_viscous_x, flux_viscous_y = flux_viscous
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         # Calculate volume terms in one element
         for j in eachnode(dg), i in eachnode(dg)
             flux1 = get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j,
@@ -521,13 +523,14 @@ end
 function prolong2interfaces!(cache_parabolic, flux_viscous,
                              mesh::P4estMesh{2},
                              equations_parabolic::AbstractEquationsParabolic,
-                             surface_integral, dg::DG, cache)
+                             surface_integral, dg::DG, cache,
+                             interface_indices = eachinterface(dg, cache))
     (; interfaces) = cache_parabolic
     (; contravariant_vectors) = cache_parabolic.elements
     index_range = eachnode(dg)
     flux_viscous_x, flux_viscous_y = flux_viscous
 
-    @threaded for interface in eachinterface(dg, cache)
+    @threaded for interface in interface_indices
         # Copy solution data from the primary element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
         # Note that in the current implementation, the interface will be
@@ -607,13 +610,14 @@ end
 # This version is used for divergence flux computations
 function calc_interface_flux!(surface_flux_values,
                               mesh::P4estMesh{2}, equations_parabolic,
-                              dg::DG, cache_parabolic)
+                              dg::DG, cache_parabolic,
+                              interface_indices = eachinterface(dg, cache))
     (; neighbor_ids, node_indices) = cache_parabolic.interfaces
     (; contravariant_vectors) = cache_parabolic.elements
     index_range = eachnode(dg)
     index_end = last(index_range)
 
-    @threaded for interface in eachinterface(dg, cache_parabolic)
+    @threaded for interface in interface_indices
         # Get element and side index information on the primary element
         primary_element = neighbor_ids[1, interface]
         primary_indices = node_indices[1, interface]
@@ -676,14 +680,16 @@ function prolong2mortars_divergence!(cache, flux_viscous::Vector{Array{uEltype, 
                                      equations,
                                      mortar_l2::LobattoLegendreMortarL2,
                                      surface_integral,
-                                     dg::DGSEM) where {uEltype <: Real}
+                                     dg::DGSEM,
+                                     mortar_indices = eachmortar(dg, cache)) where {uEltype <:
+                                                                                    Real}
     @unpack neighbor_ids, node_indices = cache.mortars
     @unpack contravariant_vectors = cache.elements
     index_range = eachnode(dg)
 
     flux_viscous_x, flux_viscous_y = flux_viscous
 
-    @threaded for mortar in eachmortar(dg, cache)
+    @threaded for mortar in mortar_indices
         # Copy solution data from the small elements using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
         small_indices = node_indices[1, mortar]
@@ -769,13 +775,14 @@ function calc_mortar_flux_divergence!(surface_flux_values,
                                       mesh::Union{P4estMesh{2}, T8codeMesh{2}},
                                       equations::AbstractEquationsParabolic,
                                       mortar_l2::LobattoLegendreMortarL2,
-                                      surface_integral, dg::DG, cache)
+                                      surface_integral, dg::DG, cache,
+                                      mortar_indices = eachmortar(dg, cache))
     @unpack neighbor_ids, node_indices = cache.mortars
     @unpack contravariant_vectors = cache.elements
     @unpack fstar_upper_threaded, fstar_lower_threaded = cache
     index_range = eachnode(dg)
 
-    @threaded for mortar in eachmortar(dg, cache)
+    @threaded for mortar in mortar_indices
         # Choose thread-specific pre-allocated container
         fstar = (fstar_lower_threaded[Threads.threadid()],
                  fstar_upper_threaded[Threads.threadid()])
@@ -837,14 +844,15 @@ end
 function prolong2boundaries!(cache_parabolic, flux_viscous,
                              mesh::P4estMesh{2},
                              equations_parabolic::AbstractEquationsParabolic,
-                             surface_integral, dg::DG, cache)
+                             surface_integral, dg::DG, cache,
+                             boundary_indices = eachboundary(dg, cache_parabolic))
     (; boundaries) = cache_parabolic
     (; contravariant_vectors) = cache_parabolic.elements
     index_range = eachnode(dg)
 
     flux_viscous_x, flux_viscous_y = flux_viscous
 
-    @threaded for boundary in eachboundary(dg, cache_parabolic)
+    @threaded for boundary in cache_parabolic
         # Copy solution data from the element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
         element = boundaries.neighbor_ids[boundary]
@@ -998,10 +1006,11 @@ end
 
 function apply_jacobian_parabolic!(du, mesh::P4estMesh{2},
                                    equations::AbstractEquationsParabolic,
-                                   dg::DG, cache)
+                                   dg::DG, cache,
+                                   element_indices = eachelement(dg, cache))
     @unpack inverse_jacobian = cache.elements
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         for j in eachnode(dg), i in eachnode(dg)
             factor = inverse_jacobian[i, j, element]
 
