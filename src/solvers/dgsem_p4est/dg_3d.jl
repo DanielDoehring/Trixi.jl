@@ -95,9 +95,7 @@ end
 function prolong2interfaces!(cache, u,
                              mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                              equations, surface_integral, dg::DG,
-                             interface_indices = eachinterface(dg,
-                                                               cache)::Union{Base.OneTo{Int},
-                                                                             Vector{Int}})
+                             interface_indices = eachinterface(dg, cache))
     @unpack interfaces = cache
     index_range = eachnode(dg)
 
@@ -319,9 +317,7 @@ end
 function prolong2boundaries!(cache, u,
                              mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                              equations, surface_integral, dg::DG,
-                             boundary_indices = eachboundary(dg,
-                                                             cache)::Union{Base.OneTo{Int},
-                                                                           Vector{Int}})
+                             boundary_indices = eachboundary(dg, cache))
     @unpack boundaries = cache
     index_range = eachnode(dg)
 
