@@ -179,4 +179,6 @@ function solve_a_butcher_coeffs_unknown! end
 # Basic implementation of the second-order paired explicit Runge-Kutta (PERK) method
 include("methods_PERK2.jl")
 include("methods_PERK3.jl")
+
+include("methods_PERK3_embedded.jl")
 end # @muladd
