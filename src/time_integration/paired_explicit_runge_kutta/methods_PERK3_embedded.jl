@@ -171,7 +171,7 @@ function step!(integrator::EmbeddedPairedRK3Integrator)
           integrator.u_old[i] = integrator.u[i]
         end
 
-        # k1
+        # k1 is in general required, as we use b_1 to satisfy the first-order cons. cond.
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
         @threaded for i in eachindex(integrator.du)
             integrator.k1[i] = integrator.du[i] * integrator.dt
@@ -179,38 +179,19 @@ function step!(integrator::EmbeddedPairedRK3Integrator)
             integrator.u[i] += alg.b[1] * integrator.k1[i]
         end
 
-        # k2
+        # This is the first stage after stage 1 for which we need to evaluate `k_higher`
+        stage = alg.num_stages - alg.num_stage_evals + 2
         # Construct current state
         @threaded for i in eachindex(integrator.du)
-            integrator.u_tmp[i] = integrator.u_old[i] + alg.c[2] * integrator.k1[i]
+            integrator.u_tmp[i] = integrator.u_old[i] + alg.c[stage] * integrator.k1[i]
         end
 
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[2] * integrator.dt)
+                     integrator.t + alg.c[stage] * integrator.dt)
 
         @threaded for i in eachindex(integrator.du)
             integrator.k_higher[i] = integrator.du[i] * integrator.dt
-        end
-        
-        # TODO: Can make this more efficient: Only evaluate k_higher if actually needed!
-        # Higher stages where only the first column of A is non-zero
-        for stage in 2:(alg.num_stages - alg.num_stage_evals + 2)
-            # Construct current state
-            @threaded for i in eachindex(integrator.du)
-                integrator.u_tmp[i] = integrator.u_old[i] + alg.c[stage] * integrator.k1[i]
-            end
-
-            integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                         integrator.t + alg.c[stage] * integrator.dt)
-
-            @threaded for i in eachindex(integrator.du)
-                integrator.k_higher[i] = integrator.du[i] * integrator.dt
-            end
-        end
-
-        # stage = num_stages - num_stage_evals + 2 => entries in b are (in general) non-zero
-        @threaded for i in eachindex(integrator.u)
-          integrator.u[i] += alg.b[alg.num_stages - alg.num_stage_evals + 2] * integrator.k_higher[i]
+            integrator.u[i] += alg.b[stage] * integrator.k_higher[i]
         end
 
         # Non-reducible stages
@@ -225,7 +206,7 @@ function step!(integrator::EmbeddedPairedRK3Integrator)
             end
 
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                        integrator.t + alg.c[stage] * integrator.dt)
+                         integrator.t + alg.c[stage] * integrator.dt)
 
             @threaded for i in eachindex(integrator.du)
                 integrator.k_higher[i] = integrator.du[i] * integrator.dt
