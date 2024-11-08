@@ -54,15 +54,15 @@ mutable struct SerialTree{NDIMS, RealT <: Real} <: AbstractTree{NDIMS}
         t.child_ids = fill(typemin(Int), 2^NDIMS, capacity + 1)
         t.neighbor_ids = fill(typemin(Int), 2 * NDIMS, capacity + 1)
         t.levels = fill(typemin(Int), capacity + 1)
-        t.coordinates = fill(NaN, NDIMS, capacity + 1)
+        t.coordinates = fill(convert(RealT, NaN), NDIMS, capacity + 1) # `NaN` is of type Float64
         t.original_cell_ids = fill(typemin(Int), capacity + 1)
 
         t.capacity = capacity
         t.length = 0
         t.dummy = capacity + 1
 
-        t.center_level_0 = SVector(ntuple(_ -> NaN, NDIMS))
-        t.length_level_0 = NaN
+        t.center_level_0 = SVector(ntuple(_ -> convert(RealT, NaN), NDIMS))
+        t.length_level_0 = convert(RealT, NaN)
 
         return t
     end
@@ -83,16 +83,19 @@ function SerialTree{NDIMS, RealT}(capacity::Int, center::AbstractArray{RealT},
 
     return t
 end
-
 function SerialTree{NDIMS}(capacity::Int, center::AbstractArray{RealT},
                            length::RealT,
                            periodicity = true) where {NDIMS, RealT <: Real}
     t = SerialTree{NDIMS, RealT}(capacity, center, length, periodicity)
 end
 
-# Constructor accepting a single number as center (as opposed to an array) for 1D
+# Constructors accepting a single number as center (as opposed to an array) for 1D
 function SerialTree{1, RealT}(cap::Int, center::RealT, len::RealT,
                               periodicity = true) where {RealT <: Real}
+    SerialTree{1, RealT}(cap, [center], len, periodicity)
+end
+function SerialTree{1}(cap::Int, center::RealT, len::RealT,
+                       periodicity = true) where {RealT <: Real}
     SerialTree{1, RealT}(cap, [center], len, periodicity)
 end
 
@@ -178,7 +181,8 @@ end
 # Reset range of cells to values that are prone to cause errors as soon as they are used.
 #
 # Rationale: If an invalid cell is accidentally used, we want to know it as soon as possible.
-function invalidate!(t::SerialTree, first::Int, last::Int)
+function invalidate!(t::SerialTree{NDIMS, RealT},
+                     first::Int, last::Int) where {NDIMS, RealT <: Real}
     @assert first > 0
     @assert last <= t.capacity + 1
 
@@ -187,7 +191,7 @@ function invalidate!(t::SerialTree, first::Int, last::Int)
     t.child_ids[:, first:last] .= typemin(Int)
     t.neighbor_ids[:, first:last] .= typemin(Int)
     t.levels[first:last] .= typemin(Int)
-    t.coordinates[:, first:last] .= NaN
+    t.coordinates[:, first:last] .= convert(RealT, NaN) # `NaN` is of type Float64
     t.original_cell_ids[first:last] .= typemin(Int)
 
     return nothing
