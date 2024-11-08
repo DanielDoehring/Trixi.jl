@@ -151,7 +151,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator::PairedExplicitRK4Integrator, alg, p)
+@inline function last_three_stages!(integrator, alg, p)
     for stage in 1:2
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +

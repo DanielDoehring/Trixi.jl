@@ -13,6 +13,8 @@ include("polynomial_optimizer.jl")
 abstract type AbstractPairedExplicitRK end
 # Abstract base type for single/standalone PERK time integration schemes
 abstract type AbstractPairedExplicitRKSingle <: AbstractPairedExplicitRK end
+# Abstract base type for single/standalone PERK time integration schemes
+abstract type AbstractPairedExplicitRKMulti <: AbstractPairedExplicitRK end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
 mutable struct PairedExplicitRKOptions{Callback, TStops}
@@ -38,6 +40,8 @@ end
 
 abstract type AbstractPairedExplicitRKIntegrator end
 abstract type AbstractPairedExplicitRKSingleIntegrator <:
+              AbstractPairedExplicitRKIntegrator end
+abstract type AbstractPairedExplicitRKMultiIntegrator <:
               AbstractPairedExplicitRKIntegrator end
 
 """
@@ -176,10 +180,17 @@ end
 # extension or by the NLsolve-specific code loaded by Requires.jl
 function solve_a_butcher_coeffs_unknown! end
 
+### Standalone/Single PERK methods ###
 # Basic implementation of the second-order paired explicit Runge-Kutta (PERK) method
 include("methods_PERK2.jl")
 # Slightly customized implementation of the third-order PERK method
 include("methods_PERK3.jl")
 # Basic implementation of the fourth-order PERK method
 include("methods_PERK4.jl")
+
+### Multi-level/partitioned PERK methods ### 
+include("methods_PERK4_multi.jl")
+
+include("partitioning.jl")
+
 end # @muladd

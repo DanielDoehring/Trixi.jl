@@ -137,6 +137,7 @@ include("semidiscretization/semidiscretization_euler_acoustics.jl")
 include("semidiscretization/semidiscretization_coupled.jl")
 include("time_integration/time_integration.jl")
 include("callbacks_step/callbacks_step.jl")
+include("time_integration/paired_explicit_runge_kutta/amr_perk.jl") # Needs to be included after time_integration.jl and callbacks_step.jl
 include("callbacks_stage/callbacks_stage.jl")
 include("semidiscretization/semidiscretization_euler_gravity.jl")
 
