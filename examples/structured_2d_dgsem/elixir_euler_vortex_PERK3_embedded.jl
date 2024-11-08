@@ -83,7 +83,10 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 cfl_PERK3_8 = 5.8
 cfl_PERK2_8 = 6.0
-stepsize_callback = StepsizeCallback(cfl = cfl_PERK2_8)
+
+cfl_PERK3_4 = 2.5
+cfl_PERK2_4 = 2.9
+stepsize_callback = StepsizeCallback(cfl = cfl_PERK2_4)
 
 callbacks = CallbackSet(summary_callback,
                         stepsize_callback,
@@ -92,10 +95,10 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # set up time integration algorithm
 
-num_stages = 8
-#ode_algorithm = Trixi.PairedExplicitRK3(num_stages, "/home/daniel/git/MA/PERK/4thOrder/Embedded_Scheme/p3/")
+num_stages = 8 # 8
+ode_algorithm = Trixi.PairedExplicitRK3(num_stages, "/home/daniel/git/MA/PERK/4thOrder/Embedded_Scheme/p3/")
 
-num_stage_evals = 8
+num_stage_evals = 4
 ode_algorithm = Trixi.EmbeddedPairedRK3(num_stages, num_stage_evals, "/home/daniel/git/MA/PERK/4thOrder/Embedded_Scheme/p3/")
 
 ###############################################################################

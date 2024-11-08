@@ -15,17 +15,11 @@ function compute_EmbeddedPairedRK3_butcher_tableau(num_stages, num_stage_evals,
     # Initialize array of c
     c = compute_c_coeffs(num_stages, cS2)
 
-    # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
-    coeffs_max = num_stage_evals - 2
-
-    a_matrix = zeros(coeffs_max, 2)
+    a_matrix = zeros(num_stages - 2, 2)
     a_matrix[:, 1] = c[3:end]
 
-    b = zeros(coeffs_max)
-
     path_a_coeffs = joinpath(base_path_coeffs,
-                             "a_" * string(num_stages) * "_" * string(num_stage_evals) *
-                             ".txt")
+                             "a_" * string(num_stage_evals) * ".txt")
 
     path_b_coeffs = joinpath(base_path_coeffs,
                              "b_" * string(num_stages) * "_" * string(num_stage_evals) *
@@ -35,15 +29,19 @@ function compute_EmbeddedPairedRK3_butcher_tableau(num_stages, num_stage_evals,
     a_coeffs = readdlm(path_a_coeffs, Float64)
     num_a_coeffs = size(a_coeffs, 1)
 
+    # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
+    coeffs_max = num_stage_evals - 2
+
     @assert num_a_coeffs == coeffs_max
     # Fill A-matrix in P-ERK style
-    a_matrix[:, 1] -= a_coeffs
-    a_matrix[:, 2] = a_coeffs
+    a_matrix[num_stages - num_stage_evals + 1:end, 1] -= a_coeffs
+    a_matrix[num_stages - num_stage_evals + 1:end, 2] = a_coeffs
 
     @assert isfile(path_b_coeffs) "Couldn't find file $path_b_coeffs"
     b = vec(readdlm(path_b_coeffs, Float64))
     num_b_coeffs = size(b, 1)
-    @assert num_b_coeffs == coeffs_max + 2
+    #@assert num_b_coeffs == coeffs_max + 2
+    @assert num_b_coeffs == num_stages # TODO: Revisit this!
 
     return a_matrix, b, c
 end
