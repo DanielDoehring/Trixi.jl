@@ -78,12 +78,13 @@ callbacks = CallbackSet(summary_callback,
 
 Stages = 14
 
-#ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
+ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
+ode_algorithm = Trixi.PairedExplicitERRK4(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
 
 dtRatios = [1, 0.5, 0.25]
 Stages = [14, 8, 5]
 
-ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
+#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,

@@ -201,7 +201,9 @@ include("methods_PERK4_multi.jl")
 
 include("partitioning.jl")
 
+### Entropy-relaxation PERK methods ###
 include("entropy_relaxation.jl")
 
-include("methods_PERK4_multi_er.jl")
+include("methods_PERK4_ER.jl")
+include("methods_PERK4_multi_ER.jl")
 end # @muladd
