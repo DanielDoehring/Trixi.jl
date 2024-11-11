@@ -191,7 +191,7 @@ end
           int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
     #println("Entropy difference: ", dS)
     # CARE: Enforce isentropy manually, i.e., turn off floating point errors!
-    #dS = 0.0
+    dS = 0.0
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     dir_wrap = wrap_array(integrator.direction, p)

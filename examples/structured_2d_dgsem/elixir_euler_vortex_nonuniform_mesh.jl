@@ -84,7 +84,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 10
+analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
@@ -112,11 +112,11 @@ Stages = [19, 11, 7, 5]
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
                                              "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
                                              dtRatios)
-#=
+
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
                                                "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
                                                dtRatios)
-=#
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
