@@ -467,17 +467,19 @@ function partitioning_variables!(level_info_elements,
                                                            nnodes, eltype(dg.basis.nodes))
 
     # For "grid-based" partitioning approach
-
+    #=
     S_min = alg.num_stage_evals_min
-    S_max = alg.NumStages
+    S_max = alg.num_stages
     n_levels = Int((S_max - S_min) / 2) + 1 # Linearly increasing levels
     h_bins = LinRange(h_min, h_max, n_levels + 1) # These are the intervals
     println("h_bins:")
     display(h_bins)
+    =#
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
+        #=
         # This approach is "grid-based" in the sense that 
         # the entire grid range gets mapped linearly onto the available methods
         level = findfirst(x -> x >= h, h_bins) - 1
@@ -485,18 +487,17 @@ function partitioning_variables!(level_info_elements,
         if level == 0
             level = 1
         end
+        =#
 
-        #=
         # This approach is "method-based" in the sense that
         # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
         level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
-          level = n_levels
+            level = n_levels
         else # Avoid reduction in timestep: Use next higher level
-          level = level - 1
+            level = level - 1
         end
-        =#
 
         append!(level_info_elements[level], element_id)
 

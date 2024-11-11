@@ -49,7 +49,7 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
         PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
 
         if NumStageEvals > 5
-            @assert isfile(PathMonCoeffs) "Couldn't find file $path_a_coeffs"
+            @assert isfile(PathMonCoeffs) "Couldn't find file $PathMonCoeffs"
             A = readdlm(PathMonCoeffs, Float64)
             NumMonCoeffs = size(A, 1)
         else

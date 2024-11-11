@@ -121,8 +121,14 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
     return integrator
 end
 
+#=
 @inline function last_three_stages!(integrator::PairedExplicitERRK4Integrator{RealT},
                                     alg, p) where {RealT}
+=#
+@inline function last_three_stages!(integrator::AbstractPairedExplicitERRKIntegrator,
+                                    alg, p)
+    RealT = Float64
+
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     # S - 2
@@ -183,9 +189,9 @@ end
     # 0.5 = b_{S}
     dS += integrator.dt *
           int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
+    #println("Entropy difference: ", dS)
     # CARE: Enforce isentropy manually, i.e., turn off floating point errors!
     #dS = 0.0
-    println("Entropy difference: ", dS)
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     dir_wrap = wrap_array(integrator.direction, p)
