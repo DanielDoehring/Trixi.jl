@@ -49,12 +49,12 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
         PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
 
         if NumStageEvals > 5
-          @assert isfile(PathMonCoeffs) "Couldn't find file $path_a_coeffs"
-          A = readdlm(PathMonCoeffs, Float64)
-          NumMonCoeffs = size(A, 1)
+            @assert isfile(PathMonCoeffs) "Couldn't find file $path_a_coeffs"
+            A = readdlm(PathMonCoeffs, Float64)
+            NumMonCoeffs = size(A, 1)
         else
-          A = []
-          NumMonCoeffs = 0
+            A = []
+            NumMonCoeffs = 0
         end
 
         if NumMonCoeffs > 0
@@ -74,8 +74,8 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
     end
     # Shared matrix
     a_matrix_constant = [0.364422246578869 0.114851811257441
-               0.1397682537005989 0.648906880894214
-               0.1830127018922191 0.028312163512968]
+                         0.1397682537005989 0.648906880894214
+                         0.1830127018922191 0.028312163512968]
 
     HighestActiveLevels = maximum.(ActiveLevels)
     HighestEvalLevels = maximum.(EvalLevels)
@@ -93,7 +93,8 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
     display(HighestEvalLevels)
     println()
 
-    return AMatrices, a_matrix_constant, c, ActiveLevels, HighestActiveLevels, HighestEvalLevels
+    return AMatrices, a_matrix_constant, c, ActiveLevels, HighestActiveLevels,
+           HighestEvalLevels
 end
 
 mutable struct PairedExplicitRK4Multi{StageCallbacks} <: AbstractPairedExplicitRKMulti

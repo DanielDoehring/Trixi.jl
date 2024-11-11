@@ -192,5 +192,4 @@ include("methods_PERK4.jl")
 include("methods_PERK4_multi.jl")
 
 include("partitioning.jl")
-
 end # @muladd
