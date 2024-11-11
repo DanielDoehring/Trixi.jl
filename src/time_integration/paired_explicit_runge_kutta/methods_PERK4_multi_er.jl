@@ -21,7 +21,17 @@ mutable struct PairedExplicitERRK4Multi <: AbstractPairedExplicitRKMulti
     function PairedExplicitERRK4Multi(stages::Vector{Int64},
                                       base_path_a_coeffs::AbstractString,
                                       dt_ratios)
-        PairedExplicitRK4Multi(stages, base_path_a_coeffs, dt_ratios)
+        newPERK4_Multi = new(minimum(stages),
+                             length(stages),
+                             maximum(stages),
+                             dt_ratios)
+
+        newPERK4_Multi.a_matrices, newPERK4_Multi.a_matrix_constant, newPERK4_Multi.c,
+        newPERK4_Multi.active_levels, newPERK4_Multi.max_active_levels, newPERK4_Multi.max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages,
+                                                                                                                                           newPERK4_Multi.num_stages,
+                                                                                                                                           base_path_a_coeffs)
+
+        return newPERK4_Multi
     end
 end # struct PairedExplicitERRK4Multi
 
@@ -164,7 +174,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
 end
 
 # TODO: This should live in "PERK4_er" when I construct that integrator
-function last_three_stages_ER!(integrator::AbstractPairedExplicitERRKIntegrator, alg, p)
+function last_three_stages!(integrator::AbstractPairedExplicitERRKIntegrator, alg, p)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     # S - 2
@@ -177,7 +187,7 @@ function last_three_stages_ER!(integrator::AbstractPairedExplicitERRKIntegrator,
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[alg.NumStages - 2] * integrator.dt)
+                 integrator.t + alg.c[alg.num_stages - 2] * integrator.dt)
 
     @threaded for u_ind in eachindex(integrator.du)
         integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
@@ -193,7 +203,7 @@ function last_three_stages_ER!(integrator::AbstractPairedExplicitERRKIntegrator,
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[alg.NumStages - 1] * integrator.dt)
+                 integrator.t + alg.c[alg.num_stages - 1] * integrator.dt)
 
     @threaded for u_ind in eachindex(integrator.du)
         integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
@@ -214,7 +224,7 @@ function last_three_stages_ER!(integrator::AbstractPairedExplicitERRKIntegrator,
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[alg.NumStages] * integrator.dt)
+                 integrator.t + alg.c[alg.num_stages] * integrator.dt)
 
     @threaded for i in eachindex(integrator.du)
         integrator.direction[i] = 0.5 * (integrator.k_higher[i] +
