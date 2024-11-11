@@ -5,99 +5,7 @@
 @muladd begin
 #! format: noindent
 
-function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::Int,
-                                           BasePathMonCoeffs::AbstractString)
-
-    # Current approach: Use ones (best internal stability properties)
-    c = ones(num_stages)
-    c[1] = 0.0
-
-    c[num_stages - 3] = 1.0
-    c[num_stages - 2] = 0.479274057836310
-    c[num_stages - 1] = sqrt(3) / 6 + 0.5
-    c[num_stages] = -sqrt(3) / 6 + 0.5
-
-    println("Timestep-split: ")
-    display(c)
-    println("\n")
-
-    # For the p = 4 method there are less free coefficients
-    CoeffsMax = num_stages - 5
-
-    a_matrices = zeros(CoeffsMax, 2, length(Stages))
-    for i in 1:length(Stages)
-        a_matrices[:, 1, i] = c[3:(num_stages - 3)]
-    end
-
-    # Datastructure indicating at which stage which level is evaluated
-    active_levels = [Vector{Int64}() for _ in 1:num_stages]
-    # k1 is evaluated at all levels
-    active_levels[1] = 1:length(Stages)
-
-    # Datastructure indicating at which stage which level contributes to state
-    EvalLevels = [Vector{Int64}() for _ in 1:num_stages]
-    # k1 is evaluated at all levels
-    EvalLevels[1] = 1:length(Stages)
-    # Second stage: Only finest method
-    EvalLevels[2] = [1]
-
-    for level in eachindex(Stages)
-        NumStageEvals = Stages[level]
-
-        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" * string(num_stages) * ".txt"
-        # If all c = 1.0, the max number of stages does not matter
-        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
-
-        if NumStageEvals > 5
-            @assert isfile(PathMonCoeffs) "Couldn't find file $path_a_coeffs"
-            A = readdlm(PathMonCoeffs, Float64)
-            NumMonCoeffs = size(A, 1)
-        else
-            A = []
-            NumMonCoeffs = 0
-        end
-
-        if NumMonCoeffs > 0
-            a_matrices[(CoeffsMax - NumMonCoeffs + 1):end, 1, level] -= A
-            a_matrices[(CoeffsMax - NumMonCoeffs + 1):end, 2, level] = A
-        end
-
-        # Add active levels to stages
-        for stage in num_stages:-1:(num_stages - (3 + NumMonCoeffs))
-            push!(active_levels[stage], level)
-        end
-
-        # Add eval levels to stages
-        for stage in num_stages:-1:(num_stages - (3 + NumMonCoeffs) - 1)
-            push!(EvalLevels[stage], level)
-        end
-    end
-    # Shared matrix
-    a_matrix_constant = [0.364422246578869 0.114851811257441
-                         0.1397682537005989 0.648906880894214
-                         0.1830127018922191 0.028312163512968]
-
-    max_active_levels = maximum.(active_levels)
-    max_eval_levels = maximum.(EvalLevels)
-
-    for i in 1:length(Stages)
-        println("A-Matrix of Butcher tableau of level " * string(i))
-        display(a_matrices[:, :, i])
-        println()
-    end
-
-    println("\nActive Levels:")
-    display(active_levels)
-    println()
-    println("\nmax_eval_levels:")
-    display(max_eval_levels)
-    println()
-
-    return a_matrices, a_matrix_constant, c, active_levels, max_active_levels,
-           max_eval_levels
-end
-
-mutable struct PairedExplicitRK4Multi <: AbstractPairedExplicitRKMulti
+mutable struct PairedExplicitRK4MultiER <: AbstractPairedExplicitRKMulti
     const num_stage_evals_min::Int64
     const num_methods::Int64
     const num_stages::Int64
@@ -110,28 +18,18 @@ mutable struct PairedExplicitRK4Multi <: AbstractPairedExplicitRKMulti
     max_active_levels::Vector{Int64}
     max_eval_levels::Vector{Int64}
 
-    function PairedExplicitRK4Multi(stages::Vector{Int64},
+    function PairedExplicitRK4MultiER(stages::Vector{Int64},
                                     base_path_a_coeffs::AbstractString,
                                     dt_ratios)
-        newPERK4_Multi = new(minimum(stages),
-                             length(stages),
-                             maximum(stages),
-                             dt_ratios)
-
-        newPERK4_Multi.a_matrices, newPERK4_Multi.a_matrix_constant, newPERK4_Multi.c,
-        newPERK4_Multi.active_levels, newPERK4_Multi.max_active_levels, newPERK4_Multi.max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages,
-                                                                                                                                           newPERK4_Multi.num_stages,
-                                                                                                                                           base_path_a_coeffs)
-
-        return newPERK4_Multi
+        PairedExplicitRK4Multi(stages, base_path_a_coeffs, dt_ratios)
     end
-end # struct PairedExplicitRK4Multi
+end # struct PairedExplicitRK4MultiER
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
+mutable struct PairedExplicitRK4MultiERIntegrator{RealT <: Real, uType, Params, Sol, F,
                                                 Alg,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiIntegrator
@@ -148,7 +46,7 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, So
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # PairedExplicitRK4Multi stages:
+    # PairedExplicitRK4MultiER stages:
     k1::uType
     k_higher::uType
 
@@ -169,17 +67,24 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, So
 
     coarsest_lvl::Int64
     n_levels::Int64
+
+    # Entropy Relaxation additions
+    direction::uType
+    num_timestep_relaxations::Int
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
+function init(ode::ODEProblem, alg::PairedExplicitRK4MultiER;
               dt, callback = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # PairedExplicitRK4Multi stages
+    # PairedExplicitRK4MultiER stages
     k1 = zero(u0)
     k_higher = zero(u0)
+
+    # For entropy relaxation
+    direction = zero(u0)
 
     t0 = first(ode.tspan)
     iter = 0
@@ -224,7 +129,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
 
     ### Done with setting up for handling of level-dependent integration ###
 
-    integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp, t0, dt, zero(dt), iter,
+    integrator = PairedExplicitRK4MultiERIntegrator(u0, du, u_tmp, t0, dt, zero(dt), iter,
                                                   ode.p,
                                                   (prob = ode,), ode.f, alg,
                                                   PairedExplicitRKOptions(callback,
@@ -241,22 +146,23 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                   level_info_mortars_acc,
                                                   level_info_mpi_mortars_acc,
                                                   level_u_indices_elements, -
-                                                  1, n_levels)
+                                                  1, n_levels,
+                                                  direction, 0)
 
     # initialize callbacks
     if callback isa CallbackSet
-        for cb in callback.continuous_callbacks
-            throw(ArgumentError("Continuous callbacks are unsupported with paired explicit Runge-Kutta methods."))
-        end
-        for cb in callback.discrete_callbacks
-            cb.initialize(cb, integrator.u, integrator.t, integrator)
-        end
-    end
+      for cb in callback.continuous_callbacks
+          throw(ArgumentError("Continuous callbacks are unsupported with paired explicit Runge-Kutta methods."))
+      end
+      for cb in callback.discrete_callbacks
+          cb.initialize(cb, integrator.u, integrator.t, integrator)
+      end
+  end
 
     return integrator
 end
 
-function step!(integrator::PairedExplicitRK4MultiIntegrator)
+function step!(integrator::PairedExplicitRK4MultiERIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -398,7 +304,7 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
         end # end loop over different stages
 
         last_three_stages!(integrator, alg, prob.p)
-    end # PairedExplicitRK4Multi step
+    end # PairedExplicitRK4MultiER step
 
     integrator.iter += 1
     integrator.t += integrator.dt
@@ -423,7 +329,7 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
 end
 
 # used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::PairedExplicitRK4MultiIntegrator, new_size)
+function Base.resize!(integrator::PairedExplicitRK4MultiERIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
