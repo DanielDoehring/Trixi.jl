@@ -44,6 +44,14 @@ abstract type AbstractPairedExplicitRKSingleIntegrator <:
 abstract type AbstractPairedExplicitRKMultiIntegrator <:
               AbstractPairedExplicitRKIntegrator end
 
+# Entropy-relaxation integrators              
+abstract type AbstractPairedExplicitERRKIntegrator <:
+              AbstractPairedExplicitRKIntegrator end
+abstract type AbstractPairedExplicitERRKSingleIntegrator <:
+              AbstractPairedExplicitERRKIntegrator end
+abstract type AbstractPairedExplicitERRKMultiIntegrator <:
+              AbstractPairedExplicitERRKIntegrator end
+
 """
     calculate_cfl(ode_algorithm::AbstractPairedExplicitRK, ode)
 
@@ -192,4 +200,8 @@ include("methods_PERK4.jl")
 include("methods_PERK4_multi.jl")
 
 include("partitioning.jl")
+
+include("entropy_relaxation.jl")
+
+include("methods_PERK4_multi_er.jl")
 end # @muladd

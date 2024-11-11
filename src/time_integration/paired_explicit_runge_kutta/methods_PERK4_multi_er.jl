@@ -5,7 +5,7 @@
 @muladd begin
 #! format: noindent
 
-mutable struct PairedExplicitRK4MultiER <: AbstractPairedExplicitRKMulti
+mutable struct PairedExplicitERRK4Multi <: AbstractPairedExplicitRKMulti
     const num_stage_evals_min::Int64
     const num_methods::Int64
     const num_stages::Int64
@@ -18,21 +18,21 @@ mutable struct PairedExplicitRK4MultiER <: AbstractPairedExplicitRKMulti
     max_active_levels::Vector{Int64}
     max_eval_levels::Vector{Int64}
 
-    function PairedExplicitRK4MultiER(stages::Vector{Int64},
-                                    base_path_a_coeffs::AbstractString,
-                                    dt_ratios)
+    function PairedExplicitERRK4Multi(stages::Vector{Int64},
+                                      base_path_a_coeffs::AbstractString,
+                                      dt_ratios)
         PairedExplicitRK4Multi(stages, base_path_a_coeffs, dt_ratios)
     end
-end # struct PairedExplicitRK4MultiER
+end # struct PairedExplicitERRK4Multi
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK4MultiERIntegrator{RealT <: Real, uType, Params, Sol, F,
-                                                Alg,
-                                                PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKMultiIntegrator
+mutable struct PairedExplicitERRK4MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
+                                                  Alg,
+                                                  PairedExplicitRKOptions} <:
+               AbstractPairedExplicitERRKMultiIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -46,7 +46,7 @@ mutable struct PairedExplicitRK4MultiERIntegrator{RealT <: Real, uType, Params, 
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # PairedExplicitRK4MultiER stages:
+    # PairedExplicitERRK4Multi stages:
     k1::uType
     k_higher::uType
 
@@ -73,13 +73,13 @@ mutable struct PairedExplicitRK4MultiERIntegrator{RealT <: Real, uType, Params, 
     num_timestep_relaxations::Int
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRK4MultiER;
+function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
               dt, callback = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # PairedExplicitRK4MultiER stages
+    # PairedExplicitERRK4Multi stages
     k1 = zero(u0)
     k_higher = zero(u0)
 
@@ -129,54 +129,187 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4MultiER;
 
     ### Done with setting up for handling of level-dependent integration ###
 
-    integrator = PairedExplicitRK4MultiERIntegrator(u0, du, u_tmp, t0, dt, zero(dt), iter,
-                                                  ode.p,
-                                                  (prob = ode,), ode.f, alg,
-                                                  PairedExplicitRKOptions(callback,
-                                                                          ode.tspan;
-                                                                          kwargs...),
-                                                  false,
-                                                  k1, k_higher,
-                                                  level_info_elements,
-                                                  level_info_elements_acc,
-                                                  level_info_interfaces_acc,
-                                                  level_info_mpi_interfaces_acc,
-                                                  level_info_boundaries_acc,
-                                                  level_info_boundaries_orientation_acc,
-                                                  level_info_mortars_acc,
-                                                  level_info_mpi_mortars_acc,
-                                                  level_u_indices_elements, -
-                                                  1, n_levels,
-                                                  direction, 0)
+    integrator = PairedExplicitERRK4MultiIntegrator(u0, du, u_tmp, t0, dt, zero(dt),
+                                                    iter,
+                                                    ode.p,
+                                                    (prob = ode,), ode.f, alg,
+                                                    PairedExplicitRKOptions(callback,
+                                                                            ode.tspan;
+                                                                            kwargs...),
+                                                    false,
+                                                    k1, k_higher,
+                                                    level_info_elements,
+                                                    level_info_elements_acc,
+                                                    level_info_interfaces_acc,
+                                                    level_info_mpi_interfaces_acc,
+                                                    level_info_boundaries_acc,
+                                                    level_info_boundaries_orientation_acc,
+                                                    level_info_mortars_acc,
+                                                    level_info_mpi_mortars_acc,
+                                                    level_u_indices_elements, -
+                                                    1, n_levels,
+                                                    direction, 0)
 
     # initialize callbacks
     if callback isa CallbackSet
-      for cb in callback.continuous_callbacks
-          throw(ArgumentError("Continuous callbacks are unsupported with paired explicit Runge-Kutta methods."))
-      end
-      for cb in callback.discrete_callbacks
-          cb.initialize(cb, integrator.u, integrator.t, integrator)
-      end
-  end
+        for cb in callback.continuous_callbacks
+            throw(ArgumentError("Continuous callbacks are unsupported with paired explicit Runge-Kutta methods."))
+        end
+        for cb in callback.discrete_callbacks
+            cb.initialize(cb, integrator.u, integrator.t, integrator)
+        end
+    end
 
     return integrator
 end
 
-function step!(integrator::PairedExplicitRK4MultiERIntegrator)
+# TODO: This should live in "PERK4_er" when I construct that integrator
+function last_three_stages_ER!(integrator::AbstractPairedExplicitERRKIntegrator, alg, p)
+    mesh, equations, dg, cache = mesh_equations_solver_cache(p)
+
+    # S - 2
+    @threaded for u_ind in eachindex(integrator.u)
+        integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+                                  alg.a_matrix_constant[1, 1] *
+                                  integrator.k1[u_ind] +
+                                  alg.a_matrix_constant[1, 2] *
+                                  integrator.k_higher[u_ind]
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.NumStages - 2] * integrator.dt)
+
+    @threaded for u_ind in eachindex(integrator.du)
+        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+    end
+
+    # S - 1
+    @threaded for u_ind in eachindex(integrator.u)
+        integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+                                  alg.a_matrix_constant[2, 1] *
+                                  integrator.k1[u_ind] +
+                                  alg.a_matrix_constant[2, 2] *
+                                  integrator.k_higher[u_ind]
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.NumStages - 1] * integrator.dt)
+
+    @threaded for u_ind in eachindex(integrator.du)
+        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+    end
+
+    k_higher_wrap = wrap_array(integrator.k_higher, p)
+    u_tmp_wrap = wrap_array(integrator.u_tmp, p)
+    # 0.5 = b_{S-1}
+    dS = 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+
+    # S
+    @threaded for i in eachindex(integrator.du)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              alg.a_matrix_constant[3, 1] *
+                              integrator.k1[i] +
+                              alg.a_matrix_constant[3, 2] *
+                              integrator.k_higher[i]
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.NumStages] * integrator.dt)
+
+    @threaded for i in eachindex(integrator.du)
+        integrator.direction[i] = 0.5 * (integrator.k_higher[i] +
+                                   integrator.du[i] * integrator.dt)
+    end
+
+    du_wrap = wrap_array(integrator.du, integrator.p)
+    # 0.5 = b_{S}
+    dS += 0.5 * integrator.dt *
+          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+    # CARE: Enforce isentropy manually, i.e., turn off floating point errors!
+    dS = 0.0
+
+    u_wrap = wrap_array(integrator.u, integrator.p)
+    dir_wrap = wrap_array(integrator.direction, p)
+
+    S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+
+    gamma = 1.0 # Default value if entropy relaxation methodology not applicable
+
+    # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
+    gamma_min = 0.1 # Cannot be 0, as then r(0) = 0
+    gamma_max = 1.0
+    bisection_its_max = 100
+
+    # Re-use `du_wrap` as helper data structure (not needed anymore)
+    @threaded for element in eachelement(dg, cache)
+        @views @. du_wrap[.., element] = u_wrap[.., element] +
+                                         gamma_max *
+                                         dir_wrap[.., element]
+    end
+    r_max = entropy_difference(gamma_max, S_old, dS, du_wrap, mesh,
+                               equations, dg, cache)
+
+    @threaded for element in eachelement(dg, cache)
+        @views @. du_wrap[.., element] = u_wrap[.., element] +
+                                         gamma_min *
+                                         dir_wrap[.., element]
+    end
+    r_min = entropy_difference(gamma_min, S_old, dS, du_wrap,
+                               mesh, equations, dg, cache)
+
+    # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
+    if r_max > 0 && r_min < 0 # && 
+        # integrator.finalstep == false # Avoid last-step shenanigans for now
+
+        integrator.num_timestep_relaxations += 1
+        gamma_eps = 1e-15
+
+        bisect_its = 0
+        @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min > gamma_eps #&& bisect_its < bisection_its_max
+            gamma = 0.5 * (gamma_max + gamma_min)
+
+            @threaded for element in eachelement(dg, cache)
+                @views @. du_wrap[.., element] = u_wrap[.., element] +
+                                                 gamma *
+                                                 dir_wrap[.., element]
+            end
+            r_gamma = entropy_difference(gamma, S_old, dS, du_wrap,
+                                         mesh, equations, dg, cache)
+
+            if r_gamma < 0
+                gamma_min = gamma
+            else
+                gamma_max = gamma
+            end
+            bisect_its += 1
+        end
+    end
+
+    t_end = last(integrator.sol.prob.tspan)
+    integrator.iter += 1
+    # Last timestep shenanigans
+    if integrator.t + gamma * integrator.dt > t_end ||
+       isapprox(integrator.t + gamma * integrator.dt, t_end)
+        integrator.t = t_end
+        gamma = (t_end - integrator.t) / integrator.dt
+        terminate!(integrator)
+        println("# Relaxed timesteps: ", integrator.num_timestep_relaxations)
+    else
+        integrator.t += gamma * integrator.dt
+    end
+
+    @threaded for i in eachindex(integrator.u)
+        integrator.u[i] += gamma * integrator.direction[i]
+    end
+end
+
+function step!(integrator::PairedExplicitERRK4MultiIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
-    t_end = last(prob.tspan)
     callbacks = integrator.opts.callback
 
     if isnan(integrator.dt)
         error("time step size `dt` is NaN")
-    end
-
-    # if the next iteration would push the simulation beyond the end time, set dt accordingly
-    if integrator.t + integrator.dt > t_end ||
-       isapprox(integrator.t + integrator.dt, t_end)
-        integrator.dt = t_end - integrator.t
-        terminate!(integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
@@ -304,10 +437,7 @@ function step!(integrator::PairedExplicitRK4MultiERIntegrator)
         end # end loop over different stages
 
         last_three_stages!(integrator, alg, prob.p)
-    end # PairedExplicitRK4MultiER step
-
-    integrator.iter += 1
-    integrator.t += integrator.dt
+    end # PairedExplicitERRK4Multi step
 
     @trixi_timeit timer() "Step-Callbacks" begin
         # handle callbacks
@@ -329,12 +459,14 @@ function step!(integrator::PairedExplicitRK4MultiERIntegrator)
 end
 
 # used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::PairedExplicitRK4MultiERIntegrator, new_size)
+function Base.resize!(integrator::PairedExplicitERRK4MultiIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
 
     resize!(integrator.k1, new_size)
     resize!(integrator.k_higher, new_size)
+
+    resize!(integrator.direction, new_size)
 end
 end # @muladd
