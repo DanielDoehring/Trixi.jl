@@ -84,7 +84,7 @@ mutable struct PairedExplicitERRK4MultiIntegrator{RealT <: Real, uType, Params, 
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
-              dt, callback = nothing, kwargs...)
+              dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
     u_tmp = zero(u0)

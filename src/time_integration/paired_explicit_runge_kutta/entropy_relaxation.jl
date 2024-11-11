@@ -2,8 +2,8 @@
 # as it is not PERK-specific.
 
 function int_w_dot_stage(stage, u_i,
-                         mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations, dg::DG,
-                         cache)
+                         mesh::Union{TreeMesh{1}, StructuredMesh{1}},
+                         equations, dg::DG, cache)
     # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
     integrate_via_indices(u_i, mesh, equations, dg, cache,
                           stage) do u_i, i, element, equations, dg, stage

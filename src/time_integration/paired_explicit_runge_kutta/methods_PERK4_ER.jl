@@ -60,7 +60,7 @@ mutable struct PairedExplicitERRK4Integrator{RealT <: Real, uType, Params, Sol, 
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::RealT
+    tdir::Real
     dt::RealT # current time step
     dtcache::RealT # manually set time step
     iter::Int # current number of time steps (iteration)
@@ -121,8 +121,8 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitERRKIntegrator,
-                                    alg, p)
+@inline function last_three_stages!(integrator::PairedExplicitERRK4Integrator{RealT},
+                                    alg, p) where {RealT}
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     # S - 2
@@ -160,7 +160,7 @@ end
     k_higher_wrap = wrap_array(integrator.k_higher, p)
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # 0.5 = b_{S-1}
-    dS = 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+    dS = int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
 
     # S
     @threaded for i in eachindex(integrator.du)
@@ -175,27 +175,28 @@ end
                  integrator.t + alg.c[alg.num_stages] * integrator.dt)
 
     @threaded for i in eachindex(integrator.du)
-        integrator.direction[i] = 0.5 * (integrator.k_higher[i] +
-                                   integrator.du[i] * integrator.dt)
+        integrator.direction[i] = (integrator.k_higher[i] +
+                                   integrator.du[i] * integrator.dt) / 2
     end
 
     du_wrap = wrap_array(integrator.du, integrator.p)
     # 0.5 = b_{S}
-    dS += 0.5 * integrator.dt *
-          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+    dS += integrator.dt *
+          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
     # CARE: Enforce isentropy manually, i.e., turn off floating point errors!
-    dS = 0.0
+    #dS = 0.0
+    println("Entropy difference: ", dS)
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     dir_wrap = wrap_array(integrator.direction, p)
 
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
-    gamma = 1.0 # Default value if entropy relaxation methodology not applicable
+    gamma = one(RealT) # Default value if entropy relaxation methodology not applicable
 
     # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-    gamma_min = 0.1 # Cannot be 0, as then r(0) = 0
-    gamma_max = 1.0
+    gamma_min = 1 / RealT(10) # Cannot be 0, as then r(0) = 0
+    gamma_max = one(RealT)
     bisection_its_max = 100
 
     # Re-use `du_wrap` as helper data structure (not needed anymore)
@@ -217,14 +218,12 @@ end
 
     # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
     if r_max > 0 && r_min < 0 # && 
-        # integrator.finalstep == false # Avoid last-step shenanigans for now
-
         integrator.num_timestep_relaxations += 1
-        gamma_eps = 1e-15
+        gamma_eps = 10 * eps(RealT)
 
         bisect_its = 0
         @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min > gamma_eps #&& bisect_its < bisection_its_max
-            gamma = 0.5 * (gamma_max + gamma_min)
+            gamma = (gamma_max + gamma_min) / 2
 
             @threaded for element in eachelement(dg, cache)
                 @views @. du_wrap[.., element] = u_wrap[.., element] +
