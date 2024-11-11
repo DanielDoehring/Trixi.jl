@@ -69,7 +69,7 @@ gamma = 1.4
 
 equations = CompressibleEulerEquations2D(gamma)
 
-EdgeLength = 10
+EdgeLength = 10.0
 
 N_passes = 1
 T_end = 2 * EdgeLength * N_passes

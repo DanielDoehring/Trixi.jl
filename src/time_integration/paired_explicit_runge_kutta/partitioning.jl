@@ -10,7 +10,7 @@ function get_n_levels(mesh::TreeMesh, alg)
 end
 
 function get_n_levels(mesh::Union{P4estMesh, StructuredMesh}, alg)
-    n_levels = alg.NumMethods
+    n_levels = alg.num_methods
 
     return n_levels
 end
@@ -50,7 +50,7 @@ function partitioning_variables!(level_info_elements,
             end
         end
         # Similar to procedure for P4est
-        level_id = findfirst(x -> x < c_max_el, alg.dtRatios)
+        level_id = findfirst(x -> x < c_max_el, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level_id === nothing
             level_id = n_levels
@@ -361,7 +361,7 @@ function partitioning_variables!(level_info_elements,
         h = h_min_per_element[element_id]
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, alg.dtRatios)
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -387,7 +387,7 @@ function partitioning_variables!(level_info_elements,
         h = min(h1, h2)
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, alg.dtRatios)
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -408,7 +408,7 @@ function partitioning_variables!(level_info_elements,
         h = h_min_per_element[element_id]
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, alg.dtRatios)
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -437,7 +437,7 @@ function partitioning_variables!(level_info_elements,
             h = min(h_lower, h_higher)
 
             # Beyond linear scaling of timestep
-            level = findfirst(x -> x < h_min / h, alg.dtRatios)
+            level = findfirst(x -> x < h_min / h, alg.dt_ratios)
             # Catch case that cell is "too coarse" for method with fewest stage evals
             if level === nothing
                 level = n_levels
@@ -468,7 +468,7 @@ function partitioning_variables!(level_info_elements,
 
     # For "grid-based" partitioning approach
 
-    S_min = alg.NumStageEvalsMin
+    S_min = alg.num_stage_evals_min
     S_max = alg.NumStages
     n_levels = Int((S_max - S_min) / 2) + 1 # Linearly increasing levels
     h_bins = LinRange(h_min, h_max, n_levels + 1) # These are the intervals
@@ -489,7 +489,7 @@ function partitioning_variables!(level_info_elements,
         #=
         # This approach is "method-based" in the sense that
         # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
-        level = findfirst(x -> x < h_min / h, alg.dtRatios)
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
           level = n_levels

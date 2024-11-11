@@ -19,13 +19,13 @@ function (amr_callback::AMRCallback)(integrator::AbstractPairedExplicitRKMultiIn
             u_modified!(integrator, true)
 
             ### PERK additions ###
-            # TODO: Need to make this much less allocating!
             @trixi_timeit timer() "PERK stage identifiers update" begin
                 mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
 
                 integrator.n_levels = get_n_levels(mesh, integrator.alg)
                 n_dims = ndims(mesh) # Spatial dimension
 
+                # TODO: Can you avoid complete re-assignment, i.e., only update/remove changed elements?
                 # Re-initialize storage for level-wise information
                 if integrator.n_levels != length(integrator.level_info_elements_acc)
                     integrator.level_info_elements = [Vector{Int64}()

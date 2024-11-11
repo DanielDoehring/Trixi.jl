@@ -24,15 +24,15 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
     # For the p = 4 method there are less free coefficients
     CoeffsMax = num_stages - 5
 
-    AMatrices = zeros(CoeffsMax, 2, length(Stages))
+    a_matrices = zeros(CoeffsMax, 2, length(Stages))
     for i in 1:length(Stages)
-        AMatrices[:, 1, i] = c[3:(num_stages - 3)]
+        a_matrices[:, 1, i] = c[3:(num_stages - 3)]
     end
 
     # Datastructure indicating at which stage which level is evaluated
-    ActiveLevels = [Vector{Int64}() for _ in 1:num_stages]
+    active_levels = [Vector{Int64}() for _ in 1:num_stages]
     # k1 is evaluated at all levels
-    ActiveLevels[1] = 1:length(Stages)
+    active_levels[1] = 1:length(Stages)
 
     # Datastructure indicating at which stage which level contributes to state
     EvalLevels = [Vector{Int64}() for _ in 1:num_stages]
@@ -58,13 +58,13 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
         end
 
         if NumMonCoeffs > 0
-            AMatrices[(CoeffsMax - NumMonCoeffs + 1):end, 1, level] -= A
-            AMatrices[(CoeffsMax - NumMonCoeffs + 1):end, 2, level] = A
+            a_matrices[(CoeffsMax - NumMonCoeffs + 1):end, 1, level] -= A
+            a_matrices[(CoeffsMax - NumMonCoeffs + 1):end, 2, level] = A
         end
 
         # Add active levels to stages
         for stage in num_stages:-1:(num_stages - (3 + NumMonCoeffs))
-            push!(ActiveLevels[stage], level)
+            push!(active_levels[stage], level)
         end
 
         # Add eval levels to stages
@@ -77,54 +77,51 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
                          0.1397682537005989 0.648906880894214
                          0.1830127018922191 0.028312163512968]
 
-    HighestActiveLevels = maximum.(ActiveLevels)
-    HighestEvalLevels = maximum.(EvalLevels)
+    max_active_levels = maximum.(active_levels)
+    max_eval_levels = maximum.(EvalLevels)
 
     for i in 1:length(Stages)
         println("A-Matrix of Butcher tableau of level " * string(i))
-        display(AMatrices[:, :, i])
+        display(a_matrices[:, :, i])
         println()
     end
 
     println("\nActive Levels:")
-    display(ActiveLevels)
+    display(active_levels)
     println()
-    println("\nHighestEvalLevels:")
-    display(HighestEvalLevels)
+    println("\nmax_eval_levels:")
+    display(max_eval_levels)
     println()
 
-    return AMatrices, a_matrix_constant, c, ActiveLevels, HighestActiveLevels,
-           HighestEvalLevels
+    return a_matrices, a_matrix_constant, c, active_levels, max_active_levels,
+           max_eval_levels
 end
 
-mutable struct PairedExplicitRK4Multi{StageCallbacks} <: AbstractPairedExplicitRKMulti
-    const NumStageEvalsMin::Int64
-    const NumMethods::Int64
+mutable struct PairedExplicitRK4Multi <: AbstractPairedExplicitRKMulti
+    const num_stage_evals_min::Int64
+    const num_methods::Int64
     const num_stages::Int64
-    const dtRatios::Vector{Float64}
-    stage_callbacks::StageCallbacks
+    const dt_ratios::Vector{Float64}
 
-    AMatrices::Array{Float64, 3}
+    a_matrices::Array{Float64, 3}
     a_matrix_constant::Matrix{Float64}
     c::Vector{Float64}
-    ActiveLevels::Vector{Vector{Int64}}
-    HighestActiveLevels::Vector{Int64}
-    HighestEvalLevels::Vector{Int64}
+    active_levels::Vector{Vector{Int64}}
+    max_active_levels::Vector{Int64}
+    max_eval_levels::Vector{Int64}
 
-    function PairedExplicitRK4Multi(Stages_::Vector{Int64},
-                                    BasePathMonCoeffs_::AbstractString,
-                                    dtRatios_,
-                                    stage_callbacks = ())
-        newPERK4_Multi = new{typeof(stage_callbacks)}(minimum(Stages_),
-                                                      length(Stages_),
-                                                      maximum(Stages_),
-                                                      dtRatios_,
-                                                      stage_callbacks)
+    function PairedExplicitRK4Multi(stages::Vector{Int64},
+                                    base_path_a_coeffs::AbstractString,
+                                    dt_ratios)
+        newPERK4_Multi = new(minimum(stages),
+                             length(stages),
+                             maximum(stages),
+                             dt_ratios)
 
-        newPERK4_Multi.AMatrices, newPERK4_Multi.a_matrix_constant, newPERK4_Multi.c,
-        newPERK4_Multi.ActiveLevels, newPERK4_Multi.HighestActiveLevels, newPERK4_Multi.HighestEvalLevels = ComputePERK4_Multi_ButcherTableau(Stages_,
-                                                                                                                                              newPERK4_Multi.num_stages,
-                                                                                                                                              BasePathMonCoeffs_)
+        newPERK4_Multi.a_matrices, newPERK4_Multi.a_matrix_constant, newPERK4_Multi.c,
+        newPERK4_Multi.active_levels, newPERK4_Multi.max_active_levels, newPERK4_Multi.max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages,
+                                                                                                                                           newPERK4_Multi.num_stages,
+                                                                                                                                           base_path_a_coeffs)
 
         return newPERK4_Multi
     end
@@ -234,7 +231,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                           ode.tspan;
                                                                           kwargs...),
                                                   false,
-                                                  k1, k_higher, level_info_elements,
+                                                  k1, k_higher,
+                                                  level_info_elements,
                                                   level_info_elements_acc,
                                                   level_info_interfaces_acc,
                                                   level_info_mpi_interfaces_acc,
@@ -280,7 +278,7 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
         k1!(integrator, prob.p, alg.c)
 
-        # k2
+        # k2: Only evaluated at finest level
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
                      integrator.t + alg.c[2] * integrator.dt,
                      integrator.level_info_elements_acc[1],
@@ -289,7 +287,6 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
                      #integrator.level_info_boundaries_orientation_acc[1],
                      integrator.level_info_mortars_acc[1])
 
-        # Update finest level only
         @threaded for u_ind in integrator.level_u_indices_elements[1]
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
@@ -298,34 +295,34 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
 
             ### General implementation: Not own method for each grid level ###
             # Loop over different methods with own associated level
-            for level in 1:min(alg.NumMethods, integrator.n_levels)
+            for level in 1:min(alg.num_methods, integrator.n_levels)
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                              alg.AMatrices[stage - 2, 1, level] *
+                                              alg.a_matrices[stage - 2, 1, level] *
                                               integrator.k1[u_ind]
                 end
             end
-            for level in 1:min(alg.HighestEvalLevels[stage], integrator.n_levels)
+            for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] *
+                    integrator.u_tmp[u_ind] += alg.a_matrices[stage - 2, 2, level] *
                                                integrator.k_higher[u_ind]
                 end
             end
 
             # "Remainder": Non-efficiently integrated
-            for level in (alg.NumMethods + 1):(integrator.n_levels)
+            for level in (alg.num_methods + 1):(integrator.n_levels)
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                              alg.AMatrices[stage - 2, 1,
-                                                            alg.NumMethods] *
+                                              alg.a_matrices[stage - 2, 1,
+                                                             alg.num_methods] *
                                               integrator.k1[u_ind]
                 end
             end
-            if alg.HighestEvalLevels[stage] == alg.NumMethods
-                for level in (alg.HighestEvalLevels[stage] + 1):(integrator.n_levels)
+            if alg.max_eval_levels[stage] == alg.num_methods
+                for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
                     @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2,
-                                                                 alg.NumMethods] *
+                        integrator.u_tmp[u_ind] += alg.a_matrices[stage - 2, 2,
+                                                                  alg.num_methods] *
                                                    integrator.k_higher[u_ind]
                     end
                 end
@@ -335,13 +332,13 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
             #=
             for level in 1:integrator.n_levels
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1, level] *
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.a_matrices[stage - 2, 1, level] *
                                                integrator.k1[u_ind]
                 end
             end
-            for level in 1:alg.HighestEvalLevels[stage]
+            for level in 1:alg.max_eval_levels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] += alg.AMatrices[stage - 2, 2, level] *
+                    integrator.u_tmp[u_ind] += alg.a_matrices[stage - 2, 2, level] *
                                                integrator.k_higher[u_ind]
                 end
             end
@@ -349,15 +346,15 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
 
             #=
             ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
-            for level in 1:alg.HighestEvalLevels[stage]
+            for level in 1:alg.max_eval_levels[stage]
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.AMatrices[stage - 2, 1, level] *
+                    integrator.u_tmp[u_ind] = integrator.u[u_ind] + alg.a_matrices[stage - 2, 1, level] *
                                                integrator.k1[u_ind] + 
-                                               alg.AMatrices[stage - 2, 2, level] *
+                                               alg.a_matrices[stage - 2, 2, level] *
                                                integrator.k_higher[u_ind]
                 end
             end
-            for level in alg.HighestEvalLevels[stage]+1:integrator.n_levels
+            for level in alg.max_eval_levels[stage]+1:integrator.n_levels
                 @threaded for u_ind in integrator.level_u_indices_elements[level]
                     integrator.u_tmp[u_ind] = integrator.u[u_ind] + integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
                 end
@@ -365,14 +362,14 @@ function step!(integrator::PairedExplicitRK4MultiIntegrator)
             =#
 
             # For statically non-uniform meshes/characteristic speeds
-            #integrator.coarsest_lvl = alg.HighestActiveLevels[stage]
+            #integrator.coarsest_lvl = alg.max_active_levels[stage]
 
             # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-            integrator.coarsest_lvl = min(alg.HighestActiveLevels[stage],
+            integrator.coarsest_lvl = min(alg.max_active_levels[stage],
                                           integrator.n_levels)
 
             # Check if there are fewer integrators than grid levels (non-optimal method)
-            if integrator.coarsest_lvl == alg.NumMethods
+            if integrator.coarsest_lvl == alg.num_methods
                 # NOTE: This is supposedly more efficient than setting
                 #integrator.coarsest_lvl = integrator.n_levels
                 # and then using the level-dependent version
