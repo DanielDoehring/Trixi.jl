@@ -576,7 +576,7 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
     return hmin_per_element, h_min, h_max
 end
 
-# TODO: 3D version of "get_hmin_per_element"
+# TODO: 3D versions of "get_hmin_per_element"
 # TODO: T8Code extensions
 
 function partitioning_u!(level_u_indices_elements,

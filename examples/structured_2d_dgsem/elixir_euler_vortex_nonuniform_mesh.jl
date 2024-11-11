@@ -62,7 +62,7 @@ function mapping(xi_, eta_)
     xi = 0.5 * (xi_ + 1.0)
     eta = 0.5 * (eta_ + 1.0)
 
-    exponent = 1.4
+    exponent = 1.5
 
     x = xi^exponent * EdgeLength
     y = eta^exponent * EdgeLength
@@ -70,7 +70,7 @@ function mapping(xi_, eta_)
     return SVector(x, y)
 end
 
-N_Cells = 16
+N_Cells = 32
 cells_per_dimension = (N_Cells, N_Cells)
 
 mesh = StructuredMesh(cells_per_dimension, mapping)
@@ -84,14 +84,17 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1
+analysis_interval = 10
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = (entropy,),
+                                     extra_analysis_integrals = (entropy,),
+                                     #analysis_integrals = (entropy,),
+                                     analysis_filename="analysis_ER.dat",
+                                     #analysis_filename="analysis_standard.dat",
                                      save_analysis = true)
 
 cfl = 18.2 # S = 19 PERK4                                     
-cfl = 9.6 # S = 19 PERK4 Multi
+cfl = 8.0 # S = 19 PERK4 Multi
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
