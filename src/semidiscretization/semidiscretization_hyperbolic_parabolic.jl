@@ -331,6 +331,20 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     return nothing
 end
 
+function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                   semi::SemidiscretizationHyperbolicParabolic, t,
+                                   du_ode_hyp)
+    @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
+        # Implementation of split ODE problem in OrdinaryDiffEq
+        rhs!(du_ode_hyp, u_ode, semi, t)
+        rhs_parabolic!(du_ode, u_ode, semi, t)
+
+        @threaded for u_ind in eachindex(du_ode)
+            du_ode[u_ind] += du_ode_hyp[u_ind]
+        end
+    end
+end
+
 function _jacobian_ad_forward(semi::SemidiscretizationHyperbolicParabolic, t0, u0_ode,
                               du_ode, config)
     new_semi = remake(semi, uEltype = eltype(config))
