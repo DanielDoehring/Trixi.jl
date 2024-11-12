@@ -5,8 +5,11 @@ using Trixi
 gamma = 1.4
 equations = CompressibleEulerEquations2D(gamma)
 
-# NOTE: This is HLLC => entropy diffusive!
-solver = DGSEM(polydeg = 3, surface_flux = flux_hllc)
+# Volume flux adds some (minimal) disspation, thus stabilizing the simulation -
+# in contrast to standard DGSEM only
+volume_flux = flux_ranocha
+solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
+               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 EdgeLength = 20.0
 """
@@ -63,7 +66,7 @@ function mapping(xi_, eta_)
     xi = 0.5 * (xi_ + 1.0)
     eta = 0.5 * (eta_ + 1.0)
 
-    exponent = 1.5
+    exponent = 1.4
 
     x = xi^exponent * EdgeLength
     y = eta^exponent * EdgeLength
@@ -71,7 +74,7 @@ function mapping(xi_, eta_)
     return SVector(x, y)
 end
 
-N_Cells = 32
+N_Cells = 32 # 20
 cells_per_dimension = (N_Cells, N_Cells)
 
 mesh = StructuredMesh(cells_per_dimension, mapping)
@@ -88,47 +91,45 @@ summary_callback = SummaryCallback()
 analysis_interval = 10
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     extra_analysis_integrals = (entropy,),
-                                     #analysis_integrals = (entropy,),
-                                     analysis_filename = "analysis_ER.dat",
-                                     #analysis_filename="analysis_standard.dat",
+                                     #extra_analysis_integrals = (entropy,),
+                                     analysis_integrals = (entropy,),
+                                     analysis_filename="analysis_standard.dat",
+                                     #analysis_filename = "analysis_ER.dat",
                                      save_analysis = true)
-
-cfl = 18.2 # S = 19 PERK4                                     
-cfl = 8.0 # S = 19 PERK4 Multi
+                                
+cfl = 6.9
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        stepsize_callback,
-                        analysis_callback)
+                        analysis_callback,
+                        stepsize_callback)
 
 ###############################################################################
 # run the simulation
 
-#=
-Stages = 19
-ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
-=#
-
-dtRatios = [1, 0.5, 0.25, 0.125]
-Stages = [19, 11, 7, 5]
+Stages = [16, 11, 9, 8, 7, 6, 5]
+dtRatios = [
+    0.636282563128043,
+    0.412078842462506,
+    0.31982226180844,
+    0.26286863302812,
+    0.22663973638555,
+    0.160154267621692,
+    0.130952239152975
+] ./ 0.636282563128043
 
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
-                                             "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
+                                             "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                              dtRatios)
 
+#=
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
-                                               "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
+                                               "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                                dtRatios)
+=#
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
-
-#=
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-=#
 
 summary_callback() # print the timer summary

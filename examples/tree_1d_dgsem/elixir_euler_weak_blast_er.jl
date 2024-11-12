@@ -16,8 +16,8 @@ equations = CompressibleEulerEquations1D(RealT(14) / 10)
 
 initial_condition = initial_condition_weak_blast_wave
 
-# Volume flux adds some (minimal) disspation, thus stabilizing the simulation but also
-# destroying (?) entropy stability
+# Volume flux adds some (minimal) disspation, thus stabilizing the simulation - 
+# in contrast to standard DGSEM only
 volume_flux = flux_ranocha
 solver = DGSEM(RealT = RealT, polydeg = 3, surface_flux = flux_ranocha,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
