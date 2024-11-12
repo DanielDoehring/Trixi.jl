@@ -189,23 +189,28 @@ end
     # 0.5 = b_{S}
     dS += integrator.dt *
           int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
-    #println("Entropy difference: ", dS)
+    #println("Total entropy difference S: ", dS)
+
     # CARE: Enforce isentropy manually, i.e., turn off floating point errors!
-    
-    if abs(dS) < 1e-8
-        dS = 0.0
+    #dS = 0.0
+    # Ensure entropy decreases
+    #=
+    if dS > 0
+        dS = 0
+        integrator.num_timestep_relaxations += 1
     end
-    
+    =#
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     dir_wrap = wrap_array(integrator.direction, p)
-
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
     gamma = one(RealT) # Default value if entropy relaxation methodology not applicable
 
-    # TODO: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-    gamma_min = 1 / RealT(10) # Cannot be 0, as then r(0) = 0
+    # Bisection for gamma
+    #=
+    # Note: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
+    gamma_min = 1 / RealT(10) # Not clear what value to choose here!
     gamma_max = one(RealT)
 
     @threaded for element in eachelement(dg, cache)
@@ -213,8 +218,8 @@ end
                                             gamma_max *
                                             dir_wrap[.., element]
     end
-    r_max = entropy_difference(gamma_max, S_old, dS, u_tmp_wrap, mesh,
-                               equations, dg, cache)
+    r_max = entropy_difference(gamma_max, S_old, dS, u_tmp_wrap, 
+                               mesh, equations, dg, cache)
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -226,10 +231,6 @@ end
 
     # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
     if r_max > 0 && r_min < 0
-        integrator.num_timestep_relaxations += 1
-
-        # Bisection for gamma
-        #=
         gamma_tol = 100 * eps(RealT)
         bisection_its_max = 100
         bisect_its = 0
@@ -251,40 +252,46 @@ end
             end
             bisect_its += 1
         end
-        =#
+    end
+    =#
 
-        # Newton search for gamma
-        @trixi_timeit timer() "ER: Newton" begin
-            damping = 1.0
+    # Newton search for gamma
+    @trixi_timeit timer() "ER: Newton" begin
+        damping = 1.0
+
+        @threaded for element in eachelement(dg, cache)
+            @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                                gamma *
+                                                dir_wrap[.., element]
+        end
+        r_gamma = entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations,
+                                     dg, cache)
+        dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
+
+        r_tol = 2 * eps(RealT)
+
+        n_its_max = 20
+        n_its = 0
+
+        while abs(r_gamma) > r_tol && n_its < n_its_max
+            gamma -= damping * r_gamma / dr
 
             @threaded for element in eachelement(dg, cache)
                 @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                                     gamma *
                                                     dir_wrap[.., element]
             end
-            r_gamma = entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations, dg,
-                                        cache)
+            r_gamma = entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations,
+                                         dg, cache)
             dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
 
-            r_tol = 100 * eps(RealT)
-            while abs(r_gamma) > r_tol
-                gamma -= damping * r_gamma / dr
+            n_its += 1
+        end
 
-                @threaded for element in eachelement(dg, cache)
-                    @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                                        gamma *
-                                                        dir_wrap[.., element]
-                end
-                r_gamma = entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations,
-                                            dg, cache)
-                dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
-            end
-
-            # Catch case Newton overshoots
-            if gamma > 1
-                integrator.num_timestep_relaxations -= 1
-                gamma = 1
-            end
+        # Catch Newton failures
+        if gamma < 0 #|| gamma > 1
+            integrator.num_timestep_relaxations -= 1
+            gamma = 1
         end
     end
 
@@ -301,6 +308,7 @@ end
         integrator.t += gamma * integrator.dt
     end
 
+    # Do relaxed update
     @threaded for i in eachindex(integrator.u)
         integrator.u[i] += gamma * integrator.direction[i]
     end

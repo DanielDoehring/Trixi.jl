@@ -5,6 +5,7 @@ using Trixi
 gamma = 1.4
 equations = CompressibleEulerEquations2D(gamma)
 
+# NOTE: This is HLLC => entropy diffusive!
 solver = DGSEM(polydeg = 3, surface_flux = flux_hllc)
 
 EdgeLength = 20.0
@@ -89,7 +90,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      extra_analysis_integrals = (entropy,),
                                      #analysis_integrals = (entropy,),
-                                     analysis_filename="analysis_ER.dat",
+                                     analysis_filename = "analysis_ER.dat",
                                      #analysis_filename="analysis_standard.dat",
                                      save_analysis = true)
 
@@ -119,7 +120,6 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
                                                "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
                                                dtRatios)
-
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
