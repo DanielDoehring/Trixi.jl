@@ -89,23 +89,33 @@ ode = semidiscretize(semi, tspan)
 summary_callback = SummaryCallback()
 
 analysis_interval = 10
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      #extra_analysis_integrals = (entropy,),
                                      analysis_integrals = (entropy,),
                                      analysis_filename="analysis_standard.dat",
                                      #analysis_filename = "analysis_ER.dat",
                                      save_analysis = true)
-                                
-cfl = 6.9
+ 
+analysis_cb_errors = AnalysisCallback(semi, interval = 10 * analysis_interval)                                     
+
+cfl = 19.2 # Standalone
+#cfl = 6.9 # Multi
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback,
+                        
+                        #analysis_cb_entropy,
+                        analysis_cb_errors,
+
                         stepsize_callback)
 
 ###############################################################################
 # run the simulation
+
+Stages_standalone = 16
+ode_algorithm = Trixi.PairedExplicitERRK4(Stages_standalone, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
 
 Stages = [16, 11, 9, 8, 7, 6, 5]
 dtRatios = [
@@ -118,11 +128,12 @@ dtRatios = [
     0.130952239152975
 ] ./ 0.636282563128043
 
+#=
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
                                              "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                              dtRatios)
 
-#=
+
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
                                                "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                                dtRatios)
