@@ -43,7 +43,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (zero(RealT), RealT(4)/10)
+tspan = (zero(RealT), RealT(4) / 10)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -52,7 +52,7 @@ analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
-                                     analysis_filename="analysis_ER.dat",
+                                     analysis_filename = "analysis_ER.dat",
                                      #analysis_filename = "analysis_standard.dat",
                                      save_analysis = true)
 
@@ -93,7 +93,9 @@ dtRatios = [1, 0.5, 0.25]
 Stages = [14, 8, 5]
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
-ode_alg = Trixi.PairedExplicitERRK4Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
+ode_alg = Trixi.PairedExplicitERRK4Multi(Stages,
+                                         "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
+                                         dtRatios)
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = RealT(42),

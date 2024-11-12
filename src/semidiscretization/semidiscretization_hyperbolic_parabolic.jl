@@ -268,7 +268,7 @@ end
 
 """
     semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
-                   reset_threads=true)
+                   reset_threads=true, split_form=true)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
 that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
@@ -291,10 +291,17 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
     iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
-    # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
-    # first function implicitly and the second one explicitly. Thus, we pass the
-    # stiffer parabolic function first.
-    return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+
+    if split_form
+        # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
+        # first function implicitly and the second one explicitly. Thus, we pass the
+        # stiffer parabolic function first.
+        return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+    else
+        specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
+        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan,
+                                           semi)
+    end
 end
 
 """
@@ -316,7 +323,7 @@ https://github.com/JuliaSIMD/Polyester.jl/issues/30
 """
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
                         restart_file::AbstractString;
-                        reset_threads = true)
+                        reset_threads = true, split_form = true)
     if reset_threads
         Polyester.reset_threads!()
     end
@@ -326,10 +333,17 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
     iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
-    # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
-    # first function implicitly and the second one explicitly. Thus, we pass the
-    # stiffer parabolic function first.
-    return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+
+    if split_form
+        # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
+        # first function implicitly and the second one explicitly. Thus, we pass the
+        # stiffer parabolic function first.
+        return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+    else
+        specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
+        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan,
+                                           semi)
+    end
 end
 
 function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t)
@@ -342,6 +356,29 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t)
     time_start = time_ns()
     @trixi_timeit timer() "rhs!" rhs!(du, u, t, mesh, equations,
                                       boundary_conditions, source_terms, solver, cache)
+    runtime = time_ns() - time_start
+    put!(semi.performance_counter.counters[1], runtime)
+
+    return nothing
+end
+
+function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
+              element_indices, interface_indices, boundary_indices, mortar_indices)
+    @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
+
+    u = wrap_array(u_ode, mesh, equations, solver, cache)
+    du = wrap_array(du_ode, mesh, equations, solver, cache)
+
+    # TODO: Taal decide, do we need to pass the mesh?
+    time_start = time_ns()
+    @trixi_timeit timer() "rhs! (level-dependent)" rhs!(du, u, t, mesh, equations,
+                                                        initial_condition,
+                                                        boundary_conditions,
+                                                        source_terms, solver, cache,
+                                                        element_indices,
+                                                        interface_indices,
+                                                        boundary_indices,
+                                                        mortar_indices)
     runtime = time_ns() - time_start
     put!(semi.performance_counter.counters[1], runtime)
 
@@ -368,6 +405,36 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     return nothing
 end
 
+function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
+                        element_indices, interface_indices,
+                        boundary_indices, mortar_indices)
+    @unpack mesh, equations_parabolic, initial_condition, boundary_conditions_parabolic, source_terms, solver, solver_parabolic, cache, cache_parabolic = semi
+
+    u = wrap_array(u_ode, mesh, equations_parabolic, solver, cache_parabolic)
+    du = wrap_array(du_ode, mesh, equations_parabolic, solver, cache_parabolic)
+
+    # TODO: Taal decide, do we need to pass the mesh?
+    time_start = time_ns()
+    @trixi_timeit timer() "rhs_parabolic! (level-dependent)" rhs_parabolic!(du, u, t,
+                                                                            mesh,
+                                                                            equations_parabolic,
+                                                                            initial_condition,
+                                                                            boundary_conditions_parabolic,
+                                                                            source_terms,
+                                                                            solver,
+                                                                            solver_parabolic,
+                                                                            cache,
+                                                                            cache_parabolic,
+                                                                            element_indices,
+                                                                            interface_indices,
+                                                                            boundary_indices,
+                                                                            mortar_indices)
+    runtime = time_ns() - time_start
+    put!(semi.performance_counter.counters[2], runtime)
+
+    return nothing
+end
+
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
                                    du_ode_hyp)
@@ -378,6 +445,28 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
 
         @threaded for u_ind in eachindex(du_ode)
             du_ode[u_ind] += du_ode_hyp[u_ind]
+        end
+    end
+end
+
+function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                   semi::SemidiscretizationHyperbolicParabolic, t,
+                                   du_ode_hyp,
+                                   element_indices, interface_indices,
+                                   boundary_indices, mortar_indices,
+                                   max_level::Int64)
+    @trixi_timeit timer() "rhs_hyperbolic-parabolic! (level-dependent)" begin
+        rhs!(du_ode_hyp, u_ode, semi, t,
+             element_indices, interface_indices,
+             boundary_indices, mortar_indices)
+        rhs_parabolic!(du_ode, u_ode, semi, t,
+                       element_indices, interface_indices,
+                       boundary_indices, mortar_indices)
+
+        for level in 1:max_level
+            @threaded for u_ind in level_u_indices_elements_acc[level]
+                du_ode[u_ind] += du_ode_hyp[u_ind]
+            end
         end
     end
 end
