@@ -457,7 +457,7 @@ function partitioning_variables!(level_info_elements,
                                  level_info_elements_acc,
                                  level_info_interfaces_acc,
                                  level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
+                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for StructuredMesh
                                  level_info_mortars_acc,
                                  n_levels, n_dims, mesh::StructuredMesh, dg, cache, alg)
     nnodes = length(dg.basis.nodes)
