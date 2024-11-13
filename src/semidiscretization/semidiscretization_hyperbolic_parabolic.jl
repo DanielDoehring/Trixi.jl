@@ -277,7 +277,7 @@ will be used by default by the implicit part of IMEX methods from the
 SciML ecosystem.
 """
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
-                        reset_threads = true)
+                        reset_threads = true, split_problem = true)
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
     # https://github.com/JuliaSIMD/Polyester.jl/issues/30
@@ -343,47 +343,6 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
     end
 end
 
-"""
-    semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
-                   restart_file::AbstractString;
-                   split_problem = true)
-
-Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
-that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
-The parabolic right-hand side is the first function of the split ODE problem and
-will be used by default by the implicit part of IMEX methods from the
-SciML ecosystem.
-
-The initial condition etc. is taken from the `restart_file`.
-"""
-function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
-                        restart_file::AbstractString;
-                        reset_threads = true, split_problem = true)
-    # Optionally reset Polyester.jl threads. See
-    # https://github.com/trixi-framework/Trixi.jl/issues/1583
-    # https://github.com/JuliaSIMD/Polyester.jl/issues/30
-    if reset_threads
-        Polyester.reset_threads!()
-    end
-
-    u0_ode = load_restart_file(semi, restart_file)
-    # TODO: MPI, do we want to synchronize loading and print debug statements, e.g. using
-    #       mpi_isparallel() && MPI.Barrier(mpi_comm())
-    #       See https://github.com/trixi-framework/Trixi.jl/issues/328
-    iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
-
-    if split_problem
-        # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
-        # first function implicitly and the second one explicitly. Thus, we pass the
-        # stiffer parabolic function first.
-        return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
-    else
-        specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
-        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan,
-                                           semi)
-    end
-end
-
 function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t)
     @unpack mesh, equations, boundary_conditions, source_terms, solver, cache = semi
 
@@ -410,7 +369,6 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
     @trixi_timeit timer() "rhs! (level-dependent)" rhs!(du, u, t, mesh, equations,
-                                                        initial_condition,
                                                         boundary_conditions,
                                                         source_terms, solver, cache,
                                                         element_indices,
@@ -456,7 +414,6 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     @trixi_timeit timer() "rhs_parabolic! (level-dependent)" rhs_parabolic!(du, u, t,
                                                                             mesh,
                                                                             equations_parabolic,
-                                                                            initial_condition,
                                                                             boundary_conditions_parabolic,
                                                                             source_terms,
                                                                             solver,
@@ -475,26 +432,26 @@ end
 
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
-                                   du_ode_hyp)
+                                   du_tmp)
     @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
         # Implementation of split ODE problem in OrdinaryDiffEq
-        rhs!(du_ode_hyp, u_ode, semi, t)
+        rhs!(du_tmp, u_ode, semi, t)
         rhs_parabolic!(du_ode, u_ode, semi, t)
 
         @threaded for u_ind in eachindex(du_ode)
-            du_ode[u_ind] += du_ode_hyp[u_ind]
+            du_ode[u_ind] += du_tmp[u_ind]
         end
     end
 end
 
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
-                                   du_ode_hyp,
+                                   du_tmp,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,
-                                   max_level::Int64)
+                                   u_indices, max_level)
     @trixi_timeit timer() "rhs_hyperbolic-parabolic! (level-dependent)" begin
-        rhs!(du_ode_hyp, u_ode, semi, t,
+        rhs!(du_tmp, u_ode, semi, t,
              element_indices, interface_indices,
              boundary_indices, mortar_indices)
         rhs_parabolic!(du_ode, u_ode, semi, t,
@@ -502,8 +459,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                        boundary_indices, mortar_indices)
 
         for level in 1:max_level
-            @threaded for u_ind in level_u_indices_elements_acc[level]
-                du_ode[u_ind] += du_ode_hyp[u_ind]
+            @threaded for u_ind in u_indices[level]
+                du_ode[u_ind] += du_tmp[u_ind]
             end
         end
     end
@@ -513,12 +470,12 @@ function _jacobian_ad_forward(semi::SemidiscretizationHyperbolicParabolic, t0, u
                               du_ode, config)
     new_semi = remake(semi, uEltype = eltype(config))
 
-    du_ode_hyp = Vector{eltype(config)}(undef, length(du_ode))
+    du_tmp = Vector{eltype(config)}(undef, length(du_ode))
     J = ForwardDiff.jacobian(du_ode, u0_ode, config) do du_ode, u_ode
         # Implementation of split ODE problem in OrdinaryDiffEq
-        rhs!(du_ode_hyp, u_ode, new_semi, t0)
+        rhs!(du_tmp, u_ode, new_semi, t0)
         rhs_parabolic!(du_ode, u_ode, new_semi, t0)
-        du_ode .+= du_ode_hyp
+        du_ode .+= du_tmp
     end
 
     return J

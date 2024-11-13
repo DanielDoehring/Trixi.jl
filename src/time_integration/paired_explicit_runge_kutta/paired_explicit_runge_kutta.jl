@@ -43,6 +43,8 @@ abstract type AbstractPairedExplicitRKSingleIntegrator <:
               AbstractPairedExplicitRKIntegrator end
 abstract type AbstractPairedExplicitRKMultiIntegrator <:
               AbstractPairedExplicitRKIntegrator end
+abstract type AbstractPairedExplicitRKMultiParabolicIntegrator <:
+              AbstractPairedExplicitRKMultiIntegrator end
 
 # Entropy-relaxation integrators              
 abstract type AbstractPairedExplicitERRKIntegrator <:
@@ -198,6 +200,7 @@ include("methods_PERK4.jl")
 
 ### Multi-level/partitioned PERK methods ### 
 include("methods_PERK4_multi.jl")
+include("methods_PERK4_multi_parabolic.jl")
 
 include("partitioning.jl")
 

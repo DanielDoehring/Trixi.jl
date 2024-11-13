@@ -381,7 +381,7 @@ function Base.resize!(integrator::AbstractPairedExplicitERRKIntegrator, new_size
 
     resize!(integrator.k1, new_size)
     resize!(integrator.k_higher, new_size)
-
+    # Addition for entropy relaxation PERK methods
     resize!(integrator.direction, new_size)
 end
 end # @muladd
