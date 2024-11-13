@@ -93,21 +93,21 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                        analysis_errors = Symbol[],
                                        #extra_analysis_integrals = (entropy,),
                                        analysis_integrals = (entropy,),
-                                       analysis_filename = "analysis_standard.dat",
-                                       #analysis_filename = "analysis_ER.dat",
+                                       #analysis_filename = "analysis_standard.dat",
+                                       analysis_filename = "analysis_ER.dat",
                                        save_analysis = true)
 
 analysis_cb_errors = AnalysisCallback(semi, interval = 10 * analysis_interval)
 
-cfl = 19.2 # Standalone
-#cfl = 6.9 # Multi
+#cfl = 19.2 # Standalone
+cfl = 6.9 # Multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-
-                        #analysis_cb_entropy,
-                        analysis_cb_errors, stepsize_callback)
+                        analysis_cb_entropy,
+                        #analysis_cb_errors,
+                        stepsize_callback)
 
 ###############################################################################
 # run the simulation
@@ -131,11 +131,12 @@ dtRatios = [
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
                                              "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                              dtRatios)
+=#
 
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
                                                "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                                dtRatios)
-=#
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,

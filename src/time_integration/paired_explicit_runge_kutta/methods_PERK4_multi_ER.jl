@@ -80,7 +80,7 @@ mutable struct PairedExplicitERRK4MultiIntegrator{RealT <: Real, uType, Params, 
 
     # Entropy Relaxation additions
     direction::uType
-    num_timestep_relaxations::Int
+    gamma::RealT
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
@@ -95,6 +95,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
 
     # For entropy relaxation
     direction = zero(u0)
+    gamma = one(eltype(u0))
 
     t0 = first(ode.tspan)
     iter = 0
@@ -158,7 +159,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
                                                     level_info_mpi_mortars_acc,
                                                     level_u_indices_elements, -
                                                     1, n_levels,
-                                                    direction, 0)
+                                                    direction, gamma)
 
     # initialize callbacks
     if callback isa CallbackSet

@@ -2,6 +2,9 @@
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
+
+using NLsolve, LineSearches
+
 @muladd begin
 #! format: noindent
 
@@ -78,7 +81,7 @@ mutable struct PairedExplicitERRK4Integrator{RealT <: Real, uType, Params, Sol, 
 
     # Entropy Relaxation additions
     direction::uType
-    num_timestep_relaxations::Int
+    gamma::RealT
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitERRK4;
@@ -93,6 +96,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
 
     # For entropy relaxation
     direction = zero(u0)
+    gamma = one(eltype(u0))
 
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
@@ -106,7 +110,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
                                                                        kwargs...),
                                                false, true, false,
                                                k1, k_higher,
-                                               direction, 0)
+                                               direction, gamma)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -194,8 +198,6 @@ end
     dir_wrap = wrap_array(integrator.direction, p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
-    gamma = one(RealT) # Default value if entropy relaxation methodology not applicable
-
     # Bisection for gamma
     #=
     # Note: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
@@ -244,27 +246,20 @@ end
     end
     =#
 
+    @unpack gamma = integrator # Use previous value for gamma as starting value for Newton
+
     # Newton search for gamma
     @trixi_timeit timer() "ER: Newton" begin
+
+        
         step_scaling = 1.0 # > 1: Accelerated Newton, < 1: Damped Newton
 
-        @threaded for element in eachelement(dg, cache)
-            @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                                gamma *
-                                                dir_wrap[.., element]
-        end
-        r_gamma = entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations,
-                                     dg, cache)
-        dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
-
         r_tol = 2 * eps(RealT)
+        r_gamma = floatmax(RealT) # Initialize with large value
 
         n_its_max = 20
         n_its = 0
-
         while abs(r_gamma) > r_tol && n_its < n_its_max
-            gamma -= step_scaling * r_gamma / dr
-
             @threaded for element in eachelement(dg, cache)
                 @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                                     gamma *
@@ -274,12 +269,21 @@ end
                                          dg, cache)
             dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
 
+            gamma -= step_scaling * r_gamma / dr
+
             n_its += 1
         end
+        
+        #=
+        res = nlsolve(gamma -> r_gamma(gamma[1], S_old, dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache),
+                      gamma -> dr(gamma[1], dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache),
+                      [gamma], method = :newton,  ftol = 2 * eps(RealT), iterations = 20,
+                      linesearch = LineSearches.BackTracking(order=3))
+        gamma = res.zero[1]
+        =#
 
         # Catch Newton failures
         if gamma < 0 #|| gamma > 1
-            integrator.num_timestep_relaxations -= 1
             gamma = 1
         end
     end
@@ -292,7 +296,6 @@ end
         integrator.t = t_end
         gamma = (t_end - integrator.t) / integrator.dt
         terminate!(integrator)
-        println("# Relaxed timesteps: ", integrator.num_timestep_relaxations)
     else
         integrator.t += gamma * integrator.dt
     end
