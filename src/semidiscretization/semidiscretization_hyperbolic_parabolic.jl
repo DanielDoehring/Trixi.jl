@@ -268,7 +268,7 @@ end
 
 """
     semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
-                   split_form=true)
+                   split_problem=true)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
 that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
@@ -291,7 +291,7 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
     iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
 
-    if split_form
+    if split_problem
         # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
         # first function implicitly and the second one explicitly. Thus, we pass the
         # stiffer parabolic function first.
@@ -305,7 +305,7 @@ end
 
 """
     semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
-                   restart_file::AbstractString)
+                   restart_file::AbstractString; split_problem=true)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
 that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
@@ -317,7 +317,7 @@ The initial condition etc. is taken from the `restart_file`.
 """
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
                         restart_file::AbstractString;
-                        reset_threads = true, split_form = true)
+                        reset_threads = true, split_problem = true)
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
     # https://github.com/JuliaSIMD/Polyester.jl/issues/30                        
@@ -331,7 +331,7 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
     iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
 
-    if split_form
+    if split_problem
         # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
         # first function implicitly and the second one explicitly. Thus, we pass the
         # stiffer parabolic function first.
@@ -345,7 +345,8 @@ end
 
 """
     semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
-                   restart_file::AbstractString)
+                   restart_file::AbstractString;
+                   split_problem = true)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
 that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
@@ -357,7 +358,7 @@ The initial condition etc. is taken from the `restart_file`.
 """
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
                         restart_file::AbstractString;
-                        reset_threads = true)
+                        reset_threads = true, split_problem = true)
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
     # https://github.com/JuliaSIMD/Polyester.jl/issues/30
@@ -370,10 +371,17 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
     iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
-    # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
-    # first function implicitly and the second one explicitly. Thus, we pass the
-    # stiffer parabolic function first.
-    return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+
+    if split_problem
+        # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
+        # first function implicitly and the second one explicitly. Thus, we pass the
+        # stiffer parabolic function first.
+        return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+    else
+        specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
+        return ODEProblem{iip, specialize}(rhs_hyperbolic_parabolic!, u0_ode, tspan,
+                                           semi)
+    end
 end
 
 function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t)
