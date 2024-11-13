@@ -14,7 +14,7 @@ airfoil_cord_length = 1.0
 
 t_c = airfoil_cord_length / U_inf
 
-aoa = 4 * pi/180
+aoa = 4 * pi / 180
 u_x = U_inf * cos(aoa)
 u_y = U_inf * sin(aoa)
 
@@ -28,16 +28,16 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
                                                           gradient_variables = GradientVariablesPrimitive())
 
 @inline function initial_condition_mach02_flow(x, t, equations)
-  # set the freestream flow parameters
-  rho_freestream = 1.4
+    # set the freestream flow parameters
+    rho_freestream = 1.4
 
-  v1 = 0.19951281005196486 # 0.2 * cos(aoa)
-  v2 = 0.01395129474882506 # 0.2 * sin(aoa)
-  
-  p_freestream = 1.0
+    v1 = 0.19951281005196486 # 0.2 * cos(aoa)
+    v2 = 0.01395129474882506 # 0.2 * sin(aoa)
 
-  prim = SVector(rho_freestream, v1, v2, p_freestream)
-  return prim2cons(prim, equations)
+    p_freestream = 1.0
+
+    prim = SVector(rho_freestream, v1, v2, p_freestream)
+    return prim2cons(prim, equations)
 end
 
 initial_condition = initial_condition_mach02_flow
@@ -55,7 +55,6 @@ surf_flux = flux_hllc
 vol_flux = flux_chandrashekar
 solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
                volume_integral = VolumeIntegralFluxDifferencing(vol_flux))
-
 
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
@@ -81,7 +80,6 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 ###############################################################################
 # ODE solvers, callbacks etc.
-
 
 #tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 tspan = (0.0, 1) # Test time
@@ -129,15 +127,14 @@ save_solution = SaveSolutionCallback(interval = 2000,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
-                                     output_directory="out")
+                                     output_directory = "out")
 
 alive_callback = AliveCallback(alive_interval = 200)
 
 save_restart = SaveRestartCallback(interval = Int(10^7), # Only at end
                                    save_final_restart = true)
 
-callbacks = CallbackSet(#analysis_callback, # For measurements
-                        stepsize_callback, # For measurements: Fixed timestep (do not use this)
+callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
                         #save_solution, # For plotting during measurement run
                         save_restart, # For restart with measurements
@@ -147,12 +144,12 @@ callbacks = CallbackSet(#analysis_callback, # For measurements
 # run the simulation
 
 dtRatios = [0.208310160790890, # 14
-            0.172356930215766, # 12
-            0.129859071602721, # 10
-            0.092778774946394, #  8
-            0.069255720146485, #  7
-            0.049637258180915, #  6
-            0.030629777558366] #= 5 =# / 0.208310160790890
+    0.172356930215766, # 12
+    0.129859071602721, # 10
+    0.092778774946394, #  8
+    0.069255720146485, #  7
+    0.049637258180915, #  6
+    0.030629777558366] / 0.208310160790890 #= 5 =#
 Stages = [14, 12, 10, 8, 7, 6, 5]
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
@@ -163,6 +160,6 @@ dt = 1e-3 # PERK4, dt_c = 2e-4
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
-                  save_everystep=false, callback=callbacks);
+                  save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary

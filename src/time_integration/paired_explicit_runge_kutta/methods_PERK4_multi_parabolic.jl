@@ -8,51 +8,52 @@
 # Own function for multirate PERK methods for parabolic problems
 # as these require `du_tmp` to store the contribution of the `rhs!`
 @inline function k1!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator, p, c)
-  integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_tmp)
+    integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_tmp)
 
-  @threaded for i in eachindex(integrator.du)
-      integrator.k1[i] = integrator.du[i] * integrator.dt
-      integrator.u_tmp[i] = integrator.u[i] + c[2] * integrator.k1[i]
-  end
+    @threaded for i in eachindex(integrator.du)
+        integrator.k1[i] = integrator.du[i] * integrator.dt
+        integrator.u_tmp[i] = integrator.u[i] + c[2] * integrator.k1[i]
+    end
 end
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator, alg, p)
-  for stage in 1:2
-      @threaded for u_ind in eachindex(integrator.u)
-          integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                    alg.a_matrix_constant[stage, 1] *
-                                    integrator.k1[u_ind] +
-                                    alg.a_matrix_constant[stage, 2] *
-                                    integrator.k_higher[u_ind]
-      end
+@inline function last_three_stages!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
+                                    alg, p)
+    for stage in 1:2
+        @threaded for u_ind in eachindex(integrator.u)
+            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+                                      alg.a_matrix_constant[stage, 1] *
+                                      integrator.k1[u_ind] +
+                                      alg.a_matrix_constant[stage, 2] *
+                                      integrator.k_higher[u_ind]
+        end
 
-      integrator.f(integrator.du, integrator.u_tmp, p,
-                   integrator.t +
-                   alg.c[alg.num_stages - 3 + stage] * integrator.dt,
-                   integrator.du_tmp)
+        integrator.f(integrator.du, integrator.u_tmp, p,
+                     integrator.t +
+                     alg.c[alg.num_stages - 3 + stage] * integrator.dt,
+                     integrator.du_tmp)
 
-      @threaded for u_ind in eachindex(integrator.du)
-          integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
-      end
-  end
+        @threaded for u_ind in eachindex(integrator.du)
+            integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+        end
+    end
 
-  # Last stage
-  @threaded for i in eachindex(integrator.du)
-      integrator.u_tmp[i] = integrator.u[i] +
-                            alg.a_matrix_constant[3, 1] * integrator.k1[i] +
-                            alg.a_matrix_constant[3, 2] * integrator.k_higher[i]
-  end
+    # Last stage
+    @threaded for i in eachindex(integrator.du)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              alg.a_matrix_constant[3, 1] * integrator.k1[i] +
+                              alg.a_matrix_constant[3, 2] * integrator.k_higher[i]
+    end
 
-  integrator.f(integrator.du, integrator.u_tmp, p,
-               integrator.t + alg.c[alg.num_stages] * integrator.dt,
-               integrator.du_tmp)
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.num_stages] * integrator.dt,
+                 integrator.du_tmp)
 
-  @threaded for u_ind in eachindex(integrator.u)
-      # Note that 'k_higher' carries the values of K_{S-1}
-      # and that we construct 'K_S' "in-place" from 'integrator.du'
-      integrator.u[u_ind] += 0.5 * (integrator.k_higher[u_ind] +
-                              integrator.du[u_ind] * integrator.dt)
-  end
+    @threaded for u_ind in eachindex(integrator.u)
+        # Note that 'k_higher' carries the values of K_{S-1}
+        # and that we construct 'K_S' "in-place" from 'integrator.du'
+        integrator.u[u_ind] += 0.5 * (integrator.k_higher[u_ind] +
+                                integrator.du[u_ind] * integrator.dt)
+    end
 end
 
 function step!(integrator::PairedExplicitRK4MultiParabolicIntegrator)
@@ -189,7 +190,8 @@ function step!(integrator::PairedExplicitRK4MultiParabolicIntegrator)
                              integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
                              #integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                              integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                             integrator.level_u_indices_elements, integrator.coarsest_lvl)
+                             integrator.level_u_indices_elements,
+                             integrator.coarsest_lvl)
 
                 # Update k_higher of relevant levels
                 for level in 1:(integrator.coarsest_lvl)
@@ -227,7 +229,8 @@ function step!(integrator::PairedExplicitRK4MultiParabolicIntegrator)
 end
 
 # used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator, new_size)
+function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
+                      new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
