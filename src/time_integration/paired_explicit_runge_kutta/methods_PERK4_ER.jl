@@ -189,17 +189,6 @@ end
     # 0.5 = b_{S}
     dS += integrator.dt *
           int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
-    #println("Total entropy difference S: ", dS)
-
-    # CARE: Enforce isentropy manually, i.e., turn off floating point errors!
-    #dS = 0.0
-    # Ensure entropy decreases
-    #=
-    if dS > 0
-        dS = 0
-        integrator.num_timestep_relaxations += 1
-    end
-    =#
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     dir_wrap = wrap_array(integrator.direction, p)
@@ -257,7 +246,7 @@ end
 
     # Newton search for gamma
     @trixi_timeit timer() "ER: Newton" begin
-        damping = 1.0
+        step_scaling = 1.0 # > 1: Accelerated Newton, < 1: Damped Newton
 
         @threaded for element in eachelement(dg, cache)
             @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -274,7 +263,7 @@ end
         n_its = 0
 
         while abs(r_gamma) > r_tol && n_its < n_its_max
-            gamma -= damping * r_gamma / dr
+            gamma -= step_scaling * r_gamma / dr
 
             @threaded for element in eachelement(dg, cache)
                 @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
