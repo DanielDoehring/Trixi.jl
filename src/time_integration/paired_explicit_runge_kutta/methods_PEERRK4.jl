@@ -193,13 +193,13 @@ end
           int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
 
     u_wrap = wrap_array(integrator.u, integrator.p)
-    dir_wrap = wrap_array(integrator.direction, p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
     
+    dir_wrap = wrap_array(integrator.direction, p)
     @unpack gamma = integrator # Use previous value for gamma as starting value for Newton
 
     # Bisection for gamma
-    
+    #=
     # Note: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
     gamma_min = 0.1 # Not clear what value to choose here!
     gamma_max = 1.1 # Observed that sometimes larger > 1 is required
@@ -246,9 +246,9 @@ end
     else
         gamma = 1
     end
-    
+    =#
 
-    #=
+    
     # Newton search for gamma
     @trixi_timeit timer() "ER: Newton" begin
         # Custom Newton: Probably required for demonstrating the method
@@ -257,7 +257,7 @@ end
         r_tol = 1e-14 # Similar to e.g. conservation error
         r_gamma = floatmax(RealT) # Initialize with large value
 
-        n_its_max = 20
+        n_its_max = 2
         n_its = 0
         while abs(r_gamma) > r_tol && n_its < n_its_max
             @threaded for element in eachelement(dg, cache)
@@ -279,7 +279,7 @@ end
             gamma = 1
         end
     end
-    =#
+    
 
     t_end = last(integrator.sol.prob.tspan)
     integrator.iter += 1

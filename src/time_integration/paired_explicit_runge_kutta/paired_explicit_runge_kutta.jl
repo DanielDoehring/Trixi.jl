@@ -204,9 +204,9 @@ include("methods_PERK4_multi_parabolic.jl")
 
 include("partitioning.jl")
 
-### Entropy-relaxation PERK methods ###
+### Paired Explicit Entropy Relaxation RK (PEERRK) methods ###
 include("entropy_relaxation.jl")
 
-include("methods_PERK4_ER.jl")
-include("methods_PERK4_multi_ER.jl")
+include("methods_PEERRK4.jl")
+include("methods_PEERRK4_multi.jl")
 end # @muladd
