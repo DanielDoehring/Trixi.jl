@@ -93,10 +93,6 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
     k1 = zero(u0)
     k_higher = zero(u0)
 
-    # For entropy relaxation
-    direction = zero(u0)
-    gamma = one(eltype(u0))
-
     t0 = first(ode.tspan)
     iter = 0
 
@@ -119,6 +115,10 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+    # For entropy relaxation
+    direction = zero(u0)
+    gamma = one(eltype(u0))
 
     partitioning_variables!(level_info_elements,
                             level_info_elements_acc,

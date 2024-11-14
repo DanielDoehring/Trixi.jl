@@ -398,9 +398,9 @@ function (analysis_callback::AnalysisCallback)(io, du, u, u_ode, t, semi, iter)
     if any(q in analysis_errors
            for q in (:l2_error, :linf_error, :conservation_error, :residual)) &&
        mpi_isroot()
-        print(" Variable:    ")
+        print(" Variable:     ")
         for v in eachvariable(equations)
-            @printf("   %-21s", varnames(cons2cons, equations)[v])
+            @printf("  %-15s", varnames(cons2cons, equations)[v])
         end
         println()
     end
@@ -478,9 +478,9 @@ function (analysis_callback::AnalysisCallback)(io, du, u, u_ode, t, semi, iter)
                                                           semi, cache_analysis)
 
         if mpi_isroot()
-            print(" Variable:    ")
+            print(" Variable:     ")
             for v in eachvariable(equations)
-                @printf("   %-21s", varnames(cons2prim, equations)[v])
+                @printf("  %-15s", varnames(cons2prim, equations)[v])
             end
             println()
 

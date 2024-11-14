@@ -49,7 +49,7 @@ end
     end
 end
 
-@inline function entropy_difference(gamma, S_old, dS, u_gamma_dir, mesh, 
+@inline function entropy_difference(gamma, S_old, dS, u_gamma_dir, mesh,
                                     equations, dg, cache)
     return integrate(entropy_math, u_gamma_dir, mesh, equations, dg, cache) -
            S_old - gamma * dS
@@ -57,7 +57,19 @@ end
 
 function r_gamma(gamma, S_old, dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache)
     @threaded for element in eachelement(dg, cache)
-        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] + gamma * dir_wrap[.., element]
+        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                            gamma * dir_wrap[.., element]
+    end
+    return entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations, dg, cache)
+end
+
+# For NonlinearSolve.jl
+function r_gamma(gamma, params_nonlinear)
+    @unpack S_old, dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache = params_nonlinear
+
+    @threaded for element in eachelement(dg, cache)
+        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                            gamma * dir_wrap[.., element]
     end
     return entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations, dg, cache)
 end
@@ -65,6 +77,18 @@ end
 function dr(gamma, dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache)
     # NOTE: Not sure if this is valid, i.e., do not recomputing `u_tmp_wrap` here
     #=
+    @threaded for element in eachelement(dg, cache)
+        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] + gamma * dir_wrap[.., element]
+    end
+    =#
+    return int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
+end
+
+# For NonlinearSolve.jl
+function dr(gamma, params_nonlinear)
+    #=
+    @unpack dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache = params_nonlinear
+
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] + gamma * dir_wrap[.., element]
     end
