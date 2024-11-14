@@ -27,6 +27,8 @@ V_f = U_L/U_R
 c = max(U_L, U_R) / Ma
 p_ref = rho_ref * c^2 / gamma
 
+h_ref = p_ref / (gamma - 1) + 0.5 * U_L^2
+
 mu() = rho_ref * U_L * L_ref / Re
 
 alpha = 2 * gamma/(gamma + 1) * mu() / (prandtl_number() * Mass_flow)
@@ -39,23 +41,25 @@ function dV(V)
   return - alpha * V[1] / ((V[1] - 1) * (V[1] - V_f))
 end
 
-coordinates_min = -0.5
-coordinates_max = 0.5
+coordinates_min = -1.0
+coordinates_max = 1.0
 
 function initial_condition_viscous_shock(x, t, equations)
   V_0 = (U_L + U_R) / 2
   # Turn into momentum
   V_0 *= rho_ref
 
+  # TODO: Try out bisection for IC
   momentum = nlsolve(V -> momemtum_ode_sol(V[1], x[1]), 
                      dV, [V_0], 
                      ftol = 1e-14, iterations = 1000,
                      method = :newton).zero[1]
 
   rho = rho_ref
-  p = p_ref
 
   v = momentum / rho
+
+  p = (h_ref - 0.5 * v^2) * (gamma - 1)
 
   return prim2cons(SVector(rho, v, p), equations)
 end
