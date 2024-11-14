@@ -281,6 +281,19 @@ end
     return T
 end
 
+@inline function velocity(u, equations::CompressibleNavierStokesDiffusion2D)
+    rho = u[1]
+    v1 = u[2] / rho
+    v2 = u[3] / rho
+    return SVector(v1, v2)
+end
+
+@inline function velocity(u, orientation::Int, equations::CompressibleNavierStokesDiffusion2D)
+    rho = u[1]
+    v = u[orientation + 1] / rho
+    return v
+end
+
 @inline function enstrophy(u, gradients, equations::CompressibleNavierStokesDiffusion2D)
     # Enstrophy is 0.5 rho ω⋅ω where ω = ∇ × v
 
