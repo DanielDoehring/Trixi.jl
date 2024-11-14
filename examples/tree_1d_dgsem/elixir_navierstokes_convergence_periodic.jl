@@ -110,7 +110,8 @@ refinement_patches = ((type = "box", coordinates_min = (-0.5,),
                        coordinates_max = (0.25,)))
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 5,
+                initial_refinement_level = 4,
+                #refinement_patches = refinement_patches,
                 n_cells_max = 100_000)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
@@ -120,17 +121,17 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 10.0)
+tspan = (0.0, 1.0) # 10
 ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 10000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-stepsize_callback = StepsizeCallback(cfl = 5.0)
+stepsize_callback = StepsizeCallback(cfl = 4.5)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
@@ -149,6 +150,8 @@ Stages = [14, 8, 6]
 path = "/home/daniel/git/paper-2024-perk4/6_Applications/6_4_SD7003Airfoil/"
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+
+# NOTE: Not sure if working with ER and source terms!
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,

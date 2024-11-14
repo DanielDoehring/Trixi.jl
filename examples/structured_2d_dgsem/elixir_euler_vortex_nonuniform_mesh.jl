@@ -74,8 +74,11 @@ function mapping(xi_, eta_)
     return SVector(x, y)
 end
 
-N_Cells = 32 # 20
-cells_per_dimension = (N_Cells, N_Cells)
+#N_Cells = 32
+#cells_per_dimension = (N_Cells, N_Cells)
+
+# For convergence test
+cells_per_dimension = (16, 16)
 
 mesh = StructuredMesh(cells_per_dimension, mapping)
 
@@ -96,7 +99,8 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                        analysis_filename = "analysis_ER.dat",
                                        save_analysis = true)
 
-analysis_cb_errors = AnalysisCallback(semi, interval = 10 * analysis_interval)
+# For convergence test                                       
+analysis_callback = AnalysisCallback(semi, interval = 10 * analysis_interval)
 
 #cfl = 19.2 # Standalone
 cfl = 6.9 # Multi
@@ -104,16 +108,18 @@ cfl = 6.9 # Multi
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_cb_entropy,
-                        #analysis_cb_errors,
+                        #analysis_cb_entropy,
+                        analysis_callback,
                         stepsize_callback)
 
 ###############################################################################
 # run the simulation
 
+#=
 Stages_standalone = 16
 ode_algorithm = Trixi.PairedExplicitERRK4(Stages_standalone,
                                           "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
+=#
 
 Stages = [16, 11, 9, 8, 7, 6, 5]
 dtRatios = [
