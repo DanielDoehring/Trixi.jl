@@ -39,6 +39,7 @@ function PairedExplicitRKOptions(callback, tspan; maxiters = typemax(Int), kwarg
 end
 
 abstract type AbstractPairedExplicitRKIntegrator end
+
 abstract type AbstractPairedExplicitRKSingleIntegrator <:
               AbstractPairedExplicitRKIntegrator end
 abstract type AbstractPairedExplicitRKMultiIntegrator <:
@@ -49,11 +50,14 @@ abstract type AbstractPairedExplicitRKMultiParabolicIntegrator <:
 # Entropy-relaxation integrators              
 abstract type AbstractPairedExplicitERRKIntegrator <:
               AbstractPairedExplicitRKIntegrator end
+
 abstract type AbstractPairedExplicitERRKSingleIntegrator <:
               AbstractPairedExplicitERRKIntegrator end
 abstract type AbstractPairedExplicitERRKMultiIntegrator <:
               AbstractPairedExplicitERRKIntegrator end
 
+abstract type AbstractPairedExplicitERRKMultiParabolicIntegrator <:
+              AbstractPairedExplicitRKMultiParabolicIntegrator end
 """
     calculate_cfl(ode_algorithm::AbstractPairedExplicitRK, ode)
 
@@ -134,7 +138,7 @@ function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
-
+    # PERK stages
     resize!(integrator.k1, new_size)
     resize!(integrator.k_higher, new_size)
 end
@@ -209,4 +213,5 @@ include("entropy_relaxation.jl")
 
 include("methods_PEERRK4.jl")
 include("methods_PEERRK4_multi.jl")
+include("methods_PEERRK4_multi_parabolic.jl")
 end # @muladd

@@ -442,6 +442,20 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
         end
     end
 end
+# Required for analysis_callback
+function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                   semi::SemidiscretizationHyperbolicParabolic, t)
+    @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
+        # Implementation of split ODE problem in OrdinaryDiffEq
+        du_tmp = similar(du_ode) # This obviously allocates
+        rhs!(du_tmp, u_ode, semi, t)
+        rhs_parabolic!(du_ode, u_ode, semi, t)
+
+        @threaded for u_ind in eachindex(du_ode)
+            du_ode[u_ind] += du_tmp[u_ind]
+        end
+    end
+end
 
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
