@@ -3,11 +3,6 @@
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 
-using LineSearches # Always included
-
-using NLsolve
-using NonlinearSolve
-
 @muladd begin
 #! format: noindent
 
@@ -85,8 +80,6 @@ mutable struct PairedExplicitERRK4Integrator{RealT <: Real, uType, Params, Sol, 
     # Entropy Relaxation additions
     direction::uType
     gamma::RealT
-    nonlinear_problem::Any
-    cache_newton_solver::Any
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitERRK4;
@@ -107,18 +100,6 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
     direction = zero(u0)
     gamma = one(eltype(u0))
 
-    mesh, equations, dg, cache = mesh_equations_solver_cache(ode.p)
-
-    params_nonlinear = (S_old = 42.0, dS = 42.0, u_tmp_wrap = wrap_array(u_tmp, ode.p),
-                        u_wrap = wrap_array(u0, ode.p),
-                        dir_wrap = wrap_array(direction, ode.p), mesh = mesh,
-                        equations = equations, dg = dg, cache = cache)
-    h = NonlinearFunction(r_gamma, jac = dr)
-    nonlinear_problem = NonlinearProblem(h, gamma, params_nonlinear)
-    cache_newton_solver = init(nonlinear_problem,
-                               NewtonRaphson(; concrete_jac = true, autodiff = false);
-                               abstol = 2 * eps(eltype(u0)))
-
     integrator = PairedExplicitERRK4Integrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
                                                ode.p,
                                                (prob = ode,), ode.f, alg,
@@ -127,8 +108,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
                                                                        kwargs...),
                                                false, true, false,
                                                k1, k_higher,
-                                               direction, gamma,
-                                               nonlinear_problem, cache_newton_solver)
+                                               direction, gamma)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -215,12 +195,14 @@ end
     u_wrap = wrap_array(integrator.u, integrator.p)
     dir_wrap = wrap_array(integrator.direction, p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+    
+    @unpack gamma = integrator # Use previous value for gamma as starting value for Newton
 
     # Bisection for gamma
-    #=
+    
     # Note: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-    gamma_min = 1 / RealT(10) # Not clear what value to choose here!
-    gamma_max = one(RealT)
+    gamma_min = 0.1 # Not clear what value to choose here!
+    gamma_max = 1.1 # Observed that sometimes larger > 1 is required
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -240,7 +222,7 @@ end
 
     # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
     if r_max > 0 && r_min < 0
-        gamma_tol = 100 * eps(RealT)
+        gamma_tol = 2 * eps(RealT)
         bisection_its_max = 100
         bisect_its = 0
         @trixi_timeit timer() "ER: Bisection" while gamma_max - gamma_min > gamma_tol #&& bisect_its < bisection_its_max
@@ -261,17 +243,18 @@ end
             end
             bisect_its += 1
         end
+    else
+        gamma = 1
     end
-    =#
+    
 
-    @unpack gamma = integrator # Use previous value for gamma as starting value for Newton
-
+    #=
     # Newton search for gamma
     @trixi_timeit timer() "ER: Newton" begin
         # Custom Newton: Probably required for demonstrating the method
         step_scaling = 1.0 # > 1: Accelerated Newton, < 1: Damped Newton
 
-        r_tol = 2 * eps(RealT)
+        r_tol = 1e-14 # Similar to e.g. conservation error
         r_gamma = floatmax(RealT) # Initialize with large value
 
         n_its_max = 20
@@ -291,26 +274,12 @@ end
             n_its += 1
         end
 
-        #=
-        params_nonlinear = (S_old = S_old, dS = dS, u_tmp_wrap = u_tmp_wrap, u_wrap = u_wrap, 
-                            dir_wrap = dir_wrap, mesh = mesh, equations = equations, dg = dg, cache = cache)
-        reinit!(integrator.cache_newton_solver; p = params_nonlinear, u0 = gamma)
-        NonlinearSolve.solve(integrator.nonlinear_problem, NewtonRaphson(;concrete_jac = true, autodiff = false), abstol = 2 * eps(RealT))
-        =#
-
-        #=
-        res = nlsolve(gamma -> r_gamma(gamma[1], S_old, dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache),
-                      gamma -> dr(gamma[1], dS, u_tmp_wrap, u_wrap, dir_wrap, mesh, equations, dg, cache),
-                      [gamma], method = :newton,  ftol = 2 * eps(RealT), xtol = 10 * eps(RealT), iterations = 100,
-                      linesearch = LineSearches.BackTracking(order=3))
-        gamma = res.zero[1]
-        =#
-
         # Catch Newton failures
         if gamma < 0 #|| gamma > 1
             gamma = 1
         end
     end
+    =#
 
     t_end = last(integrator.sol.prob.tspan)
     integrator.iter += 1

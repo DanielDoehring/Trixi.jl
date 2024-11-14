@@ -90,8 +90,7 @@ summary_callback = SummaryCallback()
 
 analysis_interval = 10
 analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
-                                       analysis_errors = Symbol[],
-                                       #extra_analysis_integrals = (entropy,),
+                                       analysis_errors = [:conservation_error],
                                        analysis_integrals = (entropy,),
                                        #analysis_filename = "analysis_standard.dat",
                                        analysis_filename = "analysis_ER.dat",
