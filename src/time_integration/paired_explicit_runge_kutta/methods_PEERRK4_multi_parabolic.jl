@@ -105,7 +105,7 @@
 
     # Do relaxed update
     @threaded for i in eachindex(integrator.u)
-        integrator.u[i] += gamma * integrator.direction[i]
+        integrator.u[i] += integrator.gamma * integrator.direction[i]
     end
 end
 
