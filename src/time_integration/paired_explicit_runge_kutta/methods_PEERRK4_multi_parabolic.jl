@@ -5,6 +5,110 @@
 @muladd begin
 #! format: noindent
 
+@inline function last_three_stages!(integrator::AbstractPairedExplicitERRKMultiParabolicIntegrator,
+                                    alg, p)
+    mesh, equations, dg, cache = mesh_equations_solver_cache(p)
+
+    # S - 2
+    @threaded for u_ind in eachindex(integrator.u)
+        integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+                                  alg.a_matrix_constant[1, 1] *
+                                  integrator.k1[u_ind] +
+                                  alg.a_matrix_constant[1, 2] *
+                                  integrator.k_higher[u_ind]
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.num_stages - 2] * integrator.dt,
+                 integrator.du_tmp)
+
+    @threaded for u_ind in eachindex(integrator.du)
+        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+    end
+
+    # S - 1
+    @threaded for u_ind in eachindex(integrator.u)
+        integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+                                  alg.a_matrix_constant[2, 1] *
+                                  integrator.k1[u_ind] +
+                                  alg.a_matrix_constant[2, 2] *
+                                  integrator.k_higher[u_ind]
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.num_stages - 1] * integrator.dt,
+                 integrator.du_tmp)
+
+    @threaded for u_ind in eachindex(integrator.du)
+        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+    end
+
+    k_higher_wrap = wrap_array(integrator.k_higher, p)
+    u_tmp_wrap = wrap_array(integrator.u_tmp, p)
+    # 0.5 = b_{S-1}
+    # TODO: Combine integration of i-1, i!
+    dS = int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
+
+    # S
+    @threaded for i in eachindex(integrator.du)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              alg.a_matrix_constant[3, 1] *
+                              integrator.k1[i] +
+                              alg.a_matrix_constant[3, 2] *
+                              integrator.k_higher[i]
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.num_stages] * integrator.dt,
+                 integrator.du_tmp)
+
+    @threaded for i in eachindex(integrator.du)
+        integrator.direction[i] = (integrator.k_higher[i] +
+                                   integrator.du[i] * integrator.dt) / 2
+    end
+
+    du_wrap = wrap_array(integrator.du, integrator.p)
+    # 0.5 = b_{S}
+    dS += integrator.dt *
+          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
+
+    u_wrap = wrap_array(integrator.u, integrator.p)
+    S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+
+    dir_wrap = wrap_array(integrator.direction, p)
+
+    #=
+    # Bisection for gamma
+    @trixi_timeit timer() "ER: Bisection" begin
+        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                         mesh, equations, dg, cache)
+    end
+    =#
+
+    # Newton search for gamma
+    @trixi_timeit timer() "ER: Newton" begin
+        gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                      mesh, equations, dg, cache)
+    end
+
+    t_end = last(integrator.sol.prob.tspan)
+    integrator.iter += 1
+    # Last timestep shenanigans
+    if integrator.t + integrator.gamma * integrator.dt > t_end ||
+       isapprox(integrator.t + integrator.gamma * integrator.dt, t_end)
+        integrator.t = t_end
+        integrator.gamma = (t_end - integrator.t) / integrator.dt
+        terminate!(integrator)
+    else
+        integrator.t += integrator.gamma * integrator.dt
+    end
+
+    # Do relaxed update
+    @threaded for i in eachindex(integrator.u)
+        integrator.u[i] += gamma * integrator.direction[i]
+    end
+end
+
 function step!(integrator::PairedExplicitERRK4MultiParabolicIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
@@ -116,7 +220,8 @@ function step!(integrator::PairedExplicitERRK4MultiParabolicIntegrator)
                 # and then using the level-dependent version
 
                 integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                             integrator.t + alg.c[stage] * integrator.dt)
+                             integrator.t + alg.c[stage] * integrator.dt,
+                             integrator.du_tmp)
 
                 @threaded for u_ind in eachindex(integrator.du)
                     integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
@@ -130,7 +235,8 @@ function step!(integrator::PairedExplicitERRK4MultiParabolicIntegrator)
                              integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
                              #integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
                              integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                             integrator.level_u_indices_elements, integrator.coarsest_lvl)
+                             integrator.level_u_indices_elements,
+                             integrator.coarsest_lvl)
 
                 # Update k_higher of relevant levels
                 for level in 1:(integrator.coarsest_lvl)

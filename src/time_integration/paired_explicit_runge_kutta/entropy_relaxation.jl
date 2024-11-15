@@ -54,3 +54,84 @@ end
     return integrate(entropy_math, u_gamma_dir, mesh, equations, dg, cache) -
            S_old - gamma * dS
 end
+
+function gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                          mesh, equations, dg, cache)
+    gamma_min = 0.1 # Not clear what value to choose here!
+    gamma_max = 1.1 # Observed that sometimes larger > 1 is required
+
+    @threaded for element in eachelement(dg, cache)
+        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                            gamma_max *
+                                            dir_wrap[.., element]
+    end
+    r_max = entropy_difference(gamma_max, S_old, dS, u_tmp_wrap,
+                               mesh, equations, dg, cache)
+
+    @threaded for element in eachelement(dg, cache)
+        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                            gamma_min *
+                                            dir_wrap[.., element]
+    end
+    r_min = entropy_difference(gamma_min, S_old, dS, u_tmp_wrap,
+                               mesh, equations, dg, cache)
+
+    # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
+    if r_max > 0 && r_min < 0
+        gamma_tol = 2 * eps(typeof(integrator.gamma))
+        #bisection_its_max = 100
+        #bisect_its = 0
+        while gamma_max - gamma_min > gamma_tol #&& bisect_its < bisection_its_max
+            integrator.gamma = (gamma_max + gamma_min) / 2
+
+            @threaded for element in eachelement(dg, cache)
+                @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                                    integrator.gamma *
+                                                    dir_wrap[.., element]
+            end
+            r_gamma = entropy_difference(integrator.gamma, S_old, dS, u_tmp_wrap,
+                                         mesh, equations, dg, cache)
+
+            if r_gamma < 0
+                gamma_min = integrator.gamma
+            else
+                gamma_max = integrator.gamma
+            end
+            #bisect_its += 1
+        end
+    else
+        integrator.gamma = 1
+    end
+end
+
+function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                       mesh, equations, dg, cache)
+    # Custom Newton: Probably required for demonstrating the method
+    step_scaling = 1.0 # > 1: Accelerated Newton, < 1: Damped Newton
+
+    r_tol = 1e-14 # Similar to e.g. conservation error: 1e-14
+    r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
+
+    n_its_max = 3
+    n_its = 0
+    while abs(r_gamma) > r_tol && n_its < n_its_max
+        @threaded for element in eachelement(dg, cache)
+            @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                                integrator.gamma *
+                                                dir_wrap[.., element]
+        end
+        r_gamma = entropy_difference(integrator.gamma, S_old, dS, u_tmp_wrap, mesh,
+                                     equations,
+                                     dg, cache)
+        dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
+
+        integrator.gamma -= step_scaling * r_gamma / dr
+
+        n_its += 1
+    end
+
+    # Catch Newton failures
+    if integrator.gamma < 0 #|| gamma > 1
+        integrator.gamma = 1
+    end
+end

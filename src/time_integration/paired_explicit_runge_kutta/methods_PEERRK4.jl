@@ -123,15 +123,8 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
     return integrator
 end
 
-#=
-@inline function last_three_stages!(integrator::PairedExplicitERRK4Integrator{RealT},
-                                    alg, p) where {RealT}
-=#
-@inline function last_three_stages!(integrator::Union{AbstractPairedExplicitERRKIntegrator,
-    AbstractPairedExplicitERRKMultiParabolicIntegrator},
+@inline function last_three_stages!(integrator::AbstractPairedExplicitERRKIntegrator,
                                     alg, p)
-    RealT = Float64
-
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     # S - 2
@@ -169,6 +162,7 @@ end
     k_higher_wrap = wrap_array(integrator.k_higher, p)
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # 0.5 = b_{S-1}
+    # TODO: Combine integration of i-1, i!
     dS = int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
 
     # S
@@ -195,109 +189,38 @@ end
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
-    
+
     dir_wrap = wrap_array(integrator.direction, p)
-    @unpack gamma = integrator # Use previous value for gamma as starting value for Newton
-
-    # Bisection for gamma
-    @trixi_timeit timer() "ER: Bisection" begin
-        # Note: If we do not want to sacrifice order, we would need to restrict this lower bound to 1 - O(dt)
-        gamma_min = 0.1 # Not clear what value to choose here!
-        gamma_max = 1.1 # Observed that sometimes larger > 1 is required
-
-        @threaded for element in eachelement(dg, cache)
-            @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                                gamma_max *
-                                                dir_wrap[.., element]
-        end
-        r_max = entropy_difference(gamma_max, S_old, dS, u_tmp_wrap, 
-                                mesh, equations, dg, cache)
-
-        @threaded for element in eachelement(dg, cache)
-            @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                                gamma_min *
-                                                dir_wrap[.., element]
-        end
-        r_min = entropy_difference(gamma_min, S_old, dS, u_tmp_wrap,
-                                mesh, equations, dg, cache)
-
-        # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
-        if r_max > 0 && r_min < 0
-            gamma_tol = 2 * eps(RealT)
-            #bisection_its_max = 100
-            #bisect_its = 0
-            while gamma_max - gamma_min > gamma_tol #&& bisect_its < bisection_its_max
-                gamma = (gamma_max + gamma_min) / 2
-
-                @threaded for element in eachelement(dg, cache)
-                    @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                                    gamma *
-                                                    dir_wrap[.., element]
-                end
-                r_gamma = entropy_difference(gamma, S_old, dS, u_tmp_wrap,
-                                            mesh, equations, dg, cache)
-
-                if r_gamma < 0
-                    gamma_min = gamma
-                else
-                    gamma_max = gamma
-                end
-                #bisect_its += 1
-            end
-        else
-            gamma = 1
-        end
-    end
-    
 
     #=
-    # Newton search for gamma
-    @trixi_timeit timer() "ER: Newton" begin
-        # Custom Newton: Probably required for demonstrating the method
-        step_scaling = 1.0 # > 1: Accelerated Newton, < 1: Damped Newton
-
-        r_tol = 1e-14 # Similar to e.g. conservation error: 1e-14
-        r_gamma = floatmax(RealT) # Initialize with large value
-
-        n_its_max = 10
-        n_its = 0
-        while abs(r_gamma) > r_tol && n_its < n_its_max
-            @threaded for element in eachelement(dg, cache)
-                @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                                    gamma *
-                                                    dir_wrap[.., element]
-            end
-            r_gamma = entropy_difference(gamma, S_old, dS, u_tmp_wrap, mesh, equations,
-                                         dg, cache)
-            dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
-
-            gamma -= step_scaling * r_gamma / dr
-
-            n_its += 1
-        end
-
-        # Catch Newton failures
-        if gamma < 0 #|| gamma > 1
-            gamma = 1
-        end
+    # Bisection for gamma
+    @trixi_timeit timer() "ER: Bisection" begin
+        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                         mesh, equations, dg, cache)
     end
     =#
+
+    # Newton search for gamma
+    @trixi_timeit timer() "ER: Newton" begin
+        gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                      mesh, equations, dg, cache)
+    end
 
     t_end = last(integrator.sol.prob.tspan)
     integrator.iter += 1
     # Last timestep shenanigans
-    if integrator.t + gamma * integrator.dt > t_end ||
-       isapprox(integrator.t + gamma * integrator.dt, t_end)
+    if integrator.t + integrator.gamma * integrator.dt > t_end ||
+       isapprox(integrator.t + integrator.gamma * integrator.dt, t_end)
         integrator.t = t_end
-        gamma = (t_end - integrator.t) / integrator.dt
+        integrator.gamma = (t_end - integrator.t) / integrator.dt
         terminate!(integrator)
     else
-        integrator.t += gamma * integrator.dt
+        integrator.t += integrator.gamma * integrator.dt
     end
 
     # Do relaxed update
     @threaded for i in eachindex(integrator.u)
-        integrator.u[i] += gamma * integrator.direction[i]
+        integrator.u[i] += integrator.gamma * integrator.direction[i]
     end
 end
 

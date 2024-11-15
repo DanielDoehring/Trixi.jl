@@ -84,8 +84,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 #tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 tspan = (0.0, 1) # Test time
 
-#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
-ode = semidiscretize(semi, tspan) # for OrdinaryDiffEq integrators
+ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+#ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
@@ -120,7 +120,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            lift_coefficient))
 
 stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Multi E = 5, ..., 14
-stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
+#stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
 
 # For plots etc
 save_solution = SaveSolutionCallback(interval = 2000,
@@ -153,8 +153,9 @@ dtRatios = [0.208310160790890, # 14
 Stages = [14, 12, 10, 8, 7, 6, 5]
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
 
-ode_algorithm = Trixi.PairedExplicitRK4(12, path)
+#ode_algorithm = Trixi.PairedExplicitRK4(12, path)
 
 dt = 1e-3 # PERK4, dt_c = 2e-4
 

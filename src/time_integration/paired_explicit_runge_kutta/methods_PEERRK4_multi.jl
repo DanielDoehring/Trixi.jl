@@ -83,10 +83,11 @@ mutable struct PairedExplicitERRK4MultiIntegrator{RealT <: Real, uType, Params, 
     gamma::RealT
 end
 
-mutable struct PairedExplicitERRK4MultiParabolicIntegrator{RealT <: Real, uType, Params, Sol, F,
-                                                  Alg,
-                                                  PairedExplicitRKOptions} <:
-                AbstractPairedExplicitERRKMultiParabolicIntegrator
+mutable struct PairedExplicitERRK4MultiParabolicIntegrator{RealT <: Real, uType, Params,
+                                                           Sol, F,
+                                                           Alg,
+                                                           PairedExplicitRKOptions} <:
+               AbstractPairedExplicitERRKMultiParabolicIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -191,27 +192,30 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
 
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
-        integrator = PairedExplicitERRK4MultiParabolicIntegrator(u0, du, u_tmp, t0, dt, zero(dt),
-                                                        iter,
-                                                        ode.p,
-                                                        (prob = ode,), ode.f, alg,
-                                                        PairedExplicitRKOptions(callback,
-                                                                                ode.tspan;
-                                                                                kwargs...),
-                                                        false,
-                                                        k1, k_higher,
-                                                        level_info_elements,
-                                                        level_info_elements_acc,
-                                                        level_info_interfaces_acc,
-                                                        level_info_mpi_interfaces_acc,
-                                                        level_info_boundaries_acc,
-                                                        level_info_boundaries_orientation_acc,
-                                                        level_info_mortars_acc,
-                                                        level_info_mpi_mortars_acc,
-                                                        level_u_indices_elements, -
-                                                        1, n_levels,
-                                                        direction, gamma,
-                                                        du_tmp)
+        integrator = PairedExplicitERRK4MultiParabolicIntegrator(u0, du, u_tmp, t0, dt,
+                                                                 zero(dt),
+                                                                 iter,
+                                                                 ode.p,
+                                                                 (prob = ode,), ode.f,
+                                                                 alg,
+                                                                 PairedExplicitRKOptions(callback,
+                                                                                         ode.tspan;
+                                                                                         kwargs...),
+                                                                 false,
+                                                                 k1, k_higher,
+                                                                 level_info_elements,
+                                                                 level_info_elements_acc,
+                                                                 level_info_interfaces_acc,
+                                                                 level_info_mpi_interfaces_acc,
+                                                                 level_info_boundaries_acc,
+                                                                 level_info_boundaries_orientation_acc,
+                                                                 level_info_mortars_acc,
+                                                                 level_info_mpi_mortars_acc,
+                                                                 level_u_indices_elements,
+                                                                 -
+                                                                 1, n_levels,
+                                                                 direction, gamma,
+                                                                 du_tmp)
     else
         integrator = PairedExplicitERRK4MultiIntegrator(u0, du, u_tmp, t0, dt, zero(dt),
                                                         iter,
