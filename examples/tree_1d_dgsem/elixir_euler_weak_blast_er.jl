@@ -2,48 +2,42 @@
 using OrdinaryDiffEq
 using Trixi
 
-using DoubleFloats
-RealT = Double64
-
-RealT = Float64
-
 ###############################################################################
 # semidiscretization of the compressible Euler equations
 
-# NOTE: Copied setup from "euler_ec.jl"
+# NOTE: Tied to 1D somewhat as mortars are not EC (yet)!
 
-equations = CompressibleEulerEquations1D(RealT(14) / 10)
+equations = CompressibleEulerEquations1D(1.4)
 
 initial_condition = initial_condition_weak_blast_wave
 
 # Volume flux adds some (minimal) disspation, thus stabilizing the simulation - 
 # in contrast to standard DGSEM only
 volume_flux = flux_ranocha
-solver = DGSEM(RealT = RealT, polydeg = 3, surface_flux = flux_ranocha,
+solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
-coordinates_min = -RealT(2)
-coordinates_max = RealT(2)
+coordinates_min = -2.0
+coordinates_max = 2.0
 
 BaseLevel = 7
 # Test PERK on non-uniform mesh
-refinement_patches = ((type = "box", coordinates_min = (0.5,),
-                       coordinates_max = (1.5,)),
-                      (type = "box", coordinates_min = (0.75,),
-                       coordinates_max = (1.25,)))
+refinement_patches = ((type = "box", coordinates_min = (-1.0,),
+                       coordinates_max = (1.0,)),
+                      (type = "box", coordinates_min = (-0.5,),
+                       coordinates_max = (0.5,)))
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = BaseLevel,
                 refinement_patches = refinement_patches,
-                n_cells_max = 10_000,
-                RealT = RealT)
+                n_cells_max = 10_000)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (zero(RealT), RealT(4) / 10)
+tspan = (0.0, 1.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -56,19 +50,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      #analysis_filename = "analysis_standard.dat",
                                      save_analysis = true)
 
-### Standalone ###
-# Double 64:                                     
-# PERK4 14 standalone                                     
-cfl = 2.2 # Uniform
-cfl = 2.2 # Non-uniform
-
-# Float64:
-cfl = 1.7 # Uniform
-#cfl = 2.2 # Non-uniform
-
-### Multi ###
-# Float64:
-cfl = 2.2 # Non-uniform
+cfl = 1.7
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -94,6 +76,7 @@ Stages = [14, 8, 5]
 
 ode_alg = Trixi.PairedExplicitRK4Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
 
+
 # NOTE: 3 Newton iterations suffice to ensure exact entropy conservation!
 ode_alg = Trixi.PairedExplicitERRK4Multi(Stages,
                                          "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
@@ -101,7 +84,10 @@ ode_alg = Trixi.PairedExplicitERRK4Multi(Stages,
 
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = RealT(42),
+                  dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
+
+using Plots
+plot(sol)

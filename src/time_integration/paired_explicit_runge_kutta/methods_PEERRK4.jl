@@ -163,6 +163,7 @@ end
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # 0.5 = b_{S-1}
     # TODO: Combine integration of i-1, i!
+    # => Would need to store u_tmp_wrap in yet another register!
     dS = int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
 
     # S
