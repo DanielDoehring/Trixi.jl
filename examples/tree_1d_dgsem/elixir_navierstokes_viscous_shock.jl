@@ -1,64 +1,77 @@
 using OrdinaryDiffEq
 using Trixi
 
-using NLsolve # Need nonlinear solver to solve for the IC/true solution
-
 ###############################################################################
 # semidiscretization of the ideal compressible Navier-Stokes equations
 
-# TODO: Reference
+# TODO: Reference for Becker-Morduchow-Libby solution
 
-prandtl_number() = 3/4
-Re = 10  # Reynolds number
-Ma = 2.5 # Mach number
-
+# "Physics"
+prandtl_number() = 3/4 # Strictly required for this testcase!
 gamma = 1.4
 
-# TODO: Check if these lead to constant mass/enthalpy!
-rho_ref = 1.0
+# "Choices"
+u_0 = 1.0
+D = u_0
 
-L_ref = 1.0 # TODO: Not sure if this is the right reference length (= domain size)
-Mass_flow = 0.1
+rho_0 = 1.0
+# p_0 = 1.0
+p_0 = rho_0^gamma
 
-U_L = 2.0
-U_R = 1.0
-V_f = U_L/U_R
+Ma_0 = 2.0
+c_0 = u_0 / Ma_0 # Not needed at the moment
 
-c = max(U_L, U_R) / Ma
-p_ref = rho_ref * c^2 / gamma
+eta_1 = (gamma - 1)/(gamma + 1) + 2/((gamma + 1) * Ma_0^2)
 
-h_ref = p_ref / (gamma - 1) + 0.5 * U_L^2
+mu() = 0.1
 
-mu() = rho_ref * U_L * L_ref / Re
-
-alpha = 2 * gamma/(gamma + 1) * mu() / (prandtl_number() * Mass_flow)
-#alpha = 2 * gamma/(gamma + 1) * Re / (prandtl_number() * Mass_flow)
-
-function momemtum_ode_sol(V, x)
-  x - 0.5 * alpha * (log(abs((V - 1) * (V - V_f))) + (1 + V_f)/(1 - V_f) * log(abs((V - 1)/(V - V_f))))
+# This is valid for constant viscosity mu
+function xi_of_x(x)
+  3 * (gamma + 1) / (8 * gamma) * rho_0 * D/mu() * x
 end
 
-function dV(V)
-  return - alpha * V[1] / ((V[1] - 1) * (V[1] - V_f))
+function eta_root_of_x(eta, x)
+  xi = xi_of_x(x)
+  eta - 1 + ((1 - eta_1)/2)^(1 - eta_1) * exp((1 - eta_1) * xi) * (eta - eta_1)^eta_1
 end
 
-coordinates_min = -0.5
-coordinates_max = 0.5
+function eta_bisection(eta_0, eta_1, x, eta_tol=1e-13)
+  @assert eta_root_of_x(eta_0, x) * eta_root_of_x(eta_1, x) < 0
+
+  eta_max = eta_0
+  eta_min = eta_1
+
+  eta = (eta_max + eta_min) / 2
+
+  while eta_max - eta_min > eta_tol
+    if eta_root_of_x(eta, x) < 0
+      eta_min = eta
+    else
+      eta_max = eta
+    end
+
+    eta = (eta_max + eta_min) / 2
+  end
+
+  return eta
+end
+
+Length = 2.0
+coordinates_min = -Length/2
+coordinates_max = Length/2
 
 function initial_condition_viscous_shock(x, t, equations)
-  V_0 = (U_L + U_R) / 2
-  # Turn into momentum
-  V_0 *= rho_ref
+  #x_moving = x[1] + D * t
+  x_moving = x[1]
 
-  momentum = nlsolve(V -> momemtum_ode_sol(V[1], x[1]), 
-                     dV, [V_0], 
-                     ftol = 1e-14, iterations = 1000,
-                     method = :newton).zero[1]
+  eta_sol = eta_bisection(1.0, eta_1, x_moving)
 
-  rho = rho_ref
-  v = momentum / rho
-  p = (h_ref - 0.5 * v^2) * (gamma - 1)
-  rho = p^(1/gamma)
+  rho = rho_0 / eta_sol
+
+  v = eta_sol * D
+  #v -= D # Correction due to moving frame of reference?
+  
+  p = p_0 * 1/eta_sol * (1 + (gamma - 1)/2 * Ma_0^2 * (1 - eta_sol^2))
 
   return prim2cons(SVector(rho, v, p), equations)
 end
@@ -66,37 +79,37 @@ end
 equations = CompressibleEulerEquations1D(gamma)
 equations_parabolic = CompressibleNavierStokesDiffusion1D(equations, mu = mu(),
                                                           Prandtl = prandtl_number(),
-                                                          gradient_variables = GradientVariablesPrimitive())
+                                                          gradient_variables = GradientVariablesEntropy())
 
-# Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg = 3, surface_flux = flux_hllc,
+solver = DGSEM(polydeg = 3, surface_flux = flux_hlle,
                volume_integral = VolumeIntegralWeakForm())
 
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 4,
+                initial_refinement_level = 6,
                 periodicity = false,
                 n_cells_max = 30_000) # set maximum capacity of tree data structure
 
 initial_condition = initial_condition_viscous_shock
 
+boundary_condition_dirichlet = BoundaryConditionDirichlet(initial_condition)
+# define inviscid boundary conditions
+
+boundary_conditions = (; x_neg = boundary_condition_dirichlet,
+                       x_pos = boundary_condition_dirichlet)
+
 velocity_bc = NoSlip((x, t, equations) -> Trixi.velocity(initial_condition(x,
                                                                            t,
-                                                                           equations),
-                                                         equations_parabolic))
+                                                                           equations), 
+                                                         equations))
+
 
 heat_bc = Isothermal((x, t, equations) -> Trixi.temperature(initial_condition(x,
                                                                               t,
                                                                               equations),
-                                                                 equations_parabolic))
+                                                            equations_parabolic))
 
-boundary_condition_parabolic = BoundaryConditionNavierStokesWall(velocity_bc, heat_bc)                                                                 
-
-boundary_condition_dirichlet = BoundaryConditionDirichlet(initial_condition)
-
-# define inviscid boundary conditions
-boundary_conditions = (; x_neg = boundary_condition_dirichlet,
-                       x_pos = boundary_condition_dirichlet)
+boundary_condition_parabolic = BoundaryConditionNavierStokesWall(velocity_bc, heat_bc)
 
 # define viscous boundary conditions
 boundary_conditions_parabolic = (; x_neg = boundary_condition_parabolic,
@@ -116,7 +129,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-alive_callback = AliveCallback(alive_interval = 10)
+alive_callback = AliveCallback(alive_interval = 100)
 
 analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
