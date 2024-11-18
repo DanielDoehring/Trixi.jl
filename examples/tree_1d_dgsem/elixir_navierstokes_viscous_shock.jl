@@ -1,4 +1,4 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEq, Plots
 using Trixi
 
 ###############################################################################
@@ -35,7 +35,7 @@ function eta_root_of_x(eta, x)
   eta - 1 + ((1 - eta_1)/2)^(1 - eta_1) * exp((1 - eta_1) * xi) * (eta - eta_1)^eta_1
 end
 
-function eta_bisection(eta_0, eta_1, x, eta_tol=1e-13)
+function eta_bisection(eta_0, eta_1, x, eta_tol=1e-15)
   @assert eta_root_of_x(eta_0, x) * eta_root_of_x(eta_1, x) < 0
 
   eta_max = eta_0
@@ -61,15 +61,11 @@ coordinates_min = -Length/2
 coordinates_max = Length/2
 
 function initial_condition_viscous_shock(x, t, equations)
-  #x_moving = x[1] + D * t
-  x_moving = x[1]
-
-  eta_sol = eta_bisection(1.0, eta_1, x_moving)
+  eta_sol = eta_bisection(1.0, eta_1, x[1])
 
   rho = rho_0 / eta_sol
 
   v = eta_sol * D
-  #v -= D # Correction due to moving frame of reference?
   
   p = p_0 * 1/eta_sol * (1 + (gamma - 1)/2 * Ma_0^2 * (1 - eta_sol^2))
 
@@ -124,7 +120,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span `tspan`
-tspan = (0.0, 0.5)
+tspan = (0.0, 0.1)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -134,7 +130,12 @@ alive_callback = AliveCallback(alive_interval = 100)
 analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
+visualization = VisualizationCallback(interval=10, plot_data_creator=PlotData1D)
+
+callbacks = CallbackSet(summary_callback, 
+                        alive_callback, 
+                        #visualization,
+                        analysis_callback)
 
 ###############################################################################
 # run the simulation
