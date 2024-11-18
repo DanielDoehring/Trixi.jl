@@ -7,8 +7,8 @@ using Trixi
 # TODO: Reference for Becker-Morduchow-Libby solution
 
 # "Physics"
-prandtl_number() = 3/4 # Strictly required for this testcase!
 gamma = 1.4
+prandtl_number() = 3/4 # Strictly required for this testcase!
 
 # "Choices"
 u_0 = 1.0
