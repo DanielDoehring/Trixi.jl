@@ -58,12 +58,11 @@ initial_condition = initial_condition_isentropic_vortex
 
 N_passes = 1
 T_end = EdgeLength * N_passes
-tspan = (0.0, 0.0)
+tspan = (0.0, T_end)
 
 function mapping(xi_, eta_)
     exponent = 1.4
     
-    #=
     # Apply a non-linear transformation to refine towards the center
     xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_)) + 1
     eta_transformed = sign(eta_) * abs(eta_)^(exponent + abs(eta_)) + 1
@@ -71,24 +70,11 @@ function mapping(xi_, eta_)
     # Scale the transformed coordinates to maintain the original domain size
     x = xi_transformed * EdgeLength / 2
     y = eta_transformed * EdgeLength / 2
-    =#
-
-    # Compute the combined coordinate
-    combined = (xi_ + eta_) / sqrt(2)
-
-    # Apply a non-linear transformation to refine towards the line x = y
-    combined_transformed = sign(combined) * abs(combined)^(exponent + abs(combined)) + 1
-
-    # Scale the transformed combined coordinate to maintain the original domain size
-    x = combined_transformed * EdgeLength / 2
-    y = combined_transformed * EdgeLength / 2
 
     return SVector(x, y)
 end
 
-# For convergence test
-cells_per_dimension = (10, 10) # Low resolution for convergence test
-
+cells_per_dimension = (16, 16)
 mesh = StructuredMesh(cells_per_dimension, mapping)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
@@ -108,10 +94,6 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                        #analysis_filename = "analysis_ER.dat",
                                        save_analysis = true)
 
-# For convergence test                                       
-analysis_callback = AnalysisCallback(semi, interval = 1_000_000)
-
-#cfl = 19.2 # Standalone
 cfl = 5.0 # Multi # 8
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -119,61 +101,37 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 alive_callback = AliveCallback(alive_interval = 100)
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_cb_entropy,
-                        analysis_callback,
-                        #stepsize_callback,
+                        analysis_cb_entropy,
+                        stepsize_callback,
                         alive_callback)
 
 ###############################################################################
 # run the simulation
 
-#=
-Stages_standalone = 16
-ode_algorithm = Trixi.PairedExplicitERRK4(Stages_standalone,
-                                          "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
-=#
-
-Stages = [16, 11, 9, 8, 7, 6, 5]
+Stages = [16, 11, 9, 7, 6, 5]
 dtRatios = [
     0.636282563128043,
     0.412078842462506,
     0.31982226180844,
-    0.26286863302812,
     0.22663973638555,
     0.160154267621692,
     0.130952239152975
 ] ./ 0.636282563128043
 
-
+#=
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
                                              "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                              dtRatios)
+=#
 
 
-#=
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
                                                "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
                                                dtRatios)
-=#
 
-# Obtained from finest discretization
-cfl_factor = 0.07439492193432441
-
-h_min = -1
-if cells_per_dimension[1] == 10
-    h_min = 0.7614615754863507
-elseif cells_per_dimension[1] == 20
-    h_min = 0.3162277660168371
-elseif cells_per_dimension[1] == 40
-    h_min = 0.12986930197671676
-elseif cells_per_dimension[1] == 80
-    h_min = 0.05212721378246066
-end
-
-dt = cfl_factor * h_min
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = dt,
+                  dt = 1.0,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
