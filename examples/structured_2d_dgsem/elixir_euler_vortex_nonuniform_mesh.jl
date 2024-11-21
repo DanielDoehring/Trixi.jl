@@ -64,31 +64,31 @@ tspan = (0.0, 0.0)
 function mapping(xi_, eta_)
     exponent = 1.4
     
+    #=
     # Apply a non-linear transformation to refine towards the center
-    xi_transformed = sign(xi_) * abs(xi_)^exponent + 1
-    eta_transformed = sign(eta_) * abs(eta_)^exponent + 1
+    xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_)) + 1
+    eta_transformed = sign(eta_) * abs(eta_)^(exponent + abs(eta_)) + 1
 
     # Scale the transformed coordinates to maintain the original domain size
     x = xi_transformed * EdgeLength / 2
     y = eta_transformed * EdgeLength / 2
-    
-
-    #=
-    xi = 0.5 * (xi_ + 1.0)
-    eta = 0.5 * (eta_ + 1.0)
-
-    x = xi^exponent * EdgeLength
-    y = eta^exponent * EdgeLength
     =#
+
+    # Compute the combined coordinate
+    combined = (xi_ + eta_) / sqrt(2)
+
+    # Apply a non-linear transformation to refine towards the line x = y
+    combined_transformed = sign(combined) * abs(combined)^(exponent + abs(combined)) + 1
+
+    # Scale the transformed combined coordinate to maintain the original domain size
+    x = combined_transformed * EdgeLength / 2
+    y = combined_transformed * EdgeLength / 2
 
     return SVector(x, y)
 end
 
-#N_Cells = 32
-#cells_per_dimension = (N_Cells, N_Cells)
-
 # For convergence test
-cells_per_dimension = (20, 20) # Low resolution for convergence test
+cells_per_dimension = (10, 10) # Low resolution for convergence test
 
 mesh = StructuredMesh(cells_per_dimension, mapping)
 
@@ -113,7 +113,7 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
 analysis_callback = AnalysisCallback(semi, interval = 1_000_000)
 
 #cfl = 19.2 # Standalone
-cfl = 6.0 # Multi # 8
+cfl = 5.0 # Multi # 8
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -122,7 +122,7 @@ alive_callback = AliveCallback(alive_interval = 100)
 callbacks = CallbackSet(summary_callback,
                         #analysis_cb_entropy,
                         analysis_callback,
-                        stepsize_callback,
+                        #stepsize_callback,
                         alive_callback)
 
 ###############################################################################
@@ -157,8 +157,24 @@ ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
                                                dtRatios)
 =#
 
+# Obtained from finest discretization
+cfl_factor = 0.07439492193432441
+
+h_min = -1
+if cells_per_dimension[1] == 10
+    h_min = 0.7614615754863507
+elseif cells_per_dimension[1] == 20
+    h_min = 0.3162277660168371
+elseif cells_per_dimension[1] == 40
+    h_min = 0.12986930197671676
+elseif cells_per_dimension[1] == 80
+    h_min = 0.05212721378246066
+end
+
+dt = cfl_factor * h_min
+
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 42.0,
+                  dt = dt,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
