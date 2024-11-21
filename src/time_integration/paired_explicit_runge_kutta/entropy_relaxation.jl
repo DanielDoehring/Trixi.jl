@@ -58,7 +58,7 @@ end
 function gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
                           mesh, equations, dg, cache)
     gamma_min = 0.1 # Not clear what value to choose here!
-    gamma_max = 1.1 # Observed that sometimes larger > 1 is required
+    gamma_max = 1.1 # For diffusive schemes, gamma > 1 is required to ensure EC
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -131,7 +131,7 @@ function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
     end
 
     # Catch Newton failures
-    if integrator.gamma < 0 #|| gamma > 1
+    if integrator.gamma < 0
         integrator.gamma = 1
     end
 end
