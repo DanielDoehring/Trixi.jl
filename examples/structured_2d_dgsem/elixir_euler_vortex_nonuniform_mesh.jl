@@ -60,7 +60,6 @@ N_passes = 1
 T_end = EdgeLength * N_passes
 tspan = (0.0, 0.0)
 
-# Mapping as described in https://arxiv.org/abs/2012.12040, but reduced to 2D
 function mapping(xi_, eta_)
     exponent = 1.4
     
