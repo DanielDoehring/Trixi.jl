@@ -77,13 +77,13 @@
 
     dir_wrap = wrap_array(integrator.direction, p)
 
-    
+    #=
     # Bisection for gamma
     @trixi_timeit timer() "ER: Bisection" begin
         gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
                          mesh, equations, dg, cache)
     end
-    
+    =#
 
     #=
     # Newton search for gamma

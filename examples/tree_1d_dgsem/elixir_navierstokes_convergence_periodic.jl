@@ -119,12 +119,12 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 10.0)
+tspan = (0.0, 1.0)
 ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 10000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
@@ -144,14 +144,14 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/"
 
 ode_algorithm = Trixi.PairedExplicitRK4(12, path)
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
 
 max_level = Trixi.maximum_level(mesh.tree)
 
 dtRef = 2e-2 # Single
 dtRef = 1e-2 # Multi
-dt = dtRef / 4^(max_level - 5)
+dt = dtRef / 4^(max_level - 5) # Divide by four for diffusion-dominated case
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,

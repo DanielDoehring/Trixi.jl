@@ -7,7 +7,7 @@ function get_n_levels(mesh::TreeMesh, alg)
     n_levels = max_level - min_level + 1
 
     # CARE: This is for testcase with random assignment
-    n_levels = alg.num_methods
+    #n_levels = alg.num_methods
 
     return n_levels
 end
@@ -34,7 +34,7 @@ function partitioning_variables!(level_info_elements,
     n_elements = length(elements.cell_ids)
 
     # CARE: This is for testcase with random assignment
-    element_id_level = Dict{Int, Int}()
+    #element_id_level = Dict{Int, Int}()
 
     # Determine level for each element
     for element_id in 1:n_elements
@@ -47,8 +47,8 @@ function partitioning_variables!(level_info_elements,
 
         # CARE: This is for testcase with random assignment
         #level_id = rand(1:n_levels)
-        level_id = mod(element_id - 1, n_levels) + 1
-        element_id_level[element_id] = level_id
+        #level_id = mod(element_id - 1, n_levels) + 1
+        #element_id_level[element_id] = level_id
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
         #=
@@ -90,7 +90,7 @@ function partitioning_variables!(level_info_elements,
         level_id = max_level + 1 - level
 
         # CARE: This is for testcase with random assignment
-        level_id = element_id_level[element_id]
+        #level_id = element_id_level[element_id]
 
         # NOTE: For case with varying characteristic speeds
         #=
@@ -134,7 +134,7 @@ function partitioning_variables!(level_info_elements,
         level_id = max_level + 1 - level
 
         # CARE: This is for testcase with random assignment
-        level_id = element_id_level[element_id]
+        #level_id = element_id_level[element_id]
 
         # Add to accumulated container
         for l in level_id:n_levels
@@ -190,7 +190,7 @@ function partitioning_variables!(level_info_elements,
             level_id = max_level + 1 - level
 
             # CARE: This is for testcase with random assignment
-            level_id = element_id_level[element_id]
+            #level_id = element_id_level[element_id]
 
             # Add to accumulated container
             for l in level_id:n_levels

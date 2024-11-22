@@ -112,7 +112,7 @@ function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
     r_tol = 1e-14 # Similar to e.g. conservation error: 1e-14
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
 
-    n_its_max = 10
+    n_its_max = 5
     n_its = 0
     while abs(r_gamma) > r_tol && n_its < n_its_max
         @threaded for element in eachelement(dg, cache)
