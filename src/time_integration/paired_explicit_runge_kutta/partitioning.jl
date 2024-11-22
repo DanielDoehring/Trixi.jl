@@ -46,7 +46,8 @@ function partitioning_variables!(level_info_elements,
         level_id = max_level + 1 - level
 
         # CARE: This is for testcase with random assignment
-        level_id = rand(1:n_levels)
+        #level_id = rand(1:n_levels)
+        level_id = mod(element_id - 1, n_levels) + 1
         element_id_level[element_id] = level_id
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)

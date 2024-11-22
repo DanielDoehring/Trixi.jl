@@ -94,10 +94,12 @@ solver = DGSEM(polydeg = 3, surface_flux = flux_hlle)
 coordinates_min = -domain_length / 2
 coordinates_max = domain_length / 2
 
-refinement_patches = ((type = "box", coordinates_min = (-1.5,),
-                       coordinates_max = (1.5,)),
+refinement_patches = ((type = "box", coordinates_min = (-1.0,),
+                       coordinates_max = (1.0,)),
+                       #=
                       (type = "box", coordinates_min = (-1.0,),
-                       coordinates_max = (1.0,)))
+                       coordinates_max = (1.0,))
+                       =#)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 3,
@@ -156,47 +158,56 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
-
-#=                                                                    
-A = jacobian_ad_forward(semi)
-
-using LinearAlgebra
-Eigenvalues = eigvals(A)
-
-# Complex conjugate eigenvalues have same modulus
-Eigenvalues = Eigenvalues[imag(Eigenvalues) .>= 0]
-
-# Sometimes due to numerical issues some eigenvalues have positive real part, which is erronous (for hyperbolic eqs)
-Eigenvalues = Eigenvalues[real(Eigenvalues) .< 0]
-
-EigValsReal = real(Eigenvalues)
-EigValsImag = imag(Eigenvalues)
-
-plotdata = Plots.scatter(EigValsReal, EigValsImag, label = "Spectrum")
-display(plotdata)
-=#
-
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
 ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
-alive_callback = AliveCallback(alive_interval = 100)
+alive_callback = AliveCallback(alive_interval = 10000)
 
-analysis_interval = 1000
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+analysis_interval = 1_000_000
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     analysis_errors = [:l2_error_primitive, :linf_error_primitive])
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 
 ###############################################################################
 # run the simulation
 
+dtRatios = [1, 0.5]
+
+# For diffusion-dominated case we need four times the timestep between the methods
+Stages = [10, 8]
+
+path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NavierStokes_ViscousShock/"
+
+#ode_algorithm = Trixi.PairedExplicitRK4(10, path)
+
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
+
+max_level = Trixi.maximum_level(mesh.tree)
+
+#dtRef = 2e-2 # Single
+dtRef = 2e-2/8 # Multi refined
+dtRef = 5e-3 # Multi evenly
+
+dt = dtRef / 4.0^(max_level - 4)
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = dt,
+                  save_everystep = false, callback = callbacks);
+
+
+#=
 time_int_tol = 1e-9
 sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol,
             dt = 1e-4, ode_default_options()..., callback = callbacks)
+=#
 
 summary_callback() # print the timer summary

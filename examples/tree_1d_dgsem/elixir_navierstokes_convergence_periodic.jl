@@ -103,8 +103,13 @@ solver = DGSEM(polydeg = 3, surface_flux = flux_hllc,
 
 coordinates_min = -1.0
 coordinates_max = 1.0
+
+refinement_patches = ((type = "box", coordinates_min = (-0.5,),
+                       coordinates_max = (0.5,)), )
+
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
+                refinement_patches = refinement_patches,
                 n_cells_max = 100_000)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
@@ -115,7 +120,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 10.0)
-ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
@@ -131,7 +136,31 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+dtRatios = [1, 0.5]
+
+Stages = [12, 7]
+
+path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/"
+
+ode_algorithm = Trixi.PairedExplicitRK4(12, path)
+
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
+
+max_level = Trixi.maximum_level(mesh.tree)
+
+dtRef = 2e-2 # Single
+dtRef = 1e-2 # Multi
+dt = dtRef / 4^(max_level - 5)
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = dt,
+                  save_everystep = false, callback = callbacks);
+
+#=                  
 time_int_tol = 1e-9
 sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol,
             ode_default_options()..., callback = callbacks)
+=#
+
 summary_callback() # print the timer summary
