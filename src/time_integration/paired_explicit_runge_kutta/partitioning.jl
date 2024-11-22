@@ -6,6 +6,9 @@ function get_n_levels(mesh::TreeMesh, alg)
 
     n_levels = max_level - min_level + 1
 
+    # CARE: This is for testcase with random assignment
+    n_levels = alg.num_methods
+
     return n_levels
 end
 
@@ -29,6 +32,10 @@ function partitioning_variables!(level_info_elements,
     max_level = maximum_level(mesh.tree)
 
     n_elements = length(elements.cell_ids)
+
+    # CARE: This is for testcase with random assignment
+    element_id_level = Dict{Int, Int}()
+
     # Determine level for each element
     for element_id in 1:n_elements
         # Determine level
@@ -37,6 +44,10 @@ function partitioning_variables!(level_info_elements,
 
         # Convert to level id
         level_id = max_level + 1 - level
+
+        # CARE: This is for testcase with random assignment
+        level_id = rand(1:n_levels)
+        element_id_level[element_id] = level_id
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
         #=
@@ -76,6 +87,9 @@ function partitioning_variables!(level_info_elements,
         level = mesh.tree.levels[elements.cell_ids[element_id]]
 
         level_id = max_level + 1 - level
+
+        # CARE: This is for testcase with random assignment
+        level_id = element_id_level[element_id]
 
         # NOTE: For case with varying characteristic speeds
         #=
@@ -117,6 +131,9 @@ function partitioning_variables!(level_info_elements,
 
         # Convert to level id
         level_id = max_level + 1 - level
+
+        # CARE: This is for testcase with random assignment
+        level_id = element_id_level[element_id]
 
         # Add to accumulated container
         for l in level_id:n_levels
@@ -170,6 +187,10 @@ function partitioning_variables!(level_info_elements,
 
             # Higher element's level determines this mortars' level
             level_id = max_level + 1 - level
+
+            # CARE: This is for testcase with random assignment
+            level_id = element_id_level[element_id]
+
             # Add to accumulated container
             for l in level_id:n_levels
                 push!(level_info_mortars_acc[l], mortar_id)
