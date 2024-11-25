@@ -125,13 +125,13 @@ dtRatios = [
 
 #=
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
-                                             "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
+                                             "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",
                                              dtRatios)
 =#
 
 
-ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
-                                               "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages,
+                                               "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",
                                                dtRatios)
 
 

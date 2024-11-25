@@ -5,7 +5,7 @@
 @muladd begin
 #! format: noindent
 
-mutable struct PairedExplicitERRK4Multi <: AbstractPairedExplicitRKMulti
+mutable struct PairedExplicitRelaxationRK4Multi <: AbstractPairedExplicitRKMulti
     const num_stage_evals_min::Int64
     const num_methods::Int64
     const num_stages::Int64
@@ -18,7 +18,7 @@ mutable struct PairedExplicitERRK4Multi <: AbstractPairedExplicitRKMulti
     max_active_levels::Vector{Int64}
     max_eval_levels::Vector{Int64}
 
-    function PairedExplicitERRK4Multi(stages::Vector{Int64},
+    function PairedExplicitRelaxationRK4Multi(stages::Vector{Int64},
                                       base_path_a_coeffs::AbstractString,
                                       dt_ratios)
         newPERK4_Multi = new(minimum(stages),
@@ -33,16 +33,16 @@ mutable struct PairedExplicitERRK4Multi <: AbstractPairedExplicitRKMulti
 
         return newPERK4_Multi
     end
-end # struct PairedExplicitERRK4Multi
+end # struct PairedExplicitRelaxationRK4Multi
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitERRK4MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
+mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
                                                   Alg,
                                                   PairedExplicitRKOptions} <:
-               AbstractPairedExplicitERRKMultiIntegrator
+               AbstractPairedExplicitRelaxationRKMultiIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -56,7 +56,7 @@ mutable struct PairedExplicitERRK4MultiIntegrator{RealT <: Real, uType, Params, 
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # PairedExplicitERRK4Multi stages:
+    # PairedExplicitRelaxationRK4Multi stages:
     k1::uType
     k_higher::uType
 
@@ -83,11 +83,11 @@ mutable struct PairedExplicitERRK4MultiIntegrator{RealT <: Real, uType, Params, 
     gamma::RealT
 end
 
-mutable struct PairedExplicitERRK4MultiParabolicIntegrator{RealT <: Real, uType, Params,
+mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real, uType, Params,
                                                            Sol, F,
                                                            Alg,
                                                            PairedExplicitRKOptions} <:
-               AbstractPairedExplicitERRKMultiParabolicIntegrator
+               AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -101,7 +101,7 @@ mutable struct PairedExplicitERRK4MultiParabolicIntegrator{RealT <: Real, uType,
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # PairedExplicitERRK4Multi stages:
+    # PairedExplicitRelaxationRK4Multi stages:
     k1::uType
     k_higher::uType
 
@@ -133,13 +133,13 @@ mutable struct PairedExplicitERRK4MultiParabolicIntegrator{RealT <: Real, uType,
     du_tmp::uType
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
+function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # PairedExplicitERRK4Multi stages
+    # PairedExplicitRelaxationRK4Multi stages
     k1 = zero(u0)
     k_higher = zero(u0)
 
@@ -192,7 +192,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
 
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
-        integrator = PairedExplicitERRK4MultiParabolicIntegrator(u0, du, u_tmp, t0, dt,
+        integrator = PairedExplicitRelaxationRK4MultiParabolicIntegrator(u0, du, u_tmp, t0, dt,
                                                                  zero(dt),
                                                                  iter,
                                                                  ode.p,
@@ -217,7 +217,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
                                                                  direction, gamma,
                                                                  du_tmp)
     else
-        integrator = PairedExplicitERRK4MultiIntegrator(u0, du, u_tmp, t0, dt, zero(dt),
+        integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp, t0, dt, zero(dt),
                                                         iter,
                                                         ode.p,
                                                         (prob = ode,), ode.f, alg,
@@ -252,7 +252,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4Multi;
     return integrator
 end
 
-function step!(integrator::PairedExplicitERRK4MultiIntegrator)
+function step!(integrator::PairedExplicitRelaxationRK4MultiIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -394,7 +394,7 @@ function step!(integrator::PairedExplicitERRK4MultiIntegrator)
         end # end loop over different stages
 
         last_three_stages!(integrator, alg, prob.p)
-    end # PairedExplicitERRK4Multi step
+    end # PairedExplicitRelaxationRK4Multi step
 
     @trixi_timeit timer() "Step-Callbacks" begin
         # handle callbacks

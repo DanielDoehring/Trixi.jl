@@ -65,21 +65,21 @@ Stages = 14
 
 #=
 ode_alg = Trixi.PairedExplicitRK4(Stages,
-                                  "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
+                                  "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/")
 
-ode_alg = Trixi.PairedExplicitERRK4(Stages,
-                                    "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
+ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages,
+                                    "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/")
 =#
 
 dtRatios = [1, 0.5, 0.25]
 Stages = [14, 8, 5]
 
-ode_alg = Trixi.PairedExplicitRK4Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
+ode_alg = Trixi.PairedExplicitRK4Multi(Stages, "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/", dtRatios)
 
 
 # NOTE: 3 Newton iterations suffice to ensure exact entropy conservation!
-ode_alg = Trixi.PairedExplicitERRK4Multi(Stages,
-                                         "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages,
+                                         "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",
                                          dtRatios)
 
 

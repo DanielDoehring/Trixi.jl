@@ -48,15 +48,15 @@ abstract type AbstractPairedExplicitRKMultiParabolicIntegrator <:
               AbstractPairedExplicitRKMultiIntegrator end
 
 # Entropy-relaxation integrators              
-abstract type AbstractPairedExplicitERRKIntegrator <:
+abstract type AbstractPairedExplicitRelaxationRKIntegrator <:
               AbstractPairedExplicitRKIntegrator end
 
-abstract type AbstractPairedExplicitERRKSingleIntegrator <:
-              AbstractPairedExplicitERRKIntegrator end
-abstract type AbstractPairedExplicitERRKMultiIntegrator <:
-              AbstractPairedExplicitERRKIntegrator end
+abstract type AbstractPairedExplicitRelaxationRKSingleIntegrator <:
+              AbstractPairedExplicitRelaxationRKIntegrator end
+abstract type AbstractPairedExplicitRelaxationRKMultiIntegrator <:
+              AbstractPairedExplicitRelaxationRKIntegrator end
 
-abstract type AbstractPairedExplicitERRKMultiParabolicIntegrator <:
+abstract type AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator <:
               AbstractPairedExplicitRKMultiParabolicIntegrator end
 """
     calculate_cfl(ode_algorithm::AbstractPairedExplicitRK, ode)
@@ -208,10 +208,10 @@ include("methods_PERK4_multi_parabolic.jl")
 
 include("partitioning.jl")
 
-### Paired Explicit Entropy Relaxation RK (PEERRK) methods ###
+### Paired Explicit Entropy Relaxation RK (PERelaxationRK) methods ###
 include("entropy_relaxation.jl")
 
-include("methods_PEERRK4.jl")
-include("methods_PEERRK4_multi.jl")
-include("methods_PEERRK4_multi_parabolic.jl")
+include("methods_PERRK4.jl")
+include("methods_PERRK4_multi.jl")
+include("methods_PERRK4_multi_parabolic.jl")
 end # @muladd

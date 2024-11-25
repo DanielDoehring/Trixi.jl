@@ -5,14 +5,14 @@ using Trixi
 gamma = 1.4
 equations = CompressibleEulerEquations2D(gamma)
 
+polydeg = 2
 # For some reason we lose an order of convergence when using this solver,
-# even when paired with e.g. CarpenterKennedy2N54
-#=
-solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
+# when being used with an ODD polynomial degree
+solver = DGSEM(polydeg = polydeg, surface_flux = flux_ranocha,
                volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
-=#
 
-solver = DGSEM(polydeg = 3, surface_flux = flux_hllc)
+
+#solver = DGSEM(polydeg = polydeg, surface_flux = flux_hllc)
 
 EdgeLength = 20.0
 """
@@ -62,6 +62,7 @@ initial_condition = initial_condition_isentropic_vortex
 N_passes = 1
 T_end = EdgeLength * N_passes
 tspan = (0.0, T_end)
+#tspan = (0.0, 2.0)
 
 coordinates_min = (-EdgeLength/2, -EdgeLength/2)
 coordinates_max = (EdgeLength/2, EdgeLength/2)
@@ -90,12 +91,12 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
 analysis_callback = AnalysisCallback(semi, interval = 10_000,
                                      analysis_integrals = (;))
 
-cfl = 1.0 # S = 5
+cfl = 2.0 # S = 5 # 1.0 for HLLC convergence
 #cfl = 7.0 # S = 19
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-alive_callback = AliveCallback(alive_interval = 100)
+alive_callback = AliveCallback(alive_interval = 1000)
 
 callbacks = CallbackSet(summary_callback,
                         #analysis_cb_entropy,
@@ -108,28 +109,34 @@ callbacks = CallbackSet(summary_callback,
 
 Stages = 5
 
-#ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
-#ode_algorithm = Trixi.PairedExplicitERRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/"
+#path = "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/"
+
+#ode_algorithm = Trixi.PairedExplicitRK4(Stages, path)
+#ode_algorithm = Trixi.PairedExplicitERRK4(Stages, path)
 
 # NOTE: Multi on uniform mesh: For random distribution of methods
 
 dtRatios = [1, 0.5, 0.25, 0.125]
 Stages = [19, 11, 7, 5]
 
+dtRatios = [1, 0.5, 0.25]
+Stages = [11, 7, 5]
+
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)                                             
+
 #=
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
-                                             "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
-                                             dtRatios)
-=#
-
-
-ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
-                                               "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
-                                               dtRatios)                                             
-
-
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
+=#
+
+
+sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
+                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  save_everystep = false, callback = callbacks);
+
 
 summary_callback() # print the timer summary

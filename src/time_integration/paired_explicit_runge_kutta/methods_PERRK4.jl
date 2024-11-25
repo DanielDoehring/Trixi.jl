@@ -7,7 +7,7 @@
 #! format: noindent
 
 @doc raw"""
-    PairedExplicitERRK4(num_stages, base_path_a_coeffs::AbstractString, dt_opt = nothing;
+    PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString, dt_opt = nothing;
                       c_const = 1.0f0)
 
     Parameters:
@@ -28,7 +28,7 @@ The method has been proposed in
   Fourth-Order Paired-Explicit Runge-Kutta Methods
   [DOI:10.48550/arXiv.2408.05470](https://doi.org/10.48550/arXiv.2408.05470)
 """
-mutable struct PairedExplicitERRK4 <: AbstractPairedExplicitRKSingle
+mutable struct PairedExplicitRelaxationRK4 <: AbstractPairedExplicitRKSingle
     const num_stages::Int # S
 
     a_matrix::Matrix{Float64}
@@ -37,26 +37,26 @@ mutable struct PairedExplicitERRK4 <: AbstractPairedExplicitRKSingle
     a_matrix_constant::Matrix{Float64}
     c::Vector{Float64}
     dt_opt::Union{Float64, Nothing}
-end # struct PairedExplicitERRK4
+end # struct PairedExplicitRelaxationRK4
 
 # Constructor for previously computed A Coeffs
-function PairedExplicitERRK4(num_stages, base_path_a_coeffs::AbstractString,
+function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString,
                              dt_opt = nothing;
                              c_const = 1.0f0)
     a_matrix, a_matrix_constant, c = compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                                                base_path_a_coeffs;
                                                                                c_const)
 
-    return PairedExplicitERRK4(num_stages, a_matrix, a_matrix_constant, c, dt_opt)
+    return PairedExplicitRelaxationRK4(num_stages, a_matrix, a_matrix_constant, c, dt_opt)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct PairedExplicitERRK4Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
+mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                              PairedExplicitRKOptions} <:
-               AbstractPairedExplicitERRKSingleIntegrator
+               AbstractPairedExplicitRelaxationRKSingleIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -82,7 +82,7 @@ mutable struct PairedExplicitERRK4Integrator{RealT <: Real, uType, Params, Sol, 
     gamma::RealT
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitERRK4;
+function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
@@ -100,7 +100,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
     direction = zero(u0)
     gamma = one(eltype(u0))
 
-    integrator = PairedExplicitERRK4Integrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
+    integrator = PairedExplicitRelaxationRK4Integrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
                                                ode.p,
                                                (prob = ode,), ode.f, alg,
                                                PairedExplicitRKOptions(callback,
@@ -123,7 +123,7 @@ function init(ode::ODEProblem, alg::PairedExplicitERRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitERRKIntegrator,
+@inline function last_three_stages!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
                                     alg, p)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
@@ -213,7 +213,7 @@ end
     end
 end
 
-function step!(integrator::PairedExplicitERRK4Integrator)
+function step!(integrator::PairedExplicitRelaxationRK4Integrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -281,7 +281,7 @@ function step!(integrator::PairedExplicitERRK4Integrator)
 end
 
 # used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::AbstractPairedExplicitERRKIntegrator, new_size)
+function Base.resize!(integrator::AbstractPairedExplicitRelaxationRKIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)

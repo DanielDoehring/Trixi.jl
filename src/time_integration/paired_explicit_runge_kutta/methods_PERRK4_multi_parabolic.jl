@@ -5,7 +5,7 @@
 @muladd begin
 #! format: noindent
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitERRKMultiParabolicIntegrator,
+@inline function last_three_stages!(integrator::AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator,
                                     alg, p)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
@@ -94,7 +94,7 @@
     end
 end
 
-function step!(integrator::PairedExplicitERRK4MultiParabolicIntegrator)
+function step!(integrator::PairedExplicitRelaxationRK4MultiParabolicIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -242,7 +242,7 @@ function step!(integrator::PairedExplicitERRK4MultiParabolicIntegrator)
         end # end loop over different stages
 
         last_three_stages!(integrator, alg, prob.p)
-    end # PairedExplicitERRK4Multi step
+    end # PairedExplicitRelaxationRK4Multi step
 
     @trixi_timeit timer() "Step-Callbacks" begin
         # handle callbacks
@@ -264,7 +264,7 @@ function step!(integrator::PairedExplicitERRK4MultiParabolicIntegrator)
 end
 
 # used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::AbstractPairedExplicitERRKMultiParabolicIntegrator,
+function Base.resize!(integrator::AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator,
                       new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
