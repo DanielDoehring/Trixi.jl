@@ -255,10 +255,18 @@ end
 function step!(integrator::PairedExplicitERRK4MultiIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
+    t_end = last(prob.tspan)
     callbacks = integrator.opts.callback
 
     if isnan(integrator.dt)
         error("time step size `dt` is NaN")
+    end
+
+    # if the next iteration would push the simulation beyond the end time, set dt accordingly
+    if integrator.t + integrator.dt > t_end ||
+        isapprox(integrator.t + integrator.dt, t_end)
+        integrator.dt = t_end - integrator.t
+        terminate!(integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin

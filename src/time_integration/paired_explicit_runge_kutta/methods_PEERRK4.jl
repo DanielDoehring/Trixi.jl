@@ -127,36 +127,22 @@ end
                                     alg, p)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
-    # S - 2
-    @threaded for u_ind in eachindex(integrator.u)
-        integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                  alg.a_matrix_constant[1, 1] *
-                                  integrator.k1[u_ind] +
-                                  alg.a_matrix_constant[1, 2] *
-                                  integrator.k_higher[u_ind]
-    end
+    for stage in 1:2
+        @threaded for u_ind in eachindex(integrator.u)
+            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+                                      alg.a_matrix_constant[stage, 1] *
+                                      integrator.k1[u_ind] +
+                                      alg.a_matrix_constant[stage, 2] *
+                                      integrator.k_higher[u_ind]
+        end
 
-    integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[alg.num_stages - 2] * integrator.dt)
+        integrator.f(integrator.du, integrator.u_tmp, p,
+                     integrator.t +
+                     alg.c[alg.num_stages - 3 + stage] * integrator.dt)
 
-    @threaded for u_ind in eachindex(integrator.du)
-        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
-    end
-
-    # S - 1
-    @threaded for u_ind in eachindex(integrator.u)
-        integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                  alg.a_matrix_constant[2, 1] *
-                                  integrator.k1[u_ind] +
-                                  alg.a_matrix_constant[2, 2] *
-                                  integrator.k_higher[u_ind]
-    end
-
-    integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[alg.num_stages - 1] * integrator.dt)
-
-    @threaded for u_ind in eachindex(integrator.du)
-        integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+        @threaded for u_ind in eachindex(integrator.du)
+            integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+        end
     end
 
     k_higher_wrap = wrap_array(integrator.k_higher, p)
@@ -164,9 +150,9 @@ end
     # 0.5 = b_{S-1}
     # TODO: Combine integration of i-1, i!
     # => Would need to store u_tmp_wrap in yet another register!
-    dS = int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
+    dS = 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
-    # S
+    # Last stage
     @threaded for i in eachindex(integrator.du)
         integrator.u_tmp[i] = integrator.u[i] +
                               alg.a_matrix_constant[3, 1] *
@@ -185,21 +171,21 @@ end
 
     du_wrap = wrap_array(integrator.du, integrator.p)
     # 0.5 = b_{S}
-    dS += integrator.dt *
-          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 2
+    dS += 0.5 * integrator.dt *
+        int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
     dir_wrap = wrap_array(integrator.direction, p)
 
-    
+    #=
     # Bisection for gamma
     @trixi_timeit timer() "ER: Bisection" begin
         gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
                          mesh, equations, dg, cache)
     end
-    
+    =#
 
     #=
     # Newton search for gamma
@@ -209,17 +195,17 @@ end
     end
     =#
 
-    t_end = last(integrator.sol.prob.tspan)
     integrator.iter += 1
-    # Last timestep shenanigans
-    if integrator.t + integrator.gamma * integrator.dt > t_end ||
-       isapprox(integrator.t + integrator.gamma * integrator.dt, t_end)
-        integrator.t = t_end
-        integrator.gamma = (t_end - integrator.t) / integrator.dt
-        terminate!(integrator)
-    else
-        integrator.t += integrator.gamma * integrator.dt
+    # Check if due to entropy relaxation the final step is not reached
+    if integrator.finalstep == true && integrator.gamma != 1.0
+        # If we would go beyond the final time, clip gamma at 1.0
+        if integrator.gamma > 1.0
+            integrator.gamma = 1.0
+        else # If we are below the final time, reset finalstep flag
+            integrator.finalstep = false
+        end
     end
+    integrator.t += integrator.gamma * integrator.dt
 
     # Do relaxed update
     @threaded for i in eachindex(integrator.u)
@@ -230,11 +216,19 @@ end
 function step!(integrator::PairedExplicitERRK4Integrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
+    t_end = last(prob.tspan)
     callbacks = integrator.opts.callback
 
     @assert !integrator.finalstep
     if isnan(integrator.dt)
         error("time step size `dt` is NaN")
+    end
+
+    # if the next iteration would push the simulation beyond the end time, set dt accordingly
+    if integrator.t + integrator.dt > t_end ||
+        isapprox(integrator.t + integrator.dt, t_end)
+        integrator.dt = t_end - integrator.t
+        terminate!(integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
