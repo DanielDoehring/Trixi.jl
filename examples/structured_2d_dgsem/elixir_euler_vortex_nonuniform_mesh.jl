@@ -94,6 +94,10 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                        #analysis_filename = "analysis_ER.dat",
                                        save_analysis = true)
 
+# NOTE: Not really well-suited for convergence test                                       
+analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
+                                      analysis_integrals = (;),)
+
 cfl = 5.0 # Multi # 8
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -101,8 +105,9 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 alive_callback = AliveCallback(alive_interval = 100)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_cb_entropy,
-                        stepsize_callback,
+                        #analysis_cb_entropy,
+                        analysis_callback,
+                        #stepsize_callback,
                         alive_callback)
 
 ###############################################################################
@@ -130,8 +135,40 @@ ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
                                                dtRatios)
 
 
+
+_, _, dg, cache = Trixi.mesh_equations_solver_cache(semi)
+
+nnodes = length(dg.basis.nodes)
+n_elements = nelements(dg, cache)
+elements = cache.elements
+
+h_min = floatmax(Float64)
+
+for element_id in 1:n_elements
+    # pull the four corners numbered as right-handed
+    P0 = elements.node_coordinates[:, 1, 1, element_id]
+    P1 = elements.node_coordinates[:, nnodes, 1, element_id]
+    P2 = elements.node_coordinates[:, nnodes, nnodes, element_id]
+    P3 = elements.node_coordinates[:, 1, nnodes, element_id]
+    # compute the four side lengths and get the smallest
+    L0 = sqrt(sum((P1 - P0) .^ 2))
+    L1 = sqrt(sum((P2 - P1) .^ 2))
+    L2 = sqrt(sum((P3 - P2) .^ 2))
+    L3 = sqrt(sum((P0 - P3) .^ 2))
+    h = min(L0, L1, L2, L3)
+
+    if h < h_min
+        global h_min = h
+    end
+end
+
+dtRef = 0.03333333333333333
+CFLREF = 2.383483940996325
+
+dt = CFLREF * dtRef * h_min
+
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 1.0,
+                  dt = dt,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary

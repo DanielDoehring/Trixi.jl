@@ -95,16 +95,12 @@ coordinates_min = -domain_length / 2
 coordinates_max = domain_length / 2
 
 refinement_patches = ((type = "box", coordinates_min = (-1.0,),
-                       coordinates_max = (1.0,)),
-                       #=
-                      (type = "box", coordinates_min = (-1.0,),
-                       coordinates_max = (1.0,))
-                       =#)
+                       coordinates_max = (1.0,)),)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 3,
                 periodicity = false,
-                #refinement_patches = refinement_patches,
+                refinement_patches = refinement_patches,
                 n_cells_max = 30_000)
 
 ### Inviscid boundary conditions ###
@@ -182,32 +178,25 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 dtRatios = [1, 0.5]
 
 # For diffusion-dominated case we need four times the timestep between the methods
-Stages = [10, 8]
+Stages = [10, 6]
 
 path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NavierStokes_ViscousShock/"
 
 #ode_algorithm = Trixi.PairedExplicitRK4(10, path)
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
 
 max_level = Trixi.maximum_level(mesh.tree)
 
-#dtRef = 2e-2 # Single
+dtRef = 2e-2 # Single
 dtRef = 2e-2/8 # Multi refined
-dtRef = 5e-3 # Multi evenly
 
-dt = dtRef / 4.0^(max_level - 4)
+dt = dtRef / 4.0^(max_level - 3)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
-                  save_everystep = false, callback = callbacks);
-
-
-#=
-time_int_tol = 1e-9
-sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol,
-            dt = 1e-4, ode_default_options()..., callback = callbacks)
-=#
+                  save_everystep = false, callback = callbacks,
+                  maxiters = typemax(Int));
 
 summary_callback() # print the timer summary

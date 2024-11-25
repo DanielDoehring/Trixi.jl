@@ -187,13 +187,13 @@ end
     end
     =#
 
-    #=
+    
     # Newton search for gamma
     @trixi_timeit timer() "ER: Newton" begin
         gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
                       mesh, equations, dg, cache)
     end
-    =#
+    
 
     integrator.iter += 1
     # Check if due to entropy relaxation the final step is not reached

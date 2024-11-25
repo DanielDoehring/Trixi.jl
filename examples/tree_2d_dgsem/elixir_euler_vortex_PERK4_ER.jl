@@ -7,8 +7,10 @@ equations = CompressibleEulerEquations2D(gamma)
 
 # For some reason we lose an order of convergence when using this solver,
 # even when paired with e.g. CarpenterKennedy2N54
+#=
 solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
                volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+=#
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_hllc)
 
@@ -65,7 +67,7 @@ coordinates_min = (-EdgeLength/2, -EdgeLength/2)
 coordinates_max = (EdgeLength/2, EdgeLength/2)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 4,
+                initial_refinement_level = 3,
                 n_cells_max = 100_000)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
@@ -88,8 +90,7 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
 analysis_callback = AnalysisCallback(semi, interval = 10_000,
                                      analysis_integrals = (;))
 
-cfl = 1.5 # CK
-cfl = 1.5 # S = 5
+cfl = 1.0 # S = 5
 #cfl = 7.0 # S = 19
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -108,7 +109,9 @@ callbacks = CallbackSet(summary_callback,
 Stages = 5
 
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
-ode_algorithm = Trixi.PairedExplicitERRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+#ode_algorithm = Trixi.PairedExplicitERRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+
+# NOTE: Multi on uniform mesh: For random distribution of methods
 
 dtRatios = [1, 0.5, 0.25, 0.125]
 Stages = [19, 11, 7, 5]
@@ -119,20 +122,14 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
                                              dtRatios)
 =#
 
-#=
+
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
-                                             "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
-                                             dtRatios)                                             
-=#
+                                               "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
+                                               dtRatios)                                             
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
-
-#=
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-                  save_everystep = false, callback = callbacks);
-=#                  
 
 summary_callback() # print the timer summary
