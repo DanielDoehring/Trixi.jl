@@ -105,13 +105,11 @@ coordinates_min = -1.0
 coordinates_max = 1.0
 
 refinement_patches = ((type = "box", coordinates_min = (-0.5,),
-                       coordinates_max = (0.5,)),
-                      (type = "box", coordinates_min = (-0.25,),
-                       coordinates_max = (0.25,)))
+                       coordinates_max = (0.5,)), )
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                #refinement_patches = refinement_patches,
+                refinement_patches = refinement_patches,
                 n_cells_max = 100_000)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
@@ -121,7 +119,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 1.0) # 10
+tspan = (0.0, 1.0)
 ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
@@ -131,31 +129,38 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-stepsize_callback = StepsizeCallback(cfl = 4.5)
-
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        stepsize_callback,
                         alive_callback)
 
 ###############################################################################
 # run the simulation
 
-dtRatios = [0.208310160790890, # 14
-            0.092778774946394, #  8
-            0.049637258180915, #= 6 =#
-            ] / 0.208310160790890 
-Stages = [14, 8, 6]
+dtRatios = [1, 0.5]
 
-path = "/home/daniel/git/paper-2024-perk4/6_Applications/6_4_SD7003Airfoil/"
+Stages = [12, 7]
+
+path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/"
+
+ode_algorithm = Trixi.PairedExplicitRK4(12, path)
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-
-# NOTE: Not sure if working with ER and source terms!
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
 
+max_level = Trixi.maximum_level(mesh.tree)
+
+dtRef = 2e-2 # Single
+dtRef = 1e-2 # Multi
+dt = dtRef / 4^(max_level - 5) # Divide by four for diffusion-dominated case
+
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 42.0,
+                  dt = dt,
                   save_everystep = false, callback = callbacks);
+
+#=                  
+time_int_tol = 1e-9
+sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol,
+            ode_default_options()..., callback = callbacks)
+=#
 
 summary_callback() # print the timer summary

@@ -5,11 +5,14 @@ using Trixi
 gamma = 1.4
 equations = CompressibleEulerEquations2D(gamma)
 
-# Volume flux adds some (minimal) disspation, thus stabilizing the simulation -
-# in contrast to standard DGSEM only
-volume_flux = flux_ranocha
+# For some reason we lose an order of convergence when using this solver,
+# even when paired with e.g. CarpenterKennedy2N54
+#=
 solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+               volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+=#
+
+solver = DGSEM(polydeg = 3, surface_flux = flux_hllc)
 
 EdgeLength = 20.0
 """
@@ -25,7 +28,7 @@ function initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerE
     end
 
     # initial center of the vortex
-    inicenter = SVector(EdgeLength / 2, EdgeLength / 2)
+    inicenter = SVector(0.0, 0.0)
     # strength of the vortex
     S = 13.5
     # Radius of vortex
@@ -60,22 +63,12 @@ N_passes = 1
 T_end = EdgeLength * N_passes
 tspan = (0.0, T_end)
 
-function mapping(xi_, eta_)
-    exponent = 1.4
-    
-    # Apply a non-linear transformation to refine towards the center
-    xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_)) + 1
-    eta_transformed = sign(eta_) * abs(eta_)^(exponent + abs(eta_)) + 1
+coordinates_min = (-EdgeLength/2, -EdgeLength/2)
+coordinates_max = (EdgeLength/2, EdgeLength/2)
 
-    # Scale the transformed coordinates to maintain the original domain size
-    x = xi_transformed * EdgeLength / 2
-    y = eta_transformed * EdgeLength / 2
-
-    return SVector(x, y)
-end
-
-cells_per_dimension = (16, 16)
-mesh = StructuredMesh(cells_per_dimension, mapping)
+mesh = TreeMesh(coordinates_min, coordinates_max,
+                initial_refinement_level = 3,
+                n_cells_max = 100_000)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
@@ -94,11 +87,11 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                        #analysis_filename = "analysis_ER.dat",
                                        save_analysis = true)
 
-# NOTE: Not really well-suited for convergence test                                       
-analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
-                                      analysis_integrals = (;),)
+analysis_callback = AnalysisCallback(semi, interval = 10_000,
+                                     analysis_integrals = (;))
 
-cfl = 5.0 # Multi # 8
+cfl = 1.0 # S = 5
+#cfl = 7.0 # S = 19
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -107,68 +100,36 @@ alive_callback = AliveCallback(alive_interval = 100)
 callbacks = CallbackSet(summary_callback,
                         #analysis_cb_entropy,
                         analysis_callback,
-                        #stepsize_callback,
+                        stepsize_callback,
                         alive_callback)
 
 ###############################################################################
 # run the simulation
 
-Stages = [16, 11, 9, 7, 6, 5]
-dtRatios = [
-    0.636282563128043,
-    0.412078842462506,
-    0.31982226180844,
-    0.22663973638555,
-    0.160154267621692,
-    0.130952239152975
-] ./ 0.636282563128043
+Stages = 5
+
+#ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+#ode_algorithm = Trixi.PairedExplicitERRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+
+# NOTE: Multi on uniform mesh: For random distribution of methods
+
+dtRatios = [1, 0.5, 0.25, 0.125]
+Stages = [19, 11, 7, 5]
 
 #=
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
-                                             "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
+                                             "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
                                              dtRatios)
 =#
 
 
 ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages,
-                                               "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/",
-                                               dtRatios)
+                                               "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
+                                               dtRatios)                                             
 
-
-
-_, _, dg, cache = Trixi.mesh_equations_solver_cache(semi)
-
-nnodes = length(dg.basis.nodes)
-n_elements = nelements(dg, cache)
-elements = cache.elements
-
-h_min = floatmax(Float64)
-
-for element_id in 1:n_elements
-    # pull the four corners numbered as right-handed
-    P0 = elements.node_coordinates[:, 1, 1, element_id]
-    P1 = elements.node_coordinates[:, nnodes, 1, element_id]
-    P2 = elements.node_coordinates[:, nnodes, nnodes, element_id]
-    P3 = elements.node_coordinates[:, 1, nnodes, element_id]
-    # compute the four side lengths and get the smallest
-    L0 = sqrt(sum((P1 - P0) .^ 2))
-    L1 = sqrt(sum((P2 - P1) .^ 2))
-    L2 = sqrt(sum((P3 - P2) .^ 2))
-    L3 = sqrt(sum((P0 - P3) .^ 2))
-    h = min(L0, L1, L2, L3)
-
-    if h < h_min
-        global h_min = h
-    end
-end
-
-dtRef = 0.03333333333333333
-CFLREF = 2.383483940996325
-
-dt = CFLREF * dtRef * h_min
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = dt,
+                  dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary

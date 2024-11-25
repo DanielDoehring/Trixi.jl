@@ -57,8 +57,8 @@ end
 
 function gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
                           mesh, equations, dg, cache)
-    gamma_min = 0.1 # Not clear what value to choose here!
-    gamma_max = 1.1 # Observed that sometimes larger > 1 is required
+    gamma_min = 0.8 # Not clear what value to choose here!
+    gamma_max = 1.1 # For diffusive schemes, gamma > 1 is required to ensure EC
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -78,7 +78,7 @@ function gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
 
     # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
     if r_max > 0 && r_min < 0
-        gamma_tol = 2 * eps(typeof(integrator.gamma))
+        gamma_tol = 10 * eps(typeof(integrator.gamma))
         #bisection_its_max = 100
         #bisect_its = 0
         while gamma_max - gamma_min > gamma_tol #&& bisect_its < bisection_its_max
@@ -112,7 +112,7 @@ function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
     r_tol = 1e-14 # Similar to e.g. conservation error: 1e-14
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
 
-    n_its_max = 3
+    n_its_max = 5
     n_its = 0
     while abs(r_gamma) > r_tol && n_its < n_its_max
         @threaded for element in eachelement(dg, cache)
@@ -131,7 +131,7 @@ function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
     end
 
     # Catch Newton failures
-    if integrator.gamma < 0 #|| gamma > 1
+    if integrator.gamma < 0
         integrator.gamma = 1
     end
 end

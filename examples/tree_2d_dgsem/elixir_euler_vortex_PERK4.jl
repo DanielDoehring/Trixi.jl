@@ -69,10 +69,10 @@ gamma = 1.4
 
 equations = CompressibleEulerEquations2D(gamma)
 
-EdgeLength = 10.0
+EdgeLength = 20.0
 
 N_passes = 1
-T_end = 2 * EdgeLength * N_passes
+T_end = EdgeLength * N_passes
 tspan = (0.0, T_end)
 
 """
@@ -123,8 +123,8 @@ surf_flux = flux_hllc # Better flux, allows much larger timesteps
 PolyDeg = 3
 solver = DGSEM(RealT = Float64, polydeg = PolyDeg, surface_flux = surf_flux)
 
-coordinates_min = (-EdgeLength, -EdgeLength)
-coordinates_max = (EdgeLength, EdgeLength)
+coordinates_min = (-EdgeLength/2, -EdgeLength/2)
+coordinates_max = (EdgeLength/2, EdgeLength/2)
 
 Refinement = 6
 mesh = TreeMesh(coordinates_min, coordinates_max,
@@ -178,7 +178,7 @@ callbacks = CallbackSet(summary_callback,
 
 Stages = 19
 
-#ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+#ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
 
 dtRatios = [1, 0.5, 0.25, 0.125]
 Stages = [19, 11, 7, 5]
