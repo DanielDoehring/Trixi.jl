@@ -5,10 +5,12 @@ using Trixi
 gamma = 1.4
 equations = CompressibleEulerEquations2D(gamma)
 
+polydeg = 3
+
 # Volume flux adds some (minimal) disspation, thus stabilizing the simulation -
 # in contrast to standard DGSEM only
 volume_flux = flux_ranocha
-solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
+solver = DGSEM(polydeg = polydeg, surface_flux = flux_ranocha,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 EdgeLength = 20.0
@@ -99,20 +101,40 @@ analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
                                       analysis_integrals = (;),)
 
 cfl = 5.0 # Multi # 8
+cfl = 5.0 # p = S = 3
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-alive_callback = AliveCallback(alive_interval = 100)
+alive_callback = AliveCallback(alive_interval = 1000)
 
 callbacks = CallbackSet(summary_callback,
                         #analysis_cb_entropy,
                         analysis_callback,
-                        #stepsize_callback,
+                        stepsize_callback,
                         alive_callback)
 
 ###############################################################################
 # run the simulation
 
+# p = 3
+path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k2/"
+
+Stages = [17, 13, 11, 9, 7, 6, 5, 4, 3]
+dtRatios = [
+    1.43509674072266,
+    1.07526779174805,
+    0.894473266601563,
+    0.714339447021484,
+    0.532713890075684,
+    0.439394950866699,
+    0.350951194763184,
+    0.253698348999023,
+    0.155333518981934
+] /  1.43509674072266
+
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+
+#=
 Stages = [16, 11, 9, 7, 6, 5]
 dtRatios = [
     0.636282563128043,
@@ -134,8 +156,9 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages,
                                                "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",
                                                dtRatios)
 
+=#
 
-
+#=
 _, _, dg, cache = Trixi.mesh_equations_solver_cache(semi)
 
 nnodes = length(dg.basis.nodes)
@@ -166,9 +189,10 @@ dtRef = 0.03333333333333333
 CFLREF = 2.383483940996325
 
 dt = CFLREF * dtRef * h_min
+=#
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = dt,
+                  dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary

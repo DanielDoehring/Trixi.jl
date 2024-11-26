@@ -19,10 +19,6 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
     c[num_stages - 1] = 1.0
     c[num_stages] = 0.5
 
-    println("Timestep-split: ")
-    display(c)
-    println("\n")
-
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
     num_coeffs_max = num_stages - 2
 
@@ -67,28 +63,6 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
     max_active_levels = maximum.(active_levels)
     max_eval_levels = maximum.(eval_levels)
 
-    for i in 1:length(stages)
-        println("A-Matrix of Butcher tableau of level " * string(i))
-        display(a_matrices[i, :, :])
-        println()
-    end
-
-    println("Check violation of internal consistency")
-    for i in 1:length(stages)
-        for j in 1:i
-            display(norm(a_matrices[i, :, 1] + a_matrices[i, :, 2] -
-                         a_matrices[j, :, 1] -
-                         a_matrices[j, :, 2], 1))
-        end
-    end
-
-    println("\nActive Levels:")
-    display(active_levels)
-    println()
-    println("\nmax_eval_levels:")
-    display(max_eval_levels)
-    println()
-
     return a_matrices, c, active_levels, max_active_levels, max_eval_levels
 end
 
@@ -104,9 +78,10 @@ mutable struct PairedExplicitRK3Multi <: AbstractPairedExplicitRKMulti
     max_active_levels::Vector{Int64}
     max_eval_levels::Vector{Int64}
 
+    # Constructor for previously computed A Coeffs
     function PairedExplicitRK3Multi(stages::Vector{Int64},
-                                    path_a_coeffs::AbstractString,
-                                    dt_ratios::Vector{Float64},
+                                    base_path_a_coeffs::AbstractString,
+                                    dt_ratios,
                                     cS2_::Float64 = 1.0)
         newPairedExplicitRK3Multi = new(minimum(stages),
                                         length(stages),
@@ -116,7 +91,7 @@ mutable struct PairedExplicitRK3Multi <: AbstractPairedExplicitRKMulti
         newPairedExplicitRK3Multi.a_matrices, newPairedExplicitRK3Multi.c, newPairedExplicitRK3Multi.active_levels,
         newPairedExplicitRK3Multi.max_active_levels, newPairedExplicitRK3Multi.max_eval_levels = ComputePERK3_Multi_ButcherTableau(stages,
                                                                                                                                    newPairedExplicitRK3Multi.num_stages,
-                                                                                                                                   path_a_coeffs,
+                                                                                                                                   base_path_a_coeffs,
                                                                                                                                    cS2_)
 
         return newPairedExplicitRK3Multi

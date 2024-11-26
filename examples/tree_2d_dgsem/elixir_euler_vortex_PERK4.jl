@@ -120,7 +120,7 @@ end
 initial_condition = initial_condition_isentropic_vortex
 
 surf_flux = flux_hllc # Better flux, allows much larger timesteps
-PolyDeg = 3
+PolyDeg = 6
 solver = DGSEM(RealT = Float64, polydeg = PolyDeg, surface_flux = surf_flux)
 
 coordinates_min = (-EdgeLength/2, -EdgeLength/2)
@@ -140,48 +140,48 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
+#=
 analysis_interval = 2000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
                                      save_analysis = true)
+=#
+
+analysis_interval = 10^6
+analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
+                                     extra_analysis_errors=(:conservation_error, :l1_error))
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
-                                      base_level = Refinement,
-                                      med_level = Refinement + 1, med_threshold = -3.0,
-                                      max_level = Refinement + 3, max_threshold = -0.6)
+                                     base_level=Refinement,
+                                     med_level=Refinement+1, med_threshold=-3.0,
+                                     max_level=Refinement+2, max_threshold=-2.0)
 
-#amr_interval = 16 # PERK4 Multi
-amr_interval = 10 # PERK4 19
-
+CFL_Convergence = 1.0 # 0.5, 0.25
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = amr_interval,
-                           adapt_initial_condition = true)
+                        # For convergence study
+                        interval=Int(20/CFL_Convergence), 
+                        adapt_initial_condition=true)
 
-### AMR, Ref_Lvl = 6, Standard DGSEM ###
-
-# E = 5, 7, 11, 19
-CFL = 7.4
-
-# PERK4 Standalone #
-#CFL = 11.5 # S = 19
-
-stepsize_callback = StepsizeCallback(cfl = CFL)
-
-callbacks = CallbackSet(summary_callback,
-                        amr_callback, # Not sure if AMR is entropy stable
-                        stepsize_callback,
-                        analysis_callback)
+callbacksPERK = CallbackSet(summary_callback,
+                            amr_callback,
+                            alive_callback,
+                            analysis_callback)
 
 ###############################################################################
 # run the simulation
 
-Stages = 19
+dtRatios = [1, 0.5, 0.25]
 
-#ode_algorithm = Trixi.PairedExplicitRK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+# p = 2
+Stages = [12, 6, 3]
 
-dtRatios = [1, 0.5, 0.25, 0.125]
-Stages = [19, 11, 7, 5]
+# p = 3
+Stages = [16, 8, 4]
+
+# p = 4
+Stages = [15, 9, 5]
+
 
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
                                              "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
