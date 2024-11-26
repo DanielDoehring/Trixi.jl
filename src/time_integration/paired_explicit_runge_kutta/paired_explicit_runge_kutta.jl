@@ -202,13 +202,14 @@ include("methods_PERK3.jl")
 # Basic implementation of the fourth-order PERK method
 include("methods_PERK4.jl")
 
-### Multi-level/partitioned PERK methods ### 
+### Multi-level/partitioned PERK methods ###
+include("methods_PERK3_multi.jl")
 include("methods_PERK4_multi.jl")
 include("methods_PERK4_multi_parabolic.jl")
 
 include("partitioning.jl")
 
-### Paired Explicit Entropy Relaxation RK (PERelaxationRK) methods ###
+### Paired Explicit Relaxation RK (PERRK) methods ###
 include("entropy_relaxation.jl")
 
 include("methods_PERRK4.jl")

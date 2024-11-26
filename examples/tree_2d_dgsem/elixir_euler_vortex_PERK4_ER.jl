@@ -92,7 +92,7 @@ analysis_callback = AnalysisCallback(semi, interval = 10_000,
                                      analysis_integrals = (;))
 
 cfl = 2.0 # S = 5 # 1.0 for HLLC convergence
-#cfl = 7.0 # S = 19
+cfl = 1.5 # S = 4, p = 3
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -109,8 +109,12 @@ callbacks = CallbackSet(summary_callback,
 
 Stages = 5
 
+# p = 4
 path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/"
 #path = "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/"
+
+# p = 3
+path = "/home/daniel/git/Paper_AMR_PERK/Data/Isentropic_Vortex/PolyDeg3/"
 
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages, path)
 #ode_algorithm = Trixi.PairedExplicitERRK4(Stages, path)
@@ -123,20 +127,24 @@ Stages = [19, 11, 7, 5]
 dtRatios = [1, 0.5, 0.25]
 Stages = [11, 7, 5]
 
+Stages = [16, 8, 4]
+
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)                                             
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)                                             
+#ode_algorithm = Trixi.PairedExplicitRK3(7, path)
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 
-#=
+
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
-=#
 
 
+#=
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false, thread = OrdinaryDiffEq.True()),
                   dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                   save_everystep = false, callback = callbacks);
-
+=#
 
 summary_callback() # print the timer summary

@@ -184,8 +184,8 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NavierStokes_ViscousSho
 
 #ode_algorithm = Trixi.PairedExplicitRK4(10, path)
 
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
 
 max_level = Trixi.maximum_level(mesh.tree)
 

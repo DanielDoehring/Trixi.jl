@@ -317,7 +317,8 @@ end
     return SVector(v1, v2, v3)
 end
 
-@inline function velocity(u, orientation::Int, equations::CompressibleNavierStokesDiffusion3D)
+@inline function velocity(u, orientation::Int,
+                          equations::CompressibleNavierStokesDiffusion3D)
     rho = u[1]
     v = u[orientation + 1] / rho
     return v

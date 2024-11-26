@@ -5,8 +5,8 @@
 @muladd begin
 #! format: noindent
 
-function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::Int,
-                                           BasePathMonCoeffs::AbstractString)
+function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
+                                           base_path_a_coeffs::AbstractString)
 
     # Current approach: Use ones (best internal stability properties)
     c = ones(num_stages)
@@ -24,52 +24,52 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
     # For the p = 4 method there are less free coefficients
     CoeffsMax = num_stages - 5
 
-    a_matrices = zeros(CoeffsMax, 2, length(Stages))
-    for i in 1:length(Stages)
+    a_matrices = zeros(CoeffsMax, 2, length(stages))
+    for i in 1:length(stages)
         a_matrices[:, 1, i] = c[3:(num_stages - 3)]
     end
 
     # Datastructure indicating at which stage which level is evaluated
     active_levels = [Vector{Int64}() for _ in 1:num_stages]
     # k1 is evaluated at all levels
-    active_levels[1] = 1:length(Stages)
+    active_levels[1] = 1:length(stages)
 
     # Datastructure indicating at which stage which level contributes to state
-    EvalLevels = [Vector{Int64}() for _ in 1:num_stages]
+    eval_levels = [Vector{Int64}() for _ in 1:num_stages]
     # k1 is evaluated at all levels
-    EvalLevels[1] = 1:length(Stages)
+    eval_levels[1] = 1:length(stages)
     # Second stage: Only finest method
-    EvalLevels[2] = [1]
+    eval_levels[2] = [1]
 
-    for level in eachindex(Stages)
-        NumStageEvals = Stages[level]
+    for level in eachindex(stages)
+        num_stage_evals = stages[level]
 
-        #PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * "_" * string(num_stages) * ".txt"
+        #path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * "_" * string(num_stages) * ".txt"
         # If all c = 1.0, the max number of stages does not matter
-        PathMonCoeffs = BasePathMonCoeffs * "a_" * string(NumStageEvals) * ".txt"
+        path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * ".txt"
 
-        if NumStageEvals > 5
-            @assert isfile(PathMonCoeffs) "Couldn't find file $PathMonCoeffs"
-            A = readdlm(PathMonCoeffs, Float64)
-            NumMonCoeffs = size(A, 1)
+        if num_stage_evals > 5
+            @assert isfile(path_a_coeffs) "Couldn't find file $path_a_coeffs"
+            A = readdlm(path_a_coeffs, Float64)
+            num_a_coeffs = size(A, 1)
         else
             A = []
-            NumMonCoeffs = 0
+            num_a_coeffs = 0
         end
 
-        if NumMonCoeffs > 0
-            a_matrices[(CoeffsMax - NumMonCoeffs + 1):end, 1, level] -= A
-            a_matrices[(CoeffsMax - NumMonCoeffs + 1):end, 2, level] = A
+        if num_a_coeffs > 0
+            a_matrices[(CoeffsMax - num_a_coeffs + 1):end, 1, level] -= A
+            a_matrices[(CoeffsMax - num_a_coeffs + 1):end, 2, level] = A
         end
 
         # Add active levels to stages
-        for stage in num_stages:-1:(num_stages - (3 + NumMonCoeffs))
+        for stage in num_stages:-1:(num_stages - (3 + num_a_coeffs))
             push!(active_levels[stage], level)
         end
 
         # Add eval levels to stages
-        for stage in num_stages:-1:(num_stages - (3 + NumMonCoeffs) - 1)
-            push!(EvalLevels[stage], level)
+        for stage in num_stages:-1:(num_stages - (3 + num_a_coeffs) - 1)
+            push!(eval_levels[stage], level)
         end
     end
     # Shared matrix
@@ -78,9 +78,9 @@ function ComputePERK4_Multi_ButcherTableau(Stages::Vector{Int64}, num_stages::In
                          0.1830127018922191 0.028312163512968]
 
     max_active_levels = maximum.(active_levels)
-    max_eval_levels = maximum.(EvalLevels)
+    max_eval_levels = maximum.(eval_levels)
 
-    for i in 1:length(Stages)
+    for i in 1:length(stages)
         println("A-Matrix of Butcher tableau of level " * string(i))
         display(a_matrices[:, :, i])
         println()
@@ -290,8 +290,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                level_info_mortars_acc,
                                                                level_info_mpi_mortars_acc,
                                                                level_u_indices_elements,
-                                                               -
-                                                               1, n_levels,
+                                                               -1, n_levels,
                                                                du_tmp)
     else
         integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp, t0, dt, zero(dt),
@@ -311,8 +310,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                       level_info_boundaries_orientation_acc,
                                                       level_info_mortars_acc,
                                                       level_info_mpi_mortars_acc,
-                                                      level_u_indices_elements, -
-                                                      1, n_levels)
+                                                      level_u_indices_elements, -1,
+                                                      n_levels)
     end
 
     # initialize callbacks

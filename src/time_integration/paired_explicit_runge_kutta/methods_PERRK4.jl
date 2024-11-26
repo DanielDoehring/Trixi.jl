@@ -41,21 +41,23 @@ end # struct PairedExplicitRelaxationRK4
 
 # Constructor for previously computed A Coeffs
 function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString,
-                             dt_opt = nothing;
-                             c_const = 1.0f0)
+                                     dt_opt = nothing;
+                                     c_const = 1.0f0)
     a_matrix, a_matrix_constant, c = compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                                                base_path_a_coeffs;
                                                                                c_const)
 
-    return PairedExplicitRelaxationRK4(num_stages, a_matrix, a_matrix_constant, c, dt_opt)
+    return PairedExplicitRelaxationRK4(num_stages, a_matrix, a_matrix_constant, c,
+                                       dt_opt)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
-                                             PairedExplicitRKOptions} <:
+mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType, Params, Sol,
+                                                     F, Alg,
+                                                     PairedExplicitRKOptions} <:
                AbstractPairedExplicitRelaxationRKSingleIntegrator
     u::uType
     du::uType
@@ -100,15 +102,16 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
     direction = zero(u0)
     gamma = one(eltype(u0))
 
-    integrator = PairedExplicitRelaxationRK4Integrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
-                                               ode.p,
-                                               (prob = ode,), ode.f, alg,
-                                               PairedExplicitRKOptions(callback,
-                                                                       ode.tspan;
-                                                                       kwargs...),
-                                               false, true, false,
-                                               k1, k_higher,
-                                               direction, gamma)
+    integrator = PairedExplicitRelaxationRK4Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
+                                                       iter,
+                                                       ode.p,
+                                                       (prob = ode,), ode.f, alg,
+                                                       PairedExplicitRKOptions(callback,
+                                                                               ode.tspan;
+                                                                               kwargs...),
+                                                       false, true, false,
+                                                       k1, k_higher,
+                                                       direction, gamma)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -172,7 +175,7 @@ end
     du_wrap = wrap_array(integrator.du, integrator.p)
     # 0.5 = b_{S}
     dS += 0.5 * integrator.dt *
-        int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     u_wrap = wrap_array(integrator.u, integrator.p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
@@ -187,13 +190,11 @@ end
     end
     =#
 
-    
     # Newton search for gamma
     @trixi_timeit timer() "ER: Newton" begin
         gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
                       mesh, equations, dg, cache)
     end
-    
 
     integrator.iter += 1
     # Check if due to entropy relaxation the final step is not reached
@@ -226,7 +227,7 @@ function step!(integrator::PairedExplicitRelaxationRK4Integrator)
 
     # if the next iteration would push the simulation beyond the end time, set dt accordingly
     if integrator.t + integrator.dt > t_end ||
-        isapprox(integrator.t + integrator.dt, t_end)
+       isapprox(integrator.t + integrator.dt, t_end)
         integrator.dt = t_end - integrator.t
         terminate!(integrator)
     end
@@ -281,7 +282,8 @@ function step!(integrator::PairedExplicitRelaxationRK4Integrator)
 end
 
 # used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::AbstractPairedExplicitRelaxationRKIntegrator, new_size)
+function Base.resize!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
+                      new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
