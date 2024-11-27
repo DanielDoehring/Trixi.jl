@@ -318,7 +318,7 @@ function step!(integrator::PairedExplicitRK3MultiIntegrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
         PERK_k1!(integrator, prob.p)
         PERK_k2!(integrator, prob.p, alg)
-        
+
         for stage in 3:(alg.num_stages - 1)
             PERK_ki!(integrator, prob.p, alg, stage)
         end

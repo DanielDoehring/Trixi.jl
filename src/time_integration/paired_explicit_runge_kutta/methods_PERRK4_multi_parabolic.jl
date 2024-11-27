@@ -12,9 +12,9 @@
     for stage in 1:2
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      alg.a_matrix_constant[stage, 1] *
+                                      alg.a_matrix_constant[1, stage] *
                                       integrator.k1[u_ind] +
-                                      alg.a_matrix_constant[stage, 2] *
+                                      alg.a_matrix_constant[2, stage] *
                                       integrator.k_higher[u_ind]
         end
 
@@ -37,9 +37,9 @@
     # Last stage
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
-                              alg.a_matrix_constant[3, 1] *
+                              alg.a_matrix_constant[1, 3] *
                               integrator.k1[i] +
-                              alg.a_matrix_constant[3, 2] *
+                              alg.a_matrix_constant[2, 3] *
                               integrator.k_higher[i]
     end
 

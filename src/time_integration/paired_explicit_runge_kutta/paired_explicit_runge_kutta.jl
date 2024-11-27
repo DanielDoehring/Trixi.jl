@@ -142,7 +142,8 @@ end
                                             AbstractPairedExplicitRelaxationRKSingleIntegrator},
                           p, alg)
     @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.dt * integrator.k1[i]
+        integrator.u_tmp[i] = integrator.u[i] +
+                              alg.c[2] * integrator.dt * integrator.k1[i]
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
@@ -156,8 +157,8 @@ end
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
                               integrator.dt *
-                              (alg.a_matrix[stage - 2, 1] * integrator.k1[i] +
-                               alg.a_matrix[stage - 2, 2] * integrator.du[i])
+                              (alg.a_matrix[1, stage - 2] * integrator.k1[i] +
+                               alg.a_matrix[2, stage - 2] * integrator.du[i])
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
@@ -166,9 +167,10 @@ end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                             AbstractPairedExplicitRelaxationRKMultiIntegrator},
-                        p, alg)
+                          p, alg)
     @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.dt * integrator.k1[i]
+        integrator.u_tmp[i] = integrator.u[i] +
+                              alg.c[2] * integrator.dt * integrator.k1[i]
     end
 
     # k2: Only evaluated at finest level
@@ -184,7 +186,7 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator, alg, stage)
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
-    
+
     for level in 1:min(alg.num_methods, integrator.n_levels)
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
@@ -202,7 +204,7 @@ end
     end
 
     # "Remainder": Non-efficiently integrated
-    for level in (alg.num_methods + 1):integrator.n_levels
+    for level in (alg.num_methods + 1):(integrator.n_levels)
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                       integrator.dt *
@@ -211,15 +213,15 @@ end
         end
     end
     if alg.max_eval_levels[stage] == alg.num_methods
-        for level in (alg.max_eval_levels[stage] + 1):integrator.n_levels
+        for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
             @threaded for u_ind in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[u_ind] += integrator.dt *
-                                           alg.a_matrices[alg.num_methods, 2, stage - 2] *
+                                           alg.a_matrices[alg.num_methods, 2,
+                                                          stage - 2] *
                                            integrator.du[u_ind]
             end
         end
     end
-    
 
     ### Simplified implementation: Own method for each level ###
     #=
@@ -302,7 +304,8 @@ end
 @inline function PERK_k2!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
                           p, alg)
     @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] + alg.c[2] * integrator.dt * integrator.k1[i]
+        integrator.u_tmp[i] = integrator.u[i] +
+                              alg.c[2] * integrator.dt * integrator.k1[i]
     end
 
     # k2: Only evaluated at finest level

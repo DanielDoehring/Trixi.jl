@@ -19,8 +19,8 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages,
 
     num_coeffs_max = num_stages - 5
 
-    a_matrix = zeros(num_coeffs_max, 2)
-    a_matrix[:, 1] = c[3:(num_stages - 3)]
+    a_matrix = zeros(2, num_coeffs_max)
+    a_matrix[1, :] = c[3:(num_stages - 3)]
 
     path_a_coeffs = joinpath(base_path_a_coeffs,
                              "a_" * string(num_stages) * ".txt")
@@ -32,15 +32,14 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages,
 
         @assert num_a_coeffs == num_coeffs_max
         if num_coeffs_max > 0
-            a_matrix[:, 1] -= a_coeffs
-            a_matrix[:, 2] = a_coeffs
+            a_matrix[1, :] -= a_coeffs
+            a_matrix[2, :] = a_coeffs
         end
     end
 
     # Constant/non-optimized part of the Butcher matrix
-    a_matrix_constant = [0.479274057836310-0.114851811257441 / cS3 0.114851811257441/cS3
-                         0.1397682537005989 0.648906880894214
-                         0.1830127018922191 0.028312163512968]
+    a_matrix_constant = [(0.479274057836310-(0.114851811257441 / cS3)) 0.1397682537005989 0.1830127018922191
+                         0.114851811257441/cS3 0.648906880894214 0.028312163512968]
 
     return a_matrix, a_matrix_constant, c
 end
@@ -155,9 +154,9 @@ end
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                       integrator.dt *
-                                      (alg.a_matrix_constant[stage, 1] *
+                                      (alg.a_matrix_constant[1, stage] *
                                        integrator.k1[u_ind] +
-                                       alg.a_matrix_constant[stage, 2] *
+                                       alg.a_matrix_constant[2, stage] *
                                        integrator.du[u_ind])
         end
 
@@ -170,8 +169,8 @@ end
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
                               integrator.dt *
-                              (alg.a_matrix_constant[3, 1] * integrator.k1[i] +
-                               alg.a_matrix_constant[3, 2] * integrator.du[i])
+                              (alg.a_matrix_constant[1, 3] * integrator.k1[i] +
+                               alg.a_matrix_constant[2, 3] * integrator.du[i])
     end
 
     # Safe K_{S-1} in `k1`:

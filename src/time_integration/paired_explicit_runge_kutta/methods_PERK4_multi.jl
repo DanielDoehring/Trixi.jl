@@ -69,9 +69,8 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
         end
     end
     # Shared matrix
-    a_matrix_constant = [0.364422246578869 0.114851811257441
-                         0.1397682537005989 0.648906880894214
-                         0.1830127018922191 0.028312163512968]
+    a_matrix_constant = [(0.479274057836310-0.114851811257441) 0.1397682537005989 0.1830127018922191
+                         0.114851811257441 0.648906880894214 0.028312163512968]
 
     max_active_levels = maximum.(active_levels)
     max_eval_levels = maximum.(eval_levels)

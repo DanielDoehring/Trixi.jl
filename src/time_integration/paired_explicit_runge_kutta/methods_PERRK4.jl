@@ -128,9 +128,9 @@ end
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                       integrator.dt *
-                                      (alg.a_matrix_constant[stage, 1] *
+                                      (alg.a_matrix_constant[1, stage] *
                                        integrator.k1[u_ind] +
-                                       alg.a_matrix_constant[stage, 2] *
+                                       alg.a_matrix_constant[2, stage] *
                                        integrator.du[u_ind])
         end
 
@@ -151,8 +151,8 @@ end
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
                               integrator.dt *
-                              (alg.a_matrix_constant[3, 1] * integrator.k1[i] +
-                               alg.a_matrix_constant[3, 2] * integrator.du[i])
+                              (alg.a_matrix_constant[1, 3] * integrator.k1[i] +
+                               alg.a_matrix_constant[2, 3] * integrator.du[i])
     end
 
     # Safe K_{S-1} in `k1`:
