@@ -6,7 +6,7 @@
 #! format: noindent
 
 @inline function last_three_stages!(integrator::AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator,
-                                    alg, p)
+                                    p, alg)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     for stage in 1:2
@@ -23,7 +23,7 @@
                      alg.c[alg.num_stages - 3 + stage] * integrator.dt,
                      integrator.du_tmp)
 
-        @threaded for u_ind in eachindex(integrator.du)
+        @threaded for u_ind in eachindex(integrator.u)
             integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
         end
     end
@@ -31,11 +31,11 @@
     k_higher_wrap = wrap_array(integrator.k_higher, p)
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # 0.5 = b_{S-1}
-    # TODO: Combine integration of i-1, i!
+    # IDEA: Combine integration of i-1, i?
     dS = 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Last stage
-    @threaded for i in eachindex(integrator.du)
+    @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
                               alg.a_matrix_constant[3, 1] *
                               integrator.k1[i] +
@@ -48,10 +48,9 @@
                  integrator.du_tmp)
 
     # Note: We re-use `k_higher` for the "direction"
-    @threaded for i in eachindex(integrator.du)
+    @threaded for i in eachindex(integrator.u)
         integrator.k_higher[i] = 0.5 * (integrator.k_higher[i] +
-                                   integrator.du[i] * integrator.dt)
-        
+                                  integrator.du[i] * integrator.dt)
     end
 
     du_wrap = wrap_array(integrator.du, integrator.p)
@@ -116,22 +115,8 @@ function step!(integrator::PairedExplicitRelaxationRK4MultiParabolicIntegrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        k1!(integrator, prob.p, alg.c)
-
-        # k2: Only evaluated at finest level
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[2] * integrator.dt,
-                     integrator.du_tmp,
-                     integrator.level_info_elements_acc[1],
-                     integrator.level_info_interfaces_acc[1],
-                     integrator.level_info_boundaries_acc[1],
-                     #integrator.level_info_boundaries_orientation_acc[1],
-                     integrator.level_info_mortars_acc[1],
-                     integrator.level_u_indices_elements, 1)
-
-        @threaded for u_ind in integrator.level_u_indices_elements[1]
-            integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
-        end
+        PERK_k1!(integrator, prob.p)
+        PERK_k2!(integrator, prob.p, alg)
 
         for stage in 3:(alg.num_stages - 3)
 
@@ -220,7 +205,7 @@ function step!(integrator::PairedExplicitRelaxationRK4MultiParabolicIntegrator)
                              integrator.t + alg.c[stage] * integrator.dt,
                              integrator.du_tmp)
 
-                @threaded for u_ind in eachindex(integrator.du)
+                @threaded for u_ind in eachindex(integrator.u)
                     integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
                 end
             else
@@ -245,7 +230,7 @@ function step!(integrator::PairedExplicitRelaxationRK4MultiParabolicIntegrator)
             end
         end # end loop over different stages
 
-        last_three_stages!(integrator, alg, prob.p)
+        last_three_stages!(integrator, prob.p, alg)
     end # PairedExplicitRelaxationRK4Multi step
 
     @trixi_timeit timer() "Step-Callbacks" begin
@@ -266,5 +251,4 @@ function step!(integrator::PairedExplicitRelaxationRK4MultiParabolicIntegrator)
         terminate!(integrator)
     end
 end
-
 end # @muladd

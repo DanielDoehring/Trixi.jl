@@ -73,7 +73,8 @@ EdgeLength = 20.0
 
 N_passes = 1
 T_end = EdgeLength * N_passes
-tspan = (0.0, T_end)
+#tspan = (0.0, T_end)
+tspan = (0.0, 1.0)
 
 """
     initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerEquations2D)
@@ -163,10 +164,12 @@ amr_callback = AMRCallback(semi, amr_controller,
                         interval=Int(20/CFL_Convergence), 
                         adapt_initial_condition=true)
 
-callbacksPERK = CallbackSet(summary_callback,
-                            amr_callback,
-                            alive_callback,
-                            analysis_callback)
+alive_callback = AliveCallback(alive_interval = 1000)
+
+callbacks = CallbackSet(summary_callback,
+                        amr_callback,
+                        alive_callback,
+                        analysis_callback)
 
 ###############################################################################
 # run the simulation
@@ -181,14 +184,15 @@ Stages = [16, 8, 4]
 
 # p = 4
 Stages = [15, 9, 5]
+path = "/home/daniel/git/paper-2024-perk4/5_Validation/5_4_Convergence/5_4_1_EulerIsentropicVortexAdvection/"
 
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
-                                             "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/",
-                                             dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+
+dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 42.0,
+                  dt = dt,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary

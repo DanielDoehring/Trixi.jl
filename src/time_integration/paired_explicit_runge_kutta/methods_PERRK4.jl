@@ -75,11 +75,9 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType, Param
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # PairedExplicitRK stages:
+    # Additional PERK stage
     k1::uType
-    k_higher::uType
-
-    # Entropy Relaxation additions
+    # Entropy Relaxation addition
     gamma::RealT
 end
 
@@ -89,9 +87,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # PairedExplicitRK stages
-    k1 = zero(u0)
-    k_higher = zero(u0)
+    k1 = zero(u0) # Additional PERK stage
 
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
@@ -108,7 +104,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
                                                                                ode.tspan;
                                                                                kwargs...),
                                                        false, true, false,
-                                                       k1, k_higher,
+                                                       k1,
                                                        gamma)
 
     # initialize callbacks
@@ -125,54 +121,55 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
 end
 
 @inline function last_three_stages!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
-                                    alg, p)
+                                    p, alg)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     for stage in 1:2
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      alg.a_matrix_constant[stage, 1] *
-                                      integrator.k1[u_ind] +
-                                      alg.a_matrix_constant[stage, 2] *
-                                      integrator.k_higher[u_ind]
+                                      integrator.dt *
+                                      (alg.a_matrix_constant[stage, 1] *
+                                       integrator.k1[u_ind] +
+                                       alg.a_matrix_constant[stage, 2] *
+                                       integrator.du[u_ind])
         end
 
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t +
                      alg.c[alg.num_stages - 3 + stage] * integrator.dt)
-
-        @threaded for u_ind in eachindex(integrator.du)
-            integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
-        end
     end
 
-    k_higher_wrap = wrap_array(integrator.k_higher, p)
+    du_wrap = wrap_array(integrator.du, p)
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # 0.5 = b_{S-1}
-    # TODO: Combine integration of i-1, i!
+    # IDEA: Combine integration of i-1, i?
     # => Would need to store u_tmp_wrap in yet another register!
-    dS = 0.5 * int_w_dot_stage(k_higher_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+    dS = 0.5 * integrator.dt *
+         int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Last stage
-    @threaded for i in eachindex(integrator.du)
+    @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
-                              alg.a_matrix_constant[3, 1] *
-                              integrator.k1[i] +
-                              alg.a_matrix_constant[3, 2] *
-                              integrator.k_higher[i]
+                              integrator.dt *
+                              (alg.a_matrix_constant[3, 1] * integrator.k1[i] +
+                               alg.a_matrix_constant[3, 2] * integrator.du[i])
+    end
+
+    # Safe K_{S-1} in `k1`:
+    @threaded for i in eachindex(integrator.u)
+        integrator.k1[i] = integrator.du[i]
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[alg.num_stages] * integrator.dt)
 
-    # Note: We re-use `k_higher` for the "direction"
-    @threaded for i in eachindex(integrator.du)
-        integrator.k_higher[i] = 0.5 * (integrator.k_higher[i] +
-                                   integrator.du[i] * integrator.dt)
-        
+    # Note: We re-use `k1` for the "direction"
+    # Note: For efficiency, we multiply the direction already by dt here!
+    @threaded for i in eachindex(integrator.u)
+        integrator.k1[i] = 0.5 * integrator.dt * (integrator.k1[i] +
+                                                  integrator.du[i])
     end
 
-    du_wrap = wrap_array(integrator.du, integrator.p)
     # 0.5 = b_{S}
     dS += 0.5 * integrator.dt *
           int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
@@ -180,8 +177,8 @@ end
     u_wrap = wrap_array(integrator.u, integrator.p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
-    # Note: We re-use `k_higher` for the "direction"
-    dir_wrap = wrap_array(integrator.k_higher, p)
+    # Note: We re-use `k1` for the "direction"
+    dir_wrap = wrap_array(integrator.k1, p)
 
     #=
     # Bisection for gamma
@@ -211,8 +208,8 @@ end
 
     # Do relaxed update
     @threaded for i in eachindex(integrator.u)
-        # Note: We re-use `k_higher` for the "direction"
-        integrator.u[i] += integrator.gamma * integrator.k_higher[i]
+        # Note: We re-use `k1` for the "direction"
+        integrator.u[i] += integrator.gamma * integrator.k1[i]
     end
 end
 
@@ -235,37 +232,16 @@ function step!(integrator::PairedExplicitRelaxationRK4Integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        k1!(integrator, prob.p, alg.c)
-
-        # k2
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[2] * integrator.dt)
-
-        @threaded for i in eachindex(integrator.du)
-            integrator.k_higher[i] = integrator.du[i] * integrator.dt
-        end
+        PERK_k1!(integrator, prob.p)
+        PERK_k2!(integrator, prob.p, alg)
 
         # Higher stages until "constant" stages
         for stage in 3:(alg.num_stages - 3)
-            # Construct current state
-            @threaded for i in eachindex(integrator.du)
-                integrator.u_tmp[i] = integrator.u[i] +
-                                      alg.a_matrix[stage - 2, 1] *
-                                      integrator.k1[i] +
-                                      alg.a_matrix[stage - 2, 2] *
-                                      integrator.k_higher[i]
-            end
-
-            integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                         integrator.t + alg.c[stage] * integrator.dt)
-
-            @threaded for i in eachindex(integrator.du)
-                integrator.k_higher[i] = integrator.du[i] * integrator.dt
-            end
+            PERK_ki!(integrator, prob.p, alg, stage)
         end
 
-        last_three_stages!(integrator, alg, prob.p)
-    end # PairedExplicitRK step timer
+        last_three_stages!(integrator, prob.p, alg)
+    end
 
     # handle callbacks
     if callbacks isa CallbackSet

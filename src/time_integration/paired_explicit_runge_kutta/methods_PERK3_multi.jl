@@ -119,7 +119,7 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType, Params, So
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # PairedExplicitRK3Multi stages:
+    # Additional PERK stage
     k1::uType
     k_higher::uType
 
@@ -160,7 +160,7 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType, P
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # PairedExplicitRK3Multi stages:
+    # Additional PERK stage
     k1::uType
     k_higher::uType
 
@@ -317,7 +317,7 @@ function step!(integrator::PairedExplicitRK3MultiIntegrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        k1!(integrator, prob.p, alg.c)
+        PERK_k1!(integrator, prob.p)
 
         # k2: Only evaluated at finest level
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
@@ -384,7 +384,7 @@ function step!(integrator::PairedExplicitRK3MultiIntegrator)
                              integrator.t + alg.c[stage] * integrator.dt)
 
                 if stage != alg.num_stages
-                    @threaded for u_ind in eachindex(integrator.du)
+                    @threaded for u_ind in eachindex(integrator.u)
                         integrator.k_higher[u_ind] = integrator.du[u_ind] *
                                                      integrator.dt
                     end
@@ -437,5 +437,14 @@ function step!(integrator::PairedExplicitRK3MultiIntegrator)
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+end
+
+function Base.resize!(integrator::PairedExplicitRK3MultiIntegrator, new_size)
+    resize!(integrator.u, new_size)
+    resize!(integrator.du, new_size)
+    resize!(integrator.u_tmp, new_size)
+
+    resize!(integrator.k1, new_size)
+    resize!(integrator.k_higher, new_size)
 end
 end # @muladd

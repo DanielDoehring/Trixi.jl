@@ -201,7 +201,7 @@ mutable struct PairedExplicitRK2Integrator{RealT <: Real, uType, Params, Sol, F,
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # Additional PairedExplicitRK2 stage
+    # Additional PERK stage
     k1::uType
 end
 
@@ -211,8 +211,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2;
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # Additional PairedExplicitRK2 stage
-    k1 = zero(u0)
+    k1 = zero(u0) # Additional PERK stage
 
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
@@ -240,17 +239,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2;
     return integrator
 end
 
-# Function that computes the first stage of a general P-ERK method
-# (in fact every explicit Runge-Kutta method)
-@inline function k1!(integrator::AbstractPairedExplicitRKIntegrator, p, c)
-    integrator.f(integrator.du, integrator.u, p, integrator.t)
-
-    @threaded for i in eachindex(integrator.du)
-        integrator.k1[i] = integrator.du[i] * integrator.dt
-        integrator.u_tmp[i] = integrator.u[i] + c[2] * integrator.k1[i]
-    end
-end
-
 function step!(integrator::PairedExplicitRK2Integrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
@@ -274,18 +262,19 @@ function step!(integrator::PairedExplicitRK2Integrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
         # First and second stage are identical across all single/standalone PERK methods
         PERK_k1!(integrator, prob.p)
-        PERK_k2!(integrator, prob.p, alg.c)
+        PERK_k2!(integrator, prob.p, alg)
 
         # Higher stages
         for stage in 3:(alg.num_stages)
-            PERK_ki!(integrator, prob.p, alg.c, alg.a_matrix, stage)
+            PERK_ki!(integrator, prob.p, alg, stage)
         end
 
         @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += integrator.dt * (alg.b1 * integrator.k1[i] +
+            integrator.u[i] += integrator.dt *
+                               (alg.b1 * integrator.k1[i] +
                                 alg.bS * integrator.du[i])
         end
-    end # PairedExplicitRK2 step
+    end
 
     integrator.iter += 1
     integrator.t += integrator.dt

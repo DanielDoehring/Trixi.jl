@@ -196,7 +196,7 @@ mutable struct PairedExplicitRK3Integrator{RealT <: Real, uType, Params, Sol, F,
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # PairedExplicitRK stages:
+    # Additional PERK stage
     k1::uType
     k_higher::uType
 end
@@ -260,10 +260,10 @@ function step!(integrator::PairedExplicitRK3Integrator)
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
         # First and second stage are identical across all single/standalone PERK methods
         PERK_k1!(integrator, prob.p)
-        PERK_k2!(integrator, prob.p, alg.c)
+        PERK_k2!(integrator, prob.p, alg)
 
         for stage in 3:(alg.num_stages - 1)
-            PERK_ki!(integrator, prob.p, alg.c, alg.a_matrix, stage)
+            PERK_ki!(integrator, prob.p, alg, stage)
         end
 
         # We need to store `du` of the S-1 stage in `k_higher` for the final update:
@@ -271,7 +271,7 @@ function step!(integrator::PairedExplicitRK3Integrator)
             integrator.k_higher[i] = integrator.du[i]
         end
 
-        PERK_ki!(integrator, prob.p, alg.c, alg.a_matrix, alg.num_stages)
+        PERK_ki!(integrator, prob.p, alg, alg.num_stages)
 
         @threaded for i in eachindex(integrator.u)
             # "Own" PairedExplicitRK based on SSPRK33.
@@ -281,7 +281,7 @@ function step!(integrator::PairedExplicitRK3Integrator)
                                (integrator.k1[i] + integrator.k_higher[i] +
                                 4.0 * integrator.du[i]) / 6.0
         end
-    end # PairedExplicitRK step timer
+    end
 
     integrator.iter += 1
     integrator.t += integrator.dt
