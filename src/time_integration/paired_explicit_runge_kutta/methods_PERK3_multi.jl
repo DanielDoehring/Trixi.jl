@@ -22,9 +22,9 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
     num_coeffs_max = num_stages - 2
 
-    a_matrices = zeros(length(stages), num_coeffs_max, 2)
+    a_matrices = zeros(length(stages), 2, num_coeffs_max)
     for i in 1:length(stages)
-        a_matrices[i, :, 1] = c[3:end]
+        a_matrices[i, 1, :] = c[3:end]
     end
 
     # Datastructure indicating at which stage which level is evaluated
@@ -47,8 +47,8 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
         num_a_coeffs = size(A, 1)
         @assert num_a_coeffs == num_stage_evals - 2
 
-        a_matrices[level, (num_coeffs_max - num_stage_evals + 3):end, 1] -= A
-        a_matrices[level, (num_coeffs_max - num_stage_evals + 3):end, 2] = A
+        a_matrices[level, 1, (num_coeffs_max - num_stage_evals + 3):end] -= A
+        a_matrices[level, 2, (num_coeffs_max - num_stage_evals + 3):end] = A
 
         # Add active levels to stages
         for stage in num_stages:-1:(num_stages - num_a_coeffs)
@@ -119,9 +119,9 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType, Params, So
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # Additional PERK stage
+    # Additional PERK3 registers
     k1::uType
-    k_higher::uType
+    kS1::uType
 
     # Variables managing level-depending integration
     level_info_elements::Vector{Vector{Int64}}
@@ -160,9 +160,9 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType, P
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # Additional PERK stage
+    # Additional PERK3 registers
     k1::uType
-    k_higher::uType
+    kS1::uType
 
     # Variables managing level-depending integration
     level_info_elements::Vector{Vector{Int64}}
@@ -194,10 +194,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # PairedExplicitRK3Multi stages
+    # Additional PERK3 registers
     k1 = zero(u0)
-    k_higher = zero(u0)
-    k_S1 = zero(u0)
+    kS1 = zero(u0)
 
     t0 = first(ode.tspan)
     iter = 0
@@ -252,7 +251,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                                                        ode.tspan;
                                                                                        kwargs...),
                                                                false,
-                                                               k1, k_higher,
+                                                               k1, kS1,
                                                                level_info_elements,
                                                                level_info_elements_acc,
                                                                level_info_interfaces_acc,
@@ -273,7 +272,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                                               ode.tspan;
                                                                               kwargs...),
                                                       false,
-                                                      k1, k_higher,
+                                                      k1, kS1,
                                                       level_info_elements,
                                                       level_info_elements_acc,
                                                       level_info_interfaces_acc,
@@ -318,104 +317,28 @@ function step!(integrator::PairedExplicitRK3MultiIntegrator)
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
         PERK_k1!(integrator, prob.p)
-
-        # k2: Only evaluated at finest level
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[2] * integrator.dt,
-                     integrator.level_info_elements_acc[1],
-                     integrator.level_info_interfaces_acc[1],
-                     integrator.level_info_boundaries_acc[1],
-                     #integrator.level_info_boundaries_orientation_acc[1],
-                     integrator.level_info_mortars_acc[1])
-
-        @threaded for u_ind in integrator.level_u_indices_elements[1]
-            integrator.k_higher[u_ind] = integrator.du[u_ind] * integrator.dt
+        PERK_k2!(integrator, prob.p, alg)
+        
+        for stage in 3:(alg.num_stages - 1)
+            PERK_ki!(integrator, prob.p, alg, stage)
         end
 
-        for stage in 3:(alg.num_stages)
-            # Loop over different methods with own associated level
-            for level in 1:min(alg.num_methods, integrator.n_levels)
-                @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                              alg.a_matrices[level, stage - 2, 1] *
-                                              integrator.k1[u_ind]
-                end
-            end
-            for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
-                @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] += alg.a_matrices[level, stage - 2, 2] *
-                                               integrator.k_higher[u_ind]
-                end
-            end
-
-            # "Remainder": Non-efficiently integrated
-            for level in (alg.num_methods + 1):(integrator.n_levels)
-                @threaded for u_ind in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                              alg.a_matrices[alg.num_methods,
-                                                             stage - 2, 1] *
-                                              integrator.k1[u_ind]
-                end
-            end
-            if alg.max_eval_levels[stage] == alg.num_methods
-                for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
-                    @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.u_tmp[u_ind] += alg.a_matrices[alg.num_methods,
-                                                                  stage - 2, 2] *
-                                                   integrator.k_higher[u_ind]
-                    end
-                end
-            end
-
-            # For statically non-uniform meshes/characteristic speeds:
-            #integrator.coarsest_lvl = alg.max_active_levels[stage]
-
-            # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-            integrator.coarsest_lvl = min(alg.max_active_levels[stage],
-                                          integrator.n_levels)
-
-            # Check if there are fewer integrators than grid levels (non-optimal method)
-            if integrator.coarsest_lvl == alg.num_methods
-                # NOTE: This is supposedly more efficient than setting
-                #integrator.coarsest_lvl = integrator.n_levels
-                # and then using the level-dependent version
-
-                integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                             integrator.t + alg.c[stage] * integrator.dt)
-
-                if stage != alg.num_stages
-                    @threaded for u_ind in eachindex(integrator.u)
-                        integrator.k_higher[u_ind] = integrator.du[u_ind] *
-                                                     integrator.dt
-                    end
-                end
-            else
-                integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                             integrator.t + alg.c[stage] * integrator.dt,
-                             integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                             integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                             integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                             #integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                             integrator.level_info_mortars_acc[integrator.coarsest_lvl])
-
-                # Update k_higher of relevant levels
-                for level in 1:(integrator.coarsest_lvl)
-                    @threaded for u_ind in integrator.level_u_indices_elements[level]
-                        integrator.k_higher[u_ind] = integrator.du[u_ind] *
-                                                     integrator.dt
-                    end
-                end
-            end
+        # We need to store `du` of the S-1 stage in `kS1` for the final update:
+        @threaded for i in eachindex(integrator.u)
+            integrator.kS1[i] = integrator.du[i]
         end
+
+        PERK_ki!(integrator, prob.p, alg, alg.num_stages)
 
         @threaded for i in eachindex(integrator.u)
             # "Own" PairedExplicitRK based on SSPRK33.
-            # Note that 'k_higher' carries the values of K_{S-1}
+            # Note that 'kS1' carries the values of K_{S-1}
             # and that we construct 'K_S' "in-place" from 'integrator.du'
-            integrator.u[i] += (integrator.k1[i] + integrator.k_higher[i] +
-                                4.0 * integrator.du[i] * integrator.dt) / 6.0
+            integrator.u[i] += integrator.dt *
+                               (integrator.k1[i] + integrator.kS1[i] +
+                                4.0 * integrator.du[i]) / 6.0
         end
-    end # PairedExplicitRK3Multi step timer
+    end
 
     integrator.iter += 1
     integrator.t += integrator.dt
@@ -445,6 +368,6 @@ function Base.resize!(integrator::PairedExplicitRK3MultiIntegrator, new_size)
     resize!(integrator.u_tmp, new_size)
 
     resize!(integrator.k1, new_size)
-    resize!(integrator.k_higher, new_size)
+    resize!(integrator.kS1, new_size)
 end
 end # @muladd

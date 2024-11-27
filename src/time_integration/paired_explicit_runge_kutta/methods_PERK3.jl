@@ -196,9 +196,9 @@ mutable struct PairedExplicitRK3Integrator{RealT <: Real, uType, Params, Sol, F,
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # Additional PERK stage
+    # Additional PERK3 registers
     k1::uType
-    k_higher::uType
+    kS1::uType
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK3;
@@ -207,9 +207,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3;
     du = zero(u0)
     u_tmp = zero(u0)
 
-    # PairedExplicitRK stages
+    # Additional PERK3 registers
     k1 = zero(u0)
-    k_higher = zero(u0)
+    kS1 = zero(u0)
 
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
@@ -222,7 +222,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3;
                                                                      ode.tspan;
                                                                      kwargs...),
                                              false, true, false,
-                                             k1, k_higher)
+                                             k1, kS1)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -266,19 +266,19 @@ function step!(integrator::PairedExplicitRK3Integrator)
             PERK_ki!(integrator, prob.p, alg, stage)
         end
 
-        # We need to store `du` of the S-1 stage in `k_higher` for the final update:
+        # We need to store `du` of the S-1 stage in `kS1` for the final update:
         @threaded for i in eachindex(integrator.u)
-            integrator.k_higher[i] = integrator.du[i]
+            integrator.kS1[i] = integrator.du[i]
         end
 
         PERK_ki!(integrator, prob.p, alg, alg.num_stages)
 
         @threaded for i in eachindex(integrator.u)
             # "Own" PairedExplicitRK based on SSPRK33.
-            # Note that 'k_higher' carries the values of K_{S-1}
+            # Note that 'kS1' carries the values of K_{S-1}
             # and that we construct 'K_S' "in-place" from 'integrator.du'
             integrator.u[i] += integrator.dt *
-                               (integrator.k1[i] + integrator.k_higher[i] +
+                               (integrator.k1[i] + integrator.kS1[i] +
                                 4.0 * integrator.du[i]) / 6.0
         end
     end
@@ -308,6 +308,6 @@ function Base.resize!(integrator::PairedExplicitRK3Integrator, new_size)
     resize!(integrator.u_tmp, new_size)
 
     resize!(integrator.k1, new_size)
-    resize!(integrator.k_higher, new_size)
+    resize!(integrator.kS1, new_size)
 end
 end # @muladd

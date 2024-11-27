@@ -112,7 +112,7 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType, Params, Sol, F,
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # Additional PERK stage
+    # Additional PERK register
     k1::uType
 end
 
@@ -122,7 +122,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
     du = zero(u0)
     u_tmp = zero(u0)
 
-    k1 = zero(u0) # Additional PERK stage
+    k1 = zero(u0) # Additional PERK register
 
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])

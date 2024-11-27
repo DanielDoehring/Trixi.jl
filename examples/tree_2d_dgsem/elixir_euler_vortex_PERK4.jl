@@ -74,7 +74,7 @@ EdgeLength = 20.0
 N_passes = 1
 T_end = EdgeLength * N_passes
 #tspan = (0.0, T_end)
-tspan = (0.0, 1.0)
+tspan = (0.0, 0.1)
 
 """
     initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerEquations2D)
@@ -175,19 +175,23 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 dtRatios = [1, 0.5, 0.25]
+basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/"
 
 # p = 2
 Stages = [12, 6, 3]
 
 # p = 3
 Stages = [16, 8, 4]
+path = basepath * "p3/"
+#ode_algorithm = Trixi.PairedExplicitRK3(16, path)
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 
 # p = 4
+#=
 Stages = [15, 9, 5]
-path = "/home/daniel/git/paper-2024-perk4/5_Validation/5_4_Convergence/5_4_1_EulerIsentropicVortexAdvection/"
-
-
+path = basepath * "p4/"
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+=#
 
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
 

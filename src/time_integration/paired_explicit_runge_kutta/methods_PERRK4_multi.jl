@@ -57,7 +57,7 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType, 
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # Additional PERK stage
+    # Additional PERK register
     k1::uType
 
     # Variables managing level-depending integration
@@ -101,7 +101,7 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # Additional PERK stage
+    # Additional PERK register
     k1::uType
 
     # Variables managing level-depending integration
@@ -137,7 +137,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     du = zero(u0)
     u_tmp = zero(u0)
 
-    k1 = zero(u0) # Additional PERK stage
+    k1 = zero(u0) # Additional PERK register
 
     t0 = first(ode.tspan)
     iter = 0

@@ -17,16 +17,12 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
     c[num_stages - 1] = sqrt(3) / 6 + 0.5
     c[num_stages] = -sqrt(3) / 6 + 0.5
 
-    println("Timestep-split: ")
-    display(c)
-    println("\n")
-
     # For the p = 4 method there are less free coefficients
-    CoeffsMax = num_stages - 5
+    num_coeffs_max = num_stages - 5
 
-    a_matrices = zeros(CoeffsMax, 2, length(stages))
+    a_matrices = zeros(length(stages), 2, num_coeffs_max)
     for i in 1:length(stages)
-        a_matrices[:, 1, i] = c[3:(num_stages - 3)]
+        a_matrices[i, 1, :] = c[3:(num_stages - 3)]
     end
 
     # Datastructure indicating at which stage which level is evaluated
@@ -58,8 +54,8 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
         end
 
         if num_a_coeffs > 0
-            a_matrices[(CoeffsMax - num_a_coeffs + 1):end, 1, level] -= A
-            a_matrices[(CoeffsMax - num_a_coeffs + 1):end, 2, level] = A
+            a_matrices[level, 1, (num_coeffs_max - num_a_coeffs + 1):end] -= A
+            a_matrices[level, 2, (num_coeffs_max - num_a_coeffs + 1):end] = A
         end
 
         # Add active levels to stages
@@ -79,19 +75,6 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
 
     max_active_levels = maximum.(active_levels)
     max_eval_levels = maximum.(eval_levels)
-
-    for i in 1:length(stages)
-        println("A-Matrix of Butcher tableau of level " * string(i))
-        display(a_matrices[:, :, i])
-        println()
-    end
-
-    println("\nActive Levels:")
-    display(active_levels)
-    println()
-    println("\nmax_eval_levels:")
-    display(max_eval_levels)
-    println()
 
     return a_matrices, a_matrix_constant, c, active_levels, max_active_levels,
            max_eval_levels
@@ -148,7 +131,7 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, So
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # Additional PERK stage
+    # Additional PERK register
     k1::uType
 
     # Variables managing level-depending integration
@@ -188,7 +171,7 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType, P
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    # Additional PERK stage
+    # Additional PERK register
     k1::uType
 
     # Variables managing level-depending integration
@@ -221,7 +204,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     du = zero(u0)
     u_tmp = zero(u0)
 
-    k1 = zero(u0) # Additional PERK stage
+    k1 = zero(u0) # Additional PERK register
 
     t0 = first(ode.tspan)
     iter = 0

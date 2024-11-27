@@ -184,19 +184,19 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator, alg, stage)
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
-    #=
+    
     for level in 1:min(alg.num_methods, integrator.n_levels)
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                       integrator.dt *
-                                      alg.a_matrices[stage - 2, 1, level] *
+                                      alg.a_matrices[level, 1, stage - 2] *
                                       integrator.k1[u_ind]
         end
     end
     for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] += integrator.dt *
-                                       alg.a_matrices[stage - 2, 2, level] *
+                                       alg.a_matrices[level, 2, stage - 2] *
                                        integrator.du[u_ind]
         end
     end
@@ -206,22 +206,20 @@ end
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                       integrator.dt *
-                                      alg.a_matrices[stage - 2, 1,
-                                                     alg.num_methods] *
+                                      alg.a_matrices[alg.num_methods, 1, stage - 2] *
                                       integrator.k1[u_ind]
         end
     end
     if alg.max_eval_levels[stage] == alg.num_methods
-        for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
+        for level in (alg.max_eval_levels[stage] + 1):integrator.n_levels
             @threaded for u_ind in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[u_ind] += integrator.dt *
-                                           alg.a_matrices[stage - 2, 2,
-                                                          alg.num_methods] *
+                                           alg.a_matrices[alg.num_methods, 2, stage - 2] *
                                            integrator.du[u_ind]
             end
         end
     end
-    =#
+    
 
     ### Simplified implementation: Own method for each level ###
     #=
@@ -229,27 +227,28 @@ end
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                       integrator.dt *
-                                      alg.a_matrices[stage - 2, 1, level] *
+                                      alg.a_matrices[level, 1, stage - 2] *
                                       integrator.k1[u_ind]
         end
     end
     for level in 1:alg.max_eval_levels[stage]
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] += integrator.dt *
-                                       alg.a_matrices[stage - 2, 2, level] *
+                                       alg.a_matrices[level, 2, stage - 2] *
                                        integrator.du[u_ind]
         end
     end
     =#
 
-    ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
+    #=
+    ### CARE: Optimized implementation for PERK4 case:  Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
     for level in 1:alg.max_eval_levels[stage]
         @threaded for u_ind in integrator.level_u_indices_elements[level]
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
                                       integrator.dt *
-                                      (alg.a_matrices[stage - 2, 1, level] *
+                                      (alg.a_matrices[level, 1, stage - 2] *
                                        integrator.k1[u_ind] +
-                                       alg.a_matrices[stage - 2, 2, level] *
+                                       alg.a_matrices[level, 2, stage - 2] *
                                        integrator.du[u_ind])
         end
     end
@@ -259,6 +258,7 @@ end
                                       integrator.dt * integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
         end
     end
+    =#
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]
