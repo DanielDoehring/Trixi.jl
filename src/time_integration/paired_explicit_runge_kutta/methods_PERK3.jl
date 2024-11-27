@@ -33,21 +33,22 @@ function compute_PairedExplicitRK3_butcher_tableau(num_stages, tspan,
     # Initialize the array of our solution
     a_unknown = zeros(num_stages - 2)
 
+    # Calculate coefficients of the stability polynomial in monomial form
+    consistency_order = 3
+    dtmax = tspan[2] - tspan[1]
+    dteps = 1.0f-9
+
+    num_eig_vals, eig_vals = filter_eig_vals(eig_vals; verbose)
+
+    monomial_coeffs, dt_opt = bisect_stability_polynomial(consistency_order,
+                                                          num_eig_vals, num_stages,
+                                                          dtmax, dteps,
+                                                          eig_vals; verbose)
+
     # Special case of e = 3
-    if num_stages == 3
+    if num_stages == consistency_order
         a_unknown = [0.25] # Use classic SSPRK33 (Shu-Osher) Butcher Tableau
     else
-        # Calculate coefficients of the stability polynomial in monomial form
-        consistency_order = 3
-        dtmax = tspan[2] - tspan[1]
-        dteps = 1.0f-9
-
-        num_eig_vals, eig_vals = filter_eig_vals(eig_vals; verbose)
-
-        monomial_coeffs, dt_opt = bisect_stability_polynomial(consistency_order,
-                                                              num_eig_vals, num_stages,
-                                                              dtmax, dteps,
-                                                              eig_vals; verbose)
         monomial_coeffs = undo_normalization!(monomial_coeffs, consistency_order,
                                               num_stages)
 
@@ -58,7 +59,7 @@ function compute_PairedExplicitRK3_butcher_tableau(num_stages, tspan,
                                                     monomial_coeffs, c;
                                                     verbose)
     end
-    # Fill A-matrix in P-ERK style
+    # Fill A-matrix in PERK style
     a_matrix = zeros(num_stages - 2, 2)
     a_matrix[:, 1] = c[3:end]
     a_matrix[:, 1] -= a_unknown
@@ -90,7 +91,7 @@ function compute_PairedExplicitRK3_butcher_tableau(num_stages,
     num_a_coeffs = size(a_coeffs, 1)
 
     @assert num_a_coeffs == a_coeffs_max
-    # Fill A-matrix in P-ERK style
+    # Fill A-matrix in PERK style
     a_matrix[:, 1] -= a_coeffs
     a_matrix[:, 2] = a_coeffs
 
@@ -106,7 +107,7 @@ end
                       verbose = false, cS2 = 1.0f0)
 
     Parameters:
-    - `num_stages` (`Int`): Number of stages in the paired explicit Runge-Kutta (P-ERK) method.
+    - `num_stages` (`Int`): Number of stages in the paired explicit Runge-Kutta (PERK) method.
     - `base_path_a_coeffs` (`AbstractString`): Path to a file containing some coefficients in the A-matrix in 
       the Butcher tableau of the Runge Kutta method.
       The matrix should be stored in a text file at `joinpath(base_path_a_coeffs, "a_$(num_stages).txt")` and separated by line breaks.
@@ -121,7 +122,7 @@ end
       s is the number of stages, default is 1.0f0.
 
 The following structures and methods provide an implementation of
-the third-order paired explicit Runge-Kutta (P-ERK) method
+the third-order paired explicit Runge-Kutta (PERK) method
 optimized for a certain simulation setup (PDE, IC & BC, Riemann Solver, DG Solver).
 The original paper is
 - Nasab, Vermeire (2022)
@@ -257,53 +258,28 @@ function step!(integrator::PairedExplicitRK3Integrator)
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        k1!(integrator, prob.p, alg.c)
+        # First and second stage are identical across all single/standalone PERK methods
+        PERK_k1!(integrator, prob.p)
+        PERK_k2!(integrator, prob.p, alg.c)
 
-        # k2
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[2] * integrator.dt)
-
-        @threaded for i in eachindex(integrator.du)
-            integrator.k_higher[i] = integrator.du[i] * integrator.dt
-        end
-
-        # Higher stages
         for stage in 3:(alg.num_stages - 1)
-            # Construct current state
-            @threaded for i in eachindex(integrator.du)
-                integrator.u_tmp[i] = integrator.u[i] +
-                                      alg.a_matrix[stage - 2, 1] *
-                                      integrator.k1[i] +
-                                      alg.a_matrix[stage - 2, 2] *
-                                      integrator.k_higher[i]
-            end
-
-            integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                         integrator.t + alg.c[stage] * integrator.dt)
-
-            @threaded for i in eachindex(integrator.du)
-                integrator.k_higher[i] = integrator.du[i] * integrator.dt
-            end
+            PERK_ki!(integrator, prob.p, alg.c, alg.a_matrix, stage)
         end
 
-        # Last stage
-        @threaded for i in eachindex(integrator.du)
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  alg.a_matrix[alg.num_stages - 2, 1] *
-                                  integrator.k1[i] +
-                                  alg.a_matrix[alg.num_stages - 2, 2] *
-                                  integrator.k_higher[i]
+        # We need to store `du` of the S-1 stage in `k_higher` for the final update:
+        @threaded for i in eachindex(integrator.u)
+            integrator.k_higher[i] = integrator.du[i]
         end
 
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[alg.num_stages] * integrator.dt)
+        PERK_ki!(integrator, prob.p, alg.c, alg.a_matrix, alg.num_stages)
 
         @threaded for i in eachindex(integrator.u)
             # "Own" PairedExplicitRK based on SSPRK33.
             # Note that 'k_higher' carries the values of K_{S-1}
             # and that we construct 'K_S' "in-place" from 'integrator.du'
-            integrator.u[i] += (integrator.k1[i] + integrator.k_higher[i] +
-                                4.0 * integrator.du[i] * integrator.dt) / 6.0
+            integrator.u[i] += integrator.dt *
+                               (integrator.k1[i] + integrator.k_higher[i] +
+                                4.0 * integrator.du[i]) / 6.0
         end
     end # PairedExplicitRK step timer
 
@@ -324,5 +300,14 @@ function step!(integrator::PairedExplicitRK3Integrator)
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+end
+
+function Base.resize!(integrator::PairedExplicitRK3Integrator, new_size)
+    resize!(integrator.u, new_size)
+    resize!(integrator.du, new_size)
+    resize!(integrator.u_tmp, new_size)
+
+    resize!(integrator.k1, new_size)
+    resize!(integrator.k_higher, new_size)
 end
 end # @muladd
