@@ -131,7 +131,7 @@ function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
     end
 
     # Catch Newton failures
-    if integrator.gamma < 0
+    if integrator.gamma < 0 || isnan(integrator.gamma) || isinf(integrator.gamma)
         integrator.gamma = 1
     end
 end

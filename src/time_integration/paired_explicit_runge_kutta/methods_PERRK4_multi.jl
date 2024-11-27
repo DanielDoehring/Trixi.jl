@@ -80,7 +80,6 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType, 
     n_levels::Int64
 
     # Entropy Relaxation additions
-    direction::uType
     gamma::RealT
 end
 
@@ -126,7 +125,6 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
     n_levels::Int64
 
     # Entropy Relaxation additions
-    direction::uType
     gamma::RealT
 
     # Addition for hyperbolic-parabolic problems:
@@ -169,7 +167,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     # For entropy relaxation
-    direction = zero(u0)
     gamma = one(eltype(u0))
 
     partitioning_variables!(level_info_elements,
@@ -217,7 +214,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          level_info_mpi_mortars_acc,
                                                                          level_u_indices_elements,
                                                                          -1, n_levels,
-                                                                         direction,
                                                                          gamma,
                                                                          du_tmp)
     else
@@ -242,7 +238,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                 level_info_mpi_mortars_acc,
                                                                 level_u_indices_elements,
                                                                 -1, n_levels,
-                                                                direction, gamma)
+                                                                gamma)
     end
 
     # initialize callbacks

@@ -47,9 +47,11 @@
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,
                  integrator.du_tmp)
 
+    # Note: We re-use `k_higher` for the "direction"
     @threaded for i in eachindex(integrator.du)
-        integrator.direction[i] = 0.5 * (integrator.k_higher[i] +
+        integrator.k_higher[i] = 0.5 * (integrator.k_higher[i] +
                                    integrator.du[i] * integrator.dt)
+        
     end
 
     du_wrap = wrap_array(integrator.du, integrator.p)
@@ -60,7 +62,8 @@
     u_wrap = wrap_array(integrator.u, integrator.p)
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
-    dir_wrap = wrap_array(integrator.direction, p)
+    # Note: We re-use `k_higher` for the "direction"
+    dir_wrap = wrap_array(integrator.k_higher, p)
 
     #=
     # Bisection for gamma
@@ -78,7 +81,7 @@
 
     integrator.iter += 1
     # Check if due to entropy relaxation the final step is not reached
-    if integrator.finalstep == true && integrator.gamma != 1.0
+    if integrator.finalstep == true && integrator.gamma != 1
         # If we would go beyond the final time, clip gamma at 1.0
         if integrator.gamma > 1.0
             integrator.gamma = 1.0
@@ -90,7 +93,8 @@
 
     # Do relaxed update
     @threaded for i in eachindex(integrator.u)
-        integrator.u[i] += integrator.gamma * integrator.direction[i]
+        # Note: We re-use `k_higher` for the "direction"
+        integrator.u[i] += integrator.gamma * integrator.k_higher[i]
     end
 end
 
@@ -263,18 +267,4 @@ function step!(integrator::PairedExplicitRelaxationRK4MultiParabolicIntegrator)
     end
 end
 
-# used for AMR (Adaptive Mesh Refinement)
-function Base.resize!(integrator::AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator,
-                      new_size)
-    resize!(integrator.u, new_size)
-    resize!(integrator.du, new_size)
-    resize!(integrator.u_tmp, new_size)
-
-    resize!(integrator.k1, new_size)
-    resize!(integrator.k_higher, new_size)
-    # Addition for entropy relaxation PERK methods
-    resize!(integrator.direction, new_size)
-    # Addition for multirate PERK methods for parabolic problems
-    resize!(integrator.du_tmp, new_size)
-end
 end # @muladd
