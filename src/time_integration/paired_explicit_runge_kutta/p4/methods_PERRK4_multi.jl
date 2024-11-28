@@ -178,15 +178,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
         integrator = PairedExplicitRelaxationRK4MultiParabolicIntegrator(u0, du, u_tmp,
-                                                                         t0, tdir, dt,
-                                                                         zero(dt),
+                                                                         t0, tdir,
+                                                                         dt, zero(dt),
                                                                          iter,
                                                                          ode.p,
                                                                          (prob = ode,),
-                                                                         ode.f,
-                                                                         # Note that here the `PERK4Multi` algorithm is passed on as 
-                                                                         # `alg` of the integrator
-                                                                         alg.PERK4Multi,
+                                                                         ode.f, alg,
                                                                          PairedExplicitRKOptions(callback,
                                                                                                  ode.tspan;
                                                                                                  kwargs...),
@@ -207,15 +204,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          du_tmp)
     else
         integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp,
-                                                                t0, tdir, dt,
-                                                                zero(dt),
+                                                                t0, tdir,
+                                                                dt, zero(dt),
                                                                 iter,
                                                                 ode.p,
                                                                 (prob = ode,),
-                                                                ode.f,
-                                                                # Note that here the `PERK4Multi` algorithm is passed on as 
-                                                                # `alg` of the integrator
-                                                                alg.PERK4Multi,
+                                                                ode.f, alg,
                                                                 PairedExplicitRKOptions(callback,
                                                                                         ode.tspan;
                                                                                         kwargs...),

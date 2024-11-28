@@ -177,14 +177,17 @@ basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/
 
 # p = 2
 Stages = [12, 6, 3]
+path = basepath * "p2/"
+#ode_algorithm = Trixi.PairedExplicitRK2(12, path)
+ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 # p = 3
-
+#=
 Stages = [16, 8, 4]
 path = basepath * "p3/"
 #ode_algorithm = Trixi.PairedExplicitRK3(16, path)
 ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-
+=#
 
 # p = 4
 #=

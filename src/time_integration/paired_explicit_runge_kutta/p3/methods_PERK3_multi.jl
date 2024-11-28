@@ -22,20 +22,21 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
     num_coeffs_max = num_stages - 2
 
-    a_matrices = zeros(length(stages), 2, num_coeffs_max)
-    for i in 1:length(stages)
+    num_methods = length(stages)
+    a_matrices = zeros(num_methods, 2, num_coeffs_max)
+    for i in 1:num_methods
         a_matrices[i, 1, :] = c[3:end]
     end
 
     # Datastructure indicating at which stage which level is evaluated
     active_levels = [Vector{Int64}() for _ in 1:num_stages]
     # k1 is evaluated at all levels
-    active_levels[1] = 1:length(stages)
+    active_levels[1] = 1:num_methods
 
     # Datastructure indicating at which stage which level contributes to state
     eval_levels = [Vector{Int64}() for _ in 1:num_stages]
     # k1 is evaluated at all levels
-    eval_levels[1] = 1:length(stages)
+    eval_levels[1] = 1:num_methods
     # Second stage: Only finest method
     eval_levels[2] = [1]
 
@@ -70,10 +71,12 @@ struct PairedExplicitRK3Multi <: AbstractPairedExplicitRKMulti
     num_stage_evals_min::Int64
     num_methods::Int64
     num_stages::Int64
+
     dt_ratios::Vector{Float64}
 
     a_matrices::Array{Float64, 3}
     c::Vector{Float64}
+
     active_levels::Vector{Vector{Int64}}
     max_active_levels::Vector{Int64}
     max_eval_levels::Vector{Int64}
@@ -252,11 +255,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
         integrator = PairedExplicitRK3MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir,
-                                                               dt,
-                                                               zero(dt), iter,
-                                                               ode.p,
-                                                               (prob = ode,), ode.f,
-                                                               alg,
+                                                               dt, zero(dt), iter,
+                                                               ode.p, (prob = ode,),
+                                                               ode.f, alg,
                                                                PairedExplicitRKOptions(callback,
                                                                                        ode.tspan;
                                                                                        kwargs...),
@@ -274,11 +275,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                                -1, n_levels,
                                                                du_tmp)
     else
-        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp, t0, tdir, dt,
-                                                      zero(dt), iter,
-                                                      ode.p,
-                                                      (prob = ode,), ode.f,
-                                                      alg,
+        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp, t0, tdir,
+                                                      dt, zero(dt), iter,
+                                                      ode.p, (prob = ode,),
+                                                      ode.f, alg,
                                                       PairedExplicitRKOptions(callback,
                                                                               ode.tspan;
                                                                               kwargs...),
@@ -292,8 +292,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                       level_info_boundaries_orientation_acc,
                                                       level_info_mortars_acc,
                                                       level_info_mpi_mortars_acc,
-                                                      level_u_indices_elements, -1,
-                                                      n_levels)
+                                                      level_u_indices_elements,
+                                                      -1, n_levels)
     end
 
     # initialize callbacks

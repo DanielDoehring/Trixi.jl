@@ -298,4 +298,6 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{2})
         terminate!(integrator)
     end
 end
+
+include("methods_PERK2_multi.jl")
 end # @muladd

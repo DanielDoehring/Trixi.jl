@@ -5,25 +5,26 @@
 @muladd begin
 #! format: noindent
 
-function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
-                                           base_path_a_coeffs::AbstractString)
+function ComputePERK2_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
+                                           base_path_mon_coeffs::AbstractString,
+                                           bS, cS)
 
-    # Current approach: Use ones (best internal stability properties)
-    c = ones(num_stages)
-    c[1] = 0.0
+    # c Vector form Butcher Tableau (defines timestep per stage)
+    c = zeros(Float64, num_stages)
 
-    c[num_stages - 3] = 1.0 # TODO: This is in principle variable
-    c[num_stages - 2] = 0.479274057836310
-    c[num_stages - 1] = sqrt(3) / 6 + 0.5
-    c[num_stages] = -sqrt(3) / 6 + 0.5
+    for k in 2:num_stages
+        c[k] = cS * (k - 1) / (num_stages - 1)
+    end
 
-    # For the p = 4 method there are less free coefficients
-    num_coeffs_max = num_stages - 5
+    stage_scaling_factors = bS * reverse(c[2:(end - 1)])
+
+    # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
+    num_coeffs_max = num_stages - 2
 
     num_methods = length(stages)
     a_matrices = zeros(num_methods, 2, num_coeffs_max)
     for i in 1:num_methods
-        a_matrices[i, 1, :] = c[3:(num_stages - 3)]
+        a_matrices[i, 1, :] = c[3:end]
     end
 
     # Datastructure indicating at which stage which level is evaluated
@@ -40,48 +41,36 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
 
     for level in eachindex(stages)
         num_stage_evals = stages[level]
+        path_monomial_coeffs = joinpath(base_path_mon_coeffs,
+                                        "gamma_" * string(num_stage_evals) * ".txt")
 
-        #path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * "_" * string(num_stages) * ".txt"
-        # If all c = 1.0, the max number of stages does not matter
-        path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * ".txt"
+        @assert isfile(path_monomial_coeffs) "Couldn't find file"
+        monomial_coeffs = readdlm(path_monomial_coeffs, Float64)
+        num_monomial_coeffs = size(monomial_coeffs, 1)
 
-        if num_stage_evals > 5
-            @assert isfile(path_a_coeffs) "Couldn't find file $path_a_coeffs"
-            A = readdlm(path_a_coeffs, Float64)
-            num_a_coeffs = size(A, 1)
-            @assert num_a_coeffs == num_stage_evals - 5
-        else
-            A = []
-            num_a_coeffs = 0
-        end
+        @assert num_monomial_coeffs == num_stage_evals - 2
+        A = compute_a_coeffs(num_stage_evals, stage_scaling_factors, monomial_coeffs)
 
-        if num_a_coeffs > 0
-            a_matrices[level, 1, (num_coeffs_max - num_a_coeffs + 1):end] -= A
-            a_matrices[level, 2, (num_coeffs_max - num_a_coeffs + 1):end] = A
-        end
+        a_matrices[level, 1, (num_coeffs_max - (num_stage_evals - 3)):end] -= A
+        a_matrices[level, 2, (num_coeffs_max - (num_stage_evals - 3)):end] = A
 
         # Add active levels to stages
-        for stage in num_stages:-1:(num_stages - (3 + num_a_coeffs))
+        for stage in num_stages:-1:(num_stages - num_monomial_coeffs)
             push!(active_levels[stage], level)
         end
 
         # Add eval levels to stages
-        for stage in num_stages:-1:(num_stages - (3 + num_a_coeffs) - 1)
+        for stage in num_stages:-1:(num_stages - num_monomial_coeffs + 1)
             push!(eval_levels[stage], level)
         end
     end
-    # Shared matrix
-    a_matrix_constant = [(0.479274057836310-0.114851811257441) 0.1397682537005989 0.1830127018922191
-                         0.114851811257441 0.648906880894214 0.028312163512968]
-
     max_active_levels = maximum.(active_levels)
     max_eval_levels = maximum.(eval_levels)
 
-    return a_matrices, a_matrix_constant, c, active_levels, max_active_levels,
-           max_eval_levels
+    return a_matrices, c, active_levels, max_active_levels, max_eval_levels
 end
 
-struct PairedExplicitRK4Multi <: AbstractPairedExplicitRKMulti
+struct PairedExplicitRK2Multi <: AbstractPairedExplicitRKMulti
     num_stage_evals_min::Int64
     num_methods::Int64
     num_stages::Int64
@@ -89,29 +78,31 @@ struct PairedExplicitRK4Multi <: AbstractPairedExplicitRKMulti
     dt_ratios::Vector{Float64}
 
     a_matrices::Array{Float64, 3}
-    a_matrix_constant::Matrix{Float64}
     c::Vector{Float64}
+    b1::Float64
+    bS::Float64
 
     active_levels::Vector{Vector{Int64}}
     max_active_levels::Vector{Int64}
     max_eval_levels::Vector{Int64}
 end
 
-function PairedExplicitRK4Multi(stages::Vector{Int64},
-                                base_path_a_coeffs::AbstractString,
-                                dt_ratios)
+function PairedExplicitRK2Multi(stages::Vector{Int64},
+                                base_path_mon_coeffs::AbstractString,
+                                dt_ratios,
+                                bS = 1.0, cS = 0.5)
     num_stages = maximum(stages)
 
-    a_matrices,
-    a_matrix_constant, c,
+    a_matrices, c,
     active_levels,
     max_active_levels,
-    max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages, num_stages,
-                                                        base_path_a_coeffs)
+    max_eval_levels = ComputePERK2_Multi_ButcherTableau(stages, num_stages,
+                                                        base_path_mon_coeffs,
+                                                        bS, cS)
 
-    return PairedExplicitRK4Multi(minimum(stages), length(stages), num_stages,
+    return PairedExplicitRK2Multi(minimum(stages), length(stages), num_stages,
                                   dt_ratios,
-                                  a_matrices, a_matrix_constant, c, active_levels,
+                                  a_matrices, c, 1 - bS, bS, active_levels,
                                   max_active_levels, max_eval_levels)
 end
 
@@ -119,10 +110,10 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
+mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
                                                 Alg,
                                                 PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKMultiIntegrator{4}
+               AbstractPairedExplicitRKMultiIntegrator{2}
     u::uType
     du::uType
     u_tmp::uType
@@ -161,11 +152,11 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, So
     n_levels::Int64
 end
 
-mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType, Params,
+mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType, Params,
                                                          Sol, F,
                                                          Alg,
                                                          PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKMultiParabolicIntegrator{4}
+               AbstractPairedExplicitRKMultiParabolicIntegrator{2}
     u::uType
     du::uType
     u_tmp::uType
@@ -209,7 +200,7 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType, P
     du_tmp::uType
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
+function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
               dt, callback = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
@@ -262,7 +253,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     ### Done with setting up for handling of level-dependent integration ###
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
-        integrator = PairedExplicitRK4MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir,
+        integrator = PairedExplicitRK2MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir,
                                                                dt, zero(dt), iter,
                                                                ode.p, (prob = ode,),
                                                                ode.f, alg,
@@ -283,7 +274,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                -1, n_levels,
                                                                du_tmp)
     else
-        integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp, t0, tdir,
+        integrator = PairedExplicitRK2MultiIntegrator(u0, du, u_tmp, t0, tdir,
                                                       dt, zero(dt), iter,
                                                       ode.p, (prob = ode,),
                                                       ode.f, alg,
@@ -315,117 +306,5 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     end
 
     return integrator
-end
-
-@inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator{4},
-                                                                 AbstractPairedExplicitRelaxationRKMultiIntegrator{4}},
-                                               alg, stage)
-    #=                                               
-    ### General implementation: Not own method for each grid level ###
-    # Loop over different methods with own associated level
-    for level in 1:min(alg.num_methods, integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[u_ind]
-        end
-    end
-    for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] += integrator.dt *
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[u_ind]
-        end
-    end
-
-    # "Remainder": Non-efficiently integrated
-    for level in (alg.num_methods + 1):(integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                      integrator.k1[u_ind]
-        end
-    end
-    if alg.max_eval_levels[stage] == alg.num_methods
-        for level in (alg.max_eval_levels[stage] + 1):integrator.n_levels
-            @threaded for u_ind in integrator.level_u_indices_elements[level]
-                integrator.u_tmp[u_ind] += integrator.dt *
-                                           alg.a_matrices[alg.num_methods, 2,
-                                                          stage - 2] *
-                                           integrator.du[u_ind]
-            end
-        end
-    end
-    =#
-
-    ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
-    for level in 1:alg.max_eval_levels[stage]
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      (alg.a_matrices[level, 1, stage - 2] *
-                                       integrator.k1[u_ind] +
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[u_ind])
-        end
-    end
-    for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt * integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
-        end
-    end
-
-    # For statically non-uniform meshes/characteristic speeds
-    #integrator.coarsest_lvl = alg.max_active_levels[stage]
-
-    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-    integrator.coarsest_lvl = min(alg.max_active_levels[stage],
-                                  integrator.n_levels)
-end
-
-@inline function last_three_stages!(integrator::PairedExplicitRK4MultiParabolicIntegrator,
-                                    p, alg)
-    for stage in 1:2
-        @threaded for u_ind in eachindex(integrator.u)
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      (alg.a_matrix_constant[1, stage] *
-                                       integrator.k1[u_ind] +
-                                       alg.a_matrix_constant[2, stage] *
-                                       integrator.du[u_ind])
-        end
-
-        integrator.f(integrator.du, integrator.u_tmp, p,
-                     integrator.t +
-                     alg.c[alg.num_stages - 3 + stage] * integrator.dt,
-                     integrator.du_tmp)
-    end
-
-    # Last stage
-    @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] +
-                              integrator.dt *
-                              (alg.a_matrix_constant[1, 3] * integrator.k1[i] +
-                               alg.a_matrix_constant[2, 3] * integrator.du[i])
-    end
-
-    # Safe K_{S-1} in `k1`:
-    @threaded for i in eachindex(integrator.u)
-        integrator.k1[i] = integrator.du[i]
-    end
-
-    integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[alg.num_stages] * integrator.dt,
-                 integrator.du_tmp)
-
-    @threaded for u_ind in eachindex(integrator.u)
-        # Note that 'k1' carries the values of K_{S-1}
-        # and that we construct 'K_S' "in-place" from 'integrator.du'
-        integrator.u[u_ind] += 0.5 * integrator.dt *
-                               (integrator.k1[u_ind] + integrator.du[u_ind])
-    end
 end
 end # @muladd
