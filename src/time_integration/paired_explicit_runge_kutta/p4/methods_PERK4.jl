@@ -66,14 +66,15 @@ The method has been proposed in
   Fourth-Order Paired-Explicit Runge-Kutta Methods
   [DOI:10.48550/arXiv.2408.05470](https://doi.org/10.48550/arXiv.2408.05470)
 """
-mutable struct PairedExplicitRK4 <: AbstractPairedExplicitRKSingle
-    const num_stages::Int # S
+struct PairedExplicitRK4 <: AbstractPairedExplicitRKSingle
+    num_stages::Int # S
 
     a_matrix::Matrix{Float64}
     # This part of the Butcher array matrix A is constant for all PERK methods, i.e., 
     # regardless of the optimized coefficients.
     a_matrix_constant::Matrix{Float64}
     c::Vector{Float64}
+
     dt_opt::Union{Float64, Nothing}
 end
 

@@ -132,14 +132,15 @@ optimized for a certain simulation setup (PDE, IC & BC, Riemann Solver, DG Solve
 Note: To use this integrator, the user must import the `Convex` and `ECOS` packages
 unless the coefficients are provided in a "gamma_<num_stages>.txt" file.
 """
-mutable struct PairedExplicitRK2 <: AbstractPairedExplicitRKSingle
-    const num_stages::Int
+struct PairedExplicitRK2 <: AbstractPairedExplicitRKSingle
+    num_stages::Int
 
     a_matrix::Matrix{Float64}
     c::Vector{Float64}
     b1::Float64
     bS::Float64
     cS::Float64
+
     dt_opt::Union{Float64, Nothing}
 end
 

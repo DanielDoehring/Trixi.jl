@@ -99,8 +99,7 @@ function PairedExplicitRK4Multi(stages::Vector{Int64},
     num_stages = maximum(stages)
 
     a_matrices,
-    a_matrix_constant,
-    c,
+    a_matrix_constant, c,
     active_levels,
     max_active_levels,
     max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages, num_stages,

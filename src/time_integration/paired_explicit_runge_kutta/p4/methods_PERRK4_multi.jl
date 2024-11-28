@@ -183,7 +183,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          iter,
                                                                          ode.p,
                                                                          (prob = ode,),
-                                                                         ode.f, 
+                                                                         ode.f,
                                                                          # Note that here the `PERK4Multi` algorithm is passed on as 
                                                                          # `alg` of the integrator
                                                                          alg.PERK4Multi,
@@ -212,7 +212,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                 iter,
                                                                 ode.p,
                                                                 (prob = ode,),
-                                                                ode.f, 
+                                                                ode.f,
                                                                 # Note that here the `PERK4Multi` algorithm is passed on as 
                                                                 # `alg` of the integrator
                                                                 alg.PERK4Multi,
