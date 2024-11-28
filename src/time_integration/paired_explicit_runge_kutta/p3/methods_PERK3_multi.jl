@@ -110,6 +110,7 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType, Params, So
     du::uType
     u_tmp::uType
     t::RealT
+    tdir::Real
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
@@ -119,6 +120,8 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType, Params, So
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
     # Additional PERK3 registers
     k1::uType
     kS1::uType
@@ -151,6 +154,7 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType, P
     du::uType
     u_tmp::uType
     t::RealT
+    tdir::Real
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
@@ -160,6 +164,8 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType, P
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
     # Additional PERK3 registers
     k1::uType
     kS1::uType
@@ -199,6 +205,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     kS1 = zero(u0)
 
     t0 = first(ode.tspan)
+    tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
     ### Set datastructures for handling of level-dependent integration ###
@@ -242,7 +249,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     ### Done with setting up for handling of level-dependent integration ###
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
-        integrator = PairedExplicitRK3MultiParabolicIntegrator(u0, du, u_tmp, t0, dt,
+        integrator = PairedExplicitRK3MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir, dt,
                                                                zero(dt), iter,
                                                                ode.p,
                                                                (prob = ode,), ode.f,
@@ -250,7 +257,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                                PairedExplicitRKOptions(callback,
                                                                                        ode.tspan;
                                                                                        kwargs...),
-                                                               false,
+                                                               false, true, false,
                                                                k1, kS1,
                                                                level_info_elements,
                                                                level_info_elements_acc,
@@ -264,14 +271,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                                -1, n_levels,
                                                                du_tmp)
     else
-        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp, t0, dt, zero(dt),
-                                                      iter,
+        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp, t0, tdir, dt, 
+                                                      zero(dt), iter,
                                                       ode.p,
-                                                      (prob = ode,), ode.f, alg,
+                                                      (prob = ode,), ode.f, 
+                                                      alg,
                                                       PairedExplicitRKOptions(callback,
                                                                               ode.tspan;
                                                                               kwargs...),
-                                                      false,
+                                                      false, true, false,
                                                       k1, kS1,
                                                       level_info_elements,
                                                       level_info_elements_acc,
@@ -296,78 +304,5 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     end
 
     return integrator
-end
-
-function step!(integrator::PairedExplicitRK3MultiIntegrator)
-    @unpack prob = integrator.sol
-    @unpack alg = integrator
-    t_end = last(prob.tspan)
-    callbacks = integrator.opts.callback
-
-    if isnan(integrator.dt)
-        error("time step size `dt` is NaN")
-    end
-
-    # if the next iteration would push the simulation beyond the end time, set dt accordingly
-    if integrator.t + integrator.dt > t_end ||
-       isapprox(integrator.t + integrator.dt, t_end)
-        integrator.dt = t_end - integrator.t
-        terminate!(integrator)
-    end
-
-    @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        PERK_k1!(integrator, prob.p)
-        PERK_k2!(integrator, prob.p, alg)
-
-        for stage in 3:(alg.num_stages - 1)
-            PERK_ki!(integrator, prob.p, alg, stage)
-        end
-
-        # We need to store `du` of the S-1 stage in `kS1` for the final update:
-        @threaded for i in eachindex(integrator.u)
-            integrator.kS1[i] = integrator.du[i]
-        end
-
-        PERK_ki!(integrator, prob.p, alg, alg.num_stages)
-
-        @threaded for i in eachindex(integrator.u)
-            # "Own" PairedExplicitRK based on SSPRK33.
-            # Note that 'kS1' carries the values of K_{S-1}
-            # and that we construct 'K_S' "in-place" from 'integrator.du'
-            integrator.u[i] += integrator.dt *
-                               (integrator.k1[i] + integrator.kS1[i] +
-                                4.0 * integrator.du[i]) / 6.0
-        end
-    end
-
-    integrator.iter += 1
-    integrator.t += integrator.dt
-
-    @trixi_timeit timer() "Step-Callbacks" begin
-        # handle callbacks
-        if callbacks isa CallbackSet
-            foreach(callbacks.discrete_callbacks) do cb
-                if cb.condition(integrator.u, integrator.t, integrator)
-                    cb.affect!(integrator)
-                end
-                return nothing
-            end
-        end
-    end
-
-    # respect maximum number of iterations
-    if integrator.iter >= integrator.opts.maxiters && !integrator.finalstep
-        @warn "Interrupted. Larger maxiters is needed."
-        terminate!(integrator)
-    end
-end
-
-function Base.resize!(integrator::PairedExplicitRK3MultiIntegrator, new_size)
-    resize!(integrator.u, new_size)
-    resize!(integrator.du, new_size)
-    resize!(integrator.u_tmp, new_size)
-
-    resize!(integrator.k1, new_size)
-    resize!(integrator.kS1, new_size)
 end
 end # @muladd

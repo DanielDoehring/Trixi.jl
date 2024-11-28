@@ -237,7 +237,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3;
     return integrator
 end
 
-function step!(integrator::PairedExplicitRK3Integrator)
+function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -248,7 +248,7 @@ function step!(integrator::PairedExplicitRK3Integrator)
         error("time step size `dt` is NaN")
     end
 
-    modify_dt_for_tstops!(integrator)
+    #modify_dt_for_tstops!(integrator)
 
     # if the next iteration would push the simulation beyond the end time, set dt accordingly
     if integrator.t + integrator.dt > t_end ||
@@ -287,10 +287,14 @@ function step!(integrator::PairedExplicitRK3Integrator)
     integrator.t += integrator.dt
 
     # handle callbacks
-    if callbacks isa CallbackSet
-        for cb in callbacks.discrete_callbacks
-            if cb.condition(integrator.u, integrator.t, integrator)
-                cb.affect!(integrator)
+    @trixi_timeit timer() "Step-Callbacks" begin
+        # handle callbacks
+        if callbacks isa CallbackSet
+            foreach(callbacks.discrete_callbacks) do cb
+                if cb.condition(integrator.u, integrator.t, integrator)
+                    cb.affect!(integrator)
+                end
+                return nothing
             end
         end
     end
@@ -302,7 +306,7 @@ function step!(integrator::PairedExplicitRK3Integrator)
     end
 end
 
-function Base.resize!(integrator::PairedExplicitRK3Integrator, new_size)
+function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator{3}, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
