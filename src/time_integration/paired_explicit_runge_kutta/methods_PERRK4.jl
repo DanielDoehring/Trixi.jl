@@ -6,6 +6,8 @@
 @muladd begin
 #! format: noindent
 
+# TODO: Make this structure to include the base scheme + options regarding 
+# solution of the nonlinear system!
 @doc raw"""
     PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString, dt_opt = nothing;
                       c_const = 1.0f0)
@@ -58,7 +60,7 @@ end
 mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType, Params, Sol,
                                                      F, Alg,
                                                      PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRelaxationRKSingleIntegrator
+               AbstractPairedExplicitRelaxationRKSingleIntegrator{4}
     u::uType
     du::uType
     u_tmp::uType
@@ -120,7 +122,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
+@inline function last_three_stages!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4},
                                     p, alg)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
@@ -213,7 +215,7 @@ end
     end
 end
 
-function step!(integrator::PairedExplicitRelaxationRK4Integrator)
+function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -223,6 +225,8 @@ function step!(integrator::PairedExplicitRelaxationRK4Integrator)
     if isnan(integrator.dt)
         error("time step size `dt` is NaN")
     end
+
+    #modify_dt_for_tstops!(integrator)
 
     # if the next iteration would push the simulation beyond the end time, set dt accordingly
     if integrator.t + integrator.dt > t_end ||
@@ -243,11 +247,13 @@ function step!(integrator::PairedExplicitRelaxationRK4Integrator)
         last_three_stages!(integrator, prob.p, alg)
     end
 
-    # handle callbacks
-    if callbacks isa CallbackSet
-        for cb in callbacks.discrete_callbacks
-            if cb.condition(integrator.u, integrator.t, integrator)
-                cb.affect!(integrator)
+    @trixi_timeit timer() "Step-Callbacks" begin
+        # handle callbacks
+        if callbacks isa CallbackSet
+            for cb in callbacks.discrete_callbacks
+                if cb.condition(integrator.u, integrator.t, integrator)
+                    cb.affect!(integrator)
+                end
             end
         end
     end

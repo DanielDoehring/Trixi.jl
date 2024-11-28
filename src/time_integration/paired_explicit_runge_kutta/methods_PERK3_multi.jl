@@ -105,7 +105,7 @@ end # struct PairedExplicitRK3Multi
 mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
                                                 Alg,
                                                 PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKMultiIntegrator
+               AbstractPairedExplicitRKMultiIntegrator{3}
     u::uType
     du::uType
     u_tmp::uType
@@ -146,7 +146,7 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType, P
                                                          Sol, F,
                                                          Alg,
                                                          PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKMultiParabolicIntegrator
+               AbstractPairedExplicitRKMultiParabolicIntegrator{3}
     u::uType
     du::uType
     u_tmp::uType

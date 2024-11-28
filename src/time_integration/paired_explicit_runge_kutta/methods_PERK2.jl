@@ -184,7 +184,7 @@ end
 # which are used in Trixi.
 mutable struct PairedExplicitRK2Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                            PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKSingleIntegrator
+               AbstractPairedExplicitRKSingleIntegrator{2}
     u::uType
     du::uType
     u_tmp::uType

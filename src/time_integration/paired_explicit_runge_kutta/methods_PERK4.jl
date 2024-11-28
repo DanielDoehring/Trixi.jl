@@ -94,7 +94,7 @@ end
 # which are used in Trixi.jl.
 mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                            PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKSingleIntegrator
+               AbstractPairedExplicitRKSingleIntegrator{4}
     u::uType
     du::uType
     u_tmp::uType
@@ -149,7 +149,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator, p, alg)
+@inline function last_three_stages!(integrator::AbstractPairedExplicitRKIntegrator{4}, p, alg)
     for stage in 1:2
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
@@ -189,7 +189,7 @@ end
     end
 end
 
-function step!(integrator::PairedExplicitRK4Integrator)
+function step!(integrator::AbstractPairedExplicitRKIntegrator{4})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -200,7 +200,7 @@ function step!(integrator::PairedExplicitRK4Integrator)
         error("time step size `dt` is NaN")
     end
 
-    modify_dt_for_tstops!(integrator)
+    #modify_dt_for_tstops!(integrator)
 
     # if the next iteration would push the simulation beyond the end time, set dt accordingly
     if integrator.t + integrator.dt > t_end ||
@@ -224,11 +224,13 @@ function step!(integrator::PairedExplicitRK4Integrator)
     integrator.iter += 1
     integrator.t += integrator.dt
 
-    # handle callbacks
-    if callbacks isa CallbackSet
-        for cb in callbacks.discrete_callbacks
-            if cb.condition(integrator.u, integrator.t, integrator)
-                cb.affect!(integrator)
+    @trixi_timeit timer() "Step-Callbacks" begin
+        # handle callbacks
+        if callbacks isa CallbackSet
+            for cb in callbacks.discrete_callbacks
+                if cb.condition(integrator.u, integrator.t, integrator)
+                    cb.affect!(integrator)
+                end
             end
         end
     end

@@ -5,6 +5,8 @@
 @muladd begin
 #! format: noindent
 
+# TODO: Make this structure to include the base scheme + options regarding 
+# solution of the nonlinear system!
 mutable struct PairedExplicitRelaxationRK4Multi <: AbstractPairedExplicitRKMulti
     const num_stage_evals_min::Int64
     const num_methods::Int64
@@ -43,11 +45,12 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType, 
                                                           Sol, F,
                                                           Alg,
                                                           PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRelaxationRKMultiIntegrator
+               AbstractPairedExplicitRelaxationRKMultiIntegrator{4}
     u::uType
     du::uType
     u_tmp::uType
     t::RealT
+    tdir::Real
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
@@ -57,6 +60,8 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType, 
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
     # Additional PERK register
     k1::uType
 
@@ -87,11 +92,12 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
                                                                    Sol, F,
                                                                    Alg,
                                                                    PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator
+               AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{4}
     u::uType
     du::uType
     u_tmp::uType
     t::RealT
+    tdir::Real
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
@@ -101,6 +107,8 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
     # Additional PERK register
     k1::uType
 
@@ -140,6 +148,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     k1 = zero(u0) # Additional PERK register
 
     t0 = first(ode.tspan)
+    tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
     ### Set datastructures for handling of level-dependent integration ###
@@ -188,16 +197,16 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
         integrator = PairedExplicitRelaxationRK4MultiParabolicIntegrator(u0, du, u_tmp,
-                                                                         t0, dt,
+                                                                         t0, tdir, dt,
                                                                          zero(dt),
                                                                          iter,
                                                                          ode.p,
                                                                          (prob = ode,),
-                                                                         ode.f,
-                                                                         alg,
+                                                                         ode.f, alg,
                                                                          PairedExplicitRKOptions(callback,
                                                                                                  ode.tspan;
                                                                                                  kwargs...),
+                                                                         false, true,
                                                                          false,
                                                                          k1,
                                                                          level_info_elements,
@@ -213,15 +222,17 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          gamma,
                                                                          du_tmp)
     else
-        integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp, t0, dt,
+        integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp,
+                                                                t0, tdir, dt,
                                                                 zero(dt),
                                                                 iter,
                                                                 ode.p,
-                                                                (prob = ode,), ode.f,
-                                                                alg,
+                                                                (prob = ode,),
+                                                                ode.f, alg,
                                                                 PairedExplicitRKOptions(callback,
                                                                                         ode.tspan;
                                                                                         kwargs...),
+                                                                false, true, 
                                                                 false,
                                                                 k1,
                                                                 level_info_elements,
@@ -248,52 +259,5 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     end
 
     return integrator
-end
-
-function step!(integrator::PairedExplicitRelaxationRK4MultiIntegrator)
-    @unpack prob = integrator.sol
-    @unpack alg = integrator
-    t_end = last(prob.tspan)
-    callbacks = integrator.opts.callback
-
-    if isnan(integrator.dt)
-        error("time step size `dt` is NaN")
-    end
-
-    # if the next iteration would push the simulation beyond the end time, set dt accordingly
-    if integrator.t + integrator.dt > t_end ||
-       isapprox(integrator.t + integrator.dt, t_end)
-        integrator.dt = t_end - integrator.t
-        terminate!(integrator)
-    end
-
-    @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        PERK_k1!(integrator, prob.p)
-        PERK_k2!(integrator, prob.p, alg)
-
-        for stage in 3:(alg.num_stages - 3)
-            PERK_ki!(integrator, prob.p, alg, stage)
-        end
-
-        last_three_stages!(integrator, prob.p, alg)
-    end
-
-    @trixi_timeit timer() "Step-Callbacks" begin
-        # handle callbacks
-        if callbacks isa CallbackSet
-            foreach(callbacks.discrete_callbacks) do cb
-                if cb.condition(integrator.u, integrator.t, integrator)
-                    cb.affect!(integrator)
-                end
-                return nothing
-            end
-        end
-    end
-
-    # respect maximum number of iterations
-    if integrator.iter >= integrator.opts.maxiters && !integrator.finalstep
-        @warn "Interrupted. Larger maxiters is needed."
-        terminate!(integrator)
-    end
 end
 end # @muladd

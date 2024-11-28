@@ -145,8 +145,8 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/"
 #ode_algorithm = Trixi.PairedExplicitRK4(12, path)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(12, path)
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
 
 max_level = Trixi.maximum_level(mesh.tree)
 

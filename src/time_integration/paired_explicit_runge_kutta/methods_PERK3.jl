@@ -179,7 +179,7 @@ end
 # which are used in Trixi.jl.
 mutable struct PairedExplicitRK3Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                            PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKSingleIntegrator
+               AbstractPairedExplicitRKSingleIntegrator{3}
     u::uType
     du::uType
     u_tmp::uType
