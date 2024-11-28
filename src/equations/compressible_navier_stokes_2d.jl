@@ -148,7 +148,7 @@ end
 function flux(u, gradients, orientation::Integer,
               equations::CompressibleNavierStokesDiffusion2D)
     # Here, `u` is assumed to be the "transformed" variables specified by `gradient_variable_transformation`.
-    rho, v1, v2, _ = convert_transformed_to_primitive(u, equations)
+    _, v1, v2, _ = convert_transformed_to_primitive(u, equations)
     # Here `gradients` is assumed to contain the gradients of the primitive variables (rho, v1, v2, T)
     # either computed directly or reverse engineered from the gradient of the entropy variables
     # by way of the `convert_gradient_variables` function.
@@ -286,13 +286,6 @@ end
     v1 = u[2] / rho
     v2 = u[3] / rho
     return SVector(v1, v2)
-end
-
-@inline function velocity(u, orientation::Int,
-                          equations::CompressibleNavierStokesDiffusion2D)
-    rho = u[1]
-    v = u[orientation + 1] / rho
-    return v
 end
 
 @inline function enstrophy(u, gradients, equations::CompressibleNavierStokesDiffusion2D)

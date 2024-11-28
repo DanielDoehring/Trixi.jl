@@ -32,13 +32,15 @@ using Trixi
 # Corresponds essentially to fixing the Mach number
 alpha = 0.5
 # We want kappa = cp * mu = mu_bar to ensure constant enthalpy
-prandtl_number() = 1
+prandtl_number() = 3 / 4
 
 ### Free choices: ###
 gamma() = 5 / 3
 
-mu() = 0.15
-mu_bar() = mu() / (gamma() - 1) # Re-scaled viscosity
+# In Margolin et al., the Navier-Stokes equations are given for an 
+# isotropic stress tensor τ, i.e., ∇ ⋅ τ = μ Δu 
+mu_isotropic() = 0.15
+mu_bar() = mu_isotropic() / (gamma() - 1) # Re-scaled viscosity
 
 rho_0() = 1
 v() = 1 # Shock speed
@@ -77,56 +79,57 @@ function initial_condition_viscous_shock(x, t, equations)
     u = v() * (1 - w)
     p = p_0() * 1 / w * (1 + (gamma() - 1) / 2 * Ma()^2 * (1 - w^2))
 
-    return prim2cons(SVector(rho, u, p), equations)
+    return prim2cons(SVector(rho, u, 0, 0, p), equations)
 end
 initial_condition = initial_condition_viscous_shock
 
 ###############################################################################
 # semidiscretization of the ideal compressible Navier-Stokes equations
 
-equations = CompressibleEulerEquations1D(gamma())
-equations_parabolic = CompressibleNavierStokesDiffusion1D(equations, mu = mu_bar(),
+equations = CompressibleEulerEquations3D(gamma())
+
+# Trixi implements the stress tensor in deviatoric form, thus we need to 
+# convert the "isotropic viscosity" to the "deviatoric viscosity"
+mu_deviatoric() = mu_bar() * 3 / 4
+equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu_deviatoric(),
                                                           Prandtl = prandtl_number(),
                                                           gradient_variables = GradientVariablesPrimitive())
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_hlle)
 
-coordinates_min = -domain_length / 2
-coordinates_max = domain_length / 2
+coordinates_min = (-domain_length / 2, -domain_length / 2, -domain_length / 2)
+coordinates_max = (domain_length / 2, domain_length / 2, domain_length / 2)
 
-refinement_patches = ((type = "box", coordinates_min = (-1.0,),
-                       coordinates_max = (1.0,)),)
-
-mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 3,
-                periodicity = false,
-                refinement_patches = refinement_patches,
-                n_cells_max = 30_000)
+trees_per_dimension = (8, 2, 2)
+mesh = P4estMesh(trees_per_dimension,
+                 polydeg = 3, initial_refinement_level = 0,
+                 coordinates_min = coordinates_min, coordinates_max = coordinates_max,
+                 periodicity = (false, true, true))
 
 ### Inviscid boundary conditions ###
 
 # Prescribe pure influx based on initial conditions
-function boundary_condition_inflow(u_inner, orientation::Integer, normal_direction, x, t,
+function boundary_condition_inflow(u_inner, normal_direction::AbstractVector, x, t,
                                    surface_flux_function,
-                                   equations::CompressibleEulerEquations1D)
+                                   equations::CompressibleEulerEquations3D)
     u_cons = initial_condition_viscous_shock(x, t, equations)
-    flux = Trixi.flux(u_cons, orientation, equations)
+    flux = Trixi.flux(u_cons, normal_direction, equations)
 
     return flux
 end
 
 # Completely free outflow
-function boundary_condition_outflow(u_inner, orientation::Integer, normal_direction, x, t,
+function boundary_condition_outflow(u_inner, normal_direction::AbstractVector, x, t,
                                     surface_flux_function,
-                                    equations::CompressibleEulerEquations1D)
+                                    equations::CompressibleEulerEquations3D)
     # Calculate the boundary flux entirely from the internal solution state
-    flux = Trixi.flux(u_inner, orientation, equations)
+    flux = Trixi.flux(u_inner, normal_direction, equations)
 
     return flux
 end
 
-boundary_conditions = (; x_neg = boundary_condition_inflow,
-                       x_pos = boundary_condition_outflow)
+boundary_conditions = Dict(:x_neg => boundary_condition_inflow,
+                           :x_pos => boundary_condition_outflow)
 
 ### Viscous boundary conditions ###
 # For the viscous BCs, we use the known analytical solution
@@ -146,8 +149,8 @@ end
 
 boundary_condition_parabolic = BoundaryConditionNavierStokesWall(velocity_bc, heat_bc)
 
-boundary_conditions_parabolic = (; x_neg = boundary_condition_parabolic,
-                                 x_pos = boundary_condition_parabolic)
+boundary_conditions_parabolic = Dict(:x_neg => boundary_condition_parabolic,
+                                     :x_pos => boundary_condition_parabolic)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
@@ -160,43 +163,21 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
 ode = semidiscretize(semi, tspan)
-ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
-alive_callback = AliveCallback(alive_interval = 10000)
+alive_callback = AliveCallback(alive_interval = 10)
 
-analysis_interval = 1_000_000
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     analysis_errors = [:l2_error_primitive, :linf_error_primitive])
+analysis_interval = 100
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 
 ###############################################################################
 # run the simulation
 
-dtRatios = [1, 0.5]
-
-# For diffusion-dominated case we need four times the timestep between the methods
-Stages = [10, 6]
-
-path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NavierStokes_ViscousShock/"
-
-#ode_algorithm = Trixi.PairedExplicitRK4(10, path)
-
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
-
-max_level = Trixi.maximum_level(mesh.tree)
-
-dtRef = 2e-2 # Single
-dtRef = 2e-2/8 # Multi refined
-
-dt = dtRef / 4.0^(max_level - 3)
-
-sol = Trixi.solve(ode, ode_algorithm,
-                  dt = dt,
-                  save_everystep = false, callback = callbacks,
-                  maxiters = typemax(Int));
+time_int_tol = 1e-8
+sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol,
+            dt = 1e-3, ode_default_options()..., callback = callbacks)
 
 summary_callback() # print the timer summary
