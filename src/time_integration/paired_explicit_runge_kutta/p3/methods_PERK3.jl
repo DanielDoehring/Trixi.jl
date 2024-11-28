@@ -310,4 +310,6 @@ function Base.resize!(integrator::PairedExplicitRK3Integrator, new_size)
     resize!(integrator.k1, new_size)
     resize!(integrator.kS1, new_size)
 end
+
+include("methods_PERK3_multi.jl")
 end # @muladd

@@ -149,7 +149,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitRKIntegrator{4}, p, alg)
+@inline function last_three_stages!(integrator::AbstractPairedExplicitRKIntegrator{4},
+                                    p, alg)
     for stage in 1:2
         @threaded for u_ind in eachindex(integrator.u)
             integrator.u_tmp[u_ind] = integrator.u[u_ind] +
@@ -241,4 +242,11 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{4})
         terminate!(integrator)
     end
 end
+
+# Multirate/partitioned method
+include("methods_PERK4_multi.jl")
+
+# Paired Explicit Relaxation Runge-Kutta (PERRK) methods
+include("methods_PERRK4.jl")
+include("methods_PERRK4_multi.jl")
 end # @muladd

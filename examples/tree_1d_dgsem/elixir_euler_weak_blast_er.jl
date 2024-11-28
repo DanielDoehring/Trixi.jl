@@ -46,8 +46,8 @@ analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
-                                     #analysis_filename = "analysis_ER.dat",
-                                     analysis_filename = "analysis_standard.dat",
+                                     analysis_filename = "analysis_ER.dat",
+                                     #analysis_filename = "analysis_standard.dat",
                                      save_analysis = true)
 
 cfl = 1.7
@@ -67,17 +67,16 @@ path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k3/"
 
 
 #ode_alg = Trixi.PairedExplicitRK4(Stages, path)
-
 #ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages, path)
 
 
 dtRatios = [1, 0.5, 0.25]
 Stages = [14, 8, 5]
 
-ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 # NOTE: 3 Newton iterations suffice to ensure exact entropy conservation!
-#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,

@@ -189,7 +189,9 @@ end
                  integrator.level_info_mortars_acc[1])
 end
 
-@inline function PERKMulti_intermediate_stage!(integrator, alg, stage)
+@inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator{ORDER},
+                                                                 AbstractPairedExplicitRelaxationRKMultiIntegrator{ORDER}},
+                                               alg, stage) where {ORDER}
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
 
@@ -244,26 +246,6 @@ end
             integrator.u_tmp[u_ind] += integrator.dt *
                                        alg.a_matrices[level, 2, stage - 2] *
                                        integrator.du[u_ind]
-        end
-    end
-    =#
-
-    #=
-    ### CARE: Optimized implementation for PERK4 case:  Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
-    for level in 1:alg.max_eval_levels[stage]
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      (alg.a_matrices[level, 1, stage - 2] *
-                                       integrator.k1[u_ind] +
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[u_ind])
-        end
-    end
-    for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt * integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
         end
     end
     =#
@@ -427,25 +409,12 @@ end
 # extension or by the NLsolve-specific code loaded by Requires.jl
 function solve_a_butcher_coeffs_unknown! end
 
-### Standalone/Single PERK methods ###
-# Basic implementation of the second-order paired explicit Runge-Kutta (PERK) method
-include("methods_PERK2.jl")
-# Slightly customized implementation of the third-order PERK method
-include("methods_PERK3.jl")
-# Basic implementation of the fourth-order PERK method
-include("methods_PERK4.jl")
-
-### Multi-level/partitioned PERK methods ###
-include("methods_PERK3_multi.jl")
-include("methods_PERK4_multi.jl")
-include("methods_PERK4_multi_parabolic.jl")
-
+# Paired Explicit Relaxation RK (PERRK) helpers
+include("entropy_relaxation.jl")
+# Multirate/partitioned helpers
 include("partitioning.jl")
 
-### Paired Explicit Relaxation RK (PERRK) methods ###
-include("entropy_relaxation.jl")
-
-include("methods_PERRK4.jl")
-include("methods_PERRK4_multi.jl")
-include("methods_PERRK4_multi_parabolic.jl")
+include("p2/methods_PERK2.jl")
+include("p3/methods_PERK3.jl")
+include("p4/methods_PERK4.jl")
 end # @muladd
