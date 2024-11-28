@@ -6,40 +6,10 @@
 @muladd begin
 #! format: noindent
 
-# TODO: Make this structure to include the base scheme + options regarding 
-# solution of the nonlinear system!
-@doc raw"""
-    PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString, dt_opt = nothing;
-                      c_const = 1.0f0)
-
-    Parameters:
-    - `num_stages` (`Int`): Number of stages in the paired explicit Runge-Kutta (P-ERK) method.
-    - `base_path_a_coeffs` (`AbstractString`): Path to a file containing some coefficients in the A-matrix in 
-      the Butcher tableau of the Runge Kutta method.
-      The matrix should be stored in a text file at `joinpath(base_path_a_coeffs, "a_$(num_stages).txt")` and separated by line breaks.
-    - `dt_opt` (`Float64`, optional): Optimal time step size for the simulation setup. Can be `nothing` if it is unknown. 
-       In this case the optimal CFL number cannot be computed and the [`StepsizeCallback`](@ref) cannot be used.
-    - `c_const` (`Float64`, optional): Value of abscissae $c$ in the Butcher tableau for the optimized coefficients. 
-       Default is 1.0.
-
-The following structures and methods provide an implementation of
-the fourth-order paired explicit Runge-Kutta (P-ERK) method
-optimized for a certain simulation setup (PDE, IC & BC, Riemann Solver, DG Solver).
-The method has been proposed in 
-- D. Doehring, L. Christmann, M. Schlottke-Lakemper, G. J. Gassner and M. Torrilhon (2024).
-  Fourth-Order Paired-Explicit Runge-Kutta Methods
-  [DOI:10.48550/arXiv.2408.05470](https://doi.org/10.48550/arXiv.2408.05470)
-"""
-mutable struct PairedExplicitRelaxationRK4 <: AbstractPairedExplicitRKSingle
-    const num_stages::Int # S
-
-    a_matrix::Matrix{Float64}
-    # This part of the Butcher array matrix A is constant for all PERK methods, i.e., 
-    # regardless of the optimized coefficients.
-    a_matrix_constant::Matrix{Float64}
-    c::Vector{Float64}
-    dt_opt::Union{Float64, Nothing}
-end # struct PairedExplicitRelaxationRK4
+struct PairedExplicitRelaxationRK4 <: AbstractPairedExplicitRKSingle
+    PERK4::PairedExplicitRK4
+    # TODO: Nonlinear solver options
+end
 
 # Constructor for previously computed A Coeffs
 function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString,
@@ -49,8 +19,9 @@ function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractStr
                                                                                base_path_a_coeffs;
                                                                                c_const)
 
-    return PairedExplicitRelaxationRK4(num_stages, a_matrix, a_matrix_constant, c,
-                                       dt_opt)
+    return PairedExplicitRelaxationRK4(PairedExplicitRK4(num_stages, a_matrix,
+                                                         a_matrix_constant, c,
+                                                         dt_opt))
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -101,7 +72,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
     integrator = PairedExplicitRelaxationRK4Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
                                                        iter,
                                                        ode.p,
-                                                       (prob = ode,), ode.f, alg,
+                                                       (prob = ode,), ode.f,
+                                                       # Note that here the `PERK4` algorithm is passed on as 
+                                                       # `alg` of the integrator
+                                                       alg.PERK4,
                                                        PairedExplicitRKOptions(callback,
                                                                                ode.tspan;
                                                                                kwargs...),

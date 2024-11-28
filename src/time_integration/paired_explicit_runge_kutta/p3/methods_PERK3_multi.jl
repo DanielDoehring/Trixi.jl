@@ -96,7 +96,7 @@ mutable struct PairedExplicitRK3Multi <: AbstractPairedExplicitRKMulti
 
         return newPairedExplicitRK3Multi
     end
-end # struct PairedExplicitRK3Multi
+end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
@@ -249,7 +249,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     ### Done with setting up for handling of level-dependent integration ###
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
-        integrator = PairedExplicitRK3MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir, dt,
+        integrator = PairedExplicitRK3MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir,
+                                                               dt,
                                                                zero(dt), iter,
                                                                ode.p,
                                                                (prob = ode,), ode.f,
@@ -271,10 +272,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                                -1, n_levels,
                                                                du_tmp)
     else
-        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp, t0, tdir, dt, 
+        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp, t0, tdir, dt,
                                                       zero(dt), iter,
                                                       ode.p,
-                                                      (prob = ode,), ode.f, 
+                                                      (prob = ode,), ode.f,
                                                       alg,
                                                       PairedExplicitRKOptions(callback,
                                                                               ode.tspan;

@@ -5,37 +5,18 @@
 @muladd begin
 #! format: noindent
 
-# TODO: Make this structure to include the base scheme + options regarding 
-# solution of the nonlinear system!
-mutable struct PairedExplicitRelaxationRK4Multi <: AbstractPairedExplicitRKMulti
-    const num_stage_evals_min::Int64
-    const num_methods::Int64
-    const num_stages::Int64
-    const dt_ratios::Vector{Float64}
+struct PairedExplicitRelaxationRK4Multi <: AbstractPairedExplicitRKMulti
+    PERK4Multi::PairedExplicitRK4Multi
+    # TODO: Nonlinear solver options
+end
 
-    a_matrices::Array{Float64, 3}
-    a_matrix_constant::Matrix{Float64}
-    c::Vector{Float64}
-    active_levels::Vector{Vector{Int64}}
-    max_active_levels::Vector{Int64}
-    max_eval_levels::Vector{Int64}
-
-    function PairedExplicitRelaxationRK4Multi(stages::Vector{Int64},
-                                              base_path_a_coeffs::AbstractString,
-                                              dt_ratios)
-        newPERK4_Multi = new(minimum(stages),
-                             length(stages),
-                             maximum(stages),
-                             dt_ratios)
-
-        newPERK4_Multi.a_matrices, newPERK4_Multi.a_matrix_constant, newPERK4_Multi.c,
-        newPERK4_Multi.active_levels, newPERK4_Multi.max_active_levels, newPERK4_Multi.max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages,
-                                                                                                                                           newPERK4_Multi.num_stages,
-                                                                                                                                           base_path_a_coeffs)
-
-        return newPERK4_Multi
-    end
-end # struct PairedExplicitRelaxationRK4Multi
+function PairedExplicitRelaxationRK4Multi(stages::Vector{Int64},
+                                          base_path_a_coeffs::AbstractString,
+                                          dt_ratios)
+    return PairedExplicitRelaxationRK4Multi(PairedExplicitRK4Multi(stages,
+                                                                   base_path_a_coeffs,
+                                                                   dt_ratios))
+end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
@@ -202,7 +183,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          iter,
                                                                          ode.p,
                                                                          (prob = ode,),
-                                                                         ode.f, alg,
+                                                                         ode.f, 
+                                                                         # Note that here the `PERK4Multi` algorithm is passed on as 
+                                                                         # `alg` of the integrator
+                                                                         alg.PERK4Multi,
                                                                          PairedExplicitRKOptions(callback,
                                                                                                  ode.tspan;
                                                                                                  kwargs...),
@@ -228,7 +212,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                 iter,
                                                                 ode.p,
                                                                 (prob = ode,),
-                                                                ode.f, alg,
+                                                                ode.f, 
+                                                                # Note that here the `PERK4Multi` algorithm is passed on as 
+                                                                # `alg` of the integrator
+                                                                alg.PERK4Multi,
                                                                 PairedExplicitRKOptions(callback,
                                                                                         ode.tspan;
                                                                                         kwargs...),
