@@ -287,7 +287,6 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
     integrator.iter += 1
     integrator.t += integrator.dt
 
-    # handle callbacks
     @trixi_timeit timer() "Step-Callbacks" begin
         # handle callbacks
         if callbacks isa CallbackSet
@@ -318,4 +317,7 @@ end
 
 # Multirate/partitioned method
 include("methods_PERK3_multi.jl")
+
+# Paired Explicit Relaxation Runge-Kutta (PERRK) methods
+include("methods_PERRK3.jl")
 end # @muladd

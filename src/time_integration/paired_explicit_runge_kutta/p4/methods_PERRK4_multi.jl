@@ -307,19 +307,19 @@ end
     S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
     # Note: We re-use `k1` for the "direction"
-    dir_wrap = wrap_array(integrator.k1, p)
+    k1_wrap = wrap_array(integrator.k1, p)
 
     #=
     # Bisection for gamma
     @trixi_timeit timer() "ER: Bisection" begin
-        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
                          mesh, equations, dg, cache)
     end
     =#
 
     # Newton search for gamma
     @trixi_timeit timer() "ER: Newton" begin
-        gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+        gamma_newton!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
                       mesh, equations, dg, cache)
     end
 

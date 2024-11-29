@@ -5,50 +5,49 @@
 @muladd begin
 #! format: noindent
 
-struct PairedExplicitRelaxationRK2 <: AbstractPairedExplicitRKSingle
-    PERK2::PairedExplicitRK2
+struct PairedExplicitRelaxationRK3 <: AbstractPairedExplicitRKSingle
+    PERK3::PairedExplicitRK3
     # TODO: Nonlinear solver options
 end
 
-# Constructor that reads the coefficients from a file
-function PairedExplicitRelaxationRK2(num_stages,
-                                     base_path_monomial_coeffs::AbstractString,
-                                     dt_opt = nothing,
-                                     bS = 1.0, cS = 0.5)
-    return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages,
-                                                         base_path_monomial_coeffs,
-                                                         dt_opt, bS, cS))
+# Constructor for previously computed A Coeffs
+function PairedExplicitRelaxationRK3(num_stages, base_path_a_coeffs::AbstractString,
+                                     dt_opt = nothing;
+                                     cS2 = 1.0f0)
+    return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
+                                                         base_path_a_coeffs,
+                                                         dt_opt; cS2 = cS2))
 end
 
-# Constructor that calculates the coefficients with polynomial optimizer from a
-# semidiscretization
-function PairedExplicitRelaxationRK2(num_stages, tspan,
+# Constructor that computes Butcher matrix A coefficients from a semidiscretization
+function PairedExplicitRelaxationRK3(num_stages, tspan,
                                      semi::AbstractSemidiscretization;
-                                     verbose = false,
-                                     bS = 1.0, cS = 0.5)
-    return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages, tspan, semi;
+                                     verbose = false, cS2 = 1.0f0)
+    return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
+                                                         tspan,
+                                                         semi;
                                                          verbose = verbose,
-                                                         bS = bS, cS = cS))
+                                                         cS2 = cS2))
 end
 
-# Constructor that calculates the coefficients with polynomial optimizer from a
-# list of eigenvalues
-function PairedExplicitRelaxationRK2(num_stages, tspan, eig_vals::Vector{ComplexF64};
-                                     verbose = false,
-                                     bS = 1.0, cS = 0.5)
-    return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages, tspan, eig_vals;
+# Constructor that calculates the coefficients with polynomial optimizer from a list of eigenvalues
+function PairedExplicitRelaxationRK3(num_stages, tspan, eig_vals::Vector{ComplexF64};
+                                     verbose = false, cS2 = 1.0f0)
+    return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
+                                                         tspan,
+                                                         eig_vals;
                                                          verbose = verbose,
-                                                         bS = bS, cS = cS))
+                                                         cS2 = cS2))
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
-# which are used in Trixi.
-mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType, Params, Sol,
+# which are used in Trixi.jl.
+mutable struct PairedExplicitRelaxationRK3Integrator{RealT <: Real, uType, Params, Sol,
                                                      F, Alg,
                                                      PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRelaxationRKSingleIntegrator{2}
+               AbstractPairedExplicitRelaxationRKSingleIntegrator{3}
     u::uType
     du::uType
     u_tmp::uType
@@ -65,19 +64,22 @@ mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType, Param
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # Additional PERK register
+    # Additional PERK3 registers
     k1::uType
+    kS1::uType
     # Entropy Relaxation addition
     gamma::RealT
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2;
+function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
     u_tmp = zero(u0)
 
-    k1 = zero(u0) # Additional PERK register
+    # Additional PERK3 registers
+    k1 = zero(u0)
+    kS1 = zero(u0)
 
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
@@ -86,18 +88,18 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2;
     # For entropy relaxation
     gamma = one(eltype(u0))
 
-    integrator = PairedExplicitRelaxationRK2Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
+    integrator = PairedExplicitRelaxationRK3Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
                                                        iter,
                                                        ode.p,
                                                        (prob = ode,), ode.f,
-                                                       # Note that here the `PERK4` algorithm is passed on as 
+                                                       # Note that here the `PERK3` algorithm is passed on as 
                                                        # `alg` of the integrator
-                                                       alg.PERK2,
+                                                       alg.PERK3,
                                                        PairedExplicitRKOptions(callback,
                                                                                ode.tspan;
                                                                                kwargs...),
                                                        false, true, false,
-                                                       k1,
+                                                       k1, kS1,
                                                        gamma)
 
     # initialize callbacks
@@ -113,7 +115,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2;
     return integrator
 end
 
-function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{2})
+function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -142,26 +144,35 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{2})
         PERK_k1!(integrator, prob.p)
 
         k1_wrap = wrap_array(integrator.k1, prob.p)
-        dS = alg.b1 * integrator.dt *
+        dS = 1 / 6 * integrator.dt * # b1 = 1/6
              int_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache)
 
         PERK_k2!(integrator, prob.p, alg)
 
-        # Higher stages
-        for stage in 3:(alg.num_stages)
+        for stage in 3:(alg.num_stages - 1)
             PERK_ki!(integrator, prob.p, alg, stage)
         end
 
         du_wrap = wrap_array(integrator.du, prob.p)
         u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
-        dS += alg.bS * integrator.dt *
+        dS += 1 / 6 * integrator.dt * # b_{S-1} = 1/6
+              int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+
+        # We need to store `du` of the S-1 stage in `kS1` for the final update:
+        @threaded for i in eachindex(integrator.u)
+            integrator.kS1[i] = integrator.du[i]
+        end
+
+        PERK_ki!(integrator, prob.p, alg, alg.num_stages)
+
+        dS += 2 / 3 * integrator.dt * # b_{S} = 2/3
               int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
         # Note: We reuse `k1` for the "direction"
         @threaded for i in eachindex(integrator.u)
             integrator.k1[i] = integrator.dt *
-                               (alg.b1 * integrator.k1[i] +
-                                alg.bS * integrator.du[i])
+                               (integrator.k1[i] + integrator.kS1[i] +
+                                4.0 * integrator.du[i]) / 6.0
         end
 
         #=
