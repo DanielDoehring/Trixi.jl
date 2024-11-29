@@ -87,6 +87,7 @@ function relaxation_solver(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
     gamma_min = relaxation_solver.gamma_min
     gamma_max = relaxation_solver.gamma_max
     gamma_tol = relaxation_solver.gamma_tol
+
     max_iterations = relaxation_solver.max_iterations
 
     @threaded for element in eachelement(dg, cache)
