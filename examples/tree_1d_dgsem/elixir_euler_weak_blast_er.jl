@@ -55,7 +55,7 @@ cfl = 1.0
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         stepsize_callback)
 
 ###############################################################################
