@@ -50,7 +50,7 @@ end
 end
 
 @inline function entropy_difference(gamma, S_old, dS, u_gamma_dir, mesh,
-                                    equations, dg, cache)
+                                    equations, dg::DG, cache)
     return integrate(entropy_math, u_gamma_dir, mesh, equations, dg, cache) -
            S_old - gamma * dS
 end
@@ -81,14 +81,12 @@ function EntropyRelaxationNewton(; step_scaling = 1.0, root_tol = 1e-14,
     return EntropyRelaxationNewton(step_scaling, root_tol, max_iterations)
 end
 
-function relaxation_solver(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
-                           mesh, equations, dg, cache,
-                           relaxation_solver::EntropyRelaxationBisection)
-    gamma_min = relaxation_solver.gamma_min
-    gamma_max = relaxation_solver.gamma_max
-    gamma_tol = relaxation_solver.gamma_tol
-
-    max_iterations = relaxation_solver.max_iterations
+function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
+                            u_tmp_wrap, u_wrap, dir_wrap,
+                            S_old, dS,
+                            mesh, equations, dg::DG, cache,
+                            relaxation_solver::EntropyRelaxationBisection)
+    @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -132,12 +130,12 @@ function relaxation_solver(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
     end
 end
 
-function relaxation_solver(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
-                           mesh, equations, dg, cache,
-                           relaxation_solver::EntropyRelaxationNewton)
-    step_scaling = relaxation_solver.step_scaling
-    root_tol = relaxation_solver.root_tol
-    max_iterations = relaxation_solver.max_iterations
+function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
+                            u_tmp_wrap, u_wrap, dir_wrap,
+                            S_old, dS,
+                            mesh, equations, dg::DG, cache,
+                            relaxation_solver::EntropyRelaxationNewton)
+    @unpack step_scaling, root_tol, max_iterations = relaxation_solver
 
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
     iterations = 0
@@ -147,13 +145,11 @@ function relaxation_solver(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
                                                 integrator.gamma *
                                                 dir_wrap[.., element]
         end
-        r_gamma = entropy_difference(integrator.gamma, S_old, dS, u_tmp_wrap, mesh,
-                                     equations,
-                                     dg, cache)
+        r_gamma = entropy_difference(integrator.gamma, S_old, dS, u_tmp_wrap,
+                                     mesh, equations, dg, cache)
         dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
 
         integrator.gamma -= step_scaling * r_gamma / dr
-
         iterations += 1
     end
 

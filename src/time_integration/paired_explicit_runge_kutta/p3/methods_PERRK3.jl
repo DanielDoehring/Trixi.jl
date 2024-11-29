@@ -182,12 +182,13 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
                                 4.0 * integrator.du[i]) / 6.0
         end
 
-        @trixi_timeit timer() "Relaxation solver" relaxation_solver(integrator,
-                                                                    u_tmp_wrap, u_wrap,
-                                                                    k1_wrap, S_old, dS,
-                                                                    mesh, equations, dg,
-                                                                    cache,
-                                                                    integrator.relaxation_solver)
+        @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
+                                                                     u_tmp_wrap, u_wrap,
+                                                                     k1_wrap,
+                                                                     S_old, dS,
+                                                                     mesh, equations,
+                                                                     dg, cache,
+                                                                     integrator.relaxation_solver)
 
         integrator.iter += 1
         # Check if due to entropy relaxation the final step is not reached

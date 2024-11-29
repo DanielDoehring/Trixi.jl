@@ -154,12 +154,13 @@ end
     # Note: We re-use `k1` for the "direction"
     k1_wrap = wrap_array(integrator.k1, p)
 
-    @trixi_timeit timer() "Relaxation solver" relaxation_solver(integrator,
-                                                                u_tmp_wrap, u_wrap,
-                                                                k1_wrap, S_old, dS,
-                                                                mesh, equations, dg,
-                                                                cache,
-                                                                integrator.relaxation_solver)
+    @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
+                                                                 u_tmp_wrap, u_wrap,
+                                                                 k1_wrap,
+                                                                 S_old, dS,
+                                                                 mesh, equations,
+                                                                 dg, cache,
+                                                                 integrator.relaxation_solver)
 
     integrator.iter += 1
     # Check if due to entropy relaxation the final step is not reached
