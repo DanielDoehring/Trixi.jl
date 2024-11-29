@@ -28,7 +28,7 @@ mutable struct PairedExplicitRelaxationRK3MultiIntegrator{RealT <: Real, uType, 
                                                           Sol, F,
                                                           Alg,
                                                           PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRelaxationRKMultiIntegrator{4}
+               AbstractPairedExplicitRelaxationRKMultiIntegrator{3}
     u::uType
     du::uType
     u_tmp::uType
@@ -76,7 +76,7 @@ mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real
                                                                    Sol, F,
                                                                    Alg,
                                                                    PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{4}
+               AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{3}
     u::uType
     du::uType
     u_tmp::uType

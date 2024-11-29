@@ -46,8 +46,8 @@ analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
-                                     analysis_filename = "analysis_ER.dat",
                                      #analysis_filename = "analysis_standard.dat",
+                                     analysis_filename = "analysis_ER.dat",
                                      save_analysis = true)
 
 cfl = 1.0
@@ -83,9 +83,10 @@ Stages = [16, 8, 4]
 path = basepath * "p3/"
 
 #ode_alg = Trixi.PairedExplicitRK3(16, path)
-ode_alg = Trixi.PairedExplicitRelaxationRK3(16, path)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(16, path)
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
 
 
 # p = 4
