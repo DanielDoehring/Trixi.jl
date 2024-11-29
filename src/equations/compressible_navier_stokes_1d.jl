@@ -262,12 +262,6 @@ end
     return v1
 end
 
-@inline function velocity(u, equations::CompressibleNavierStokesDiffusion1D)
-    rho = u[1]
-    v1 = u[2] / rho
-    return v1
-end
-
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,
                                                                         <:Adiabatic})(flux_inner,
                                                                                       u_inner,

@@ -71,8 +71,8 @@ EdgeLength = 20.0
 
 N_passes = 1
 T_end = EdgeLength * N_passes
-#tspan = (0.0, T_end)
-tspan = (0.0, 0.1)
+tspan = (0.0, T_end)
+#tspan = (0.0, 0.1)
 
 """
     initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerEquations2D)
@@ -165,7 +165,7 @@ amr_callback = AMRCallback(semi, amr_controller,
 alive_callback = AliveCallback(alive_interval = 1000)
 
 callbacks = CallbackSet(summary_callback,
-                        amr_callback,
+                        #amr_callback,
                         alive_callback,
                         analysis_callback)
 
