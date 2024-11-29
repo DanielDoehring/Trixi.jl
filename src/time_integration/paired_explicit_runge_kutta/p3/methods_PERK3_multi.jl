@@ -86,7 +86,7 @@ end
 function PairedExplicitRK3Multi(stages::Vector{Int64},
                                 base_path_a_coeffs::AbstractString,
                                 dt_ratios,
-                                cS2_::Float64 = 1.0)
+                                cS2::Float64 = 1.0)
     num_stages = maximum(stages)
 
     a_matrices, c,
@@ -95,7 +95,7 @@ function PairedExplicitRK3Multi(stages::Vector{Int64},
     max_eval_levels = ComputePERK3_Multi_ButcherTableau(stages,
                                                         num_stages,
                                                         base_path_a_coeffs,
-                                                        cS2_)
+                                                        cS2)
 
     return PairedExplicitRK3Multi(minimum(stages), length(stages), num_stages,
                                   dt_ratios,
