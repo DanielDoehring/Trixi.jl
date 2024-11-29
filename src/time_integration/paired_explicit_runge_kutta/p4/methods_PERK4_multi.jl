@@ -6,13 +6,15 @@
 #! format: noindent
 
 function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
-                                           base_path_a_coeffs::AbstractString)
+                                           base_path_a_coeffs::AbstractString,
+                                           c_const = 1.0)
 
     # Current approach: Use ones (best internal stability properties)
-    c = ones(num_stages)
+    c = c_const * ones(num_stages)
     c[1] = 0.0
 
-    c[num_stages - 3] = 1.0 # TODO: This is in principle variable (c_const)
+    cS3 = c_const
+    c[num_stages - 3] = cS3
     c[num_stages - 2] = 0.479274057836310
     c[num_stages - 1] = sqrt(3) / 6 + 0.5
     c[num_stages] = -sqrt(3) / 6 + 0.5
@@ -71,8 +73,8 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
         end
     end
     # Shared matrix
-    a_matrix_constant = [(0.479274057836310-0.114851811257441) 0.1397682537005989 0.1830127018922191
-                         0.114851811257441 0.648906880894214 0.028312163512968]
+    a_matrix_constant = [(0.479274057836310-(0.114851811257441 / cS3)) 0.1397682537005989 0.1830127018922191
+                         (0.114851811257441/cS3) 0.648906880894214 0.028312163512968]
 
     max_active_levels = maximum.(active_levels)
     max_eval_levels = maximum.(eval_levels)
@@ -99,7 +101,8 @@ end
 
 function PairedExplicitRK4Multi(stages::Vector{Int64},
                                 base_path_a_coeffs::AbstractString,
-                                dt_ratios)
+                                dt_ratios;
+                                c_const = 1.0f0)
     num_stages = maximum(stages)
 
     a_matrices,
@@ -107,7 +110,8 @@ function PairedExplicitRK4Multi(stages::Vector{Int64},
     active_levels,
     max_active_levels,
     max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages, num_stages,
-                                                        base_path_a_coeffs)
+                                                        base_path_a_coeffs,
+                                                        c_const)
 
     return PairedExplicitRK4Multi(minimum(stages), length(stages), num_stages,
                                   dt_ratios,

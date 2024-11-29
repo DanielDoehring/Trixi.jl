@@ -85,7 +85,7 @@ end
 # Constructor for previously computed A Coeffs
 function PairedExplicitRK3Multi(stages::Vector{Int64},
                                 base_path_a_coeffs::AbstractString,
-                                dt_ratios,
+                                dt_ratios;
                                 cS2::Float64 = 1.0)
     num_stages = maximum(stages)
 
