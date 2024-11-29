@@ -8,20 +8,17 @@
 
 struct PairedExplicitRelaxationRK4 <: AbstractPairedExplicitRKSingle
     PERK4::PairedExplicitRK4
-    # TODO: Nonlinear solver options
+    relaxation_solver::RelaxationSolver
 end
 
 # Constructor for previously computed A Coeffs
 function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString,
                                      dt_opt = nothing;
-                                     c_const = 1.0f0)
-    a_matrix, a_matrix_constant, c = compute_PairedExplicitRK4_butcher_tableau(num_stages,
-                                                                               base_path_a_coeffs;
-                                                                               c_const)
-
-    return PairedExplicitRelaxationRK4(PairedExplicitRK4(num_stages, a_matrix,
-                                                         a_matrix_constant, c,
-                                                         dt_opt))
+                                     c_const = 1.0f0,
+                                     relaxation_solver = EntropyRelaxationNewton())
+    return PairedExplicitRelaxationRK4(PairedExplicitRK4(num_stages, base_path_a_coeffs,
+                                                         dt_opt; c_const = c_const),
+                                       relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -50,8 +47,9 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType, Param
     force_stepfail::Bool
     # Additional PERK register
     k1::uType
-    # Entropy Relaxation addition
+    # Entropy Relaxation additions
     gamma::RealT
+    relaxation_solver::RelaxationSolver
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
@@ -81,7 +79,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
                                                                                kwargs...),
                                                        false, true, false,
                                                        k1,
-                                                       gamma)
+                                                       gamma, alg.relaxation_solver)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -156,19 +154,12 @@ end
     # Note: We re-use `k1` for the "direction"
     k1_wrap = wrap_array(integrator.k1, p)
 
-    #=
-    # Bisection for gamma
-    @trixi_timeit timer() "ER: Bisection" begin
-        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                         mesh, equations, dg, cache)
-    end
-    =#
-
-    # Newton search for gamma
-    @trixi_timeit timer() "ER: Newton" begin
-        gamma_newton!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                      mesh, equations, dg, cache)
-    end
+    @trixi_timeit timer() "Relaxation solver" relaxation_solver(integrator,
+                                                                u_tmp_wrap, u_wrap,
+                                                                k1_wrap, S_old, dS,
+                                                                mesh, equations, dg,
+                                                                cache,
+                                                                integrator.relaxation_solver)
 
     integrator.iter += 1
     # Check if due to entropy relaxation the final step is not reached

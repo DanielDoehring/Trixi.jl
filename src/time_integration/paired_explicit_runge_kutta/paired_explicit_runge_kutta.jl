@@ -409,10 +409,11 @@ end
 # extension or by the NLsolve-specific code loaded by Requires.jl
 function solve_a_butcher_coeffs_unknown! end
 
-# Paired Explicit Relaxation RK (PERRK) helpers
-include("entropy_relaxation.jl")
 # Multirate/partitioned helpers
 include("partitioning.jl")
+
+# Paired Explicit Relaxation RK (PERRK) helpers
+include("entropy_relaxation.jl")
 
 include("p2/methods_PERK2.jl")
 include("p3/methods_PERK3.jl")

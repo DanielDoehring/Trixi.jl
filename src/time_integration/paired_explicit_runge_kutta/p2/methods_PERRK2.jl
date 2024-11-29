@@ -7,17 +7,19 @@
 
 struct PairedExplicitRelaxationRK2 <: AbstractPairedExplicitRKSingle
     PERK2::PairedExplicitRK2
-    # TODO: Nonlinear solver options
+    relaxation_solver::RelaxationSolver
 end
 
 # Constructor that reads the coefficients from a file
 function PairedExplicitRelaxationRK2(num_stages,
                                      base_path_monomial_coeffs::AbstractString,
                                      dt_opt = nothing,
-                                     bS = 1.0, cS = 0.5)
+                                     bS = 1.0, cS = 0.5,
+                                     relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages,
                                                          base_path_monomial_coeffs,
-                                                         dt_opt, bS, cS))
+                                                         dt_opt, bS, cS),
+                                       relaxation_solver)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a
@@ -25,20 +27,25 @@ end
 function PairedExplicitRelaxationRK2(num_stages, tspan,
                                      semi::AbstractSemidiscretization;
                                      verbose = false,
-                                     bS = 1.0, cS = 0.5)
+                                     bS = 1.0, cS = 0.5,
+                                     relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages, tspan, semi;
                                                          verbose = verbose,
-                                                         bS = bS, cS = cS))
+                                                         bS = bS, cS = cS),
+                                       relaxation_solver)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a
 # list of eigenvalues
 function PairedExplicitRelaxationRK2(num_stages, tspan, eig_vals::Vector{ComplexF64};
                                      verbose = false,
-                                     bS = 1.0, cS = 0.5)
+                                     bS = 1.0, cS = 0.5,
+                                     gamma_solver = :newton,
+                                     relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages, tspan, eig_vals;
                                                          verbose = verbose,
-                                                         bS = bS, cS = cS))
+                                                         bS = bS, cS = cS),
+                                       relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -67,8 +74,9 @@ mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType, Param
     force_stepfail::Bool
     # Additional PERK register
     k1::uType
-    # Entropy Relaxation addition
+    # Entropy Relaxation additions
     gamma::RealT
+    relaxation_solver::RelaxationSolver
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2;
@@ -98,7 +106,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2;
                                                                                kwargs...),
                                                        false, true, false,
                                                        k1,
-                                                       gamma)
+                                                       gamma, alg.relaxation_solver)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -164,19 +172,12 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{2})
                                 alg.bS * integrator.du[i])
         end
 
-        #=
-        # Bisection for gamma
-        @trixi_timeit timer() "ER: Bisection" begin
-        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                     mesh, equations, dg, cache)
-        end
-        =#
-
-        # Newton search for gamma
-        @trixi_timeit timer() "ER: Newton" begin
-            gamma_newton!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                          mesh, equations, dg, cache)
-        end
+        @trixi_timeit timer() "Relaxation solver" relaxation_solver(integrator,
+                                                                    u_tmp_wrap, u_wrap,
+                                                                    k1_wrap, S_old, dS,
+                                                                    mesh, equations, dg,
+                                                                    cache,
+                                                                    integrator.relaxation_solver)
 
         integrator.iter += 1
         # Check if due to entropy relaxation the final step is not reached

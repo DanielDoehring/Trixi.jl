@@ -7,37 +7,43 @@
 
 struct PairedExplicitRelaxationRK3 <: AbstractPairedExplicitRKSingle
     PERK3::PairedExplicitRK3
-    # TODO: Nonlinear solver options
+    relaxation_solver::RelaxationSolver
 end
 
 # Constructor for previously computed A Coeffs
 function PairedExplicitRelaxationRK3(num_stages, base_path_a_coeffs::AbstractString,
                                      dt_opt = nothing;
-                                     cS2 = 1.0f0)
+                                     cS2 = 1.0f0,
+                                     relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
                                                          base_path_a_coeffs,
-                                                         dt_opt; cS2 = cS2))
+                                                         dt_opt; cS2 = cS2),
+                                       relaxation_solver)
 end
 
 # Constructor that computes Butcher matrix A coefficients from a semidiscretization
 function PairedExplicitRelaxationRK3(num_stages, tspan,
                                      semi::AbstractSemidiscretization;
-                                     verbose = false, cS2 = 1.0f0)
+                                     verbose = false, cS2 = 1.0f0,
+                                     relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
                                                          tspan,
                                                          semi;
                                                          verbose = verbose,
-                                                         cS2 = cS2))
+                                                         cS2 = cS2),
+                                       relaxation_solver)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a list of eigenvalues
 function PairedExplicitRelaxationRK3(num_stages, tspan, eig_vals::Vector{ComplexF64};
-                                     verbose = false, cS2 = 1.0f0)
+                                     verbose = false, cS2 = 1.0f0,
+                                     relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
                                                          tspan,
                                                          eig_vals;
                                                          verbose = verbose,
-                                                         cS2 = cS2))
+                                                         cS2 = cS2),
+                                       relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -67,8 +73,9 @@ mutable struct PairedExplicitRelaxationRK3Integrator{RealT <: Real, uType, Param
     # Additional PERK3 registers
     k1::uType
     kS1::uType
-    # Entropy Relaxation addition
+    # Entropy Relaxation additions
     gamma::RealT
+    relaxation_solver::RelaxationSolver
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
@@ -100,7 +107,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
                                                                                kwargs...),
                                                        false, true, false,
                                                        k1, kS1,
-                                                       gamma)
+                                                       gamma, alg.relaxation_solver)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -175,19 +182,12 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
                                 4.0 * integrator.du[i]) / 6.0
         end
 
-        #=
-        # Bisection for gamma
-        @trixi_timeit timer() "ER: Bisection" begin
-        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                     mesh, equations, dg, cache)
-        end
-        =#
-
-        # Newton search for gamma
-        @trixi_timeit timer() "ER: Newton" begin
-            gamma_newton!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                          mesh, equations, dg, cache)
-        end
+        @trixi_timeit timer() "Relaxation solver" relaxation_solver(integrator,
+                                                                    u_tmp_wrap, u_wrap,
+                                                                    k1_wrap, S_old, dS,
+                                                                    mesh, equations, dg,
+                                                                    cache,
+                                                                    integrator.relaxation_solver)
 
         integrator.iter += 1
         # Check if due to entropy relaxation the final step is not reached

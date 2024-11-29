@@ -78,7 +78,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
 =#
 
 # p = 3
-
+#=
 Stages = [16, 8, 4]
 path = basepath * "p3/"
 
@@ -87,19 +87,19 @@ path = basepath * "p3/"
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
-
+=#
 
 # p = 4
-#=
+
 Stages = [15, 9, 5]
 path = basepath * "p4/"
 
 #ode_alg = Trixi.PairedExplicitRK4(15, path)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4(15, path)
+ode_alg = Trixi.PairedExplicitRelaxationRK4(15, path)
 
-ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
-=#
+#ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+
 
 #=
 # Note: This is actually optimized!

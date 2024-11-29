@@ -55,10 +55,39 @@ end
            S_old - gamma * dS
 end
 
-function gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
-                          mesh, equations, dg, cache)
-    gamma_min = 0.8 # Not clear what value to choose here!
-    gamma_max = 1.1 # For diffusive schemes, gamma > 1 is required to ensure EC
+abstract type RelaxationSolver end
+
+struct EntropyRelaxationBisection <: RelaxationSolver
+    gamma_min::Real
+    gamma_max::Real
+    gamma_tol::Real
+    max_iterations::Int
+end
+
+function EntropyRelaxationBisection(; gamma_min = 0.1, gamma_max = 1.2,
+                                    gamma_tol = 100 * eps(typeof(gamma_min)),
+                                    max_iterations = 100)
+    return EntropyRelaxationBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
+end
+
+struct EntropyRelaxationNewton <: RelaxationSolver
+    step_scaling::Real
+    root_tol::Real
+    max_iterations::Int
+end
+
+function EntropyRelaxationNewton(; step_scaling = 1.0, root_tol = 1e-14,
+                                 max_iterations = 5)
+    return EntropyRelaxationNewton(step_scaling, root_tol, max_iterations)
+end
+
+function relaxation_solver(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                           mesh, equations, dg, cache,
+                           relaxation_solver::EntropyRelaxationBisection)
+    gamma_min = relaxation_solver.gamma_min
+    gamma_max = relaxation_solver.gamma_max
+    gamma_tol = relaxation_solver.gamma_tol
+    max_iterations = relaxation_solver.max_iterations
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -78,10 +107,8 @@ function gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
 
     # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
     if r_max > 0 && r_min < 0
-        gamma_tol = 10 * eps(typeof(integrator.gamma))
-        #bisection_its_max = 100
-        #bisect_its = 0
-        while gamma_max - gamma_min > gamma_tol #&& bisect_its < bisection_its_max
+        iterations = 0
+        while gamma_max - gamma_min > gamma_tol && iterations < max_iterations
             integrator.gamma = (gamma_max + gamma_min) / 2
 
             @threaded for element in eachelement(dg, cache)
@@ -97,24 +124,23 @@ function gamma_bisection!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
             else
                 gamma_max = integrator.gamma
             end
-            #bisect_its += 1
+            iterations += 1
         end
     else
         integrator.gamma = 1
     end
 end
 
-function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
-                       mesh, equations, dg, cache)
-    # Custom Newton: Probably required for demonstrating the method
-    step_scaling = 1.0 # > 1: Accelerated Newton, < 1: Damped Newton
+function relaxation_solver(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
+                           mesh, equations, dg, cache,
+                           relaxation_solver::EntropyRelaxationNewton)
+    step_scaling = relaxation_solver.step_scaling
+    root_tol = relaxation_solver.root_tol
+    max_iterations = relaxation_solver.max_iterations
 
-    r_tol = 1e-14 # Similar to e.g. conservation error: 1e-14
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
-
-    n_its_max = 5
-    n_its = 0
-    while abs(r_gamma) > r_tol && n_its < n_its_max
+    iterations = 0
+    while abs(r_gamma) > root_tol && iterations < max_iterations
         @threaded for element in eachelement(dg, cache)
             @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                                 integrator.gamma *
@@ -127,7 +153,7 @@ function gamma_newton!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS,
 
         integrator.gamma -= step_scaling * r_gamma / dr
 
-        n_its += 1
+        iterations += 1
     end
 
     # Catch Newton failures

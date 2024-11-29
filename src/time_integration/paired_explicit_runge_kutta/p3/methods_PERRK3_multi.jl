@@ -7,17 +7,19 @@
 
 struct PairedExplicitRelaxationRK3Multi <: AbstractPairedExplicitRKMulti
     PERK3Multi::PairedExplicitRK3Multi
-    # TODO: Nonlinear solver options
+    relaxation_solver::RelaxationSolver
 end
 
 function PairedExplicitRelaxationRK3Multi(stages::Vector{Int64},
                                           base_path_a_coeffs::AbstractString,
                                           dt_ratios,
-                                          cS2::Float64 = 1.0)
+                                          cS2::Float64 = 1.0;
+                                          relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK3Multi(PairedExplicitRK3Multi(stages,
                                                                    base_path_a_coeffs,
                                                                    dt_ratios,
-                                                                   cS2))
+                                                                   cS2),
+                                            relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -69,6 +71,7 @@ mutable struct PairedExplicitRelaxationRK3MultiIntegrator{RealT <: Real, uType, 
 
     # Entropy Relaxation additions
     gamma::RealT
+    relaxation_solver::RelaxationSolver
 end
 
 mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real, uType,
@@ -117,6 +120,7 @@ mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real
 
     # Entropy Relaxation additions
     gamma::RealT
+    relaxation_solver::RelaxationSolver
 
     # Addition for hyperbolic-parabolic problems:
     # We need another register to temporarily store the changes due to the hyperbolic part only.
@@ -210,6 +214,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
                                                                          level_u_indices_elements,
                                                                          -1, n_levels,
                                                                          gamma,
+                                                                         alg.relaxation_solver,
                                                                          du_tmp)
     else
         integrator = PairedExplicitRelaxationRK3MultiIntegrator(u0, du, u_tmp,
@@ -238,7 +243,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
                                                                 level_info_mpi_mortars_acc,
                                                                 level_u_indices_elements,
                                                                 -1, n_levels,
-                                                                gamma)
+                                                                gamma,
+                                                                alg.relaxation_solver)
     end
 
     # initialize callbacks

@@ -7,15 +7,17 @@
 
 struct PairedExplicitRelaxationRK4Multi <: AbstractPairedExplicitRKMulti
     PERK4Multi::PairedExplicitRK4Multi
-    # TODO: Nonlinear solver options
+    relaxation_solver::RelaxationSolver
 end
 
 function PairedExplicitRelaxationRK4Multi(stages::Vector{Int64},
                                           base_path_a_coeffs::AbstractString,
-                                          dt_ratios)
+                                          dt_ratios;
+                                          relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK4Multi(PairedExplicitRK4Multi(stages,
                                                                    base_path_a_coeffs,
-                                                                   dt_ratios))
+                                                                   dt_ratios),
+                                            relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -66,6 +68,7 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType, 
 
     # Entropy Relaxation additions
     gamma::RealT
+    relaxation_solver::RelaxationSolver
 end
 
 mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real, uType,
@@ -113,6 +116,7 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
 
     # Entropy Relaxation additions
     gamma::RealT
+    relaxation_solver::RelaxationSolver
 
     # Addition for hyperbolic-parabolic problems:
     # We need another register to temporarily store the changes due to the hyperbolic part only.
@@ -204,6 +208,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          level_u_indices_elements,
                                                                          -1, n_levels,
                                                                          gamma,
+                                                                         alg.relaxation_solver,
                                                                          du_tmp)
     else
         integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp,
@@ -232,7 +237,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                 level_info_mpi_mortars_acc,
                                                                 level_u_indices_elements,
                                                                 -1, n_levels,
-                                                                gamma)
+                                                                gamma,
+                                                                alg.relaxation_solver)
     end
 
     # initialize callbacks
@@ -309,19 +315,12 @@ end
     # Note: We re-use `k1` for the "direction"
     k1_wrap = wrap_array(integrator.k1, p)
 
-    #=
-    # Bisection for gamma
-    @trixi_timeit timer() "ER: Bisection" begin
-        gamma_bisection!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                         mesh, equations, dg, cache)
-    end
-    =#
-
-    # Newton search for gamma
-    @trixi_timeit timer() "ER: Newton" begin
-        gamma_newton!(integrator, u_tmp_wrap, u_wrap, k1_wrap, S_old, dS,
-                      mesh, equations, dg, cache)
-    end
+    @trixi_timeit timer() "Relaxation solver" relaxation_solver(integrator,
+                                                                u_tmp_wrap, u_wrap,
+                                                                k1_wrap, S_old, dS,
+                                                                mesh, equations, dg,
+                                                                cache,
+                                                                integrator.relaxation_solver)
 
     integrator.iter += 1
     # Check if due to entropy relaxation the final step is not reached
