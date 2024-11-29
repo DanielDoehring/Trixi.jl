@@ -144,7 +144,7 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
 
     mesh, equations, dg, cache = mesh_equations_solver_cache(prob.p)
 
-    @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
+    @trixi_timeit timer() "Paired Explicit Relaxation RK ODE integration step" begin
         u_wrap = wrap_array(integrator.u, prob.p)
         S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 

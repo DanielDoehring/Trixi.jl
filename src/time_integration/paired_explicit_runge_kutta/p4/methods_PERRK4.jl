@@ -200,7 +200,7 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4})
         terminate!(integrator)
     end
 
-    @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
+    @trixi_timeit timer() "Paired Explicit Relaxation RK ODE integration step" begin
         PERK_k1!(integrator, prob.p)
         PERK_k2!(integrator, prob.p, alg)
 

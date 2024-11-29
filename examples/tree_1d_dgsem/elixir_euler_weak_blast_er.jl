@@ -55,7 +55,7 @@ cfl = 1.0
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback,
+                        #analysis_callback,
                         stepsize_callback)
 
 ###############################################################################
@@ -65,20 +65,20 @@ callbacks = CallbackSet(summary_callback,
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/"
 dtRatios = [1, 0.5, 0.25]
 
-#=
+
 # p = 2
 Stages = [12, 6, 3]
 path = basepath * "p2/"
 
-#ode_alg = Trixi.PairedExplicitRK2(12, path)
+ode_alg = Trixi.PairedExplicitRK2(12, path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK2(12, path)
 
 #ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
-=#
+#ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
+
 
 # p = 3
-
+#=
 Stages = [16, 8, 4]
 path = basepath * "p3/"
 
@@ -87,7 +87,7 @@ path = basepath * "p3/"
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
-
+=#
 
 # p = 4
 #=
