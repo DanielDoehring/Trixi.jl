@@ -316,5 +316,6 @@ function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator{3}, new_siz
     resize!(integrator.kS1, new_size)
 end
 
+# Multirate/partitioned method
 include("methods_PERK3_multi.jl")
 end # @muladd

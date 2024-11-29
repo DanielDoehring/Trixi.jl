@@ -299,5 +299,10 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{2})
     end
 end
 
+# Multirate/partitioned method
 include("methods_PERK2_multi.jl")
+
+# Paired Explicit Relaxation Runge-Kutta (PERRK) methods
+include("methods_PERRK2.jl")
+include("methods_PERRK2_multi.jl")
 end # @muladd

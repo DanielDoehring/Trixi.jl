@@ -46,11 +46,11 @@ analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
-                                     analysis_filename = "analysis_ER.dat",
-                                     #analysis_filename = "analysis_standard.dat",
+                                     #analysis_filename = "analysis_ER.dat",
+                                     analysis_filename = "analysis_standard.dat",
                                      save_analysis = true)
 
-cfl = 1.7
+cfl = 1.0
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -61,22 +61,58 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+# NOTE: The methods are not optimized for this testcase!
+basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/"
+dtRatios = [1, 0.5, 0.25]
+
+#=
+# p = 2
+Stages = [12, 6, 3]
+path = basepath * "p2/"
+
+#ode_alg = Trixi.PairedExplicitRK2(12, path)
+#ode_alg = Trixi.PairedExplicitRelaxationRK2(12, path)
+
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
+=#
+
+# p = 3
+#=
+Stages = [16, 8, 4]
+path = basepath * "p3/"
+
+#ode_alg = Trixi.PairedExplicitRK3(16, path)
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+=#
+
+# p = 4
+
+Stages = [15, 9, 5]
+path = basepath * "p4/"
+
+#ode_alg = Trixi.PairedExplicitRK4(15, path)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4(15, path)
+
+ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+
+
+#=
+# Note: This is actually optimized!
+path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k3/"
 Stages = 14
 
-path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k3/"
+ode_alg = Trixi.PairedExplicitRK4(Stages, path)
+ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages, path)
 
-
-#ode_alg = Trixi.PairedExplicitRK4(Stages, path)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages, path)
-
-
-dtRatios = [1, 0.5, 0.25]
 Stages = [14, 8, 5]
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 # NOTE: 3 Newton iterations suffice to ensure exact entropy conservation!
 ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+=#
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
