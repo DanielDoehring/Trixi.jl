@@ -168,7 +168,10 @@ alive_callback = AliveCallback(alive_interval = 10000)
 
 analysis_interval = 1_000_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     analysis_errors = [:l2_error_primitive, :linf_error_primitive])
+                                     analysis_errors = [
+                                         :l2_error_primitive,
+                                         :linf_error_primitive
+                                     ])
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 
@@ -190,7 +193,7 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 max_level = Trixi.maximum_level(mesh.tree)
 
 dtRef = 2e-2 # Single
-dtRef = 2e-2/8 # Multi refined
+dtRef = 2e-2 / 8 # Multi refined
 
 dt = dtRef / 4.0^(max_level - 3)
 

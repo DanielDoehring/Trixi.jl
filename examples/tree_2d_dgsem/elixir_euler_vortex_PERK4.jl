@@ -122,8 +122,8 @@ surf_flux = flux_hllc # Better flux, allows much larger timesteps
 PolyDeg = 6
 solver = DGSEM(RealT = Float64, polydeg = PolyDeg, surface_flux = surf_flux)
 
-coordinates_min = (-EdgeLength/2, -EdgeLength/2)
-coordinates_max = (EdgeLength/2, EdgeLength/2)
+coordinates_min = (-EdgeLength / 2, -EdgeLength / 2)
+coordinates_max = (EdgeLength / 2, EdgeLength / 2)
 
 Refinement = 6
 mesh = TreeMesh(coordinates_min, coordinates_max,
@@ -148,19 +148,20 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 =#
 
 analysis_interval = 10^6
-analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
-                                     extra_analysis_errors=(:conservation_error, :l1_error))
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     extra_analysis_errors = (:conservation_error,
+                                                              :l1_error))
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
-                                     base_level=Refinement,
-                                     med_level=Refinement+1, med_threshold=-3.0,
-                                     max_level=Refinement+2, max_threshold=-2.0)
+                                      base_level = Refinement,
+                                      med_level = Refinement + 1, med_threshold = -3.0,
+                                      max_level = Refinement + 2, max_threshold = -2.0)
 
 CFL_Convergence = 1.0 # 0.5, 0.25
 amr_callback = AMRCallback(semi, amr_controller,
-                        # For convergence study
-                        interval=Int(20/CFL_Convergence), 
-                        adapt_initial_condition=true)
+                           # For convergence study
+                           interval = Int(20 / CFL_Convergence),
+                           adapt_initial_condition = true)
 
 alive_callback = AliveCallback(alive_interval = 1000)
 

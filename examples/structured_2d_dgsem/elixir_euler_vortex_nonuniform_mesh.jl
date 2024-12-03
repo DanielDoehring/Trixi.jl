@@ -64,7 +64,7 @@ tspan = (0.0, T_end)
 
 function mapping(xi_, eta_)
     exponent = 1.4
-    
+
     # Apply a non-linear transformation to refine towards the center
     xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_)) + 1
     eta_transformed = sign(eta_) * abs(eta_)^(exponent + abs(eta_)) + 1
@@ -98,7 +98,7 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
 
 # NOTE: Not really well-suited for convergence test                                       
 analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
-                                      analysis_integrals = (;),)
+                                     analysis_integrals = (;))
 
 cfl = 5.0 # Multi # 8
 cfl = 5.0 # p = S = 3
@@ -130,7 +130,7 @@ dtRatios = [
     0.350951194763184,
     0.253698348999023,
     0.155333518981934
-] /  1.43509674072266
+] / 1.43509674072266
 
 ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 
@@ -150,7 +150,6 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
                                              "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",
                                              dtRatios)
 =#
-
 
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages,
                                                "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",

@@ -197,6 +197,11 @@ function initialize!(cb::DiscreteCallback{Condition, Affect!}, u_ode, du_ode, t,
                     @printf(io, "   %-21s", "linf_"*v)
                 end
             end
+            if :l1_error in analysis_errors
+                for v in varnames(cons2cons, equations)
+                    @printf(io, "   %-21s", "l1_"*v)
+                end
+            end
             if :conservation_error in analysis_errors
                 for v in varnames(cons2cons, equations)
                     @printf(io, "   %-21s", "cons_"*v)
@@ -405,10 +410,11 @@ function (analysis_callback::AnalysisCallback)(io, du, u, u_ode, t, semi, iter)
         println()
     end
 
-    if :l2_error in analysis_errors || :linf_error in analysis_errors
+    if :l2_error in analysis_errors || :linf_error in analysis_errors ||
+       :l1_error in analysis_errors
         # Calculate L2/Linf errors
-        l2_error, linf_error = calc_error_norms(u_ode, t, analyzer, semi,
-                                                cache_analysis)
+        l2_error, linf_error, l1_error = calc_error_norms(u_ode, t, analyzer, semi,
+                                                          cache_analysis)
 
         if mpi_isroot()
             # L2 error
@@ -427,6 +433,16 @@ function (analysis_callback::AnalysisCallback)(io, du, u, u_ode, t, semi, iter)
                 for v in eachvariable(equations)
                     @printf("  % 10.8e", linf_error[v])
                     @printf(io, "  % 10.15e", linf_error[v])
+                end
+                println()
+            end
+
+            # L1 error
+            if :l1_error in analysis_errors
+                print(" L1 error:    ")
+                for v in eachvariable(equations)
+                    @printf("  % 10.8e", l1_error[v])
+                    @printf(io, "  % 10.8e", l1_error[v])
                 end
                 println()
             end
@@ -649,9 +665,10 @@ function (cb::DiscreteCallback{Condition, Affect!})(sol) where {Condition,
     @unpack analyzer = analysis_callback
     cache_analysis = analysis_callback.cache
 
-    l2_error, linf_error = calc_error_norms(sol.u[end], sol.t[end], analyzer, semi,
-                                            cache_analysis)
-    (; l2 = l2_error, linf = linf_error)
+    l2_error, linf_error, l1_error = calc_error_norms(sol.u[end], sol.t[end], analyzer,
+                                                      semi,
+                                                      cache_analysis)
+    (; l2 = l2_error, linf = linf_error, l1 = l1_error)
 end
 
 # some common analysis_integrals

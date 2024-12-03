@@ -65,7 +65,6 @@ callbacks = CallbackSet(summary_callback,
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/"
 dtRatios = [1, 0.5, 0.25]
 
-
 # p = 2
 Stages = [12, 6, 3]
 path = basepath * "p2/"
@@ -75,7 +74,6 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2(12, path)
 
 #ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 #ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
-
 
 # p = 3
 #=

@@ -49,6 +49,8 @@ function calc_error_norms(func, u, t, analyzer,
     # Set up data structures
     l2_error = zero(func(get_node_vars(u, equations, dg, 1, 1), equations))
     linf_error = copy(l2_error)
+    l1_error = copy(l2_error)
+
     total_volume = zero(real(mesh))
 
     # Iterate over all elements for error calculations
@@ -71,14 +73,17 @@ function calc_error_norms(func, u, t, analyzer,
 
             l2_error += diff .^ 2 * (weights[i] * abs_jacobian_local_i)
             linf_error = @. max(linf_error, abs(diff))
+            l1_error += abs.(diff) * (weights[i] * abs_jacobian_local_i)
+
             total_volume += weights[i] * abs_jacobian_local_i
         end
     end
 
     # For L2 error, divide by total volume
     l2_error = @. sqrt(l2_error / total_volume)
+    l1_error = l1_error / total_volume
 
-    return l2_error, linf_error
+    return l2_error, linf_error, l1_error
 end
 
 function calc_error_norms(func, u, t, analyzer,
@@ -91,6 +96,7 @@ function calc_error_norms(func, u, t, analyzer,
     # Set up data structures
     l2_error = zero(func(get_node_vars(u, equations, dg, 1, 1), equations))
     linf_error = copy(l2_error)
+    l1_error = copy(l2_error)
 
     # Iterate over all elements for error calculations
     for element in eachelement(dg, cache)
@@ -109,14 +115,16 @@ function calc_error_norms(func, u, t, analyzer,
                    func(get_node_vars(u_local, equations, dg, i), equations)
             l2_error += diff .^ 2 * (weights[i] * volume_jacobian_)
             linf_error = @. max(linf_error, abs(diff))
+            l1_error += abs.(diff) * (weights[i] * volume_jacobian_)
         end
     end
 
     # For L2 error, divide by total volume
     total_volume_ = total_volume(mesh)
     l2_error = @. sqrt(l2_error / total_volume_)
+    l1_error = l1_error / total_volume_
 
-    return l2_error, linf_error
+    return l2_error, linf_error, l1_error
 end
 
 function integrate_via_indices(func::Func, u,
