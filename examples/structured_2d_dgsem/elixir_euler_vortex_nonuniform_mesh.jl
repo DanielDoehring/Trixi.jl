@@ -141,7 +141,6 @@ ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 # p = 4
 path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k3/"
 
-
 Stages = [16, 11, 9, 7, 6, 5]
 dtRatios = [
     0.636282563128043,
@@ -152,10 +151,8 @@ dtRatios = [
     0.130952239152975
 ] ./ 0.636282563128043
 
-
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
-
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,

@@ -177,10 +177,12 @@ dtRatios = [1, 0.5, 0.25]
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/"
 
 # p = 2
+#=
 Stages = [12, 6, 3]
 path = basepath * "p2/"
 #ode_algorithm = Trixi.PairedExplicitRK2(12, path)
 ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+=#
 
 # p = 3
 #=
@@ -191,11 +193,10 @@ ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 =#
 
 # p = 4
-#=
+
 Stages = [15, 9, 5]
 path = basepath * "p4/"
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-=#
 
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
 

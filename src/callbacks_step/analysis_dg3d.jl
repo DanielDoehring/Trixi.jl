@@ -151,7 +151,8 @@ function calc_error_norms(func, u, t, analyzer,
                    func(get_node_vars(u_local, equations, dg, i, j, k), equations)
             l2_error += diff .^ 2 *
                         (weights[i] * weights[j] * weights[k] * volume_jacobian_)
-            l1_error += abs.(diff) * (weights[i] * weights[j] * weights[k] * volume_jacobian_)
+            l1_error += abs.(diff) *
+                        (weights[i] * weights[j] * weights[k] * volume_jacobian_)
             linf_error = @. max(linf_error, abs(diff))
         end
     end
@@ -203,7 +204,8 @@ function calc_error_norms(func, u, t, analyzer,
             l2_error += diff .^ 2 *
                         (weights[i] * weights[j] * weights[k] * abs_jacobian_local_ijk)
             linf_error = @. max(linf_error, abs(diff))
-            l1_error += abs.(diff) * (weights[i] * weights[j] * weights[k] * abs_jacobian_local_ijk)
+            l1_error += abs.(diff) *
+                        (weights[i] * weights[j] * weights[k] * abs_jacobian_local_ijk)
             total_volume += (weights[i] * weights[j] * weights[k] *
                              abs_jacobian_local_ijk)
         end
