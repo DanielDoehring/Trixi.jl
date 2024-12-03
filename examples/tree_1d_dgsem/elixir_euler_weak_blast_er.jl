@@ -20,7 +20,7 @@ solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
 coordinates_min = -2.0
 coordinates_max = 2.0
 
-BaseLevel = 7
+BaseLevel = 5
 # Test PERK on non-uniform mesh
 refinement_patches = ((type = "box", coordinates_min = (-1.0,),
                        coordinates_max = (1.0,)),
@@ -62,7 +62,8 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 # NOTE: The methods are not optimized for this testcase!
-basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/"
+# TODO: Do so to ensure that timestep really doubles!
+basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
 dtRatios = [1, 0.5, 0.25]
 
 # p = 2
