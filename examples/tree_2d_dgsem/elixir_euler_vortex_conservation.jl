@@ -98,9 +98,9 @@ callbacks = CallbackSet(summary_callback,
 dtRatios = [1, 0.5, 0.25]
 path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k3/p4/"
 
-Stages = [16, 10, 6]
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+Stages = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6]
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
 
 dt = 0.01
 
