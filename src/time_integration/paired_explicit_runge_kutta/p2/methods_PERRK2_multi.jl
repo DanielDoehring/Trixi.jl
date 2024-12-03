@@ -140,7 +140,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
     ### Set datastructures for handling of level-dependent integration ###
     mesh, equations, dg, cache = mesh_equations_solver_cache(ode.p)
 
-    n_levels = get_n_levels(mesh, alg)
+    n_levels = get_n_levels(mesh, alg.PERK2Multi)
     n_dims = ndims(mesh) # Spatial dimension
 
     level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
@@ -166,7 +166,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                             level_info_boundaries_acc,
                             level_info_boundaries_orientation_acc,
                             level_info_mortars_acc,
-                            n_levels, n_dims, mesh, dg, cache, alg)
+                            n_levels, n_dims, mesh, dg, cache, alg.PERK2Multi)
 
     for i in 1:n_levels
         println("#Number Elements integrated with level $i: ",

@@ -76,7 +76,7 @@ function mapping(xi_, eta_)
     return SVector(x, y)
 end
 
-cells_per_dimension = (16, 16)
+cells_per_dimension = (32, 32)
 mesh = StructuredMesh(cells_per_dimension, mapping)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
@@ -90,7 +90,7 @@ summary_callback = SummaryCallback()
 
 analysis_interval = 10
 analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
-                                       analysis_errors = [:conservation_error],
+                                       analysis_errors = Symbol[],
                                        analysis_integrals = (entropy,),
                                        analysis_filename = "analysis_standard.dat",
                                        #analysis_filename = "analysis_ER.dat",
@@ -98,8 +98,10 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
 
 # NOTE: Not really well-suited for convergence test                                       
 analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
+                                     analysis_errors = [:conservation_error],
                                      analysis_integrals = (;))
 
+# TODO: Not sure if sharp!                                     
 cfl = 5.0 # Multi # 8
 cfl = 5.0 # p = S = 3
 
@@ -116,6 +118,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+#=
 # p = 3
 path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k2/"
 
@@ -133,8 +136,12 @@ dtRatios = [
 ] / 1.43509674072266
 
 ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+=#
 
-#=
+# p = 4
+path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k3/"
+
+
 Stages = [16, 11, 9, 7, 6, 5]
 dtRatios = [
     0.636282563128043,
@@ -145,50 +152,10 @@ dtRatios = [
     0.130952239152975
 ] ./ 0.636282563128043
 
-#=
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages,
-                                             "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",
-                                             dtRatios)
-=#
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages,
-                                               "/home/daniel/git/Paper_PEERRK/Data/IsentropicVortex_EC/",
-                                               dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
 
-=#
-
-#=
-_, _, dg, cache = Trixi.mesh_equations_solver_cache(semi)
-
-nnodes = length(dg.basis.nodes)
-n_elements = nelements(dg, cache)
-elements = cache.elements
-
-h_min = floatmax(Float64)
-
-for element_id in 1:n_elements
-    # pull the four corners numbered as right-handed
-    P0 = elements.node_coordinates[:, 1, 1, element_id]
-    P1 = elements.node_coordinates[:, nnodes, 1, element_id]
-    P2 = elements.node_coordinates[:, nnodes, nnodes, element_id]
-    P3 = elements.node_coordinates[:, 1, nnodes, element_id]
-    # compute the four side lengths and get the smallest
-    L0 = sqrt(sum((P1 - P0) .^ 2))
-    L1 = sqrt(sum((P2 - P1) .^ 2))
-    L2 = sqrt(sum((P3 - P2) .^ 2))
-    L3 = sqrt(sum((P0 - P3) .^ 2))
-    h = min(L0, L1, L2, L3)
-
-    if h < h_min
-        global h_min = h
-    end
-end
-
-dtRef = 0.03333333333333333
-CFLREF = 2.383483940996325
-
-dt = CFLREF * dtRef * h_min
-=#
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
