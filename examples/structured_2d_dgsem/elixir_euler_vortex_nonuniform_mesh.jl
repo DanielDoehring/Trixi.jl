@@ -58,7 +58,7 @@ function initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerE
 end
 initial_condition = initial_condition_isentropic_vortex
 
-N_passes = 1
+N_passes = 4
 T_end = EdgeLength * N_passes
 tspan = (0.0, T_end)
 
@@ -88,7 +88,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 10
+analysis_interval = 40
 analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                        analysis_errors = Symbol[],
                                        analysis_integrals = (entropy,),
@@ -100,8 +100,6 @@ analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
 analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
                                      analysis_errors = [:conservation_error],
                                      analysis_integrals = (;))
-                             
-cfl = 5.0 # Relatively sharp for all orders
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -110,16 +108,15 @@ alive_callback = AliveCallback(alive_interval = 1000)
 callbacks = CallbackSet(summary_callback,
                         analysis_cb_entropy,
                         #analysis_callback,
-                        stepsize_callback,
                         alive_callback)
 
 ###############################################################################
 # run the simulation
 
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/"
-relaxation_solver = Trixi.EntropyRelaxationNewton(max_iterations = 5, root_tol = 1e-14)
+relaxation_solver = Trixi.EntropyRelaxationNewton(max_iterations = 3, root_tol = 1e-14)
 
-#=
+
 # p = 2
 path = basepath * "p2/"
 
@@ -133,9 +130,9 @@ dtRatios = [
     0.124999046325684
 ] ./ 0.631627607345581
 
-ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+
 
 #=
 # p = 3
@@ -158,7 +155,7 @@ dtRatios = [
 ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
-
+#=
 # p = 4
 path = basepath * "p4/"
 
@@ -174,10 +171,10 @@ dtRatios = [
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
+=#
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 42.0,
+                  dt = 7.25e-3,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
