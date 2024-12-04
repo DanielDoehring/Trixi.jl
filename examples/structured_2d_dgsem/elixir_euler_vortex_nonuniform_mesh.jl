@@ -101,8 +101,6 @@ analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
                                      analysis_errors = [:conservation_error],
                                      analysis_integrals = (;))
 
-stepsize_callback = StepsizeCallback(cfl = cfl)
-
 alive_callback = AliveCallback(alive_interval = 1000)
 
 callbacks = CallbackSet(summary_callback,
