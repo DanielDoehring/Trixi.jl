@@ -81,6 +81,46 @@ function EntropyRelaxationNewton(; step_scaling = 1.0, root_tol = 1e-14,
     return EntropyRelaxationNewton(step_scaling, root_tol, max_iterations)
 end
 
+function Base.show(io::IO, relaxation_solver::EntropyRelaxationBisection)
+    print(io, "EntropyRelaxationBisection(gamma_min=", relaxation_solver.gamma_min,
+          ", gamma_max=", relaxation_solver.gamma_max,
+          ", gamma_tol=", relaxation_solver.gamma_tol,
+          ", max_iterations=", relaxation_solver.max_iterations, ")")
+end
+function Base.show(io::IO, ::MIME"text/plain",
+                   relaxation_solver::EntropyRelaxationBisection)
+    if get(io, :compact, false)
+        show(io, relaxation_solver)
+    else
+        setup = [
+            "gamma_min" => relaxation_solver.gamma_min,
+            "gamma_max" => relaxation_solver.gamma_max,
+            "gamma_tol" => relaxation_solver.gamma_tol,
+            "max_iterations" => relaxation_solver.max_iterations
+        ]
+        summary_box(io, "EntropyRelaxationBisection", setup)
+    end
+end
+
+function Base.show(io::IO, relaxation_solver::EntropyRelaxationNewton)
+    print(io, "EntropyRelaxationNewton(step_scaling=", relaxation_solver.step_scaling,
+          ", root_tol=", relaxation_solver.root_tol,
+          ", max_iterations=", relaxation_solver.max_iterations, ")")
+end
+function Base.show(io::IO, ::MIME"text/plain",
+                   relaxation_solver::EntropyRelaxationNewton)
+    if get(io, :compact, false)
+        show(io, relaxation_solver)
+    else
+        setup = [
+            "step_scaling" => relaxation_solver.step_scaling,
+            "root_tol" => relaxation_solver.root_tol,
+            "max_iterations" => relaxation_solver.max_iterations
+        ]
+        summary_box(io, "EntropyRelaxationNewton", setup)
+    end
+end
+
 function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
