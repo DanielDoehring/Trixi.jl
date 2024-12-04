@@ -15,7 +15,7 @@ initial_condition = initial_condition_weak_blast_wave
 # in contrast to standard DGSEM only
 volume_flux = flux_ranocha
 solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))          
 
 coordinates_min = -2.0
 coordinates_max = 2.0
@@ -46,11 +46,11 @@ analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
-                                     #analysis_filename = "analysis_standard.dat",
-                                     analysis_filename = "analysis_ER.dat",
+                                     analysis_filename = "entropy_standard.dat",
+                                     #analysis_filename = "entropy_ER.dat",
                                      save_analysis = true)
 
-cfl = 1.0
+cfl = 1.0 # Probably not maxed out
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -61,60 +61,44 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-# NOTE: The methods are not optimized for this testcase!
-# TODO: Do so to ensure that timestep really doubles!
-basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
+basepath = "/home/daniel/git/Paper_PERRK/Data/WeakBlastWave/"
 dtRatios = [1, 0.5, 0.25]
 
+relaxation_solver = Trixi.EntropyRelaxationNewton(max_iterations = 3)
+
 # p = 2
-Stages = [12, 6, 3]
+Stages = [9, 5, 3]
 path = basepath * "p2/"
 
-ode_alg = Trixi.PairedExplicitRK2(12, path)
-ode_alg = Trixi.PairedExplicitRelaxationRK2(12, path)
+#ode_alg = Trixi.PairedExplicitRK2(Stages[1], path)
+#ode_alg = Trixi.PairedExplicitRelaxationRK2(Stages[1], path, relaxation_solver = relaxation_solver)
 
-#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 
 # p = 3
-#=
-Stages = [16, 8, 4]
+
+Stages = [13, 7, 4]
 path = basepath * "p3/"
 
-#ode_alg = Trixi.PairedExplicitRK3(16, path)
-#ode_alg = Trixi.PairedExplicitRelaxationRK3(16, path)
+#ode_alg = Trixi.PairedExplicitRK3(Stages[1], path)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(Stages[1], path, relaxation_solver = relaxation_solver)
 
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
-=#
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+
 
 # p = 4
-#=
-Stages = [15, 9, 5]
+
+Stages = [18, 10, 6]
 path = basepath * "p4/"
 
-#ode_alg = Trixi.PairedExplicitRK4(15, path)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4(15, path)
+#ode_alg = Trixi.PairedExplicitRK4(Stages[1], path)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages[1], path, relaxation_solver = relaxation_solver)
 
 ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
-=#
+#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 
-#=
-# Note: This is actually optimized!
-path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k3/"
-Stages = 14
-
-ode_alg = Trixi.PairedExplicitRK4(Stages, path)
-ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages, path)
-
-Stages = [14, 8, 5]
-
-#ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-
-# NOTE: 3 Newton iterations suffice to ensure exact entropy conservation!
-ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
-=#
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,

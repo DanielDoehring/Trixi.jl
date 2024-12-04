@@ -27,7 +27,7 @@ function initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerE
     end
 
     # initial center of the vortex
-    inicenter = SVector(EdgeLength / 2, EdgeLength / 2)
+    inicenter = SVector(0.0, 0.0)
     # strength of the vortex
     S = 13.5
     # Radius of vortex
@@ -66,8 +66,8 @@ function mapping(xi_, eta_)
     exponent = 1.4
 
     # Apply a non-linear transformation to refine towards the center
-    xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_)) + 1
-    eta_transformed = sign(eta_) * abs(eta_)^(exponent + abs(eta_)) + 1
+    xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_))
+    eta_transformed = sign(eta_) * abs(eta_)^(exponent + abs(eta_))
 
     # Scale the transformed coordinates to maintain the original domain size
     x = xi_transformed * EdgeLength / 2
@@ -92,54 +92,75 @@ analysis_interval = 10
 analysis_cb_entropy = AnalysisCallback(semi, interval = analysis_interval,
                                        analysis_errors = Symbol[],
                                        analysis_integrals = (entropy,),
-                                       analysis_filename = "analysis_standard.dat",
-                                       #analysis_filename = "analysis_ER.dat",
+                                       #analysis_filename = "entropy_standard.dat",
+                                       analysis_filename = "entropy_ER.dat",
                                        save_analysis = true)
 
 # NOTE: Not really well-suited for convergence test                                       
 analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
                                      analysis_errors = [:conservation_error],
                                      analysis_integrals = (;))
-
-# TODO: Not sure if sharp!                                     
-cfl = 5.0 # Multi # 8
-cfl = 5.0 # p = S = 3
+                             
+cfl = 5.0 # Relatively sharp for all orders
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 alive_callback = AliveCallback(alive_interval = 1000)
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_cb_entropy,
-                        analysis_callback,
+                        analysis_cb_entropy,
+                        #analysis_callback,
                         stepsize_callback,
                         alive_callback)
 
 ###############################################################################
 # run the simulation
 
+basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/"
+relaxation_solver = Trixi.EntropyRelaxationNewton(max_iterations = 5, root_tol = 1e-14)
+
 #=
-# p = 3
-path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k2/"
+# p = 2
+path = basepath * "p2/"
 
-Stages = [17, 13, 11, 9, 7, 6, 5, 4, 3]
+Stages = [16, 12, 10, 8, 6, 4]
 dtRatios = [
-    1.43509674072266,
-    1.07526779174805,
-    0.894473266601563,
-    0.714339447021484,
-    0.532713890075684,
-    0.439394950866699,
-    0.350951194763184,
-    0.253698348999023,
-    0.155333518981934
-] / 1.43509674072266
+    0.631627607345581,
+    0.485828685760498,
+    0.366690540313721,
+    0.282330989837646,
+    0.197234153747559,
+    0.124999046325684
+] ./ 0.631627607345581
 
-ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
+#=
+# p = 3
+path = basepath * "p3/"
+
+Stages = [16, 12, 10, 9, 8, 7, 6, 5, 4]
+dtRatios = [
+    0.675333578553955,
+    0.494580285519851,
+    0.405339434131065,
+    0.359326166425581,
+    0.307904954277865,
+    0.264428701231645,
+    0.216773986597445,
+    0.176284400979739,
+    0.12732553184037
+] ./ 0.675333578553955
+
+#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+=#
+
+
 # p = 4
-path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_EC/k3/"
+path = basepath * "p4/"
 
 Stages = [16, 11, 9, 7, 6, 5]
 dtRatios = [
@@ -152,7 +173,8 @@ dtRatios = [
 ] ./ 0.636282563128043
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
