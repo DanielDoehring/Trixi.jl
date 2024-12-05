@@ -157,7 +157,7 @@ function rhs!(du, u, t,
     # Prolong solution to mortars
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars!(cache, u, mesh, equations,
-                         dg.mortar, dg.surface_integral, dg, mortar_indices)
+                         dg.mortar, dg)
     end
 
     # Calculate mortar fluxes
@@ -812,7 +812,7 @@ end
 
 function prolong2mortars!(cache, u,
                           mesh::TreeMesh{2}, equations,
-                          mortar_l2::LobattoLegendreMortarL2, surface_integral,
+                          mortar_l2::LobattoLegendreMortarL2,
                           dg::DGSEM,
                           mortar_indices = eachmortar(dg, cache))
     @threaded for mortar in mortar_indices

@@ -502,7 +502,7 @@ function prolong2mortars!(cache,
                           mesh::TreeMesh{3},
                           equations_parabolic::AbstractEquationsParabolic,
                           mortar_l2::LobattoLegendreMortarL2,
-                          surface_integral, dg::DGSEM,
+                          dg::DGSEM,
                           mortar_indices = eachmortar(dg, cache)) where {uEltype <:
                                                                          Real}
     # temporary buffer for projections
@@ -980,7 +980,7 @@ function calc_gradient!(gradients, u_transformed, t,
     # NOTE: This re-uses the implementation for hyperbolic terms in "dg_3d.jl"
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars!(cache, u_transformed, mesh, equations_parabolic,
-                         dg.mortar, dg.surface_integral, dg, mortar_indices)
+                         dg.mortar, dg)
     end
 
     # Calculate mortar fluxes

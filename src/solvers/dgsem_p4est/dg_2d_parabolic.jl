@@ -33,7 +33,7 @@ for `P4estMesh`es we call
 
     ```
     prolong2mortars_divergence!(cache, flux_viscous, mesh, equations_parabolic,
-                                dg.mortar, dg.surface_integral, dg)
+                                dg.mortar, dg)
 
     calc_mortar_flux_divergence!(cache_parabolic.elements.surface_flux_values,
                                  mesh, equations_parabolic, dg.mortar,
@@ -42,11 +42,11 @@ for `P4estMesh`es we call
 instead of
     ```
     prolong2mortars!(cache, flux_viscous, mesh, equations_parabolic,
-                     dg.mortar, dg.surface_integral, dg)
+                     dg.mortar, dg)
 
     calc_mortar_flux!(cache_parabolic.elements.surface_flux_values, mesh,
                       equations_parabolic,
-                      dg.mortar, dg.surface_integral, dg, cache)
+                      dg.mortar, dg, cache)
     ```
 =#
 function rhs_parabolic!(du, u, t, mesh::Union{P4estMesh{2}, P4estMesh{3}},
@@ -137,7 +137,7 @@ function rhs_parabolic!(du, u, t, mesh::Union{P4estMesh{2}, P4estMesh{3}},
     # !!! NOTE: we reuse the hyperbolic cache here since it contains "mortars" and "u_threaded". See https://github.com/trixi-framework/Trixi.jl/issues/1674 for a discussion
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars_divergence!(cache, flux_viscous, mesh, equations_parabolic,
-                                    dg.mortar, dg.surface_integral, dg, mortar_indices)
+                                    dg.mortar, dg)
     end
 
     # Calculate mortar fluxes (specialized for AbstractEquationsParabolic)
@@ -273,7 +273,7 @@ function calc_gradient!(gradients, u_transformed, t,
     # Prolong solution to mortars. This resues the hyperbolic version of `prolong2mortars`
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars!(cache, u_transformed, mesh, equations_parabolic,
-                         dg.mortar, dg.surface_integral, dg, mortar_indices)
+                         dg.mortar, dg)
     end
 
     # Calculate mortar fluxes. This reuses the hyperbolic version of `calc_mortar_flux`,
@@ -700,7 +700,6 @@ function prolong2mortars_divergence!(cache, flux_viscous::Vector{Array{uEltype, 
                                      mesh::Union{P4estMesh{2}, T8codeMesh{2}},
                                      equations,
                                      mortar_l2::LobattoLegendreMortarL2,
-                                     surface_integral,
                                      dg::DGSEM,
                                      mortar_indices = eachmortar(dg, cache)) where {uEltype <:
                                                                                     Real}
