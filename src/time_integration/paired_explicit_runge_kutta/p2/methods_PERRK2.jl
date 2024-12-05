@@ -13,7 +13,7 @@ end
 # Constructor that reads the coefficients from a file
 function PairedExplicitRelaxationRK2(num_stages,
                                      base_path_monomial_coeffs::AbstractString,
-                                     dt_opt = nothing,
+                                     dt_opt = nothing;
                                      bS = 1.0, cS = 0.5,
                                      relaxation_solver = EntropyRelaxationNewton())
     return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages,
