@@ -6,7 +6,7 @@
 @muladd begin
 #! format: noindent
 
-struct PairedExplicitRelaxationRK4 <: AbstractPairedExplicitRKSingle
+struct PairedExplicitRelaxationRK4{RelaxationSolver} <: AbstractPairedExplicitRKSingle
     PERK4::PairedExplicitRK4
     relaxation_solver::RelaxationSolver
 end
@@ -16,9 +16,11 @@ function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractStr
                                      dt_opt = nothing;
                                      c_const = 1.0f0,
                                      relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK4(PairedExplicitRK4(num_stages, base_path_a_coeffs,
-                                                         dt_opt; c_const = c_const),
-                                       relaxation_solver)
+    return PairedExplicitRelaxationRK4{typeof(relaxation_solver)}(PairedExplicitRK4(num_stages,
+                                                                                    base_path_a_coeffs,
+                                                                                    dt_opt;
+                                                                                    c_const = c_const),
+                                                                  relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -27,7 +29,8 @@ end
 # which are used in Trixi.jl.
 mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType, Params, Sol,
                                                      F, Alg,
-                                                     PairedExplicitRKOptions} <:
+                                                     PairedExplicitRKOptions,
+                                                     RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKSingleIntegrator{4}
     u::uType
     du::uType

@@ -5,7 +5,8 @@
 @muladd begin
 #! format: noindent
 
-struct PairedExplicitRelaxationRK3Multi <: AbstractPairedExplicitRKMulti
+struct PairedExplicitRelaxationRK3Multi{RelaxationSolver} <:
+       AbstractPairedExplicitRKMulti
     PERK3Multi::PairedExplicitRK3Multi
     relaxation_solver::RelaxationSolver
 end
@@ -15,11 +16,11 @@ function PairedExplicitRelaxationRK3Multi(stages::Vector{Int64},
                                           dt_ratios;
                                           cS2::Float64 = 1.0,
                                           relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK3Multi(PairedExplicitRK3Multi(stages,
-                                                                   base_path_a_coeffs,
-                                                                   dt_ratios,
-                                                                   cS2 = cS2),
-                                            relaxation_solver)
+    return PairedExplicitRelaxationRK3Multi{typeof(relaxation_solver)}(PairedExplicitRK3Multi(stages,
+                                                                                              base_path_a_coeffs,
+                                                                                              dt_ratios,
+                                                                                              cS2 = cS2),
+                                                                       relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -29,7 +30,8 @@ end
 mutable struct PairedExplicitRelaxationRK3MultiIntegrator{RealT <: Real, uType, Params,
                                                           Sol, F,
                                                           Alg,
-                                                          PairedExplicitRKOptions} <:
+                                                          PairedExplicitRKOptions,
+                                                          RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKMultiIntegrator{3}
     u::uType
     du::uType

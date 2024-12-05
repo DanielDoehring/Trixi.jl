@@ -5,7 +5,7 @@
 @muladd begin
 #! format: noindent
 
-struct PairedExplicitRelaxationRK2 <: AbstractPairedExplicitRKSingle
+struct PairedExplicitRelaxationRK2{RelaxationSolver} <: AbstractPairedExplicitRKSingle
     PERK2::PairedExplicitRK2
     relaxation_solver::RelaxationSolver
 end
@@ -16,10 +16,12 @@ function PairedExplicitRelaxationRK2(num_stages,
                                      dt_opt = nothing;
                                      bS = 1.0, cS = 0.5,
                                      relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages,
-                                                         base_path_monomial_coeffs,
-                                                         dt_opt, bS, cS),
-                                       relaxation_solver)
+    return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
+                                                                                    base_path_monomial_coeffs,
+                                                                                    dt_opt,
+                                                                                    bS,
+                                                                                    cS),
+                                                                  relaxation_solver)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a
@@ -29,10 +31,13 @@ function PairedExplicitRelaxationRK2(num_stages, tspan,
                                      verbose = false,
                                      bS = 1.0, cS = 0.5,
                                      relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages, tspan, semi;
-                                                         verbose = verbose,
-                                                         bS = bS, cS = cS),
-                                       relaxation_solver)
+    return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
+                                                                                    tspan,
+                                                                                    semi;
+                                                                                    verbose = verbose,
+                                                                                    bS = bS,
+                                                                                    cS = cS),
+                                                                  relaxation_solver)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a
@@ -42,10 +47,13 @@ function PairedExplicitRelaxationRK2(num_stages, tspan, eig_vals::Vector{Complex
                                      bS = 1.0, cS = 0.5,
                                      gamma_solver = :newton,
                                      relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK2(PairedExplicitRK2(num_stages, tspan, eig_vals;
-                                                         verbose = verbose,
-                                                         bS = bS, cS = cS),
-                                       relaxation_solver)
+    return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
+                                                                                    tspan,
+                                                                                    eig_vals;
+                                                                                    verbose = verbose,
+                                                                                    bS = bS,
+                                                                                    cS = cS),
+                                                                  relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -54,7 +62,8 @@ end
 # which are used in Trixi.
 mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType, Params, Sol,
                                                      F, Alg,
-                                                     PairedExplicitRKOptions} <:
+                                                     PairedExplicitRKOptions,
+                                                     RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKSingleIntegrator{2}
     u::uType
     du::uType

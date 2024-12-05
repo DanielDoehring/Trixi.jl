@@ -66,15 +66,17 @@ dtRatios = [1, 0.5, 0.25]
 
 relaxation_solver = Trixi.EntropyRelaxationNewton(max_iterations = 3)
 
+#=
 # p = 2
 Stages = [9, 5, 3]
 path = basepath * "p2/"
 
 #ode_alg = Trixi.PairedExplicitRK2(Stages[1], path)
-ode_alg = Trixi.PairedExplicitRelaxationRK2(Stages[1], path, relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRelaxationRK2(Stages[1], path, relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+=#
 
 # p = 3
 #=
@@ -84,21 +86,21 @@ path = basepath * "p3/"
 #ode_alg = Trixi.PairedExplicitRK3(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(Stages[1], path, relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
 # p = 4
-#=
+
 Stages = [18, 10, 6]
 path = basepath * "p4/"
 
 #ode_alg = Trixi.PairedExplicitRK4(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages[1], path, relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+#ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,

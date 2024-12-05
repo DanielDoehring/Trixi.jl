@@ -5,7 +5,7 @@
 @muladd begin
 #! format: noindent
 
-struct PairedExplicitRelaxationRK3 <: AbstractPairedExplicitRKSingle
+struct PairedExplicitRelaxationRK3{RelaxationSolver} <: AbstractPairedExplicitRKSingle
     PERK3::PairedExplicitRK3
     relaxation_solver::RelaxationSolver
 end
@@ -15,10 +15,11 @@ function PairedExplicitRelaxationRK3(num_stages, base_path_a_coeffs::AbstractStr
                                      dt_opt = nothing;
                                      cS2 = 1.0f0,
                                      relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
-                                                         base_path_a_coeffs,
-                                                         dt_opt; cS2 = cS2),
-                                       relaxation_solver)
+    return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
+                                                                                    base_path_a_coeffs,
+                                                                                    dt_opt;
+                                                                                    cS2 = cS2),
+                                                                  relaxation_solver)
 end
 
 # Constructor that computes Butcher matrix A coefficients from a semidiscretization
@@ -26,24 +27,24 @@ function PairedExplicitRelaxationRK3(num_stages, tspan,
                                      semi::AbstractSemidiscretization;
                                      verbose = false, cS2 = 1.0f0,
                                      relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
-                                                         tspan,
-                                                         semi;
-                                                         verbose = verbose,
-                                                         cS2 = cS2),
-                                       relaxation_solver)
+    return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
+                                                                                    tspan,
+                                                                                    semi;
+                                                                                    verbose = verbose,
+                                                                                    cS2 = cS2),
+                                                                  relaxation_solver)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a list of eigenvalues
 function PairedExplicitRelaxationRK3(num_stages, tspan, eig_vals::Vector{ComplexF64};
                                      verbose = false, cS2 = 1.0f0,
                                      relaxation_solver = EntropyRelaxationNewton())
-    return PairedExplicitRelaxationRK3(PairedExplicitRK3(num_stages,
-                                                         tspan,
-                                                         eig_vals;
-                                                         verbose = verbose,
-                                                         cS2 = cS2),
-                                       relaxation_solver)
+    return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
+                                                                                    tspan,
+                                                                                    eig_vals;
+                                                                                    verbose = verbose,
+                                                                                    cS2 = cS2),
+                                                                  relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -52,7 +53,8 @@ end
 # which are used in Trixi.jl.
 mutable struct PairedExplicitRelaxationRK3Integrator{RealT <: Real, uType, Params, Sol,
                                                      F, Alg,
-                                                     PairedExplicitRKOptions} <:
+                                                     PairedExplicitRKOptions,
+                                                     RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKSingleIntegrator{3}
     u::uType
     du::uType
