@@ -6,7 +6,8 @@
 #! format: noindent
 
 # Custom implementation for PERK integrator
-function (amr_callback::AMRCallback)(integrator::AbstractPairedExplicitRKMultiIntegrator;
+function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
+                                                       AbstractPairedExplicitRelaxationRKMultiIntegrator};
                                      kwargs...)
     u_ode = integrator.u
     semi = integrator.p
