@@ -55,7 +55,7 @@ cfl = 1.0 # Probably not maxed out
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback,
+                        #analysis_callback,
                         stepsize_callback)
 
 ###############################################################################
@@ -71,13 +71,13 @@ Stages = [9, 5, 3]
 path = basepath * "p2/"
 
 #ode_alg = Trixi.PairedExplicitRK2(Stages[1], path)
-#ode_alg = Trixi.PairedExplicitRelaxationRK2(Stages[1], path, relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK2(Stages[1], path, relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 
 # p = 3
-
+#=
 Stages = [13, 7, 4]
 path = basepath * "p3/"
 
@@ -86,10 +86,10 @@ path = basepath * "p3/"
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
+=#
 
 # p = 4
-
+#=
 Stages = [18, 10, 6]
 path = basepath * "p4/"
 
@@ -98,10 +98,29 @@ path = basepath * "p4/"
 
 ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
+=#
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
+
+# Trying to track down the allocations
+
+integrator = Trixi.init(ode, ode_alg, 
+                        dt = 42.0, callback = callbacks)
+
+u_tmp_wrap = Trixi.wrap_array(integrator.u_tmp, semi)
+u_wrap = Trixi.wrap_array(integrator.u, semi)
+dir_wrap = Trixi.wrap_array(integrator.k1, semi)
+
+S_old = 42.0
+dS = 42.0
+
+@time Trixi.relaxation_solver!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS, mesh, equations, solver, semi.cache, integrator.relaxation_solver)
+
+using BenchmarkTools
+@btime Trixi.relaxation_solver!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS, mesh, equations, solver, semi.cache, integrator.relaxation_solver)
+
+@code_warntype Trixi.relaxation_solver!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS, mesh, equations, solver, semi.cache, integrator.relaxation_solver)

@@ -168,6 +168,8 @@ function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegr
     else
         integrator.gamma = 1
     end
+
+    return nothing
 end
 
 function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
@@ -195,6 +197,8 @@ function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegr
 
     # Catch Newton failures
     if integrator.gamma < 0 || isnan(integrator.gamma) || isinf(integrator.gamma)
-        integrator.gamma = 1
+        integrator.gamma = one(typeof(integrator.gamma))
     end
+
+    return nothing
 end
