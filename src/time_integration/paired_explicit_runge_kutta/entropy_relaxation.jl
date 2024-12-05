@@ -8,8 +8,8 @@
         # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
         integrate_via_indices(u_i, mesh, equations, dg, cache,
                               stage) do u_i, i, element, equations, dg, stage
-            w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, element),
-                                  equations)
+            u_local = get_node_vars(u_i, equations, dg, i, element)
+            w_node = cons2entropy(u_local, equations)
             stage_node = get_node_vars(stage, equations, dg, i, element)
             dot(w_node, stage_node)
         end
@@ -25,8 +25,8 @@ end
         # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
         integrate_via_indices(u_i, mesh, equations, dg, cache,
                               stage) do u_i, i, j, element, equations, dg, stage
-            w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, j, element),
-                                  equations)
+            u_local = get_node_vars(u_i, equations, dg, i, j, element)
+            w_node = cons2entropy(u_local, equations)
             stage_node = get_node_vars(stage, equations, dg, i, j, element)
             dot(w_node, stage_node)
         end
@@ -41,8 +41,8 @@ end
         # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
         integrate_via_indices(u_i, mesh, equations, dg, cache,
                               stage) do u_i, i, j, k, element, equations, dg, stage
-            w_node = cons2entropy(get_node_vars(u_i, equations, dg, i, j, k, element),
-                                  equations)
+            u_local = get_node_vars(u_i, equations, dg, i, j, k, element)
+            w_node = cons2entropy(u_local, equations)
             stage_node = get_node_vars(stage, equations, dg, i, j, k, element)
             dot(w_node, stage_node)
         end
@@ -57,10 +57,10 @@ end
 
 abstract type RelaxationSolver end
 
-struct EntropyRelaxationBisection <: RelaxationSolver
-    gamma_min::Real
-    gamma_max::Real
-    gamma_tol::Real
+struct EntropyRelaxationBisection{RealT <: Real} <: RelaxationSolver
+    gamma_min::RealT
+    gamma_max::RealT
+    gamma_tol::RealT
     max_iterations::Int
 end
 
@@ -70,9 +70,9 @@ function EntropyRelaxationBisection(; gamma_min = 0.1, gamma_max = 1.2,
     return EntropyRelaxationBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
-struct EntropyRelaxationNewton <: RelaxationSolver
-    step_scaling::Real
-    root_tol::Real
+struct EntropyRelaxationNewton{RealT <: Real} <: RelaxationSolver
+    step_scaling::RealT
+    root_tol::RealT
     max_iterations::Int
 end
 
