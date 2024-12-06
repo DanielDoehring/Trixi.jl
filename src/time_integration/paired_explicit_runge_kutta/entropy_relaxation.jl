@@ -121,7 +121,8 @@ function Base.show(io::IO, ::MIME"text/plain",
     end
 end
 
-function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
+function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator,
+                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator},
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
@@ -172,7 +173,8 @@ function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegr
     return nothing
 end
 
-function relaxation_solver!(integrator::AbstractPairedExplicitRelaxationRKIntegrator,
+function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator,
+                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator},
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,

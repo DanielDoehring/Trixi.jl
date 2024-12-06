@@ -79,7 +79,8 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
                                                                    Params,
                                                                    Sol, F,
                                                                    Alg,
-                                                                   PairedExplicitRKOptions} <:
+                                                                   PairedExplicitRKOptions,
+                                                                   RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{4}
     u::uType
     du::uType
