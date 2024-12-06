@@ -72,7 +72,6 @@ EdgeLength = 20.0
 N_passes = 1
 T_end = EdgeLength * N_passes
 tspan = (0.0, T_end)
-#tspan = (0.0, 0.1)
 
 """
     initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerEquations2D)
@@ -149,8 +148,8 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 analysis_interval = 10^6
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     extra_analysis_errors = (:conservation_error,
-                                                              :l1_error))
+                                     extra_analysis_errors = (:l1_error),
+                                     analysis_integrals = (;))
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
                                       base_level = Refinement,
