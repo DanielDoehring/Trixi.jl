@@ -232,5 +232,4 @@ function (indicator_clamp::IndicatorClamp)(u::AbstractArray{<:Any, 3},
 
     return alpha
 end
-
 end # @muladd

@@ -328,37 +328,37 @@ end
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
     for level in 1:min(alg.num_methods, integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] = integrator.u[i] +
                                       integrator.dt *
                                       alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[u_ind]
+                                      integrator.k1[i]
         end
     end
     for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] += integrator.dt *
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] += integrator.dt *
                                        alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[u_ind]
+                                       integrator.du[i]
         end
     end
 
     # "Remainder": Non-efficiently integrated
     for level in (alg.num_methods + 1):(integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] = integrator.u[i] +
                                       integrator.dt *
                                       alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                      integrator.k1[u_ind]
+                                      integrator.k1[i]
         end
     end
     if alg.max_eval_levels[stage] == alg.num_methods
         for level in (alg.max_eval_levels[stage] + 1):integrator.n_levels
-            @threaded for u_ind in integrator.level_u_indices_elements[level]
-                integrator.u_tmp[u_ind] += integrator.dt *
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] += integrator.dt *
                                            alg.a_matrices[alg.num_methods, 2,
                                                           stage - 2] *
-                                           integrator.du[u_ind]
+                                           integrator.du[i]
             end
         end
     end
@@ -366,19 +366,19 @@ end
 
     ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
     for level in 1:alg.max_eval_levels[stage]
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      (alg.a_matrices[level, 1, stage - 2] *
-                                       integrator.k1[u_ind] +
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[u_ind])
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  integrator.dt *
+                                  (alg.a_matrices[level, 1, stage - 2] *
+                                   integrator.k1[i] +
+                                   alg.a_matrices[level, 2, stage - 2] *
+                                   integrator.du[i])
         end
     end
     for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
-        @threaded for u_ind in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt * integrator.k1[u_ind] # * A[stage, 1, level] = c[level] = 1
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  integrator.dt * integrator.k1[i] # * A[stage, 1, level] = c[level] = 1
         end
     end
 
@@ -393,13 +393,13 @@ end
 @inline function last_three_stages!(integrator::PairedExplicitRK4MultiParabolicIntegrator,
                                     p, alg)
     for stage in 1:2
-        @threaded for u_ind in eachindex(integrator.u)
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      (alg.a_matrix_constant[1, stage] *
-                                       integrator.k1[u_ind] +
-                                       alg.a_matrix_constant[2, stage] *
-                                       integrator.du[u_ind])
+        @threaded for i in eachindex(integrator.u)
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  integrator.dt *
+                                  (alg.a_matrix_constant[1, stage] *
+                                   integrator.k1[i] +
+                                   alg.a_matrix_constant[2, stage] *
+                                   integrator.du[i])
         end
 
         integrator.f(integrator.du, integrator.u_tmp, p,
@@ -425,11 +425,11 @@ end
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,
                  integrator.du_tmp)
 
-    @threaded for u_ind in eachindex(integrator.u)
+    @threaded for i in eachindex(integrator.u)
         # Note that 'k1' carries the values of K_{S-1}
         # and that we construct 'K_S' "in-place" from 'integrator.du'
-        integrator.u[u_ind] += 0.5 * integrator.dt *
-                               (integrator.k1[u_ind] + integrator.du[u_ind])
+        integrator.u[i] += 0.5 * integrator.dt *
+                           (integrator.k1[i] + integrator.du[i])
     end
 end
 end # @muladd

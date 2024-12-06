@@ -309,5 +309,4 @@ function Base.show(io::IO, ::MIME"text/plain", indicator::IndicatorClamp)
         summary_box(io, "IndicatorClamp", setup)
     end
 end
-
 end # @muladd

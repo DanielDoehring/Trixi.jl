@@ -437,8 +437,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
         rhs!(du_tmp, u_ode, semi, t)
         rhs_parabolic!(du_ode, u_ode, semi, t)
 
-        @threaded for u_ind in eachindex(du_ode)
-            du_ode[u_ind] += du_tmp[u_ind]
+        @threaded for i in eachindex(du_ode)
+            du_ode[i] += du_tmp[i]
         end
     end
 end
@@ -451,8 +451,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
         rhs!(du_tmp, u_ode, semi, t)
         rhs_parabolic!(du_ode, u_ode, semi, t)
 
-        @threaded for u_ind in eachindex(du_ode)
-            du_ode[u_ind] += du_tmp[u_ind]
+        @threaded for i in eachindex(du_ode)
+            du_ode[i] += du_tmp[i]
         end
     end
 end
@@ -472,8 +472,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                        boundary_indices, mortar_indices)
 
         for level in 1:max_level
-            @threaded for u_ind in u_indices[level]
-                du_ode[u_ind] += du_tmp[u_ind]
+            @threaded for i in u_indices[level]
+                du_ode[i] += du_tmp[i]
             end
         end
     end
