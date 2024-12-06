@@ -137,7 +137,7 @@ function integrate_via_indices(func::Func, u,
     total_volume = zero(real(mesh))
 
     # Use quadrature to numerically integrate over entire domain
-    for element in eachelement(dg, cache)
+    @batch reduction = ((+, integral), (+, total_volume)) for element in eachelement(dg, cache)
         for i in eachnode(dg)
             jacobian_volume = abs(inv(cache.elements.inverse_jacobian[i, element]))
             integral += jacobian_volume * weights[i] *
@@ -162,7 +162,7 @@ function integrate_via_indices(func::Func, u,
     integral = zero(func(u, 1, 1, equations, dg, args...))
 
     # Use quadrature to numerically integrate over entire domain
-    for element in eachelement(dg, cache)
+    @batch reduction = (+, integral) for element in eachelement(dg, cache)
         volume_jacobian_ = volume_jacobian(element, mesh, cache)
         for i in eachnode(dg)
             integral += volume_jacobian_ * weights[i] *
