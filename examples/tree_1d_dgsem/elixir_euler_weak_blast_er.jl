@@ -13,9 +13,8 @@ initial_condition = initial_condition_weak_blast_wave
 
 # Volume flux adds some (minimal) disspation, thus stabilizing the simulation - 
 # in contrast to standard DGSEM only
-volume_flux = flux_ranocha
 solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))          
+               volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))          
 
 coordinates_min = -2.0
 coordinates_max = 2.0
@@ -55,7 +54,7 @@ cfl = 1.0 # Probably not maxed out
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         stepsize_callback)
 
 ###############################################################################
@@ -107,22 +106,3 @@ sol = Trixi.solve(ode, ode_alg,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
-
-# Trying to track down the allocations
-
-integrator = Trixi.init(ode, ode_alg, 
-                        dt = 42.0, callback = callbacks)
-
-u_tmp_wrap = Trixi.wrap_array(integrator.u_tmp, semi)
-u_wrap = Trixi.wrap_array(integrator.u, semi)
-dir_wrap = Trixi.wrap_array(integrator.k1, semi)
-
-S_old = 42.0
-dS = 42.0
-
-@time Trixi.relaxation_solver!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS, mesh, equations, solver, semi.cache, integrator.relaxation_solver)
-
-using BenchmarkTools
-@btime Trixi.relaxation_solver!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS, mesh, equations, solver, semi.cache, integrator.relaxation_solver)
-
-@code_warntype Trixi.relaxation_solver!(integrator, u_tmp_wrap, u_wrap, dir_wrap, S_old, dS, mesh, equations, solver, semi.cache, integrator.relaxation_solver)
