@@ -12,7 +12,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
     u_ode = integrator.u
     semi = integrator.p
 
-    @trixi_timeit timer() "AMR" begin
+    @trixi_timeit timer() "AMR-PERK" begin
         has_changed = amr_callback(u_ode, semi,
                                    integrator.t, integrator.iter; kwargs...)
 

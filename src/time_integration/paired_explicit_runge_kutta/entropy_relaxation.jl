@@ -66,7 +66,7 @@ end
 
 function EntropyRelaxationBisection(; gamma_min = 0.1, gamma_max = 1.2,
                                     gamma_tol = 100 * eps(typeof(gamma_min)),
-                                    max_iterations = 100)
+                                    max_iterations = 25)
     return EntropyRelaxationBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
