@@ -102,13 +102,13 @@ end
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     for stage in 1:2
-        @threaded for u_ind in eachindex(integrator.u)
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      (alg.a_matrix_constant[1, stage] *
-                                       integrator.k1[u_ind] +
-                                       alg.a_matrix_constant[2, stage] *
-                                       integrator.du[u_ind])
+        @threaded for i in eachindex(integrator.u)
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  integrator.dt *
+                                  (alg.a_matrix_constant[1, stage] *
+                                   integrator.k1[i] +
+                                   alg.a_matrix_constant[2, stage] *
+                                   integrator.du[i])
         end
 
         integrator.f(integrator.du, integrator.u_tmp, p,

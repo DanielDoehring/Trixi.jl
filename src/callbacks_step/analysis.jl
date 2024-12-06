@@ -222,6 +222,11 @@ function initialize!(cb::DiscreteCallback{Condition, Affect!}, u_ode, du_ode, t,
                     @printf(io, "   %-21s", "linf_"*v)
                 end
             end
+            if :l1_error_primitive in analysis_errors
+                for v in varnames(cons2prim, equations)
+                    @printf(io, "   %-21s", "l2_"*v)
+                end
+            end
 
             for quantity in analysis_integrals
                 @printf(io, "   %-21s", pretty_form_ascii(quantity))
@@ -489,9 +494,13 @@ function (analysis_callback::AnalysisCallback)(io, du, u, u_ode, t, semi, iter)
 
     # L2/L∞ errors of the primitive variables
     if :l2_error_primitive in analysis_errors ||
-       :linf_error_primitive in analysis_errors
-        l2_error_prim, linf_error_prim = calc_error_norms(cons2prim, u_ode, t, analyzer,
-                                                          semi, cache_analysis)
+       :linf_error_primitive in analysis_errors ||
+       :l1_error_primitive in analysis_errors
+        l2_error_prim, linf_error_prim, l1_error_prim = calc_error_norms(cons2prim,
+                                                                         u_ode, t,
+                                                                         analyzer,
+                                                                         semi,
+                                                                         cache_analysis)
 
         if mpi_isroot()
             print(" Variable:     ")
@@ -516,6 +525,16 @@ function (analysis_callback::AnalysisCallback)(io, du, u, u_ode, t, semi, iter)
                 for v in eachvariable(equations)
                     @printf("%10.8e   ", linf_error_prim[v])
                     @printf(io, "  % 10.15e", linf_error_prim[v])
+                end
+                println()
+            end
+
+            # L1 error
+            if :l1_error_primitive in analysis_errors
+                print(" L1 error prim.: ")
+                for v in eachvariable(equations)
+                    @printf("%10.8e   ", l1_error_prim[v])
+                    @printf(io, "  % 10.8e", l1_error_prim[v])
                 end
                 println()
             end
