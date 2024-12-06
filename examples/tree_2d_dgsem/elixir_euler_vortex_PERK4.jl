@@ -1,5 +1,5 @@
 
-using OrdinaryDiffEq, Plots
+using OrdinaryDiffEq
 using Trixi
 
 ###############################################################################
@@ -148,7 +148,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 analysis_interval = 10^6
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     extra_analysis_errors = (:l1_error),
+                                     extra_analysis_errors = (:l1_error, ),
                                      analysis_integrals = (;))
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
@@ -156,13 +156,15 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi)
                                       med_level = Refinement + 1, med_threshold = -3.0,
                                       max_level = Refinement + 2, max_threshold = -2.0)
 
-CFL_Convergence = 1.0 # 0.5, 0.25, ...
+N_Convergence = 7
+CFL_Convergence = 1.0/(2^N_Convergence)
+
 amr_callback = AMRCallback(semi, amr_controller,
                            # For convergence study
-                           interval = Int(20 / CFL_Convergence),
+                           interval = Int(50 / CFL_Convergence),
                            adapt_initial_condition = true)
 
-alive_callback = AliveCallback(alive_interval = 100)
+alive_callback = AliveCallback(alive_interval = 100 * Int((2^N_Convergence)))
 
 callbacks = CallbackSet(summary_callback,
                         amr_callback,
@@ -173,30 +175,31 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 dtRatios = [1, 0.5, 0.25]
-basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
+#basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
+basepath = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
 
 # p = 2
 
 Stages = [12, 6, 3]
 path = basepath * "p2/"
-#ode_algorithm = Trixi.PairedExplicitRK2(12, path)
-ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
 
 
 # p = 3
 #=
 Stages = [16, 8, 4]
 path = basepath * "p3/"
-#ode_algorithm = Trixi.PairedExplicitRK3(16, path)
-ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
 =#
 
 # p = 4
 #=
 Stages = [15, 9, 5]
 path = basepath * "p4/"
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
 =#
 
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
