@@ -157,16 +157,16 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi)
                                       med_level = Refinement + 1, med_threshold = -3.0,
                                       max_level = Refinement + 2, max_threshold = -2.0)
 
-CFL_Convergence = 1.0 # 0.5, 0.25
+CFL_Convergence = 1.0 # 0.5, 0.25, ...
 amr_callback = AMRCallback(semi, amr_controller,
                            # For convergence study
                            interval = Int(20 / CFL_Convergence),
                            adapt_initial_condition = true)
 
-alive_callback = AliveCallback(alive_interval = 1000)
+alive_callback = AliveCallback(alive_interval = 100)
 
 callbacks = CallbackSet(summary_callback,
-                        #amr_callback,
+                        amr_callback,
                         alive_callback,
                         analysis_callback)
 
@@ -174,15 +174,15 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 dtRatios = [1, 0.5, 0.25]
-basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex_Conv_Test_AMR_k6/"
+basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
 
 # p = 2
-#=
+
 Stages = [12, 6, 3]
 path = basepath * "p2/"
 #ode_algorithm = Trixi.PairedExplicitRK2(12, path)
 ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-=#
+
 
 # p = 3
 #=
@@ -193,10 +193,12 @@ ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 =#
 
 # p = 4
-
+#=
 Stages = [15, 9, 5]
 path = basepath * "p4/"
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+=#
 
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
 
