@@ -165,10 +165,10 @@ amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
 ###############################################################################
 # run the simulation
 
-cfl = 0.8 # CarpenterKennedy2N54 # tested
+#cfl = 0.8 # CarpenterKennedy2N54 # tested
 cfl = 3.2 # SSPRK104 # tested
-cfl = 1.2  # SSPRK54 # tested
-cfl = 0.9 # DGLDDRK84_F # tested
+#cfl = 1.2  # SSPRK54 # tested 
+#cfl = 0.9 # DGLDDRK84_F # tested
 #cfl = 0.6 # ParsaniKetchesonDeconinck3S94 # tested
 #cfl = 0.6 # NDBLSRK124 # tested
 
@@ -185,8 +185,8 @@ callbacks = CallbackSet(summary_callback,
 
 ode_alg = CarpenterKennedy2N54(thread = OrdinaryDiffEq.True())
 ode_alg = SSPRK104(thread = OrdinaryDiffEq.True())
-ode_alg = SSPRK54(thread = OrdinaryDiffEq.True())
-ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
+#ode_alg = SSPRK54(thread = OrdinaryDiffEq.True())
+#ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
 #ode_alg = ParsaniKetchesonDeconinck3S94(thread = OrdinaryDiffEq.True())
 #ode_alg = NDBLSRK124(thread = OrdinaryDiffEq.True())
 

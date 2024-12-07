@@ -8,7 +8,8 @@
 # Custom implementation for PERK integrator
 function (amr_callback::AMRCallback)(integrator::Union{PERK_Multi_Integrator,
                                                        PERK3_Multi_Integrator,
-                                                       PERK4_Multi_Integrator};
+                                                       PERK4_Multi_Integrator,
+                                                       PERK4_ER_Multi_Integrator};
                                      kwargs...)
     u_ode = integrator.u
     semi = integrator.p

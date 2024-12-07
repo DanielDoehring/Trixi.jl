@@ -127,13 +127,13 @@ StagesGravity = [5, 3, 2]
 
 cfl_gravity = 1.4
 alg_gravity = PERK_Multi(StagesGravity, 
-                         "/storage/home/daniel/PERK4/EulerGravity/Blob/2D/HypDiff/p2/", 
+                         "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/HypDiff/p2/", 
                          dtRatios, bS, cEnd)
 
 
 #=
 cfl_gravity = 1.4
-alg_gravity = PERK(5, "/storage/home/daniel/PERK4/EulerGravity/Blob/2D/HypDiff/p2/",
+alg_gravity = PERK(5, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/HypDiff/p2/",
                    bS, cEnd)                         
 =#
 
@@ -207,12 +207,12 @@ dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
 
 ode_algorithm = PERK4_Multi(Stages, 
-                            "/storage/home/daniel/PERK4/EulerGravity/Blob/2D/Euler_only/", 
+                            "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/Euler_only/", 
                             dtRatios)
 
 #=
 Stages = 9
-ode_algorithm = PERK4(Stages, "/storage/home/daniel/PERK4/EulerGravity/Blob/2D/Euler_only/")
+ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/Euler_only/")
 =#
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);

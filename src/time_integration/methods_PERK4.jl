@@ -242,11 +242,10 @@ function last_three_stages!(integrator, alg, p)
 
     #integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + alg.c[alg.NumStages] * integrator.dt, integrator.du_ode_hyp)
     integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + alg.c[alg.NumStages] * integrator.dt)
-    
+
     @threaded for u_ind in eachindex(integrator.u)
-        # "Own" PairedExplicitRK based on SSPRK33.
-          # Note that 'k_higher' carries the values of K_{S-1}
-          # and that we construct 'K_S' "in-place" from 'integrator.du'
+        # Note that 'k_higher' carries the values of K_{S-1}
+        # and that we construct 'K_S' "in-place" from 'integrator.du'
         integrator.u[u_ind] += 0.5 * (integrator.k_higher[u_ind] + integrator.du[u_ind] * integrator.dt)
     end
 end

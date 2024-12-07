@@ -260,7 +260,8 @@ export SemidiscretizationHyperbolicParabolic
 export SemidiscretizationEulerAcoustics
 
 export SemidiscretizationEulerGravity, ParametersEulerGravity,
-       timestep_gravity_erk52_3Sstar!, timestep_gravity_carpenter_kennedy_erk54_2N!,
+       timestep_gravity_erk51_3Sstar!, timestep_gravity_erk52_3Sstar!, timestep_gravity_erk53_3Sstar!, 
+       timestep_gravity_carpenter_kennedy_erk54_2N!,
        timestep_gravity_PERK2!, timestep_gravity_PERK2_Multi!,
        timestep_gravity_PERK4!, timestep_gravity_PERK4_Multi!
 
@@ -289,7 +290,8 @@ export trixi_include, examples_dir, get_examples, default_example,
 
 export ode_norm, ode_unstable_check
 
-export PERK, PERK_Multi, PERK3, PERK3_Multi, PERK4, PERK4_Multi
+export PERK, PERK_Multi, PERK3, PERK3_Multi, PERK4, PERK4_Multi,
+       PERK4_ER, PERK4_ER_Multi
 
 export convergence_test, jacobian_fd, jacobian_ad_forward, linear_structure
 

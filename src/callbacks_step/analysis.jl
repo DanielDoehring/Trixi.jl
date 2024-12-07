@@ -608,7 +608,7 @@ function analyze_integrals(analysis_integrals::NTuple{N, Any}, io, du, u, t,
     if mpi_isroot()
         @printf(" %-12s:", pretty_form_utf(quantity))
         @printf("  % 10.8e", res)
-        @printf(io, "  % 10.8e", res)
+        @printf(io, "  % 10.16e", res)
     end
     mpi_println()
 

@@ -120,14 +120,16 @@ function initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerE
 end
 initial_condition = initial_condition_isentropic_vortex
 
-surf_flux = flux_hllc # Better flux, allows much larger timesteps
-PolyDeg = 3
-solver = DGSEM(RealT = Float64, polydeg=PolyDeg, surface_flux=surf_flux)
+# For real entropy conservation!
+volume_flux = flux_ranocha
+solver = DGSEM(RealT = Float64, polydeg = 3, surface_flux = flux_ranocha,
+               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+
 
 coordinates_min = (-EdgeLength, -EdgeLength)
 coordinates_max = ( EdgeLength,  EdgeLength)
 
-Refinement = 6
+Refinement = 5
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level=Refinement,
                 n_cells_max=100_000)
@@ -141,7 +143,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 20
+analysis_interval = 10
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
@@ -150,54 +152,47 @@ analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
                                       base_level=Refinement,
                                       med_level=Refinement+1, med_threshold=-3.0,
-                                      max_level=Refinement+3, max_threshold=-0.6)
+                                      max_level=Refinement+2, max_threshold=-0.6)
                                      
 #amr_interval = 16 # PERK4 Multi
-amr_interval = 10 # PERK4 19
+amr_interval = analysis_interval # PERK4 14
 
-#amr_interval = 18 # NDBLSRK144
-#amr_interval = 30 # DGLDDRK84_C
-#amr_interval = 26 # RDPK3SpFSAL49
-#amr_interval = 74 # RK4
-
+# CARE: AMR/Mortars are not entropy conservative, see 
+# https://github.com/trixi-framework/Trixi.jl/issues/195
+# https://github.com/trixi-framework/Trixi.jl/pull/247
 amr_callback = AMRCallback(semi, amr_controller,
                            interval=amr_interval, 
                            adapt_initial_condition=true)
 
 ### AMR, Ref_Lvl = 6, Standard DGSEM ###
 
-# E = 5, 7, 11, 19
-CFL = 7.4
+# E = 5, 8, 14
+CFL = 4.2
 
 # PERK4 Standalone #
-#CFL = 11.5 # S = 19
-
-# OrdinaryDiffEq.jl methods
-
-#CFL = 6.7 # NDBLSRK144
-#CFL = 3.9 # DGLDDRK84_C
-#CFL = 4.6 # RDPK3SpFSAL49
-#CFL = 1.6 # RK4
+#CFL = 6.9 # S = 14
 
 stepsize_callback = StepsizeCallback(cfl = CFL)
 
 callbacks = CallbackSet(summary_callback,
-                        amr_callback, # Not sure if AMR is entropy stable
+                        amr_callback,
                         stepsize_callback,
                         analysis_callback)                
 
 ###############################################################################
 # run the simulation
 
-Stages = 19
+Stages = 14
 
-#ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/")
+#ode_algorithm = PERK4_ER(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
+#ode_algorithm = PERK4(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/")
 
 
-dtRatios = [1, 0.5, 0.25, 0.125]
-Stages = [19, 11, 7, 5]
+dtRatios = [1, 0.5, 0.25]
+Stages = [14, 8, 5]
 
-ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/IsentropicVortex_c1/", dtRatios)
+ode_algorithm = PERK4_ER_Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
+#ode_algorithm = PERK4_Multi(Stages, "/home/daniel/git/Paper-EntropyStabPERK/Data/IsentropicVortex_EC/", dtRatios)
 
 
 sol = Trixi.solve(ode, ode_algorithm,
@@ -205,33 +200,3 @@ sol = Trixi.solve(ode, ode_algorithm,
                   save_everystep=false, callback=callbacks);
 
 summary_callback() # print the timer summary
-
-
-exit() # For MPI business
-
-###############################################################################
-
-ode_algorithm = NDBLSRK144(williamson_condition = false)
-ode_algorithm = DGLDDRK84_C(williamson_condition = false)
-ode_algorithm = RDPK3SpFSAL49()
-ode_algorithm = RK4()
-
-sol = solve(ode, ode_algorithm,
-            dt = 42.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks, 
-            adaptive = false);
-
-summary_callback() # print the timer summary
-
-exit() # For MPI business
-
-plot(sol)
-
-pd = PlotData2D(sol)
-
-xy = 4
-xlimits = (-xy, xy)
-ylimits = (-xy, xy)
-
-plot(pd["rho"], xlims = xlimits, ylims = ylimits, title = "\$ ρ, t_f = 20.0 \$", c = :jet)
-plot(getmesh(pd), xlims = xlimits, ylims = ylimits, xlabel = "\$x\$", ylabel="\$y\$", title = "Mesh at \$t_f = 20.0\$")

@@ -25,5 +25,8 @@ include("methods_PERK3Multi.jl")
 include("methods_PERK4.jl")
 include("methods_PERK4Multi.jl")
 
+include("methods_PERK4_ER.jl")
+include("methods_PERK4_ER_Multi.jl")
+
 include("methods_SSP.jl")
 end # @muladd
