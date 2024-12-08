@@ -153,6 +153,7 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
         PERK_k1!(integrator, prob.p)
 
         k1_wrap = wrap_array(integrator.k1, prob.p)
+        # Entropy change due to first stage
         dS = 1 / 6 * integrator.dt * # b1 = 1/6
              int_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache)
 
@@ -164,6 +165,7 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
 
         du_wrap = wrap_array(integrator.du, prob.p)
         u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
+        # Entropy change due to S-1 stage
         dS += 1 / 6 * integrator.dt * # b_{S-1} = 1/6
               int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
@@ -174,19 +176,20 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
 
         PERK_ki!(integrator, prob.p, alg, alg.num_stages)
 
+        # Entropy change due to last (i = S) stage
         dS += 2 / 3 * integrator.dt * # b_{S} = 2/3
               int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
-        # Note: We reuse `k1` for the "direction"
+        # Note: We reuse `du` for the "direction"
         @threaded for i in eachindex(integrator.u)
-            integrator.k1[i] = integrator.dt *
+            integrator.du[i] = integrator.dt *
                                (integrator.k1[i] + integrator.kS1[i] +
-                                4.0 * integrator.du[i]) / 6.0
+                                4 * integrator.du[i]) / 6
         end
 
         @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
                                                                      u_tmp_wrap, u_wrap,
-                                                                     k1_wrap,
+                                                                     du_wrap,
                                                                      S_old, dS,
                                                                      mesh, equations,
                                                                      dg, cache,
@@ -206,8 +209,8 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
 
         # Do relaxed update
         @threaded for i in eachindex(integrator.u)
-            # Note: We re-use `k1` for the "direction"
-            integrator.u[i] += integrator.gamma * integrator.k1[i]
+            # Note: We re-use `du` for the "direction"
+            integrator.u[i] += integrator.gamma * integrator.du[i]
         end
     end
 

@@ -45,8 +45,8 @@ analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (entropy,),
-                                     analysis_filename = "entropy_standard.dat",
-                                     #analysis_filename = "entropy_ER.dat",
+                                     #analysis_filename = "entropy_standard.dat",
+                                     analysis_filename = "entropy_ER.dat",
                                      save_analysis = true)
 
 cfl = 1.0 # Probably not maxed out
@@ -78,7 +78,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxat
 =#
 
 # p = 3
-#=
+
 Stages = [13, 7, 4]
 path = basepath * "p3/"
 
@@ -87,10 +87,10 @@ path = basepath * "p3/"
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+
 
 # p = 4
-
+#=
 Stages = [18, 10, 6]
 path = basepath * "p4/"
 
@@ -99,7 +99,7 @@ path = basepath * "p4/"
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
+=#
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,

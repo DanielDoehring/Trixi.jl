@@ -264,13 +264,13 @@ end
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     for stage in 1:2
-        @threaded for u_ind in eachindex(integrator.u)
-            integrator.u_tmp[u_ind] = integrator.u[u_ind] +
-                                      integrator.dt *
-                                      (alg.a_matrix_constant[1, stage] *
-                                       integrator.k1[u_ind] +
-                                       alg.a_matrix_constant[2, stage] *
-                                       integrator.du[u_ind])
+        @threaded for i in eachindex(integrator.u)
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  integrator.dt *
+                                  (alg.a_matrix_constant[1, stage] *
+                                   integrator.k1[i] +
+                                   alg.a_matrix_constant[2, stage] *
+                                   integrator.du[i])
         end
 
         integrator.f(integrator.du, integrator.u_tmp, p,
@@ -281,9 +281,9 @@ end
 
     du_wrap = wrap_array(integrator.du, p)
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
-    # 0.5 = b_{S-1}
+    # Entropy change due to S-1 stage
     # IDEA: Combine integration of i-1, i?
-    dS = 0.5 * integrator.dt *
+    dS = 0.5 * integrator.dt * # 0.5 = b_{S-1}
          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Last stage
@@ -303,12 +303,12 @@ end
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,
                  integrator.du_tmp)
 
-    # 0.5 = b_{S}
-    dS += 0.5 * integrator.dt *
+    # Entropy change due to last (i = S) stage
+    dS += 0.5 * integrator.dt * # 0.5 = b_{S}
           int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Note: We re-use `du` for the "direction"
-    # Note: For efficiency, we multiply the direction already by dt here!
+    # Note: For efficiency, we multiply the direction with dt already here!
     @threaded for i in eachindex(integrator.u)
         integrator.du[i] = 0.5 * integrator.dt * (integrator.k1[i] +
                                                   integrator.du[i])

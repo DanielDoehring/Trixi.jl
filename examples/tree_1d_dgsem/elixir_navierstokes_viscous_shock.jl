@@ -43,8 +43,6 @@ mu_bar() = mu() / (gamma() - 1) # Re-scaled viscosity
 rho_0() = 1
 v() = 1 # Shock speed
 
-domain_length = 4.0
-
 ### Derived quantities ###
 
 Ma() = 2 / sqrt(3 - gamma()) # Mach number for alpha = 0.5
@@ -91,6 +89,7 @@ equations_parabolic = CompressibleNavierStokesDiffusion1D(equations, mu = mu_bar
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_hlle)
 
+domain_length = 4.0
 coordinates_min = -domain_length / 2
 coordinates_max = domain_length / 2
 
@@ -129,6 +128,7 @@ boundary_conditions = (; x_neg = boundary_condition_inflow,
                        x_pos = boundary_condition_outflow)
 
 ### Viscous boundary conditions ###
+
 # For the viscous BCs, we use the known analytical solution
 velocity_bc = NoSlip() do x, t, equations_parabolic
     Trixi.velocity(initial_condition_viscous_shock(x,
