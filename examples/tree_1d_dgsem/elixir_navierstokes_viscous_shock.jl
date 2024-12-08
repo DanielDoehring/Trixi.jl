@@ -97,7 +97,7 @@ refinement_patches = ((type = "box", coordinates_min = (-1.0,),
                        coordinates_max = (1.0,)),)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 3,
+                initial_refinement_level = 2,
                 periodicity = false,
                 refinement_patches = refinement_patches,
                 n_cells_max = 30_000)
@@ -178,22 +178,22 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 ###############################################################################
 # run the simulation
 
-dtRatios = [1, 0.5]
+dtRatios = [1, 0.25]
+basepath = "/home/daniel/git/Paper_PERRK/Data/ViscousShock/"
 
 # For diffusion-dominated case we need four times the timestep between the methods
 Stages = [10, 6]
-
-path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NavierStokes_ViscousShock/"
+path = basepath * "p4/"
 
 #ode_algorithm = Trixi.PairedExplicitRK4(10, path)
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
-
-max_level = Trixi.maximum_level(mesh.tree)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
 
 dtRef = 2e-2 # Single
-dtRef = 2e-2 / 8 # Multi refined
+dtRef = 2e-3 # Multi refined
+
+max_level = Trixi.maximum_level(mesh.tree)
 
 dt = dtRef / 4.0^(max_level - 3)
 
