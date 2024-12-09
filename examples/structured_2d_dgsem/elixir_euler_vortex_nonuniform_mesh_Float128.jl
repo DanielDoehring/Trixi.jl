@@ -1,8 +1,10 @@
 using OrdinaryDiffEq
 using Trixi
 
+using Quadmath
+
 # Ratio of specific heats
-gamma = 1.4
+gamma = 1 + Float128(4)/10
 equations = CompressibleEulerEquations2D(gamma)
 
 polydeg = 3
@@ -11,9 +13,10 @@ polydeg = 3
 # in contrast to standard DGSEM only
 volume_flux = flux_ranocha
 solver = DGSEM(polydeg = polydeg, surface_flux = flux_ranocha,
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+               volume_integral = VolumeIntegralFluxDifferencing(volume_flux),
+               RealT = Float128)
 
-EdgeLength = 20.0
+EdgeLength = 20
 """
     initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerEquations2D)
 
@@ -27,16 +30,16 @@ function initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerE
     end
 
     # initial center of the vortex
-    inicenter = SVector(0.0, 0.0)
+    inicenter = SVector(0, 0)
     # strength of the vortex
-    S = 13.5
+    S = 13 + Float128(1)/2
     # Radius of vortex
-    R = 1.5
+    R = Float128(1) + Float128(1)/2
     # Free-stream Mach 
-    M = 0.4
+    M = Float128(4)/10
     # base flow
-    v1 = 1.0
-    v2 = 1.0
+    v1 = 1
+    v2 = 1
     vel = SVector(v1, v2)
 
     cent = inicenter + vel * t      # advection of center
@@ -46,7 +49,7 @@ function initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerE
 
     f = (1 - r2) / (2 * R^2)
 
-    rho = (1 - (S * M / pi)^2 * (gamma - 1) * exp(2 * f) / 8)^(1 / (gamma - 1))
+    rho = (1 - (S * M / π)^2 * (gamma - 1) * exp(2 * f) / 8)^(1 / (gamma - 1))
 
     du = S / (2 * π * R) * exp(f) # vel. perturbation
     vel = vel + du * cent
@@ -58,12 +61,12 @@ function initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerE
 end
 initial_condition = initial_condition_isentropic_vortex
 
-N_passes = 4
+N_passes = Float128(1)
 T_end = EdgeLength * N_passes
-tspan = (0.0, T_end)
+tspan = (zero(Float128), T_end)
 
 function mapping(xi_, eta_)
-    exponent = 1.4
+    exponent = 1 + Float128(4)/10
 
     # Apply a non-linear transformation to refine towards the center
     xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_))
@@ -77,7 +80,7 @@ function mapping(xi_, eta_)
 end
 
 cells_per_dimension = (32, 32)
-mesh = StructuredMesh(cells_per_dimension, mapping)
+mesh = StructuredMesh(cells_per_dimension, mapping, RealT = Float128)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
@@ -112,7 +115,9 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/"
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3, root_tol = 1e-14)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, 
+                                                 root_tol = Float128(1)/1_000_000_000_000_000_000_000,
+                                                 step_scaling = one(Float128))
 
 # p = 2
 path = basepath * "p2/"
@@ -128,7 +133,8 @@ dtRatios = [
 ] ./ 0.631627607345581
 
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, 
+                                                       relaxation_solver = relaxation_solver)
 
 #=
 # p = 3
@@ -170,7 +176,7 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, r
 =#
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 7.25e-3,
+                  dt = (Float128(725)/1000)/1000,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
