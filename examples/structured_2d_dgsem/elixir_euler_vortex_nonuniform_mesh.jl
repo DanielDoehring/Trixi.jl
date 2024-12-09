@@ -1,6 +1,8 @@
 using OrdinaryDiffEq
 using Trixi
 
+# TODO: Try quadprecision!
+
 # Ratio of specific heats
 gamma = 1.4
 equations = CompressibleEulerEquations2D(gamma)

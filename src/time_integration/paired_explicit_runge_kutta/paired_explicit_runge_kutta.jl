@@ -285,7 +285,7 @@ end
 # as these require `du_tmp` to store the contribution of the `rhs!`
 @inline function PERK_k1!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
                           p)
-    integrator.f(integrator.du, integrator.u, p, integrator.t,
+    integrator.f(integrator.k1, integrator.u, p, integrator.t,
                  integrator.du_tmp)
 end
 
