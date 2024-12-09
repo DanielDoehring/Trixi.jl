@@ -10,14 +10,7 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
                                            cS2::Float64)
 
     # c Vector form Butcher Tableau (defines timestep per stage)
-    c = zeros(num_stages)
-    for k in 2:(num_stages - 2)
-        c[k] = cS2 * (k - 1) / (num_stages - 3) # Equidistant timestep distribution (similar to PERK2)
-    end
-
-    # Own PERK based on SSPRK33
-    c[num_stages - 1] = 1.0
-    c[num_stages] = 0.5
+    c = compute_c_coeffs(num_stages, cS2)
 
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
     num_coeffs_max = num_stages - 2
@@ -307,5 +300,16 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     end
 
     return integrator
+end
+
+function Base.resize!(integrator::PairedExplicitRK3MultiParabolicIntegrator, new_size)
+    resize!(integrator.u, new_size)
+    resize!(integrator.du, new_size)
+    resize!(integrator.u_tmp, new_size)
+
+    resize!(integrator.k1, new_size)
+    resize!(integrator.kS1, new_size)
+
+    resize!(integrator.du_tmp, new_size)
 end
 end # @muladd

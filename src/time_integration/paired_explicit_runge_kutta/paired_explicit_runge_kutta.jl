@@ -285,7 +285,8 @@ end
 # as these require `du_tmp` to store the contribution of the `rhs!`
 @inline function PERK_k1!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
                           p)
-    integrator.f(integrator.du, integrator.u, p, integrator.t, integrator.du_tmp)
+    integrator.f(integrator.du, integrator.u, p, integrator.t,
+                 integrator.du_tmp)
 end
 
 @inline function PERK_k2!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
@@ -344,7 +345,6 @@ function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator,
     resize!(integrator.k1, new_size)
 end
 
-# used for AMR (Adaptive Mesh Refinement)
 function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
                       new_size)
     resize!(integrator.u, new_size)
