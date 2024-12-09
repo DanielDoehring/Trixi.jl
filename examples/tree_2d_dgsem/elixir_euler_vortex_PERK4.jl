@@ -148,7 +148,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 analysis_interval = 10^6
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     extra_analysis_errors = (:l1_error, ),
+                                     extra_analysis_errors = (:l1_error,),
                                      analysis_integrals = (;))
 
 amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi),
@@ -157,7 +157,7 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi)
                                       max_level = Refinement + 2, max_threshold = -2.0)
 
 N_Convergence = 0
-CFL_Convergence = 1.0/(2^N_Convergence)
+CFL_Convergence = 1.0 / (2^N_Convergence)
 
 amr_callback = AMRCallback(semi, amr_controller,
                            # For convergence study
@@ -184,7 +184,6 @@ Stages = [12, 6, 3]
 path = basepath * "p2/"
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
-
 
 # p = 3
 #=

@@ -14,7 +14,7 @@ initial_condition = initial_condition_weak_blast_wave
 # Volume flux adds some (minimal) disspation, thus stabilizing the simulation - 
 # in contrast to standard DGSEM only
 solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
-               volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))          
+               volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
 
 coordinates_min = -2.0
 coordinates_max = 2.0
@@ -86,8 +86,8 @@ path = basepath * "p3/"
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(Stages[1], path, relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios,
+                                                 relaxation_solver = relaxation_solver)
 
 # p = 4
 #=

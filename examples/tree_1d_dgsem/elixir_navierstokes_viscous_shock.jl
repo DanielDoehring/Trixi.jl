@@ -97,7 +97,7 @@ refinement_patches = ((type = "box", coordinates_min = (-1.0,),
                        coordinates_max = (1.0,)),)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 2,
+                initial_refinement_level = 7,
                 periodicity = false,
                 refinement_patches = refinement_patches,
                 n_cells_max = 30_000)
@@ -169,7 +169,9 @@ alive_callback = AliveCallback(alive_interval = 10000)
 analysis_interval = 1_000_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = [:l2_error, :l1_error, :linf_error,
-                                     :l2_error_primitive, :l1_error_primitive, :linf_error_primitive],
+                                         :l2_error_primitive, 
+                                         :l1_error_primitive,
+                                         :linf_error_primitive],
                                      analysis_integrals = (;))
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
@@ -203,4 +205,4 @@ sol = Trixi.solve(ode, ode_algorithm,
                   save_everystep = false, callback = callbacks,
                   maxiters = typemax(Int));
 
-summary_callback() # print the timer summary
+#summary_callback() # print the timer summary

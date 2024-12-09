@@ -114,7 +114,6 @@ callbacks = CallbackSet(summary_callback,
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/"
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3, root_tol = 1e-14)
 
-
 # p = 2
 path = basepath * "p2/"
 
@@ -130,7 +129,6 @@ dtRatios = [
 
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
 
 #=
 # p = 3
