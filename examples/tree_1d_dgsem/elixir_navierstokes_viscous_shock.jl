@@ -168,10 +168,9 @@ alive_callback = AliveCallback(alive_interval = 10000)
 
 analysis_interval = 1_000_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     analysis_errors = [
-                                         :l2_error_primitive,
-                                         :linf_error_primitive
-                                     ])
+                                     analysis_errors = [:l2_error, :l1_error, :linf_error,
+                                     :l2_error_primitive, :l1_error_primitive, :linf_error_primitive],
+                                     analysis_integrals = (;))
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 
@@ -181,21 +180,23 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 dtRatios = [1, 0.25]
 basepath = "/home/daniel/git/Paper_PERRK/Data/ViscousShock/"
 
+relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8)
+
 # For diffusion-dominated case we need four times the timestep between the methods
 Stages = [10, 6]
 path = basepath * "p4/"
 
 #ode_algorithm = Trixi.PairedExplicitRK4(10, path)
 
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 
-dtRef = 2e-2 # Single
-dtRef = 2e-3 # Multi refined
+dtRef = 1e-1 # Stable for standard multirate
+dtRef = 8.75e-3 # Asymptotic conv. for both standard/relaxation PERK multi; base level 2-6
 
 max_level = Trixi.maximum_level(mesh.tree)
 
-dt = dtRef / 4.0^(max_level - 3)
+dt = dtRef / 4.0^(max_level - 2)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,

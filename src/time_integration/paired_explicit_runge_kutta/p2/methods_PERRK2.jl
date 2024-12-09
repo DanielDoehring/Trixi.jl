@@ -15,7 +15,7 @@ function PairedExplicitRelaxationRK2(num_stages,
                                      base_path_monomial_coeffs::AbstractString,
                                      dt_opt = nothing;
                                      bS = 1.0, cS = 0.5,
-                                     relaxation_solver = EntropyRelaxationNewton())
+                                     relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
                                                                                     base_path_monomial_coeffs,
                                                                                     dt_opt,
@@ -30,7 +30,7 @@ function PairedExplicitRelaxationRK2(num_stages, tspan,
                                      semi::AbstractSemidiscretization;
                                      verbose = false,
                                      bS = 1.0, cS = 0.5,
-                                     relaxation_solver = EntropyRelaxationNewton())
+                                     relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
                                                                                     tspan,
                                                                                     semi;
@@ -46,7 +46,7 @@ function PairedExplicitRelaxationRK2(num_stages, tspan, eig_vals::Vector{Complex
                                      verbose = false,
                                      bS = 1.0, cS = 0.5,
                                      gamma_solver = :newton,
-                                     relaxation_solver = EntropyRelaxationNewton())
+                                     relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
                                                                                     tspan,
                                                                                     eig_vals;

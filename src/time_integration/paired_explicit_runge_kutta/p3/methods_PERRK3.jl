@@ -14,7 +14,7 @@ end
 function PairedExplicitRelaxationRK3(num_stages, base_path_a_coeffs::AbstractString,
                                      dt_opt = nothing;
                                      cS2 = 1.0f0,
-                                     relaxation_solver = EntropyRelaxationNewton())
+                                     relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
                                                                                     base_path_a_coeffs,
                                                                                     dt_opt;
@@ -26,7 +26,7 @@ end
 function PairedExplicitRelaxationRK3(num_stages, tspan,
                                      semi::AbstractSemidiscretization;
                                      verbose = false, cS2 = 1.0f0,
-                                     relaxation_solver = EntropyRelaxationNewton())
+                                     relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
                                                                                     tspan,
                                                                                     semi;
@@ -38,7 +38,7 @@ end
 # Constructor that calculates the coefficients with polynomial optimizer from a list of eigenvalues
 function PairedExplicitRelaxationRK3(num_stages, tspan, eig_vals::Vector{ComplexF64};
                                      verbose = false, cS2 = 1.0f0,
-                                     relaxation_solver = EntropyRelaxationNewton())
+                                     relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
                                                                                     tspan,
                                                                                     eig_vals;

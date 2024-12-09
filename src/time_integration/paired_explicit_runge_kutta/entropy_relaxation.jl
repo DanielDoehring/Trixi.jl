@@ -57,38 +57,38 @@ end
 
 abstract type RelaxationSolver end
 
-struct EntropyRelaxationBisection{RealT <: Real} <: RelaxationSolver
+struct RelaxationSolverBisection{RealT <: Real} <: RelaxationSolver
     gamma_min::RealT
     gamma_max::RealT
     gamma_tol::RealT
     max_iterations::Int
 end
 
-function EntropyRelaxationBisection(; gamma_min = 0.1, gamma_max = 1.2,
-                                    gamma_tol = 100 * eps(typeof(gamma_min)),
-                                    max_iterations = 25)
-    return EntropyRelaxationBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
+function RelaxationSolverBisection(; gamma_min = 0.1, gamma_max = 1.2,
+                                   gamma_tol = 100 * eps(typeof(gamma_min)),
+                                   max_iterations = 25)
+    return RelaxationSolverBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
-struct EntropyRelaxationNewton{RealT <: Real} <: RelaxationSolver
+struct RelaxationSolverNewton{RealT <: Real} <: RelaxationSolver
     step_scaling::RealT
     root_tol::RealT
     max_iterations::Int
 end
 
-function EntropyRelaxationNewton(; step_scaling = 1.0, root_tol = 1e-14,
-                                 max_iterations = 5)
-    return EntropyRelaxationNewton(step_scaling, root_tol, max_iterations)
+function RelaxationSolverNewton(; step_scaling = 1.0, root_tol = 1e-14,
+                                max_iterations = 5)
+    return RelaxationSolverNewton(step_scaling, root_tol, max_iterations)
 end
 
-function Base.show(io::IO, relaxation_solver::EntropyRelaxationBisection)
-    print(io, "EntropyRelaxationBisection(gamma_min=", relaxation_solver.gamma_min,
+function Base.show(io::IO, relaxation_solver::RelaxationSolverBisection)
+    print(io, "RelaxationSolverBisection(gamma_min=", relaxation_solver.gamma_min,
           ", gamma_max=", relaxation_solver.gamma_max,
           ", gamma_tol=", relaxation_solver.gamma_tol,
           ", max_iterations=", relaxation_solver.max_iterations, ")")
 end
 function Base.show(io::IO, ::MIME"text/plain",
-                   relaxation_solver::EntropyRelaxationBisection)
+                   relaxation_solver::RelaxationSolverBisection)
     if get(io, :compact, false)
         show(io, relaxation_solver)
     else
@@ -98,17 +98,17 @@ function Base.show(io::IO, ::MIME"text/plain",
             "gamma_tol" => relaxation_solver.gamma_tol,
             "max_iterations" => relaxation_solver.max_iterations
         ]
-        summary_box(io, "EntropyRelaxationBisection", setup)
+        summary_box(io, "RelaxationSolverBisection", setup)
     end
 end
 
-function Base.show(io::IO, relaxation_solver::EntropyRelaxationNewton)
-    print(io, "EntropyRelaxationNewton(step_scaling=", relaxation_solver.step_scaling,
+function Base.show(io::IO, relaxation_solver::RelaxationSolverNewton)
+    print(io, "RelaxationSolverNewton(step_scaling=", relaxation_solver.step_scaling,
           ", root_tol=", relaxation_solver.root_tol,
           ", max_iterations=", relaxation_solver.max_iterations, ")")
 end
 function Base.show(io::IO, ::MIME"text/plain",
-                   relaxation_solver::EntropyRelaxationNewton)
+                   relaxation_solver::RelaxationSolverNewton)
     if get(io, :compact, false)
         show(io, relaxation_solver)
     else
@@ -117,7 +117,7 @@ function Base.show(io::IO, ::MIME"text/plain",
             "root_tol" => relaxation_solver.root_tol,
             "max_iterations" => relaxation_solver.max_iterations
         ]
-        summary_box(io, "EntropyRelaxationNewton", setup)
+        summary_box(io, "RelaxationSolverNewton", setup)
     end
 end
 
@@ -126,7 +126,7 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
-                            relaxation_solver::EntropyRelaxationBisection)
+                            relaxation_solver::RelaxationSolverBisection)
     @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
 
     @threaded for element in eachelement(dg, cache)
@@ -178,7 +178,7 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
-                            relaxation_solver::EntropyRelaxationNewton)
+                            relaxation_solver::RelaxationSolverNewton)
     @unpack step_scaling, root_tol, max_iterations = relaxation_solver
 
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value

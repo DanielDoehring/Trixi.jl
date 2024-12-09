@@ -15,7 +15,7 @@ function PairedExplicitRelaxationRK4Multi(stages::Vector{Int64},
                                           base_path_a_coeffs::AbstractString,
                                           dt_ratios;
                                           c_const = 1.0f0,
-                                          relaxation_solver = EntropyRelaxationNewton())
+                                          relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK4Multi{typeof(relaxation_solver)}(PairedExplicitRK4Multi(stages,
                                                                                               base_path_a_coeffs,
                                                                                               dt_ratios;

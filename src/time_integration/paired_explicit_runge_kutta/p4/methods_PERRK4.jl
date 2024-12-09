@@ -15,7 +15,7 @@ end
 function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString,
                                      dt_opt = nothing;
                                      c_const = 1.0f0,
-                                     relaxation_solver = EntropyRelaxationNewton())
+                                     relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK4{typeof(relaxation_solver)}(PairedExplicitRK4(num_stages,
                                                                                     base_path_a_coeffs,
                                                                                     dt_opt;

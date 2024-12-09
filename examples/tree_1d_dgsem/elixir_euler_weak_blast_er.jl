@@ -63,7 +63,7 @@ callbacks = CallbackSet(summary_callback,
 basepath = "/home/daniel/git/Paper_PERRK/Data/WeakBlastWave/"
 dtRatios = [1, 0.5, 0.25]
 
-relaxation_solver = Trixi.EntropyRelaxationNewton(max_iterations = 3)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 
 #=
 # p = 2

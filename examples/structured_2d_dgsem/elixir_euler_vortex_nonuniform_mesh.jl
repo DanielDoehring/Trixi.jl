@@ -112,7 +112,7 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/"
-relaxation_solver = Trixi.EntropyRelaxationNewton(max_iterations = 3, root_tol = 1e-14)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3, root_tol = 1e-14)
 
 
 # p = 2
