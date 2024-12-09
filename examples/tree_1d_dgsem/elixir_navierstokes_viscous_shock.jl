@@ -87,7 +87,8 @@ equations_parabolic = CompressibleNavierStokesDiffusion1D(equations, mu = mu_bar
                                                           Prandtl = prandtl_number(),
                                                           gradient_variables = GradientVariablesPrimitive())
 
-solver = DGSEM(polydeg = 3, surface_flux = flux_hlle)
+PolyDeg = 3 # 1, 2, 3                                                          
+solver = DGSEM(polydeg = PolyDeg, surface_flux = flux_hlle)
 
 domain_length = 4.0
 coordinates_min = -domain_length / 2
@@ -159,7 +160,6 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
-ode = semidiscretize(semi, tspan)
 ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
@@ -179,25 +179,38 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 ###############################################################################
 # run the simulation
 
+# For diffusion-dominated case we need four times the timestep between the methods
 dtRatios = [1, 0.25]
 basepath = "/home/daniel/git/Paper_PERRK/Data/ViscousShock/"
 
 relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8)
 
-# For diffusion-dominated case we need four times the timestep between the methods
-Stages = [10, 6]
-path = basepath * "p4/"
+#=
+path = basepath * "p2/"
+Stages = [8, 4]
 
-#ode_algorithm = Trixi.PairedExplicitRK4(10, path)
+#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+=#
+
+#=
+path = basepath * "p3/"
+Stages = [9, 5]
+
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+=#
+
+
+path = basepath * "p4/"
+Stages = [10, 6]
 
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 
-dtRef = 1e-1 # Stable for standard multirate
-dtRef = 8.75e-3 # Asymptotic conv. for both standard/relaxation PERK multi; base level 2-6
 
+dtRef = 8.75e-3
 max_level = Trixi.maximum_level(mesh.tree)
-
 dt = dtRef / 4.0^(max_level - 2)
 
 sol = Trixi.solve(ode, ode_algorithm,
@@ -205,4 +218,4 @@ sol = Trixi.solve(ode, ode_algorithm,
                   save_everystep = false, callback = callbacks,
                   maxiters = typemax(Int));
 
-#summary_callback() # print the timer summary
+summary_callback() # print the timer summary
