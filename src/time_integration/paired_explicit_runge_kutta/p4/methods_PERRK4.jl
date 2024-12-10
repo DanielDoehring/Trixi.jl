@@ -120,9 +120,7 @@ end
     du_wrap = wrap_array(integrator.du, p)
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # Entropy change due to S-1 stage
-    # IDEA: Combine integration of i-1, i?
-    # => Would need to store u_tmp_wrap in yet another register!
-    dS = 0.5 * integrator.dt *     # 0.5 = b_{S-1}
+    dS = 0.5 * integrator.dt * # 0.5 = b_{S-1}
          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Last stage
