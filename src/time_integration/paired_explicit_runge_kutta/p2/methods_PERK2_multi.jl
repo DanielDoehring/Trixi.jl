@@ -9,13 +9,7 @@ function ComputePERK2_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
                                            base_path_mon_coeffs::AbstractString,
                                            bS, cS)
 
-    # c Vector form Butcher Tableau (defines timestep per stage)
-    c = zeros(Float64, num_stages)
-
-    for k in 2:num_stages
-        c[k] = cS * (k - 1) / (num_stages - 1)
-    end
-
+    c = PERK2_compute_c_coeffs(num_stages, cS)
     stage_scaling_factors = bS * reverse(c[2:(end - 1)])
 
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
