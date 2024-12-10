@@ -390,6 +390,7 @@ end
                                   integrator.n_levels)
 end
 
+# Computes last three stages, i.e., i = S-2, S-1, S
 @inline function PERK4_kS2_to_kS!(integrator::PairedExplicitRK4MultiParabolicIntegrator,
                                   p, alg)
     for stage in 1:2

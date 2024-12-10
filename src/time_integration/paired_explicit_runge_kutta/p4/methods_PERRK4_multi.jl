@@ -259,6 +259,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     return integrator
 end
 
+# Computes last three stages, i.e., i = S-2, S-1, S
 @inline function PERK4_kS2_to_kS!(integrator::PairedExplicitRelaxationRK4MultiParabolicIntegrator,
                                   p, alg)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)

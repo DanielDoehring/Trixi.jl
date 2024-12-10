@@ -161,6 +161,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
     return integrator
 end
 
+# Computes last three stages, i.e., i = S-2, S-1, S
 @inline function PERK4_kS2_to_kS!(integrator::AbstractPairedExplicitRKIntegrator{4},
                                   p, alg)
     for stage in 1:2
