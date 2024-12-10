@@ -262,7 +262,4 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
 
     return integrator
 end
-
-# TODO: step! for `PairedExplicitRelaxationRK3MultiParabolicIntegrator`
-
 end # @muladd

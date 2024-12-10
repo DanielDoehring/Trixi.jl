@@ -59,6 +59,9 @@ abstract type AbstractPairedExplicitRelaxationRKSingleIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRelaxationRKMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRelaxationRKIntegrator{ORDER} end
 
+# The relaxation-multi-prarabolic integrator "inherits" from the 
+# multi-parabolic integrator since the latter governs which stage functions, 
+# i.e., the `PERK_k...` are called.
 abstract type AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER} <:
               AbstractPairedExplicitRKMultiParabolicIntegrator{ORDER} end
 """

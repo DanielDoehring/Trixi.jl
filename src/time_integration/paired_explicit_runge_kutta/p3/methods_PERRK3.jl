@@ -124,7 +124,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
     return integrator
 end
 
-function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{3})
+function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3},
+                                 AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{3}})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)

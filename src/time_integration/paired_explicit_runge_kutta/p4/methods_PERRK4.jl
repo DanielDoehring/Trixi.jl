@@ -180,7 +180,8 @@ end
     end
 end
 
-function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4})
+function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{4},
+                                 AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{4}})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)

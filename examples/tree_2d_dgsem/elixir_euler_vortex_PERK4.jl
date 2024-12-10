@@ -185,6 +185,7 @@ path = basepath * "p2/"
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
 
+
 # p = 3
 #=
 Stages = [16, 8, 4]
