@@ -5,8 +5,8 @@
 @muladd begin
 #! format: noindent
 
-function PERK4_compute_c_coeffs(num_stages, cS2)
-    c = c_const * ones(num_stages) # Use same abscissae for free coefficients
+function PERK4_compute_c_coeffs(num_stages, cS3)
+    c = ones(num_stages) # Best internal stability properties
     c[1] = 0.0
 
     cS3 = c_const
@@ -26,8 +26,8 @@ end
 
 function compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                    base_path_a_coeffs::AbstractString;
-                                                   c_const = 1.0) # Default value for best internal stability
-    c = PERK4_compute_c_coeffs(num_stages, c_const)
+                                                   cS3)
+    c = PERK4_compute_c_coeffs(num_stages, cS3)
 
     num_coeffs_max = num_stages - 5
     a_matrix = zeros(2, num_coeffs_max)
@@ -92,10 +92,10 @@ end
 # Constructor for previously computed A Coeffs
 function PairedExplicitRK4(num_stages, base_path_a_coeffs::AbstractString,
                            dt_opt = nothing;
-                           c_const = 1.0f0)
+                           cS3 = 1.0f0)
     a_matrix, a_matrix_constant, c = compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                                                base_path_a_coeffs;
-                                                                               c_const)
+                                                                               cS3)
 
     return PairedExplicitRK4(num_stages, a_matrix, a_matrix_constant, c, dt_opt)
 end

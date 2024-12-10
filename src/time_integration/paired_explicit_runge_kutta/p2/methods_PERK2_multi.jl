@@ -8,7 +8,6 @@
 function ComputePERK2_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
                                            base_path_mon_coeffs::AbstractString,
                                            bS, cS)
-
     c = PERK2_compute_c_coeffs(num_stages, cS)
     stage_scaling_factors = bS * reverse(c[2:(end - 1)])
 
