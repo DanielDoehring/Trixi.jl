@@ -390,8 +390,8 @@ end
                                   integrator.n_levels)
 end
 
-@inline function last_three_stages!(integrator::PairedExplicitRK4MultiParabolicIntegrator,
-                                    p, alg)
+@inline function PERK4_kS2_to_kS!(integrator::PairedExplicitRK4MultiParabolicIntegrator,
+                                  p, alg)
     for stage in 1:2
         @threaded for i in eachindex(integrator.u)
             integrator.u_tmp[i] = integrator.u[i] +

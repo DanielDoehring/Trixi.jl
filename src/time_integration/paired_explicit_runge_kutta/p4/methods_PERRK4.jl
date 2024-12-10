@@ -97,8 +97,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4},
-                                    p, alg)
+@inline function PERK4_kS2_to_kS!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4},
+                                  p, alg)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     for stage in 1:2
@@ -210,7 +210,7 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4})
             PERK_ki!(integrator, prob.p, alg, stage)
         end
 
-        last_three_stages!(integrator, prob.p, alg)
+        PERK4_kS2_to_kS!(integrator, prob.p, alg)
     end
 
     @trixi_timeit timer() "Step-Callbacks" begin

@@ -5,9 +5,7 @@
 @muladd begin
 #! format: noindent
 
-function compute_PairedExplicitRK4_butcher_tableau(num_stages,
-                                                   base_path_a_coeffs::AbstractString;
-                                                   c_const = 1.0) # Default value for best internal stability
+function PERK4_compute_c_coeffs(num_stages, cS2)
     c = c_const * ones(num_stages) # Use same abscissae for free coefficients
     c[1] = 0.0
 
@@ -16,6 +14,20 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages,
     c[num_stages - 2] = 0.479274057836310
     c[num_stages - 1] = sqrt(3) / 6 + 0.5
     c[num_stages] = -sqrt(3) / 6 + 0.5
+
+    return c
+end
+
+# Constant/non-optimized part of the Butcher matrix
+function PERK4_a_matrix_constant(cS3)
+    return [(0.479274057836310-(0.114851811257441 / cS3)) 0.1397682537005989 0.1830127018922191
+            0.114851811257441/cS3 0.648906880894214 0.028312163512968]
+end
+
+function compute_PairedExplicitRK4_butcher_tableau(num_stages,
+                                                   base_path_a_coeffs::AbstractString;
+                                                   c_const = 1.0) # Default value for best internal stability
+    c = PERK4_compute_c_coeffs(num_stages, c_const)
 
     num_coeffs_max = num_stages - 5
     a_matrix = zeros(2, num_coeffs_max)
@@ -38,8 +50,7 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages,
     end
 
     # Constant/non-optimized part of the Butcher matrix
-    a_matrix_constant = [(0.479274057836310-(0.114851811257441 / cS3)) 0.1397682537005989 0.1830127018922191
-                         0.114851811257441/cS3 0.648906880894214 0.028312163512968]
+    a_matrix_constant = PERK4_a_matrix_constant(c[num_stages - 3])
 
     return a_matrix, a_matrix_constant, c
 end
@@ -150,8 +161,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
     return integrator
 end
 
-@inline function last_three_stages!(integrator::AbstractPairedExplicitRKIntegrator{4},
-                                    p, alg)
+@inline function PERK4_kS2_to_kS!(integrator::AbstractPairedExplicitRKIntegrator{4},
+                                  p, alg)
     for stage in 1:2
         @threaded for i in eachindex(integrator.u)
             integrator.u_tmp[i] = integrator.u[i] +
@@ -220,7 +231,7 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{4})
             PERK_ki!(integrator, prob.p, alg, stage)
         end
 
-        last_three_stages!(integrator, prob.p, alg)
+        PERK4_kS2_to_kS!(integrator, prob.p, alg)
     end
 
     integrator.iter += 1
