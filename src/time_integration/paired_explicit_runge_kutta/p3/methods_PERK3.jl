@@ -79,8 +79,8 @@ function compute_PairedExplicitRK3_butcher_tableau(num_stages,
 
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
     a_coeffs_max = num_stages - 2
-
     a_matrix = zeros(2, a_coeffs_max)
+
     a_matrix[1, :] = c[3:end]
 
     path_a_coeffs = joinpath(base_path_a_coeffs,

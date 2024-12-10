@@ -13,8 +13,8 @@ end
 
 function PairedExplicitRelaxationRK2Multi(stages::Vector{Int64},
                                           base_path_mon_coeffs::AbstractString,
-                                          dt_ratios,
-                                          bS = 1.0, cS = 0.5;
+                                          dt_ratios;
+                                          bS = 1.0, cS = 0.5,
                                           relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK2Multi{typeof(relaxation_solver)}(PairedExplicitRK2Multi(stages,
                                                                                               base_path_mon_coeffs,

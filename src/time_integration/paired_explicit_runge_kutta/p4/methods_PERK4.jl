@@ -18,8 +18,8 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages,
     c[num_stages] = -sqrt(3) / 6 + 0.5
 
     num_coeffs_max = num_stages - 5
-
     a_matrix = zeros(2, num_coeffs_max)
+
     a_matrix[1, :] = c[3:(num_stages - 3)]
 
     path_a_coeffs = joinpath(base_path_a_coeffs,
