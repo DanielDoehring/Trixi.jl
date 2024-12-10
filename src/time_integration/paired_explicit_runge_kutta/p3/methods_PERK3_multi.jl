@@ -10,7 +10,7 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
                                            cS2::Float64)
 
     # c Vector form Butcher Tableau (defines timestep per stage)
-    c = compute_c_coeffs(num_stages, cS2)
+    c = PERK3_compute_c_coeffs(num_stages, cS2)
 
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
     num_coeffs_max = num_stages - 2
