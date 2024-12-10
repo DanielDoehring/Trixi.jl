@@ -45,7 +45,6 @@ end
 function PairedExplicitRelaxationRK2(num_stages, tspan, eig_vals::Vector{ComplexF64};
                                      verbose = false,
                                      bS = 1.0, cS = 0.5,
-                                     gamma_solver = :newton,
                                      relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
                                                                                     tspan,
