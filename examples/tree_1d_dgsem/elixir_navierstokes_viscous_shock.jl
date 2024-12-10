@@ -98,7 +98,7 @@ refinement_patches = ((type = "box", coordinates_min = (-1.0,),
                        coordinates_max = (1.0,)),)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 7,
+                initial_refinement_level = 2,
                 periodicity = false,
                 refinement_patches = refinement_patches,
                 n_cells_max = 30_000)
@@ -183,7 +183,7 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 dtRatios = [1, 0.25]
 basepath = "/home/daniel/git/Paper_PERRK/Data/ViscousShock/"
 
-relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8)
+relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8, gamma_tol = 100 * eps(Float64))
 
 #=
 path = basepath * "p2/"
@@ -205,8 +205,8 @@ ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 path = basepath * "p4/"
 Stages = [10, 6]
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 
 
 dtRef = 8.75e-3

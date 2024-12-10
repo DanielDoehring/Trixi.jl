@@ -65,7 +65,7 @@ struct RelaxationSolverBisection{RealT <: Real} <: RelaxationSolver
 end
 
 function RelaxationSolverBisection(; gamma_min = 0.1, gamma_max = 1.2,
-                                   gamma_tol = 100 * eps(typeof(gamma_min)),
+                                   gamma_tol = 1e-14,
                                    max_iterations = 25)
     return RelaxationSolverBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end

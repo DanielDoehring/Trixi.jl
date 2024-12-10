@@ -9,7 +9,6 @@ function PERK4_compute_c_coeffs(num_stages, cS3)
     c = ones(num_stages) # Best internal stability properties
     c[1] = 0.0
 
-    cS3 = c_const
     c[num_stages - 3] = cS3
     c[num_stages - 2] = 0.479274057836310
     c[num_stages - 1] = sqrt(3) / 6 + 0.5

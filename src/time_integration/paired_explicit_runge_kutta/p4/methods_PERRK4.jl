@@ -14,12 +14,12 @@ end
 # Constructor for previously computed A Coeffs
 function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString,
                                      dt_opt = nothing;
-                                     c_const = 1.0f0,
+                                     cS3 = 1.0f0,
                                      relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK4{typeof(relaxation_solver)}(PairedExplicitRK4(num_stages,
                                                                                     base_path_a_coeffs,
                                                                                     dt_opt;
-                                                                                    c_const = c_const),
+                                                                                    cS3 = cS3),
                                                                   relaxation_solver)
 end
 
