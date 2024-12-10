@@ -197,8 +197,8 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, r
 path = basepath * "p3/"
 Stages = [9, 5]
 
-ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
 
