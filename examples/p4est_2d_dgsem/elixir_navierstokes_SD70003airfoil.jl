@@ -83,8 +83,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 
-#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
-ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+#ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
@@ -119,12 +119,12 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            lift_coefficient))
 
 stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Multi E = 5, ..., 14
-stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
+#stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
 
-stepsize_callback = StepsizeCallback(cfl = 7.0) # PEERRK_4 Multi E = 5, ..., 14
+#stepsize_callback = StepsizeCallback(cfl = 7.4) # PEERRK_4 Multi E = 5, ..., 14
 
 # For plots etc
-save_solution = SaveSolutionCallback(interval = 2000,
+save_solution = SaveSolutionCallback(interval = 1_000_000,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
@@ -137,8 +137,8 @@ save_restart = SaveRestartCallback(interval = Int(10^7), # Only at end
 
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        #save_solution, # For plotting during measurement run
-                        save_restart, # For restart with measurements
+                        save_solution, # For plotting during measurement run
+                        #save_restart, # For restart with measurements
                         summary_callback);
 
 ###############################################################################
@@ -153,11 +153,10 @@ dtRatios = [0.208310160790890, # 14
     0.030629777558366] / 0.208310160790890 #= 5 =#
 Stages = [14, 12, 10, 8, 7, 6, 5]
 
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitERRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
-#ode_algorithm = Trixi.PairedExplicitRK4(12, path)
-ode_algorithm = Trixi.PairedExplicitERRK4(12, path)
+#relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
