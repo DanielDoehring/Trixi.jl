@@ -128,6 +128,31 @@ function calc_error_norms(func, u, t, analyzer,
 end
 
 function integrate_via_indices(func::Func, u,
+                               mesh::TreeMesh{1}, equations, dg::DGSEM, cache,
+                               args...; normalize = true) where {Func}
+    @unpack weights = dg.basis
+
+    # Initialize integral with zeros of the right shape
+    integral = zero(func(u, 1, 1, equations, dg, args...))
+
+    # Use quadrature to numerically integrate over entire domain
+    @batch reduction=(+, integral) for element in eachelement(dg, cache)
+        volume_jacobian_ = volume_jacobian(element, mesh, cache)
+        for i in eachnode(dg)
+            integral += volume_jacobian_ * weights[i] *
+                        func(u, i, element, equations, dg, args...)
+        end
+    end
+
+    # Normalize with total volume
+    if normalize
+        integral = integral / total_volume(mesh)
+    end
+
+    return integral
+end
+
+function integrate_via_indices(func::Func, u,
                                mesh::StructuredMesh{1}, equations, dg::DGSEM, cache,
                                args...; normalize = true) where {Func}
     @unpack weights = dg.basis
@@ -149,31 +174,6 @@ function integrate_via_indices(func::Func, u,
     # Normalize with total volume
     if normalize
         integral = integral / total_volume
-    end
-
-    return integral
-end
-
-function integrate_via_indices(func::Func, u,
-                               mesh::TreeMesh{1}, equations, dg::DGSEM, cache,
-                               args...; normalize = true) where {Func}
-    @unpack weights = dg.basis
-
-    # Initialize integral with zeros of the right shape
-    integral = zero(func(u, 1, 1, equations, dg, args...))
-
-    # Use quadrature to numerically integrate over entire domain
-    @batch reduction=(+, integral) for element in eachelement(dg, cache)
-        volume_jacobian_ = volume_jacobian(element, mesh, cache)
-        for i in eachnode(dg)
-            integral += volume_jacobian_ * weights[i] *
-                        func(u, i, element, equations, dg, args...)
-        end
-    end
-
-    # Normalize with total volume
-    if normalize
-        integral = integral / total_volume(mesh)
     end
 
     return integral
