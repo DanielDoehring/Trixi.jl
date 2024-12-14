@@ -29,9 +29,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_gauss,
 
 ode = semidiscretize(semi, (0.0, 11.0))
 
-
 summary_callback = SummaryCallback()
-
 analysis_callback = AnalysisCallback(semi, interval = 100)
 
 stepsize_callback = StepsizeCallback(cfl = 4.0)
