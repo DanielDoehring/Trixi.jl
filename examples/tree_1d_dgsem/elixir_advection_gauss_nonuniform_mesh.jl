@@ -39,13 +39,16 @@ analysis_callback = AnalysisCallback(semi, interval = 1,
                                      analysis_filename = "1D_Adv_NonUni_Std.dat",
                                      #analysis_filename = "1D_Adv_NonUni_Rel.dat",
                                      save_analysis = true)
-cfl = 3.5
+cfl = 3.5 # [16, 8]
+#cfl = 5.5 # [32, 16]
 
 #cfl = 2.0 # CarpenterKennedy2N54
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-callbacks = CallbackSet(summary_callback, analysis_callback,
-                        stepsize_callback)
+callbacks = CallbackSet(summary_callback, 
+                        analysis_callback,
+                        #stepsize_callback
+                        )
 
 ###############################################################################
 # run the simulation
@@ -55,6 +58,7 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
 
 dtRatios = [1, 0.5]
 Stages = [16, 8]
+#Stages = [32, 16]
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 8)
 #relaxation_solver = Trixi.RelaxationSolverBisection()
@@ -62,10 +66,10 @@ relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 8)
 ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios; 
                                                  relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = 42.0,
+                  dt = 0.25,
                   save_everystep = false, callback = callbacks);
 
 
@@ -77,3 +81,6 @@ sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
 
 # Print the timer summary
 summary_callback()
+
+#scatter(sol.u[end])
+scatter!(sol.u[end])
