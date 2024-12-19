@@ -124,7 +124,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 stepsize_callback = StepsizeCallback(cfl = 7.4) # PEERRK_4 Multi E = 5, ..., 14
 
 # For plots etc
-save_solution = SaveSolutionCallback(interval = 1_000_000,
+save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
@@ -132,13 +132,14 @@ save_solution = SaveSolutionCallback(interval = 1_000_000,
 
 alive_callback = AliveCallback(alive_interval = 200)
 
-save_restart = SaveRestartCallback(interval = Int(10^7), # Only at end
+save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
                                    save_final_restart = true)
 
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
                         save_solution, # For plotting during measurement run
-                        #save_restart, # For restart with measurements
+                        save_restart, # For restart with measurements
+                        #analysis_callback,
                         summary_callback);
 
 ###############################################################################
