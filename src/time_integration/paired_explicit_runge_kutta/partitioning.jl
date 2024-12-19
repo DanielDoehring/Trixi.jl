@@ -373,7 +373,8 @@ function partitioning_variables!(level_info_elements,
                                  n_levels, n_dims, mesh::P4estMesh, dg, cache, alg)
     @unpack elements, interfaces, boundaries = cache
 
-    nnodes = length(mesh.nodes)
+    #nnodes = length(mesh.nodes)
+    nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
     h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements, n_elements,
