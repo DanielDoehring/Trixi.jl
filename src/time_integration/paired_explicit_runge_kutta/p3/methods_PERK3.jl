@@ -75,8 +75,8 @@ function compute_PairedExplicitRK3_butcher_tableau(num_stages,
     c = PERK3_compute_c_coeffs(num_stages, cS2)
 
     # - 2 Since First entry of A is always zero (explicit method) and second is given by c_2 (consistency)
-    a_coeffs_max = num_stages - 2
-    a_matrix = zeros(2, a_coeffs_max)
+    num_a_coeffs_max = num_stages - 2
+    a_matrix = zeros(2, num_a_coeffs_max)
 
     a_matrix[1, :] = c[3:end]
 
