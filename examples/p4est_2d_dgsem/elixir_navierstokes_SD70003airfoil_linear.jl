@@ -118,10 +118,10 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
 
-stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Multi E = 5, ..., 14
+#stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Multi E = 5, ..., 14
 #stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
 
-#stepsize_callback = StepsizeCallback(cfl = 7.4) # PEERRK_4 Multi E = 5, ..., 14
+stepsize_callback = StepsizeCallback(cfl = 7.4) # PEERRK_4 Multi E = 5, ..., 14
 
 # For plots etc
 save_solution = SaveSolutionCallback(interval = 1_000_000,
@@ -153,10 +153,11 @@ dtRatios = [0.208310160790890, # 14
     0.030629777558366] / 0.208310160790890 #= 5 =#
 Stages = [14, 12, 10, 8, 7, 6, 5]
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
-#relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; 
+                                                       relaxation_solver = relaxation_solver)
 
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
