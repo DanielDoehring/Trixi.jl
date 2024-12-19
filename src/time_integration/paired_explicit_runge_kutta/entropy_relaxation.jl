@@ -70,20 +70,6 @@ function RelaxationSolverBisection(; gamma_min = 0.1, gamma_max = 1.2,
     return RelaxationSolverBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
-struct RelaxationSolverNewton{RealT <: Real} <: RelaxationSolver
-    step_scaling::RealT # Scaling factor for the Newton step
-    root_tol::RealT     # Function-tolerance for the "relaxation equation" 
-    max_iterations::Int # Maximum number of Newton iterations
-    # Minimum relaxation parameter. If the Newton iteration computes a value smaller than this, 
-    # the relaxation parameter is set to 1.
-    gamma_min::RealT    
-end
-
-function RelaxationSolverNewton(; step_scaling = 1.0, root_tol = 1e-14,
-                                max_iterations = 5, gamma_min = 1e-13)
-    return RelaxationSolverNewton(step_scaling, root_tol, max_iterations, gamma_min)
-end
-
 function Base.show(io::IO, relaxation_solver::RelaxationSolverBisection)
     print(io, "RelaxationSolverBisection(gamma_min=", relaxation_solver.gamma_min,
           ", gamma_max=", relaxation_solver.gamma_max,
@@ -103,6 +89,20 @@ function Base.show(io::IO, ::MIME"text/plain",
         ]
         summary_box(io, "RelaxationSolverBisection", setup)
     end
+end
+
+struct RelaxationSolverNewton{RealT <: Real} <: RelaxationSolver
+    step_scaling::RealT # Scaling factor for the Newton step
+    root_tol::RealT     # Function-tolerance for the "relaxation equation" 
+    max_iterations::Int # Maximum number of Newton iterations
+    # Minimum relaxation parameter. If the Newton iteration computes a value smaller than this, 
+    # the relaxation parameter is set to 1.
+    gamma_min::RealT
+end
+
+function RelaxationSolverNewton(; step_scaling = 1.0, root_tol = 1e-14,
+                                max_iterations = 5, gamma_min = 1e-13)
+    return RelaxationSolverNewton(step_scaling, root_tol, max_iterations, gamma_min)
 end
 
 function Base.show(io::IO, relaxation_solver::RelaxationSolverNewton)
@@ -126,12 +126,12 @@ function Base.show(io::IO, ::MIME"text/plain",
     end
 end
 
-function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator,
-                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator},
+function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{ORDER},
+                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER}},
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
-                            relaxation_solver::RelaxationSolverBisection)
+                            relaxation_solver::RelaxationSolverBisection) where {ORDER}
     @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
 
     @threaded for element in eachelement(dg, cache)
@@ -173,17 +173,20 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
         end
     else
         integrator.gamma = 1
+        # CARE: This is an experimental strategy: 
+        # Set gamma to smallest value s.t. convergence is still assured
+        #integrator.gamma = 1 - integrator.dt^(ORDER - 1)
     end
 
     return nothing
 end
 
-function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator,
-                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator},
+function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{ORDER},
+                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER}},
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
-                            relaxation_solver::RelaxationSolverNewton)
+                            relaxation_solver::RelaxationSolverNewton) where {ORDER}
     @unpack step_scaling, root_tol, max_iterations, gamma_min = relaxation_solver
 
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
@@ -205,6 +208,9 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
     # Catch Newton failures
     if integrator.gamma < gamma_min || isnan(integrator.gamma) || isinf(integrator.gamma)
         integrator.gamma = 1
+        # CARE: This is an experimental strategy: 
+        # Set gamma to smallest value s.t. convergence is still assured
+        #integrator.gamma = 1 - integrator.dt^(ORDER - 1)
     end
 
     return nothing

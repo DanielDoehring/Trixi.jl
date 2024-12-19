@@ -222,7 +222,7 @@ function analyze(::Val{:linf_divb}, du, u, t,
 
     # integrate over all elements to get the divergence-free condition errors
     linf_divb = zero(eltype(u))
-    for element in eachelement(dg, cache)
+    @batch reduction=(max, linf_divb) for element in eachelement(dg, cache)
         for i in eachnode(dg)
             divb = zero(eltype(u))
             for k in eachnode(dg)
