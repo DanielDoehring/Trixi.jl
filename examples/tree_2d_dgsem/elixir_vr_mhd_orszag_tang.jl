@@ -79,7 +79,7 @@ ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 10000
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      #analysis_errors = Symbol[],
                                      analysis_integrals = Symbol[])
@@ -89,25 +89,29 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_min=0.001,
                                           alpha_smooth=false,
                                           variable=density_pressure)
-
-#For meaningful streamline plot at end                                      
+#=                                 
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level=5,
                                       med_level =7, med_threshold=0.04,
                                       max_level =9, max_threshold=0.4)
+=#
 
+amr_controller = ControllerThreeLevel(semi, amr_indicator,
+                                      base_level=4,
+                                      med_level =6, med_threshold=0.04,
+                                      max_level =9, max_threshold=0.4)
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval=10, # PERK
                            adapt_initial_condition=true,
                            adapt_initial_condition_only_refine=true)
-                      
-cfl = 1.9 # PERK 3, 4, 6
-cfL = 2.0 # PERRK 3, 4, 6
+                                   
+CFL = 1.9 # PERK 3, 4, 6
+CFL = 1.9 # PERRK 3, 4, 6
 
-stepsize_callback = StepsizeCallback(cfl=cfl)
+stepsize_callback = StepsizeCallback(cfl=CFL)
 
-glm_speed_callback = GlmSpeedCallback(glm_scale=0.5, cfl=cfl)
+glm_speed_callback = GlmSpeedCallback(glm_scale=0.5, cfl=CFL)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
@@ -125,9 +129,9 @@ path = "/home/daniel/git/paper-2024-amr-paired-rk/elixirs/sec7_applications/sec_
 
 #ode_algorithm = Trixi.PairedExplicitRK3(Stages[1], path)
 
-#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 42.0,
                   save_everystep=false, callback=callbacks);
