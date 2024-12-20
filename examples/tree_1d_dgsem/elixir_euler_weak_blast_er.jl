@@ -44,6 +44,7 @@ summary_callback = SummaryCallback()
 analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
+                                     # Note: entropy defaults to mathematical entropy
                                      analysis_integrals = (entropy,),
                                      #analysis_filename = "entropy_standard.dat",
                                      analysis_filename = "entropy_ER.dat",

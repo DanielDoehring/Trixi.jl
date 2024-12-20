@@ -302,7 +302,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     return integrator
 end
 
-function Base.resize!(integrator::PairedExplicitRK3MultiParabolicIntegrator, new_size)
+function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator{3},
+                      new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
