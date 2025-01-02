@@ -47,10 +47,8 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages, tspan,
 
     if num_stages > 5
         a_unknown = copy(monomial_coeffs)
-        l = 2
-        for _ in 5:(num_stages - 2)
-            a_unknown[l] /= monomial_coeffs[l - 1]
-            l += 1
+        for i in 5:(num_stages - 2)
+            a_unknown[i - 3] /= monomial_coeffs[i - 4]
         end
         reverse!(a_unknown)
 
@@ -120,7 +118,7 @@ end
 
 The following structures and methods provide an implementation of
 the fourth-order paired explicit Runge-Kutta (P-ERK) method
-optimized for a certain simulation setup (PDE, IC & BC, Riemann Solver, DG Solver).
+optimized for a certain simulation setup (PDE, IC & BCs, Riemann Solver, DG Solver).
 The method has been proposed in 
 - D. Doehring, L. Christmann, M. Schlottke-Lakemper, G. J. Gassner and M. Torrilhon (2024).
   Fourth-Order Paired-Explicit Runge-Kutta Methods
@@ -183,13 +181,13 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType, Params, Sol, F,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::RealT
+    tdir::RealT # DIRection of time integration, i.e, if one marches forward or backward in time
     dt::RealT # current time step
     dtcache::RealT # manually set time step
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F
+    f::F # `rhs` of the semidiscretization
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
