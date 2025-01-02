@@ -120,7 +120,7 @@ end
 
 The following structures and methods provide an implementation of
 the third-order paired explicit Runge-Kutta (PERK) method
-optimized for a certain simulation setup (PDE, IC & BC, Riemann Solver, DG Solver).
+optimized for a certain simulation setup (PDE, IC & BCs, Riemann Solver, DG Solver).
 The original paper is
 - Nasab, Vermeire (2022)
 Third-order Paired Explicit Runge-Kutta schemes for stiff systems of equations
@@ -185,13 +185,13 @@ mutable struct PairedExplicitRK3Integrator{RealT <: Real, uType, Params, Sol, F,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT # DIRection of time integration, i.e, if one marches forward or backward in time
     dt::RealT # current time step
     dtcache::RealT # manually set time step
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F
+    f::F # `rhs` of the semidiscretization
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience

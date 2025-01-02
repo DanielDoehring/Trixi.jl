@@ -55,7 +55,8 @@ function stability_polynomials!(pnoms, consistency_order,
 
     # Contribution from free coefficients
     for k in (consistency_order + 1):num_stage_evals
-        pnoms += gamma[k - consistency_order] * normalized_powered_eigvals_scaled[:, k]
+        pnoms += gamma[k - consistency_order] *
+                 view(normalized_powered_eigvals_scaled, :, k)
     end
 
     # For optimization only the maximum is relevant
@@ -90,12 +91,14 @@ function stability_polynomials_PERK4!(pnoms, num_stage_evals,
 
     # "Fixed" term due to choice of the PERK4 Butcher tableau
     # Required to un-do the normalization of the eigenvalues here
-    pnoms += k1 * dt^5 * normalized_powered_eigvals[:, 5] * factorial(5)
+    pnoms += k1 * dt^5 * view(normalized_powered_eigvals, :, 5) * factorial(5)
 
     # Contribution from free coefficients
     for k in 1:(num_stage_evals - 5)
-        pnoms += (k2 * dt^(k + 4) * normalized_powered_eigvals[:, k + 4] * gamma[k] +
-                  k1 * dt^(k + 5) * normalized_powered_eigvals[:, k + 5] * gamma[k] *
+        pnoms += (k2 * dt^(k + 4) * view(normalized_powered_eigvals, :, k + 4) *
+                  gamma[k] +
+                  k1 * dt^(k + 5) * view(normalized_powered_eigvals, :, k + 5) *
+                  gamma[k] *
                   (k + 5))
     end
 
