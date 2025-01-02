@@ -34,7 +34,9 @@ semi_euler = SemidiscretizationHyperbolic(mesh, equations_euler, initial_conditi
 # semidiscretization of the hyperbolic diffusion equations
 equations_gravity = HyperbolicDiffusionEquations2D()
 
-solver_gravity = DGSEM(polydeg, flux_lax_friedrichs)
+flux_gravity = flux_lax_friedrichs
+#flux_gravity = flux_godunov
+solver_gravity = DGSEM(polydeg, flux_gravity)
 
 semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_condition,
                                             solver_gravity,
@@ -62,16 +64,19 @@ cfl_gravity = 1.1 # NOTE: Probably not at stability limit
 alg_gravity = PERK4(Stages_Gravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/")
 =#
 
-#=
+
 Stages_Gravity = [9, 7, 5]
 dtRatios = [1, 0.5, 0.25]
 cfl_gravity = 1.1 # NOTE: Probably not at stability limit 
 
+cfl_gravity = 0.9
+
 alg_gravity = PERK4_Multi(Stages_Gravity, 
                           "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/", 
                           dtRatios)
-=#
 
+
+#=
 b1   = 0.0
 bS   = 1.0 - b1
 cEnd = 0.5/bS
@@ -79,10 +84,13 @@ cEnd = 0.5/bS
 Stages_Gravity = [5, 3, 2]
 dtRatios = [1, 0.5, 0.25]
 
-cfl_gravity = 1.5 # NOTE: Probably not at stability limit 
+#cfl_gravity = 1.5 # NOTE: Probably not at stability limit 
+cfl_gravity = 0.3
+
 alg_gravity = PERK_Multi(Stages_Gravity, 
                           "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p2/", 
                           dtRatios, bS, cEnd)
+=#
 
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # rho0 is (ab)used to add a "+8π" term to the source terms
@@ -93,9 +101,9 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     n_iterations_max = 1000, # 1000
 
                                     #timestep_gravity = timestep_gravity_PERK4!
-                                    #timestep_gravity = timestep_gravity_PERK4_Multi!
+                                    timestep_gravity = timestep_gravity_PERK4_Multi!
 
-                                    timestep_gravity = timestep_gravity_PERK2_Multi!
+                                    #timestep_gravity = timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)

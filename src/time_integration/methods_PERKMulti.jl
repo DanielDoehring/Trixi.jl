@@ -7,20 +7,6 @@
 
 #using Random # NOTE: Only for tests
 
-function ComputeACoeffs(NumStageEvals::Int,
-                        SE_Factors::Vector{Float64}, MonCoeffs::Vector{Float64})
-    ACoeffs = MonCoeffs
-
-    for stage in 1:(NumStageEvals - 2)
-        ACoeffs[stage] /= SE_Factors[stage]
-        for prev_stage in 1:(stage - 1)
-            ACoeffs[stage] /= ACoeffs[prev_stage]
-        end
-    end
-
-    return reverse(ACoeffs)
-end
-
 function ComputePERK_Multi_ButcherTableau(NumMethods::Int, NumStages::Int,
                                           BasePathMonCoeffs::AbstractString,
                                           bS::Float64, cEnd::Float64)
