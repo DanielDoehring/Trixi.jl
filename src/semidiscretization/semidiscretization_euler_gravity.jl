@@ -154,12 +154,19 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
     k1 = similar(u_ode)
     k_higher = similar(u_ode)
 
+    # TODO: Only for debugging!
+    # Registers for gravity solver, tailored to the 2N and 3S* methods implemented below
+    u_tmp1_ode = similar(u_ode)
+    u_tmp2_ode = similar(u_ode)
+
     # Association of unknowns of the gravity solver to levels
     level_u_gravity_indices_elements = [Vector{Int64}()
                                         for _ in 1:get_n_levels(semi_euler.mesh)]
 
     cache = (; alg, u_ode, du_ode, u_ode_tmp, k1, k_higher,
-             level_u_gravity_indices_elements)
+             level_u_gravity_indices_elements,
+             # TODO: Only for debugging!
+             u_tmp1_ode, u_tmp2_ode)
 
     SemidiscretizationEulerGravity{typeof(semi_euler), typeof(semi_gravity),
                                    typeof(parameters), typeof(cache)}(semi_euler,
@@ -335,11 +342,11 @@ end
 
 function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
               max_level,
-              level_info_elements_acc::Vector{Vector{Int64}},
-              level_info_interfaces_acc::Vector{Vector{Int64}},
-              level_info_boundaries_acc::Vector{Vector{Int64}},
-              #level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
-              level_info_mortars_acc::Vector{Vector{Int64}},
+              level_info_elements_acc,
+              level_info_interfaces_acc,
+              level_info_boundaries_acc,
+              #level_info_boundaries_orientation_acc,
+              level_info_mortars_acc,
               n_levels)
     @unpack semi_euler, semi_gravity, cache = semi
 
@@ -358,6 +365,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                               level_info_mortars_acc[max_level])
 
     # compute gravitational potential and forces
+    #=
     @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode,
                                                            max_level,
                                                            level_info_elements_acc,
@@ -367,6 +375,8 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                                            level_info_mortars_acc,
                                                            cache.level_u_gravity_indices_elements,
                                                            n_levels)
+    =#
+    @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
 
     # add gravitational source source_terms to the Euler part
     if ndims(semi_euler) == 1
@@ -400,6 +410,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
     return nothing
 end
 
+#=
 # TODO: Taal refactor, add some callbacks or so within the gravity update to allow investigating/optimizing it
 function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
@@ -472,16 +483,21 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
 
     return nothing
 end
+=#
 
+#=
 function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          max_level,
-                         level_info_elements_acc::Vector{Vector{Int64}},
-                         level_info_interfaces_acc::Vector{Vector{Int64}},
-                         level_info_boundaries_acc::Vector{Vector{Int64}},
-                         #level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
-                         level_info_mortars_acc::Vector{Vector{Int64}},
-                         level_u_gravity_indices_elements::Vector{Vector{Int64}},
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         #level_info_boundaries_orientation_acc,
+                         level_info_mortars_acc,
+                         level_u_gravity_indices_elements,
                          n_levels)
+=#
+
+function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
 
     # Can be changed by AMR
@@ -512,14 +528,21 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
 
         # evolve solution by one pseudo-time step
         time_start = time_ns()
-        timestep_gravity(cache, u_euler, tau, dtau, parameters, semi_gravity,
-                         level_info_elements_acc,
-                         level_info_interfaces_acc,
-                         level_info_boundaries_acc,
-                         #level_info_boundaries_orientation_acc,
-                         level_info_mortars_acc,
-                         level_u_gravity_indices_elements,
-                         n_levels)
+        #=
+        @trixi_timeit timer() "timestep_gravity" timestep_gravity(cache, u_euler, 
+                                                                  tau, dtau, 
+                                                                  parameters,
+                                                                  semi_gravity,
+                                                                  level_info_elements_acc,
+                                                                  level_info_interfaces_acc,
+                                                                  level_info_boundaries_acc,
+                                                                  #level_info_boundaries_orientation_acc,
+                                                                  level_info_mortars_acc,
+                                                                  level_u_gravity_indices_elements,
+                                                                  n_levels)
+        =#
+
+        @trixi_timeit timer() "timestep_gravity" timestep_gravity_erk52_3Sstar!(cache, u_euler, tau, dtau, parameters, semi_gravity)
 
         runtime = time_ns() - time_start
         put!(gravity_counter, runtime)
@@ -530,19 +553,23 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
 
         # TODO: Not sure if convergence check on only the current elements is correct!
 
+        @trixi_timeit timer() "Convergence Checks" begin
         # check if we reached the maximum number of iterations
         if n_iterations_max > 0 && iter >= n_iterations_max
             @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
                                                                                                 @views du_gravity[1,
                                                                                                                   ..,
-                                                                                                                  level_info_elements_acc[max_level]]) tau=tau dtau=dtau
+                                                                                                                  #level_info_elements_acc[max_level]]) tau=tau dtau=dtau
+                                                                                                                  :]) tau=tau dtau=dtau
             finalstep = true
         end
 
         # this is an absolute tolerance check
-        if maximum(abs, @views du_gravity[1, .., level_info_elements_acc[max_level]]) <=
+        #if maximum(abs, @views du_gravity[1, .., level_info_elements_acc[max_level]]) <=
+        if maximum(abs, @views du_gravity[1, .., :]) <=
            resid_tol
             finalstep = true
+        end
         end
     end
 
@@ -883,12 +910,12 @@ end
 
 function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau, gravity_parameters,
                                        semi_gravity,
-                                       level_info_elements_acc::Vector{Vector{Int64}},
-                                       level_info_interfaces_acc::Vector{Vector{Int64}},
-                                       level_info_boundaries_acc::Vector{Vector{Int64}},
-                                       level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
-                                       level_info_mortars_acc::Vector{Vector{Int64}},
-                                       level_u_gravity_indices_elements::Vector{Vector{Int64}},
+                                       level_info_elements_acc,
+                                       level_info_interfaces_acc,
+                                       level_info_boundaries_acc,
+                                       level_info_boundaries_orientation_acc,
+                                       level_info_mortars_acc,
+                                       level_u_gravity_indices_elements,
                                        n_levels)
     G = gravity_parameters.gravitational_constant
     rho0 = gravity_parameters.background_density
@@ -1222,12 +1249,12 @@ end
 
 function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parameters,
                                        semi_gravity,
-                                       level_info_elements_acc::Vector{Vector{Int64}},
-                                       level_info_interfaces_acc::Vector{Vector{Int64}},
-                                       level_info_boundaries_acc::Vector{Vector{Int64}},
-                                       #level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
-                                       level_info_mortars_acc::Vector{Vector{Int64}},
-                                       level_u_gravity_indices_elements::Vector{Vector{Int64}},
+                                       level_info_elements_acc,
+                                       level_info_interfaces_acc,
+                                       level_info_boundaries_acc,
+                                       #level_info_boundaries_orientation_acc,
+                                       level_info_mortars_acc,
+                                       level_u_gravity_indices_elements,
                                        n_levels)
     G = gravity_parameters.gravitational_constant
     rho0 = gravity_parameters.background_density
