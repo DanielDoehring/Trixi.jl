@@ -503,7 +503,7 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
 
     # iterate gravity solver until convergence or maximum number of iterations are reached
     @unpack equations = semi_gravity
-    while !finalstep
+    @trixi_timeit timer() "Poisson steady state loop" while !finalstep
         dtau = @trixi_timeit timer() "calculate dtau" begin
             cfl * max_dt(u_gravity, tau, semi_gravity.mesh,
                    have_constant_speed(equations), equations,
