@@ -98,7 +98,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
 end
 
 # Computes last three stages, i.e., i = S-2, S-1, S
-@inline function PERK4_kS2_to_kS!(integrator::AbstractPairedExplicitRelaxationRKIntegrator{4},
+@inline function PERK4_kS2_to_kS!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{4},
+                                                    AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{4}},
                                   p, alg)
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
@@ -114,7 +115,8 @@ end
 
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t +
-                     alg.c[alg.num_stages - 3 + stage] * integrator.dt)
+                     alg.c[alg.num_stages - 3 + stage] * integrator.dt,
+                     integrator)
     end
 
     du_wrap = wrap_array(integrator.du, p)
@@ -137,7 +139,8 @@ end
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[alg.num_stages] * integrator.dt)
+                 integrator.t + alg.c[alg.num_stages] * integrator.dt,
+                 integrator)
 
     # Entropy change due to last (i = S) stage
     dS += 0.5 * integrator.dt * # 0.5 = b_{S}
