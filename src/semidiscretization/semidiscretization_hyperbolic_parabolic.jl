@@ -392,7 +392,7 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "parabolic rhs!" rhs_parabolic!(du, u, t, mesh,
+    @trixi_timeit timer() "rhs_parabolic!" rhs_parabolic!(du, u, t, mesh,
                                                           equations_parabolic,
                                                           boundary_conditions_parabolic,
                                                           source_terms,
@@ -471,7 +471,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,
                                    u_indices)
-    @trixi_timeit timer() "rhs_hyperbolic-parabolic! (partitioned)" begin
+    @trixi_timeit timer() "rhs_hyperbolic_parabolic! (partitioned)" begin
         rhs!(du_tmp, u_ode, semi, t,
              element_indices, interface_indices,
              boundary_indices, mortar_indices)

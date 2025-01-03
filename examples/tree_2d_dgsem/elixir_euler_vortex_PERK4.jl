@@ -182,8 +182,8 @@ basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/
 
 Stages = [12, 6, 3]
 path = basepath * "p2/"
-#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
 
 
 # p = 3

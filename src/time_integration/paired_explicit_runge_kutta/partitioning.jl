@@ -1,10 +1,16 @@
-function get_n_levels(mesh::TreeMesh, alg)
+function get_n_levels(mesh::TreeMesh)
     # This assumes that the eigenvalues are of similar magnitude
     # and thus the mesh size is the main factor in the char. speed
     min_level = minimum_level(mesh.tree)
     max_level = maximum_level(mesh.tree)
 
     n_levels = max_level - min_level + 1
+
+    return n_levels
+end
+
+function get_n_levels(mesh::TreeMesh, alg)
+    n_levels = get_n_levels(mesh)
 
     # CARE: This is for testcase with special assignment
     #n_levels = alg.num_methods

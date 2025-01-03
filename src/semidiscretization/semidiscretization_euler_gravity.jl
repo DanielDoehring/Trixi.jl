@@ -154,11 +154,9 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
     k1 = similar(u_ode)
     k_higher = similar(u_ode)
 
-    # In general, the gravity solver may have a different level distribution than the Euler solver. 
-    # Thus, we need to store the level information for the gravity solver separately.
-    # TODO: Is this actually needed?
+    # Association of unknowns of the gravity solver to levels
     level_u_gravity_indices_elements = [Vector{Int64}()
-                                        for _ in 1:get_n_levels(semi_euler.mesh, 42)]
+                                        for _ in 1:get_n_levels(semi_euler.mesh)]
 
     cache = (; alg, u_ode, du_ode, u_ode_tmp, k1, k_higher,
              level_u_gravity_indices_elements)
@@ -316,12 +314,27 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t)
 end
 
 function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
+              integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
+                                AbstractPairedExplicitRelaxationRKMultiIntegrator},
+              max_level)
+    rhs!(du_ode, u_ode, semi, t,
+         max_level,
+         integrator.level_info_elements_acc[max_level],
+         integrator.level_info_interfaces_acc[max_level],
+         integrator.level_info_boundaries_acc[max_level],
+         #integrator.level_info_boundaries_orientation_acc[max_level],
+         integrator.level_info_mortars_acc[max_level],
+         integrator.n_levels)
+end
+
+function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
+              max_level,
               level_info_elements_acc::Vector{Vector{Int64}},
               level_info_interfaces_acc::Vector{Vector{Int64}},
               level_info_boundaries_acc::Vector{Vector{Int64}},
               #level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
               level_info_mortars_acc::Vector{Vector{Int64}},
-              level, n_levels)
+              n_levels)
     @unpack semi_euler, semi_gravity, cache = semi
 
     u_euler = wrap_array(u_ode, semi_euler)
@@ -340,29 +353,30 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
 
     # compute gravitational potential and forces
     @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode,
+                                                           max_level,
                                                            level_info_elements_acc,
                                                            level_info_interfaces_acc,
                                                            level_info_boundaries_acc,
                                                            #level_info_boundaries_orientation_acc,
                                                            level_info_mortars_acc,
                                                            cache.level_u_gravity_indices_elements,
-                                                           level, n_levels)
+                                                           n_levels)
 
     # add gravitational source source_terms to the Euler part
     if ndims(semi_euler) == 1
-        @threaded for i in level_info_elements_acc[level]
+        @threaded for i in level_info_elements_acc[max_level]
             @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
             @views @. du_euler[3, .., i] -= u_euler[2, .., i] * u_gravity[2, .., i]
         end
     elseif ndims(semi_euler) == 2
-        @threaded for i in level_info_elements_acc[level]
+        @threaded for i in level_info_elements_acc[max_level]
             @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
             @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
             @views @. du_euler[4, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
                                              u_euler[3, .., i] * u_gravity[3, .., i])
         end
     elseif ndims(semi_euler) == 3
-        @threaded for i in level_info_elements_acc[level]
+        @threaded for i in level_info_elements_acc[max_level]
             @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
             @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
             @views @. du_euler[4, .., i] -= u_euler[1, .., i] * u_gravity[4, .., i]
@@ -454,13 +468,14 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
 end
 
 function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
+                         max_level,
                          level_info_elements_acc::Vector{Vector{Int64}},
                          level_info_interfaces_acc::Vector{Vector{Int64}},
                          level_info_boundaries_acc::Vector{Vector{Int64}},
                          level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
                          #level_info_mortars_acc::Vector{Vector{Int64}},
                          level_u_gravity_indices_elements::Vector{Vector{Int64}},
-                         level, n_levels)
+                         n_levels)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
 
     # Can be changed by AMR
@@ -514,12 +529,12 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
             @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
                                                                                                 @views du_gravity[1,
                                                                                                                   ..,
-                                                                                                                  level_info_elements_acc[level]]) tau=tau dtau=dtau
+                                                                                                                  level_info_elements_acc[max_level]]) tau=tau dtau=dtau
             finalstep = true
         end
 
         # this is an absolute tolerance check
-        if maximum(abs, @views du_gravity[1, .., level_info_elements_acc[level]]) <=
+        if maximum(abs, @views du_gravity[1, .., level_info_elements_acc[max_level]]) <=
            resid_tol
             finalstep = true
         end

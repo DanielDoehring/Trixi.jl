@@ -435,7 +435,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "rhs!" rhs!(du, u, t, mesh, equations,
+    @trixi_timeit timer() "rhs! (partitioned)" rhs!(du, u, t, mesh, equations,
                                       boundary_conditions, source_terms, solver, cache,
                                       element_indices, interface_indices,
                                       boundary_indices, mortar_indices)

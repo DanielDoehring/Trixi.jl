@@ -193,6 +193,8 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerAcoustics, t)
     return nothing
 end
 
+# TODO: PERK `rhs!` version!
+
 function add_acoustic_source_terms!(du_acoustics, acoustic_source_terms, source_weights,
                                     coupled_element_ids, mesh::TreeMesh{2}, equations,
                                     dg::DGSEM,
