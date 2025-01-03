@@ -361,6 +361,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t)
     return nothing
 end
 
+# `rhs!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
 function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
               element_indices, interface_indices, boundary_indices, mortar_indices)
     @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
@@ -403,6 +404,7 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     return nothing
 end
 
+# `rhs_parabolic!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
 function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
                         element_indices, interface_indices,
                         boundary_indices, mortar_indices)
@@ -431,19 +433,21 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     return nothing
 end
 
+# `rhs_hyperbolic_parabolic!` for non-split ODE problems
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
-                                   du_tmp)
+                                   integrator)
     @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
         # Implementation of split ODE problem in OrdinaryDiffEq
-        rhs!(du_tmp, u_ode, semi, t)
+        rhs!(integrator.du_tmp, u_ode, semi, t)
         rhs_parabolic!(du_ode, u_ode, semi, t)
 
         @threaded for i in eachindex(du_ode)
-            du_ode[i] += du_tmp[i]
+            du_ode[i] += integrator.du_tmp[i]
         end
     end
 end
+
 # Required for analysis_callback
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t)
@@ -459,12 +463,14 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
     end
 end
 
+# `rhs!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
                                    du_tmp,
+                                   max_level,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,
-                                   u_indices, max_level)
+                                   u_indices)
     @trixi_timeit timer() "rhs_hyperbolic-parabolic! (partitioned)" begin
         rhs!(du_tmp, u_ode, semi, t,
              element_indices, interface_indices,

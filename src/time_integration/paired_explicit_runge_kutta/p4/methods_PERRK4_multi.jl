@@ -277,7 +277,7 @@ end
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t +
                      alg.c[alg.num_stages - 3 + stage] * integrator.dt,
-                     integrator.du_tmp)
+                     integrator)
     end
 
     du_wrap = wrap_array(integrator.du, p)
@@ -301,7 +301,7 @@ end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,
-                 integrator.du_tmp)
+                 integrator)
 
     # Entropy change due to last (i = S) stage
     dS += 0.5 * integrator.dt * # 0.5 = b_{S}

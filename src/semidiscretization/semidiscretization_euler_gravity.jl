@@ -156,6 +156,7 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
 
     # In general, the gravity solver may have a different level distribution than the Euler solver. 
     # Thus, we need to store the level information for the gravity solver separately.
+    # TODO: Is this actually needed?
     level_u_gravity_indices_elements = [Vector{Int64}()
                                         for _ in 1:get_n_levels(semi_euler.mesh, 42)]
 
@@ -314,6 +315,71 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t)
     return nothing
 end
 
+function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
+              level_info_elements_acc::Vector{Vector{Int64}},
+              level_info_interfaces_acc::Vector{Vector{Int64}},
+              level_info_boundaries_acc::Vector{Vector{Int64}},
+              #level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
+              level_info_mortars_acc::Vector{Vector{Int64}},
+              level, n_levels)
+    @unpack semi_euler, semi_gravity, cache = semi
+
+    u_euler = wrap_array(u_ode, semi_euler)
+    du_euler = wrap_array(du_ode, semi_euler)
+    u_gravity = wrap_array(cache.u_ode, semi_gravity)
+
+    time_start = time_ns()
+
+    # standard semidiscretization of the compressible Euler equations
+    @trixi_timeit timer() "Euler solver" rhs!(du_ode, u_ode, semi_euler, t,
+                                              level_info_elements_acc[level],
+                                              level_info_interfaces_acc[level],
+                                              level_info_boundaries_acc[level],
+                                              #level_info_boundaries_orientation_acc[level],
+                                              level_info_mortars_acc[level])
+
+    # compute gravitational potential and forces
+    @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode,
+                                                           level_info_elements_acc,
+                                                           level_info_interfaces_acc,
+                                                           level_info_boundaries_acc,
+                                                           #level_info_boundaries_orientation_acc,
+                                                           level_info_mortars_acc,
+                                                           cache.level_u_gravity_indices_elements,
+                                                           level, n_levels)
+
+    # add gravitational source source_terms to the Euler part
+    if ndims(semi_euler) == 1
+        @threaded for i in level_info_elements_acc[level]
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[2, .., i] * u_gravity[2, .., i]
+        end
+    elseif ndims(semi_euler) == 2
+        @threaded for i in level_info_elements_acc[level]
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
+            @views @. du_euler[4, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
+                                             u_euler[3, .., i] * u_gravity[3, .., i])
+        end
+    elseif ndims(semi_euler) == 3
+        @threaded for i in level_info_elements_acc[level]
+            @views @. du_euler[2, .., i] -= u_euler[1, .., i] * u_gravity[2, .., i]
+            @views @. du_euler[3, .., i] -= u_euler[1, .., i] * u_gravity[3, .., i]
+            @views @. du_euler[4, .., i] -= u_euler[1, .., i] * u_gravity[4, .., i]
+            @views @. du_euler[5, .., i] -= (u_euler[2, .., i] * u_gravity[2, .., i] +
+                                             u_euler[3, .., i] * u_gravity[3, .., i] +
+                                             u_euler[4, .., i] * u_gravity[4, .., i])
+        end
+    else
+        error("Number of dimensions $(ndims(semi_euler)) not supported.")
+    end
+
+    runtime = time_ns() - time_start
+    put!(semi.performance_counter, runtime)
+
+    return nothing
+end
+
 # TODO: Taal refactor, add some callbacks or so within the gravity update to allow investigating/optimizing it
 function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
@@ -392,12 +458,13 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_info_interfaces_acc::Vector{Vector{Int64}},
                          level_info_boundaries_acc::Vector{Vector{Int64}},
                          level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}},
-                         level_info_mortars_acc::Vector{Vector{Int64}},
+                         #level_info_mortars_acc::Vector{Vector{Int64}},
                          level_u_gravity_indices_elements::Vector{Vector{Int64}},
                          level, n_levels)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
 
     # Can be changed by AMR
+    # TODO: Move to `resize!` of integrator
     resize!(cache.du_ode, length(cache.u_ode))
     resize!(cache.u_ode_tmp, length(cache.u_ode))
     resize!(cache.k1, length(cache.u_ode))
@@ -428,7 +495,7 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_info_elements_acc,
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
-                         level_info_boundaries_orientation_acc,
+                         #level_info_boundaries_orientation_acc,
                          level_info_mortars_acc,
                          level_u_gravity_indices_elements,
                          n_levels)
@@ -441,6 +508,7 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
         tau += dtau
 
         # TODO: Not sure if convergence check on only the current elements is correct!
+
         # check if we reached the maximum number of iterations
         if n_iterations_max > 0 && iter >= n_iterations_max
             @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
@@ -504,20 +572,20 @@ end
 function timestep_gravity_carpenter_kennedy_erk54_2N!(cache, u_euler, tau, dtau,
                                                       gravity_parameters, semi_gravity)
     # Coefficients for Carpenter's 5-stage 4th-order low-storage Runge-Kutta method
-    a = SVector(0.0, 
+    a = SVector(0.0,
                 567301805773.0 / 1357537059087.0,
                 2404267990393.0 / 2016746695238.0,
-                3550918686646.0 / 2091501179385.0, 
+                3550918686646.0 / 2091501179385.0,
                 1275806237668.0 / 842570457699.0)
-    b = SVector(1432997174477.0 / 9575080441755.0, 
+    b = SVector(1432997174477.0 / 9575080441755.0,
                 5161836677717.0 / 13612068292357.0,
-                1720146321549.0 / 2090206949498.0, 
+                1720146321549.0 / 2090206949498.0,
                 3134564353537.0 / 4481467310338.0,
                 2277821191437.0 / 14882151754819.0)
-    c = SVector(0.0, 
+    c = SVector(0.0,
                 1432997174477.0 / 9575080441755.0,
                 2526269341429.0 / 6820363962896.0,
-                2006345519317.0 / 3224310063776.0, 
+                2006345519317.0 / 3224310063776.0,
                 2802321613138.0 / 2924317926251.0)
 
     timestep_gravity_2N!(cache, u_euler, tau, dtau, gravity_parameters, semi_gravity,

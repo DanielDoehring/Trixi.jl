@@ -396,7 +396,7 @@ end
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t +
                      alg.c[alg.num_stages - 3 + stage] * integrator.dt,
-                     integrator.du_tmp)
+                     integrator)
     end
 
     # Last stage
@@ -414,7 +414,7 @@ end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,
-                 integrator.du_tmp)
+                 integrator)
 
     @threaded for i in eachindex(integrator.u)
         # Note that 'k1' carries the values of K_{S-1}

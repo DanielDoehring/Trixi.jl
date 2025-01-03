@@ -143,7 +143,7 @@ end
 # Function that computes the first stage of a general PERK method
 @inline function PERK_k1!(integrator::AbstractPairedExplicitRKIntegrator,
                           p)
-    integrator.f(integrator.k1, integrator.u, p, integrator.t)
+    integrator.f(integrator.k1, integrator.u, p, integrator.t, integrator)
 end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
@@ -181,14 +181,10 @@ end
                               alg.c[2] * integrator.dt * integrator.k1[i]
     end
 
-    # k2: Only evaluated at finest level
+    # k2: Only evaluated at finest level (1)
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[2] * integrator.dt,
-                 integrator.level_info_elements_acc[1],
-                 integrator.level_info_interfaces_acc[1],
-                 integrator.level_info_boundaries_acc[1],
-                 #integrator.level_info_boundaries_orientation_acc[1],
-                 integrator.level_info_mortars_acc[1])
+                 integrator, 1)
 end
 
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
@@ -272,68 +268,12 @@ end
         # and then using the level-dependent version
 
         integrator.f(integrator.du, integrator.u_tmp, p,
-                     integrator.t + alg.c[stage] * integrator.dt)
+                     integrator.t + alg.c[stage] * integrator.dt,
+                     integrator)
     else
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t + alg.c[stage] * integrator.dt,
-                     integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                     integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                     integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                     #integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                     integrator.level_info_mortars_acc[integrator.coarsest_lvl])
-    end
-end
-
-# Own function for multirate PERK methods for parabolic problems
-# as these require `du_tmp` to store the contribution of the `rhs!`
-@inline function PERK_k1!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
-                          p)
-    integrator.f(integrator.k1, integrator.u, p, integrator.t,
-                 integrator.du_tmp)
-end
-
-@inline function PERK_k2!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
-                          p, alg)
-    @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] +
-                              alg.c[2] * integrator.dt * integrator.k1[i]
-    end
-
-    # k2: Only evaluated at finest level
-    integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[2] * integrator.dt,
-                 integrator.du_tmp,
-                 integrator.level_info_elements_acc[1],
-                 integrator.level_info_interfaces_acc[1],
-                 integrator.level_info_boundaries_acc[1],
-                 #integrator.level_info_boundaries_orientation_acc[1],
-                 integrator.level_info_mortars_acc[1],
-                 integrator.level_u_indices_elements, 1)
-end
-
-@inline function PERK_ki!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
-                          p, alg, stage)
-    PERKMulti_intermediate_stage!(integrator, alg, stage)
-
-    # Check if there are fewer integrators than grid levels (non-optimal method)
-    if integrator.coarsest_lvl == alg.num_methods
-        # NOTE: This is supposedly more efficient than setting
-        #integrator.coarsest_lvl = integrator.n_levels
-        # and then using the level-dependent version
-
-        integrator.f(integrator.du, integrator.u_tmp, p,
-                     integrator.t + alg.c[stage] * integrator.dt,
-                     integrator.du_tmp)
-    else
-        integrator.f(integrator.du, integrator.u_tmp, p,
-                     integrator.t + alg.c[stage] * integrator.dt,
-                     integrator.du_tmp,
-                     integrator.level_info_elements_acc[integrator.coarsest_lvl],
-                     integrator.level_info_interfaces_acc[integrator.coarsest_lvl],
-                     integrator.level_info_boundaries_acc[integrator.coarsest_lvl],
-                     #integrator.level_info_boundaries_orientation_acc[integrator.coarsest_lvl],
-                     integrator.level_info_mortars_acc[integrator.coarsest_lvl],
-                     integrator.level_u_indices_elements,
+                     integrator,
                      integrator.coarsest_lvl)
     end
 end
@@ -410,6 +350,40 @@ end
 # such that hey can be exported from Trixi.jl and extended in the TrixiConvexECOSExt package
 # extension or by the NLsolve-specific code loaded by Requires.jl
 function solve_a_butcher_coeffs_unknown! end
+
+# Dummy argument `integrator` for same signature as `rhs_hyperbolic_parabolic!` for non-split ODE problems
+@inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
+                      integrator)
+    rhs!(du_ode, u_ode, semi, t)
+end
+
+# Depending on the `semi`, different fields from `integrator` need to be passed on.
+function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
+              integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
+                                AbstractPairedExplicitRelaxationRKMultiIntegrator},
+              max_level)
+    rhs!(du_ode, u_ode, semi, t,
+         integrator.level_info_elements_acc[max_level],
+         integrator.level_info_interfaces_acc[max_level],
+         integrator.level_info_boundaries_acc[max_level],
+         #integrator.level_info_boundaries_orientation_acc[max_level],
+         integrator.level_info_mortars_acc[max_level])
+end
+
+function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                   semi::SemidiscretizationHyperbolicParabolic, t,
+                                   integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
+                                   max_level)
+    rhs_hyperbolic_parabolic!(du_ode, u_ode, semi, t,
+                              integrator.du_tmp,
+                              max_level,
+                              integrator.level_info_elements_acc[max_level],
+                              integrator.level_info_interfaces_acc[max_level],
+                              integrator.level_info_boundaries_acc[max_level],
+                              #integrator.level_info_boundaries_orientation_acc[max_level],
+                              integrator.level_info_mortars_acc[max_level],
+                              integrator.level_u_indices_elements)
+end
 
 # Multirate/partitioned helpers
 include("partitioning.jl")

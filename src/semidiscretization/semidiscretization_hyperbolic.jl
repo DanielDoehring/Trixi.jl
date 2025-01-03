@@ -425,7 +425,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t)
     return nothing
 end
 
-# `rhs!` for partitioned Runge-Kutta methods (e.g. PERK)
+# `rhs!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
 function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
               element_indices, interface_indices, boundary_indices, mortar_indices)
     @unpack mesh, equations, boundary_conditions, source_terms, solver, cache = semi

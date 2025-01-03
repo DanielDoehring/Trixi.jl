@@ -23,14 +23,16 @@ function PERK4_a_matrix_constant(cS3)
             0.114851811257441/cS3 0.648906880894214 0.028312163512968]
 end
 
+# Compute the Butcher tableau for a paired explicit Runge-Kutta method order 4
+# using provided values of coefficients a in A-matrix of Butcher tableau
 function compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                    base_path_a_coeffs::AbstractString;
                                                    cS3)
     c = PERK4_compute_c_coeffs(num_stages, cS3)
 
     num_coeffs_max = num_stages - 5
-    a_matrix = zeros(2, num_coeffs_max)
 
+    a_matrix = zeros(2, num_coeffs_max)
     a_matrix[1, :] = c[3:(num_stages - 3)]
 
     path_a_coeffs = joinpath(base_path_a_coeffs,
@@ -49,14 +51,14 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages,
     end
 
     # Constant/non-optimized part of the Butcher matrix
-    a_matrix_constant = PERK4_a_matrix_constant(c[num_stages - 3])
+    a_matrix_constant = PERK4_a_matrix_constant(cS3)
 
     return a_matrix, a_matrix_constant, c
 end
 
 @doc raw"""
     PairedExplicitRK4(num_stages, base_path_a_coeffs::AbstractString, dt_opt = nothing;
-                      c_const = 1.0f0)
+                      cS3 = 1.0f0)
 
     Parameters:
     - `num_stages` (`Int`): Number of stages in the paired explicit Runge-Kutta (P-ERK) method.
@@ -64,13 +66,13 @@ end
       the Butcher tableau of the Runge Kutta method.
       The matrix should be stored in a text file at `joinpath(base_path_a_coeffs, "a_$(num_stages).txt")` and separated by line breaks.
     - `dt_opt` (`Float64`, optional): Optimal time step size for the simulation setup. Can be `nothing` if it is unknown. 
-       In this case the optimal CFL number cannot be computed and the [`StepsizeCallback`](@ref) cannot be used.
-    - `c_const` (`Float64`, optional): Value of abscissae $c$ in the Butcher tableau for the optimized coefficients. 
-       Default is 1.0.
+      In this case the optimal CFL number cannot be computed and the [`StepsizeCallback`](@ref) cannot be used.
+    - `cS3` (`Float64`, optional): Value of $c_{S-3}$ in the Butcher tableau, where
+      $S$ is the number of stages. Default is `1.0f0`.
 
 The following structures and methods provide an implementation of
 the fourth-order paired explicit Runge-Kutta (P-ERK) method
-optimized for a certain simulation setup (PDE, IC & BC, Riemann Solver, DG Solver).
+optimized for a certain simulation setup (PDE, IC & BCs, Riemann Solver, DG Solver).
 The method has been proposed in 
 - D. Doehring, L. Christmann, M. Schlottke-Lakemper, G. J. Gassner and M. Torrilhon (2024).
   Fourth-Order Paired-Explicit Runge-Kutta Methods
@@ -79,7 +81,8 @@ The method has been proposed in
 struct PairedExplicitRK4 <: AbstractPairedExplicitRKSingle
     num_stages::Int # S
 
-    a_matrix::Matrix{Float64}
+    # Optimized coefficients, i.e., flexible part of the Butcher array matrix A.
+    a_matrix::Union{Matrix{Float64}, Nothing}
     # This part of the Butcher array matrix A is constant for all PERK methods, i.e., 
     # regardless of the optimized coefficients.
     a_matrix_constant::Matrix{Float64}
@@ -91,7 +94,8 @@ end
 # Constructor for previously computed A Coeffs
 function PairedExplicitRK4(num_stages, base_path_a_coeffs::AbstractString,
                            dt_opt = nothing;
-                           cS3 = 1.0f0)
+                           cS3 = 1.0f0)  # Default value for best internal stability
+    @assert num_stages>=5 "PERK4 requires at least five stages"
     a_matrix, a_matrix_constant, c = compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                                                base_path_a_coeffs;
                                                                                cS3)
@@ -110,13 +114,13 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType, Params, Sol, F,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT # DIRection of time integration, i.e, if one marches forward or backward in time
     dt::RealT # current time step
     dtcache::RealT # manually set time step
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F
+    f::F # `rhs` of the semidiscretization
     alg::Alg # This is our own class written above; Abbreviation for ALGorithm
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
@@ -186,7 +190,7 @@ end
                                alg.a_matrix_constant[2, 3] * integrator.du[i])
     end
 
-    # Safe K_{S-1} in `k1`:
+    # Store K_{S-1} in `k1`:
     @threaded for i in eachindex(integrator.u)
         integrator.k1[i] = integrator.du[i]
     end
