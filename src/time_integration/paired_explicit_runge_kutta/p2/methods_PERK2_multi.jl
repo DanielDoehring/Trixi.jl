@@ -34,26 +34,31 @@ function ComputePERK2_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
 
     for level in eachindex(stages)
         num_stage_evals = stages[level]
-        path_monomial_coeffs = joinpath(base_path_mon_coeffs,
-                                        "gamma_" * string(num_stage_evals) * ".txt")
+        num_free_coeffs = num_stage_evals - 2
 
-        @assert isfile(path_monomial_coeffs) "Couldn't find file"
-        monomial_coeffs = readdlm(path_monomial_coeffs, Float64)
-        num_monomial_coeffs = size(monomial_coeffs, 1)
+        if num_free_coeffs > 0
+            path_monomial_coeffs = joinpath(base_path_mon_coeffs,
+                                            "gamma_" * string(num_stage_evals) * ".txt")
 
-        @assert num_monomial_coeffs == num_stage_evals - 2
-        A = compute_a_coeffs(num_stage_evals, stage_scaling_factors, monomial_coeffs)
+            @assert isfile(path_monomial_coeffs) "Couldn't find file"
+            monomial_coeffs = readdlm(path_monomial_coeffs, Float64)
+            num_monomial_coeffs = size(monomial_coeffs, 1)
 
-        a_matrices[level, 1, (num_coeffs_max - (num_stage_evals - 3)):end] -= A
-        a_matrices[level, 2, (num_coeffs_max - (num_stage_evals - 3)):end] = A
+            @assert num_monomial_coeffs == num_free_coeffs
+            A = compute_a_coeffs(num_stage_evals, stage_scaling_factors,
+                                 monomial_coeffs)
+
+            a_matrices[level, 1, (num_coeffs_max - (num_stage_evals - 3)):end] -= A
+            a_matrices[level, 2, (num_coeffs_max - (num_stage_evals - 3)):end] = A
+        end
 
         # Add active levels to stages
-        for stage in num_stages:-1:(num_stages - num_monomial_coeffs)
+        for stage in num_stages:-1:(num_stages - num_free_coeffs)
             push!(active_levels[stage], level)
         end
 
         # Add eval levels to stages
-        for stage in num_stages:-1:(num_stages - num_monomial_coeffs + 1)
+        for stage in num_stages:-1:(num_stages - num_free_coeffs + 1)
             push!(eval_levels[stage], level)
         end
     end

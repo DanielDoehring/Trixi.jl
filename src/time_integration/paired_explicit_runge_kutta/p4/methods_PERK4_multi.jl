@@ -43,14 +43,10 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
             A = readdlm(path_a_coeffs, Float64)
             num_a_coeffs = size(A, 1)
             @assert num_a_coeffs == num_stage_evals - 5
-        else
-            A = []
-            num_a_coeffs = 0
-        end
-
-        if num_a_coeffs > 0
             a_matrices[level, 1, (num_coeffs_max - num_a_coeffs + 1):end] -= A
             a_matrices[level, 2, (num_coeffs_max - num_a_coeffs + 1):end] = A
+        else
+            num_a_coeffs = 0
         end
 
         # Add active levels to stages

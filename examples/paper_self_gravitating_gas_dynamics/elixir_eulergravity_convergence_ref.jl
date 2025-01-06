@@ -101,7 +101,7 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     n_iterations_max = 1000, # 1000
 
                                     #timestep_gravity = timestep_gravity_PERK4!
-                                    timestep_gravity = timestep_gravity_PERK4_Multi!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!
 
                                     #timestep_gravity = timestep_gravity_PERK2_Multi!
                                     )

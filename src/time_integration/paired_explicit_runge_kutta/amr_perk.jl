@@ -17,7 +17,6 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                    integrator.t, integrator.iter; kwargs...)
 
         if has_changed
-            #resize!(integrator, length(u_ode))
             u_modified!(integrator, true)
 
             ### PERK additions ###

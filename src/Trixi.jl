@@ -267,8 +267,7 @@ export SemidiscretizationEulerGravity, ParametersEulerGravity,
        timestep_gravity_erk51_3Sstar!,
        timestep_gravity_erk52_3Sstar!,
        timestep_gravity_erk53_3Sstar!,
-       timestep_gravity_carpenter_kennedy_erk54_2N!,
-       timestep_gravity_PERK4_Multi!
+       timestep_gravity_carpenter_kennedy_erk54_2N!
 
 export SemidiscretizationCoupled
 
