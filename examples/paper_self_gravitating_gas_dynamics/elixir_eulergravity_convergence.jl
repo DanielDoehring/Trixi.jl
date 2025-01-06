@@ -66,7 +66,7 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true)
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
-                        save_solution,
+                        #save_solution,
                         analysis_callback, alive_callback)
 
 ###############################################################################

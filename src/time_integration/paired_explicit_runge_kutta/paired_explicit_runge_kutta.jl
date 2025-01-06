@@ -352,7 +352,7 @@ end
 function solve_a_butcher_coeffs_unknown! end
 
 # Dummy argument `integrator` for same signature as `rhs_hyperbolic_parabolic!` for non-split ODE problems
-@inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
+@inline function rhs!(du_ode, u_ode, semi::AbstractSemidiscretization, t,
                       integrator)
     rhs!(du_ode, u_ode, semi, t)
 end
