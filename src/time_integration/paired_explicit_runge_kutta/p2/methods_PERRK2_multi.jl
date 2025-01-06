@@ -180,8 +180,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
 
     # Set initial distribution of DG Base function coefficients
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partitioning_u!(level_u_indices_elements, n_levels, n_dims, level_info_elements, u0,
-                    mesh, equations, dg, cache)
+    partitioning_u!(level_u_indices_elements, level_info_elements, n_levels,
+                    u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
 

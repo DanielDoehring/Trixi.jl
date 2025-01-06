@@ -84,8 +84,8 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                         integrator.alg)
 
                 partitioning_u!(integrator.level_u_indices_elements,
-                                integrator.n_levels, n_dims,
                                 integrator.level_info_elements,
+                                integrator.n_levels,
                                 u_ode, mesh, equations, dg, cache)
 
                 resize!(integrator, length(u_ode)) # `resize!` integrator after PERK partitioning data structures

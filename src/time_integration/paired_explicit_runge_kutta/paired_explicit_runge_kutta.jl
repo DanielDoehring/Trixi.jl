@@ -299,6 +299,19 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrat
     resize!(integrator.du_tmp, new_size)
 end
 
+function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
+                      new_size)
+    resize!(integrator.u, new_size)
+    resize!(integrator.du, new_size)
+    resize!(integrator.u_tmp, new_size)
+    # PERK stage
+    resize!(integrator.k1, new_size)
+    # Check if we have Euler-Gravity situation
+    if :semi_gravity in fieldnames(typeof(integrator.p))
+        partitioning_u_gravity!(integrator)
+    end
+end
+
 # get a cache where the RHS can be stored
 get_du(integrator::AbstractPairedExplicitRKIntegrator) = integrator.du
 get_tmp_cache(integrator::AbstractPairedExplicitRKIntegrator) = (integrator.u_tmp,)

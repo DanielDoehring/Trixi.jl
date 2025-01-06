@@ -343,7 +343,7 @@ end
          integrator.level_info_boundaries_acc,
          #integrator.level_info_boundaries_orientation_acc,
          integrator.level_info_mortars_acc,
-         integrator.n_levels) # Pass on `n_levels` to `rhs!` of a `SemidiscretizationEulerGravity`
+         integrator.n_levels) # Pass on `n_levels` to `rhs!` of a `SemidiscretizationEulerGravity` for PERKMulti timestep
 end
 
 function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
@@ -417,28 +417,6 @@ end
 function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
 
-    # Can be changed by AMR
-    resize!(cache.du_ode, length(cache.u_ode))
-
-    # 2N, 3S* integrators
-    if :u_tmp1_ode in fieldnames(typeof(cache))
-        resize!(cache.u_tmp1_ode, length(cache.u_ode))
-    end
-    if :u_tmp2_ode in fieldnames(typeof(cache))
-        resize!(cache.u_tmp2_ode, length(cache.u_ode))
-    end
-    # TODO: Revisit!
-    # PERK integrators
-    if :u_ode_tmp in fieldnames(typeof(cache))
-        resize!(cache.u_ode_tmp, length(cache.u_ode))
-    end
-    if :k1 in fieldnames(typeof(cache))
-        resize!(cache.k1, length(cache.u_ode))
-    end
-    if :k_higher in fieldnames(typeof(cache))
-        resize!(cache.k_higher, length(cache.u_ode))
-    end
-
     u_euler = wrap_array(u_ode, semi_euler)
     u_gravity = wrap_array(cache.u_ode, semi_gravity)
     du_gravity = wrap_array(cache.du_ode, semi_gravity)
@@ -497,13 +475,6 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_u_gravity_indices_elements,
                          n_levels)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
-
-    # Can be changed by AMR
-    # TODO: Move to `resize!` of integrator or below to the `amr_callback`
-    resize!(cache.du_ode, length(cache.u_ode))
-    resize!(cache.u_ode_tmp, length(cache.u_ode))
-    resize!(cache.k1, length(cache.u_ode))
-    resize!(cache.k_higher, length(cache.u_ode))
 
     u_euler = wrap_array(u_ode, semi_euler)
     u_gravity = wrap_array(cache.u_ode, semi_gravity)
@@ -1467,9 +1438,32 @@ end
                                              t, iter; kwargs...)
     passive_args = ((semi.cache.u_ode,
                      mesh_equations_solver_cache(semi.semi_gravity)...),)
-    amr_callback(u_ode, mesh_equations_solver_cache(semi.semi_euler)..., semi, t, iter;
-                 kwargs..., passive_args = passive_args)
+    has_changed = amr_callback(u_ode, mesh_equations_solver_cache(semi.semi_euler)...,
+                               semi, t, iter;
+                               kwargs..., passive_args = passive_args)
 
-    # TODO: resize stuff from `cache` here?
+    if has_changed
+        new_length = length(u_ode)
+        resize!(cache.du_ode, new_length)
+
+        # 2N, 3S* integrators
+        if :u_tmp1_ode in fieldnames(typeof(cache))
+            resize!(cache.u_tmp1_ode, new_length)
+        end
+        if :u_tmp2_ode in fieldnames(typeof(cache))
+            resize!(cache.u_tmp2_ode, new_length)
+        end
+        # TODO: Revisit!
+        # PERK integrators
+        if :u_ode_tmp in fieldnames(typeof(cache))
+            resize!(cache.u_ode_tmp, new_length)
+        end
+        if :k1 in fieldnames(typeof(cache))
+            resize!(cache.k1, new_length)
+        end
+        if :k_higher in fieldnames(typeof(cache))
+            resize!(cache.k_higher, new_length)
+        end
+    end
 end
 end # @muladd

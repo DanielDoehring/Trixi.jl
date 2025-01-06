@@ -1,4 +1,11 @@
-function get_n_levels(mesh::TreeMesh)
+# By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
+# Since these FMAs can increase the performance of many numerical algorithms,
+# we need to opt-in explicitly.
+# See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
+@muladd begin
+#! format: noindent
+
+@inline function get_n_levels(mesh::TreeMesh)
     # This assumes that the eigenvalues are of similar magnitude
     # and thus the mesh size is the main factor in the char. speed
     min_level = minimum_level(mesh.tree)
@@ -9,7 +16,7 @@ function get_n_levels(mesh::TreeMesh)
     return n_levels
 end
 
-function get_n_levels(mesh::TreeMesh, alg)
+@inline function get_n_levels(mesh::TreeMesh, alg)
     n_levels = get_n_levels(mesh)
 
     # CARE: This is for testcase with special assignment
@@ -18,7 +25,7 @@ function get_n_levels(mesh::TreeMesh, alg)
     return n_levels
 end
 
-function get_n_levels(mesh::Union{P4estMesh, StructuredMesh}, alg)
+@inline function get_n_levels(mesh::Union{P4estMesh, StructuredMesh}, alg)
     n_levels = alg.num_methods
 
     return n_levels
@@ -383,8 +390,10 @@ function partitioning_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements, n_elements,
-                                                           nnodes, eltype(dg.basis.nodes))
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
@@ -492,8 +501,10 @@ function partitioning_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements, n_elements,
-                                                           nnodes, eltype(dg.basis.nodes))
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
 
     # For "grid-based" partitioning approach
     #=
@@ -538,7 +549,8 @@ function partitioning_variables!(level_info_elements,
     # No interfaces, boundaries, mortars for structured meshes
 end
 
-function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nnodes, RealT)
+function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nnodes,
+                              RealT)
     h_min = floatmax(RealT)
     h_max = zero(RealT)
 
@@ -608,48 +620,39 @@ end
 # TODO: 3D versions of "get_hmin_per_element"
 # TODO: T8Code extensions
 
-function partitioning_u!(level_u_indices_elements,
-                         n_levels, n_dims, level_info_elements, u_ode, mesh, equations, dg,
-                         cache)
+@inline function partitioning_u!(level_u_indices_elements, level_info_elements,
+                                 n_levels, u_ode, mesh, equations, dg, cache)
     u = wrap_array(u_ode, mesh, equations, dg, cache)
 
-    if n_dims == 1
-        for level in 1:n_levels
-            for element_id in level_info_elements[level]
-                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements                                    
-                indices = vec(transpose(LinearIndices(u)[:, :, element_id]))
-                append!(level_u_indices_elements[level], indices)
-            end
-            sort!(level_u_indices_elements[level])
-            @assert length(level_u_indices_elements[level]) ==
-                    nvariables(equations) * Trixi.nnodes(dg)^ndims(mesh) *
-                    length(level_info_elements[level])
-        end
-    elseif n_dims == 2
-        for level in 1:n_levels
-            for element_id in level_info_elements[level]
-                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
-                indices = collect(Iterators.flatten(LinearIndices(u)[:, :, :,
-                                                                     element_id]))
-                append!(level_u_indices_elements[level], indices)
-            end
-            sort!(level_u_indices_elements[level])
-            @assert length(level_u_indices_elements[level]) ==
-                    nvariables(equations) * Trixi.nnodes(dg)^ndims(mesh) *
-                    length(level_info_elements[level])
-        end
-    elseif n_dims == 3
-        for level in 1:n_levels
-            for element_id in level_info_elements[level]
-                # First dimension of u: nvariables, following: nnodes (per dim) last: nelements
-                indices = collect(Iterators.flatten(LinearIndices(u)[:, :, :, :,
-                                                                     element_id]))
-                append!(level_u_indices_elements[level], indices)
-            end
-            sort!(level_u_indices_elements[level])
-            @assert length(level_u_indices_elements[level]) ==
-                    nvariables(equations) * Trixi.nnodes(dg)^ndims(mesh) *
-                    length(level_info_elements[level])
-        end
+    for level in 1:n_levels
+        @views indices = collect(Iterators.flatten(LinearIndices(u)[..,
+                                                                    level_info_elements[level]]))
+        append!(level_u_indices_elements[level], indices)
+        sort!(level_u_indices_elements[level])
     end
 end
+
+# Repartitioning of the DoF array of the gravity solver
+@inline function partitioning_u_gravity!(integrator::AbstractPairedExplicitRKMultiIntegrator)
+    @unpack level_info_elements, n_levels = integrator
+    @unpack semi_gravity, cache = integrator.p
+
+    u_gravity = wrap_array(cache.u_ode, semi_gravity)
+
+    resize!(cache.level_u_gravity_indices_elements, n_levels)
+    for level in 1:n_levels
+        if isassigned(cache.level_u_gravity_indices_elements, level)
+            empty!(cache.level_u_gravity_indices_elements[level])
+        else
+            cache.level_u_gravity_indices_elements[level] = []
+        end
+    end
+
+    for level in 1:n_levels
+        @views indices = collect(Iterators.flatten(LinearIndices(u_gravity)[..,
+                                                                            level_info_elements[level]]))
+        append!(cache.level_u_gravity_indices_elements[level], indices)
+        sort!(cache.level_u_gravity_indices_elements[level])
+    end
+end
+end # @muladd
