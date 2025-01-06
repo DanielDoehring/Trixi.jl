@@ -1,3 +1,10 @@
+# By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
+# Since these FMAs can increase the performance of many numerical algorithms,
+# we need to opt-in explicitly.
+# See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
+@muladd begin
+#! format: noindent
+
 # NOTE: This could actually live in a more general location,
 # as it is not PERK-specific.
 
@@ -34,7 +41,8 @@ end
 end
 
 @inline function int_w_dot_stage(stage, u_i,
-                                 mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
+                                 mesh::Union{TreeMesh{3}, StructuredMesh{3},
+                                             P4estMesh{3},
                                              T8codeMesh{3}},
                                  equations, dg::DG, cache)
     @trixi_timeit timer() "Integrate w ⋅ k" begin
@@ -206,7 +214,8 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
     end
 
     # Catch Newton failures
-    if integrator.gamma < gamma_min || isnan(integrator.gamma) || isinf(integrator.gamma)
+    if integrator.gamma < gamma_min || isnan(integrator.gamma) ||
+       isinf(integrator.gamma)
         integrator.gamma = 1
         # CARE: This is an experimental strategy: 
         # Set gamma to smallest value s.t. convergence is still assured
@@ -215,3 +224,4 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
 
     return nothing
 end
+end # @muladd

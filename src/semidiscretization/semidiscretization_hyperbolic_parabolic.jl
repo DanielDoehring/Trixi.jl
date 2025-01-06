@@ -371,13 +371,13 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "rhs! (partitioned)" rhs!(du, u, t, mesh, equations,
-                                                    boundary_conditions,
-                                                    source_terms, solver, cache,
-                                                    element_indices,
-                                                    interface_indices,
-                                                    boundary_indices,
-                                                    mortar_indices)
+    @trixi_timeit timer() "rhs! (part.)" rhs!(du, u, t, mesh, equations,
+                                              boundary_conditions,
+                                              source_terms, solver, cache,
+                                              element_indices,
+                                              interface_indices,
+                                              boundary_indices,
+                                              mortar_indices)
     runtime = time_ns() - time_start
     put!(semi.performance_counter.counters[1], runtime)
 
@@ -415,18 +415,18 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "rhs_parabolic! (partitioned)" rhs_parabolic!(du, u, t, mesh,
-                                                                        equations_parabolic,
-                                                                        boundary_conditions_parabolic,
-                                                                        source_terms,
-                                                                        solver,
-                                                                        solver_parabolic,
-                                                                        cache,
-                                                                        cache_parabolic,
-                                                                        element_indices,
-                                                                        interface_indices,
-                                                                        boundary_indices,
-                                                                        mortar_indices)
+    @trixi_timeit timer() "rhs_parabolic! (part.)" rhs_parabolic!(du, u, t, mesh,
+                                                                  equations_parabolic,
+                                                                  boundary_conditions_parabolic,
+                                                                  source_terms,
+                                                                  solver,
+                                                                  solver_parabolic,
+                                                                  cache,
+                                                                  cache_parabolic,
+                                                                  element_indices,
+                                                                  interface_indices,
+                                                                  boundary_indices,
+                                                                  mortar_indices)
     runtime = time_ns() - time_start
     put!(semi.performance_counter.counters[2], runtime)
 
@@ -471,7 +471,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,
                                    u_indices)
-    @trixi_timeit timer() "rhs_hyperbolic_parabolic! (partitioned)" begin
+    @trixi_timeit timer() "rhs_hyperbolic_parabolic! (part.)" begin
         rhs!(du_tmp, u_ode, semi, t,
              element_indices, interface_indices,
              boundary_indices, mortar_indices)
