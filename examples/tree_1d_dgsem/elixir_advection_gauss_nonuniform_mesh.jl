@@ -45,8 +45,8 @@ cfl = 3.5 # [16, 8]
 #cfl = 2.0 # CarpenterKennedy2N54
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-callbacks = CallbackSet(summary_callback, 
-                        analysis_callback,
+callbacks = CallbackSet(summary_callback,
+                        analysis_callback
                         #stepsize_callback
                         )
 
@@ -63,7 +63,7 @@ Stages = [16, 8]
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 8)
 #relaxation_solver = Trixi.RelaxationSolverBisection()
 
-ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios; 
+ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios;
                                                  relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
@@ -71,7 +71,6 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios;
 sol = Trixi.solve(ode, ode_alg,
                   dt = 0.25,
                   save_everystep = false, callback = callbacks);
-
 
 #=
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),

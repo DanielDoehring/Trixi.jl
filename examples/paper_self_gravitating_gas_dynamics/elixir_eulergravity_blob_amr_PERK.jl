@@ -110,7 +110,8 @@ end
 
 solver_gravity = DGSEM(polydeg, flux_lax_friedrichs)
 
-semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_condition_blob_self_gravity,
+semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity,
+                                            initial_condition_blob_self_gravity,
                                             solver_gravity,
                                             source_terms = source_terms_harmonic)
 
@@ -119,18 +120,16 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 
 base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/"
 
-b1   = 0.0
-bS   = 1.0 - b1
-cEnd = 0.5/bS
+b1 = 0.0
+bS = 1.0 - b1
+cEnd = 0.5 / bS
 
 dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
 
-
 cfl_gravity = 1.4
-alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", 
-                                     dtRatios, bS, cEnd)
-
+alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/",
+                                           dtRatios, bS, cEnd)
 
 #=
 cfl_gravity = 1.4
@@ -149,7 +148,6 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
-
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -180,17 +178,18 @@ amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
                                               base_level = 4, # 5
 
                                               med_level = 0, # 0
-                                              med_threshold = 0.0003,
-                                              
+                                              med_threshold = 0.0003, 
+
                                               max_level = 8, # 7
                                               max_threshold = 0.0003, # 0.0003 when max_level = 7
+                                              
                                               max_threshold_secondary = indicator_sc.alpha_max)
 
 cfl = 1.1 # PERK 4 Multi, S_max = 9
 #cfl = 1.1 # PERK 4 Standalone, S_max = 9
 
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = Int(floor(15 * 1.1/cfl)),
+                           interval = Int(floor(15 * 1.1 / cfl)),
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
@@ -203,7 +202,6 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-
 dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
 
@@ -214,6 +212,7 @@ Stages = 9
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/Euler_only/")
 =#
 
-sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false, callback = callbacks);
+sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false,
+                  callback = callbacks);
 
 summary_callback() # print the timer summary

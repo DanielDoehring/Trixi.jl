@@ -68,8 +68,7 @@ indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_min = 0.0001,
                                          alpha_smooth = true,
                                          #variable = pressure
-                                         variable = density_pressure
-                                         )
+                                         variable = density_pressure)
 
 volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
                                                  volume_flux_dg = volume_flux,
@@ -110,7 +109,8 @@ end
 
 solver_gravity = DGSEM(polydeg, flux_lax_friedrichs)
 
-semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_condition_blob_self_gravity,
+semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity,
+                                            initial_condition_blob_self_gravity,
                                             solver_gravity,
                                             source_terms = source_terms_harmonic)
 
@@ -125,7 +125,6 @@ parameters = ParametersEulerGravity(background_density = 1.0, # taken from above
                                     timestep_gravity = timestep_gravity_erk52_3Sstar!)
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
-
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -150,15 +149,11 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_min = 0.0001,
                                           alpha_smooth = false,
                                           #variable = Trixi.density
-                                          variable = Trixi.density_pressure
-                                          )
+                                          variable = Trixi.density_pressure)
 amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
                                               base_level = 4, # 5
-
                                               med_level = 0, # 0
-                                              med_threshold = 0.0003,
-                                              
-                                              max_level = 8, # 7
+                                              med_threshold = 0.0003, max_level = 8, # 7
                                               max_threshold = 0.0003, # 0.0003 when max_level = 7
                                               max_threshold_secondary = indicator_sc.alpha_max)
 
@@ -173,7 +168,7 @@ cfl = 3.2 # SSPRK104 # tested
 #cfl = 0.6 # NDBLSRK124 # tested
 
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = Int(floor(15 * 1.1/cfl)),
+                           interval = Int(floor(15 * 1.1 / cfl)),
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 

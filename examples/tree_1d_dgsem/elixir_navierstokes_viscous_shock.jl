@@ -169,7 +169,7 @@ alive_callback = AliveCallback(alive_interval = 10000)
 analysis_interval = 1_000_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = [:l2_error, :l1_error, :linf_error,
-                                         :l2_error_primitive, 
+                                         :l2_error_primitive,
                                          :l1_error_primitive,
                                          :linf_error_primitive],
                                      analysis_integrals = (;))
@@ -183,7 +183,8 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 dtRatios = [1, 0.25]
 basepath = "/home/daniel/git/Paper_PERRK/Data/ViscousShock/"
 
-relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8, gamma_tol = 100 * eps(Float64))
+relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8,
+                                                    gamma_tol = 100 * eps(Float64))
 
 #=
 path = basepath * "p2/"
@@ -201,13 +202,11 @@ Stages = [9, 5]
 ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
-
 path = basepath * "p4/"
 Stages = [10, 6]
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
 
 dtRef = 8.75e-3
 max_level = Trixi.maximum_level(mesh.tree)

@@ -157,7 +157,7 @@ Stages = [14, 12, 10, 8, 7, 6, 5]
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; 
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios;
                                                        relaxation_solver = relaxation_solver)
 
 dt = 1e-3 # PERK4, dt_c = 2e-4
