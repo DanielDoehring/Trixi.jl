@@ -320,10 +320,10 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t)
     return nothing
 end
 
-function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
-              integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                AbstractPairedExplicitRelaxationRKMultiIntegrator},
-              max_level)
+@inline function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
+                      integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
+                                        AbstractPairedExplicitRelaxationRKMultiIntegrator},
+                      max_level)
     rhs!(du_ode, u_ode, semi, t,
          max_level,
          integrator.level_info_elements_acc,

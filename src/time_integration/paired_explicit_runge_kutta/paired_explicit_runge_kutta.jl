@@ -358,10 +358,10 @@ function solve_a_butcher_coeffs_unknown! end
 end
 
 # Depending on the `semi`, different fields from `integrator` need to be passed on.
-function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
-              integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                AbstractPairedExplicitRelaxationRKMultiIntegrator},
-              max_level)
+@inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
+                      integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
+                                        AbstractPairedExplicitRelaxationRKMultiIntegrator},
+                      max_level)
     rhs!(du_ode, u_ode, semi, t,
          integrator.level_info_elements_acc[max_level],
          integrator.level_info_interfaces_acc[max_level],
