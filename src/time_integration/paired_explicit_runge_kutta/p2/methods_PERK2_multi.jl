@@ -5,9 +5,10 @@
 @muladd begin
 #! format: noindent
 
-function ComputePERK2_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
-                                           base_path_mon_coeffs::AbstractString,
-                                           bS, cS)
+function compute_PairedExplicitRK2Multi_butcher_tableau(stages::Vector{Int64},
+                                                        num_stages::Int,
+                                                        base_path_mon_coeffs::AbstractString,
+                                                        bS, cS)
     c = PERK2_compute_c_coeffs(num_stages, cS)
     stage_scaling_factors = bS * reverse(c[2:(end - 1)])
 
@@ -94,9 +95,9 @@ function PairedExplicitRK2Multi(stages::Vector{Int64},
     a_matrices, c,
     active_levels,
     max_active_levels,
-    max_eval_levels = ComputePERK2_Multi_ButcherTableau(stages, num_stages,
-                                                        base_path_mon_coeffs,
-                                                        bS, cS)
+    max_eval_levels = compute_PairedExplicitRK2Multi_butcher_tableau(stages, num_stages,
+                                                                     base_path_mon_coeffs,
+                                                                     bS, cS)
 
     return PairedExplicitRK2Multi(minimum(stages), length(stages), num_stages,
                                   dt_ratios,

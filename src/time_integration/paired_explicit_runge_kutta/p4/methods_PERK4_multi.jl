@@ -5,9 +5,10 @@
 @muladd begin
 #! format: noindent
 
-function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
-                                           base_path_a_coeffs::AbstractString,
-                                           cS3)
+function compute_PairedExplicitRK4Multi_butcher_tableau(stages::Vector{Int64},
+                                                        num_stages::Int,
+                                                        base_path_a_coeffs::AbstractString,
+                                                        cS3)
     c = PERK4_compute_c_coeffs(num_stages, cS3)
 
     # For the p = 4 method there are less free coefficients
@@ -34,15 +35,16 @@ function ComputePERK4_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
     for level in eachindex(stages)
         num_stage_evals = stages[level]
 
-        #path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * "_" * string(num_stages) * ".txt"
-        # If all c = 1.0, the max number of stages does not matter
-        path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * ".txt"
-
         if num_stage_evals > 5
+            #path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * "_" * string(num_stages) * ".txt"
+            # If all c = 1.0, the max number of stages does not matter
+            path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * ".txt"
+
             @assert isfile(path_a_coeffs) "Couldn't find file $path_a_coeffs"
             A = readdlm(path_a_coeffs, Float64)
             num_a_coeffs = size(A, 1)
             @assert num_a_coeffs == num_stage_evals - 5
+
             a_matrices[level, 1, (num_coeffs_max - num_a_coeffs + 1):end] -= A
             a_matrices[level, 2, (num_coeffs_max - num_a_coeffs + 1):end] = A
         else
@@ -95,9 +97,9 @@ function PairedExplicitRK4Multi(stages::Vector{Int64},
     a_matrix_constant, c,
     active_levels,
     max_active_levels,
-    max_eval_levels = ComputePERK4_Multi_ButcherTableau(stages, num_stages,
-                                                        base_path_a_coeffs,
-                                                        cS3)
+    max_eval_levels = compute_PairedExplicitRK4Multi_butcher_tableau(stages, num_stages,
+                                                                     base_path_a_coeffs,
+                                                                     cS3)
 
     return PairedExplicitRK4Multi(minimum(stages), length(stages), num_stages,
                                   dt_ratios,
@@ -310,22 +312,22 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator{4},
                                                                  AbstractPairedExplicitRelaxationRKMultiIntegrator{4}},
                                                alg, stage)
-    #=                                               
+
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
     for level in 1:min(alg.num_methods, integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[i]
+                                  integrator.dt *
+                                  alg.a_matrices[level, 1, stage - 2] *
+                                  integrator.k1[i]
         end
     end
     for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] += integrator.dt *
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i]
+                                   alg.a_matrices[level, 2, stage - 2] *
+                                   integrator.du[i]
         end
     end
 
@@ -333,23 +335,23 @@ end
     for level in (alg.num_methods + 1):(integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                      integrator.k1[i]
+                                  integrator.dt *
+                                  alg.a_matrices[alg.num_methods, 1, stage - 2] *
+                                  integrator.k1[i]
         end
     end
     if alg.max_eval_levels[stage] == alg.num_methods
-        for level in (alg.max_eval_levels[stage] + 1):integrator.n_levels
+        for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] += integrator.dt *
-                                           alg.a_matrices[alg.num_methods, 2,
-                                                          stage - 2] *
-                                           integrator.du[i]
+                                       alg.a_matrices[alg.num_methods, 2,
+                                                      stage - 2] *
+                                       integrator.du[i]
             end
         end
     end
-    =#
 
+    #=
     ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
     for level in 1:alg.max_eval_levels[stage]
         @threaded for i in integrator.level_u_indices_elements[level]
@@ -367,6 +369,7 @@ end
                                   integrator.dt * integrator.k1[i] # * A[stage, 1, level] = c[level] = 1
         end
     end
+    =#
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]

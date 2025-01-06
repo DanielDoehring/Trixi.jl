@@ -155,7 +155,7 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_
 # ODE solvers, callbacks etc.
 
 # t_f = 8.0
-tspan = (0.0, 8.0) # As tau_KH = 1.0, this is "nondimensional" time
+tspan = (0.0, 0.5) # As tau_KH = 1.0, this is "nondimensional" time
 
 ode = semidiscretize(semi, tspan)
 

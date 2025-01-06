@@ -772,8 +772,8 @@ function timestep_gravity_PERK2!(cache, u_euler, tau, dtau,
     @threaded for i in 1:n_elements
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
-    @threaded for u_ind in eachindex(du_ode)
-        k_higher[u_ind] = du_ode[u_ind] * dtau
+    @threaded for i in eachindex(du_ode)
+        k_higher[i] = du_ode[i] * dtau
     end
 
     # Higher stages
@@ -782,7 +782,7 @@ function timestep_gravity_PERK2!(cache, u_euler, tau, dtau,
 
         # Construct current state
         @threaded for i in eachindex(u_ode)
-            u_ode_tmp[i] = u_ode[i] + 
+            u_ode_tmp[i] = u_ode[i] +
                            alg.a_matrix[1, stage - 2] * k1[i] +
                            alg.a_matrix[2, stage - 2] * k_higher[i]
         end
@@ -839,8 +839,8 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
     @threaded for i in 1:n_elements
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
-    @threaded for u_ind in eachindex(du_ode)
-        k_higher[u_ind] = du_ode[u_ind] * dtau
+    @threaded for i in eachindex(du_ode)
+        k_higher[i] = du_ode[i] * dtau
     end
 
     # Higher stages
@@ -910,45 +910,45 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
          level_info_elements_acc[1],
          level_info_interfaces_acc[1],
          level_info_boundaries_acc[1],
-         level_info_boundaries_orientation_acc[1],
+         #level_info_boundaries_orientation_acc[1],
          level_info_mortars_acc[1])
 
     @threaded for i in level_info_elements_acc[1]
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
     # Update finest level only
-    @threaded for u_ind in level_u_gravity_indices_elements[1] # Update finest level
-        k_higher[u_ind] = du_ode[u_ind] * dtau
+    @threaded for i in level_u_gravity_indices_elements[1] # Update finest level
+        k_higher[i] = du_ode[i] * dtau
     end
 
     for stage in 3:(alg.num_stages)
         # Loop over different methods with own associated level
         for level in 1:min(alg.num_methods, n_levels)
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] = u_ode[i] +
-                                   alg.a_matrices[level, 1, stage - 2] * k1[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] = u_ode[i] +
+                               alg.a_matrices[level, 1, stage - 2] * k1[i]
             end
         end
         for level in 1:min(alg.max_eval_levels[stage], n_levels)
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] += alg.a_matrices[level, 2, stage - 2] *
-                                    k_higher[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] += alg.a_matrices[level, 2, stage - 2] *
+                                k_higher[i]
             end
         end
 
         # "Remainder": Non-efficiently integrated
         for level in (alg.num_methods + 1):(n_levels)
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] = u_ode[i] +
-                                   alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                   k1[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] = u_ode[i] +
+                               alg.a_matrices[alg.num_methods, 1, stage - 2] *
+                               k1[i]
             end
         end
         if alg.max_eval_levels[stage] == alg.num_methods
             for level in (alg.max_eval_levels[stage] + 1):(n_levels)
-                @threaded for u_ind in level_u_gravity_indices_elements[level]
-                    u_ode_tmp[u_ind] += alg.a_matrices[alg.num_methods, 2, stage - 2] *
-                                        k_higher[u_ind]
+                @threaded for i in level_u_gravity_indices_elements[level]
+                    u_ode_tmp[i] += alg.a_matrices[alg.num_methods, 2, stage - 2] *
+                                    k_higher[i]
                 end
             end
         end
@@ -973,8 +973,8 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
                 @views @. du_gravity[1, .., i] += grav_scale *
                                                   (u_euler[1, .., i] - rho0)
             end
-            @threaded for u_ind in eachindex(du_ode)
-                k_higher[u_ind] = du_ode[u_ind] * dtau
+            @threaded for i in eachindex(du_ode)
+                k_higher[i] = du_ode[i] * dtau
             end
         else
             # Joint RHS evaluation with all elements sharing this timestep
@@ -982,9 +982,8 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
                  level_info_elements_acc[coarsest_lvl],
                  level_info_interfaces_acc[coarsest_lvl],
                  level_info_boundaries_acc[coarsest_lvl],
-                 level_info_boundaries_orientation_acc[coarsest_lvl],
-                 level_info_mortars_acc[coarsest_lvl],
-                 coarsest_lvl)
+                 #level_info_boundaries_orientation_acc[coarsest_lvl],
+                 level_info_mortars_acc[coarsest_lvl])
 
             @threaded for i in level_info_elements_acc[coarsest_lvl]
                 @views @. du_gravity[1, .., i] += grav_scale *
@@ -992,8 +991,8 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
             end
             # Update k_higher of relevant levels
             for level in 1:coarsest_lvl
-                @threaded for u_ind in level_u_gravity_indices_elements[level]
-                    k_higher[u_ind] = du_ode[u_ind] * dtau
+                @threaded for i in level_u_gravity_indices_elements[level]
+                    k_higher[i] = du_ode[i] * dtau
                 end
             end
         end
@@ -1042,17 +1041,17 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau,
     @threaded for i in 1:n_elements
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
-    @threaded for u_ind in eachindex(du_ode)
-        k_higher[u_ind] = du_ode[u_ind] * dtau
+    @threaded for i in eachindex(du_ode)
+        k_higher[i] = du_ode[i] * dtau
     end
 
     ### Stage 3 to S-3 ###
     for stage in 3:(alg.num_stages - 3)
         # Construct current state
-        @threaded for u_ind in eachindex(u_ode)
-            u_ode_tmp[u_ind] = u_ode[u_ind] +
-                               alg.a_matrices[1, stage - 2] * k1[u_ind] +
-                               alg.a_matrices[2, stage - 2] * k_higher[u_ind]
+        @threaded for i in eachindex(u_ode)
+            u_ode_tmp[i] = u_ode[i] +
+                           alg.a_matrices[1, stage - 2] * k1[i] +
+                           alg.a_matrices[2, stage - 2] * k_higher[i]
         end
 
         tau_stage = tau + alg.c[2] * dtau
@@ -1068,10 +1067,10 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau,
 
     ### Last three stages ###
     for stage in 1:2
-        @threaded for u_ind in eachindex(u_ode)
-            u_ode_tmp[u_ind] = u_ode[u_ind] +
-                               alg.a_matrix_constant[1, stage] * k1[u_ind] +
-                               alg.a_matrix_constant[2, stage] * k_higher[u_ind]
+        @threaded for i in eachindex(u_ode)
+            u_ode_tmp[i] = u_ode[i] +
+                           alg.a_matrix_constant[1, stage] * k1[i] +
+                           alg.a_matrix_constant[2, stage] * k_higher[i]
         end
         tau_stage = tau + alg.c[alg.num_stages - 3 + stage] * dtau
 
@@ -1080,8 +1079,8 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau,
         @threaded for i in 1:n_elements
             @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end
-        @threaded for u_ind in eachindex(u_ode)
-            k_higher[u_ind] = du_ode[u_ind] * dtau
+        @threaded for i in eachindex(u_ode)
+            k_higher[i] = du_ode[i] * dtau
         end
     end
 
@@ -1098,11 +1097,11 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau,
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
-    @threaded for u_ind in eachindex(u_ode)
+    @threaded for i in eachindex(u_ode)
         # "Own" PairedExplicitRK based on SSPRK33.
         # Note that 'k_higher' carries the values of K_{S-1}
         # and that we construct 'K_S' "in-place" from 'du_ode'
-        u_ode[u_ind] += 0.5 * (k_higher[u_ind] + du_ode[u_ind] * dtau)
+        u_ode[i] += 0.5 * (k_higher[i] + du_ode[i] * dtau)
     end
 end
 
@@ -1142,18 +1141,18 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
     @threaded for i in 1:n_elements
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
-    @threaded for u_ind in eachindex(du_ode)
-        k_higher[u_ind] = du_ode[u_ind] * dtau
+    @threaded for i in eachindex(du_ode)
+        k_higher[i] = du_ode[i] * dtau
     end
 
     ### Stage 3 to S-3 ###
     for stage in 3:(alg.num_stages - 3)
         # Construct current state
-        @threaded for u_ind in eachindex(u_ode)
+        @threaded for i in eachindex(u_ode)
             # Use finest method
-            u_ode_tmp[u_ind] = u_ode[u_ind] +
-                               alg.a_matrices[1, 1, stage - 2] * k1[u_ind] +
-                               alg.a_matrices[1, 2, stage - 2] * k_higher[u_ind]
+            u_ode_tmp[i] = u_ode[i] +
+                           alg.a_matrices[1, 1, stage - 2] * k1[i] +
+                           alg.a_matrices[1, 2, stage - 2] * k_higher[i]
         end
 
         tau_stage = tau + alg.c[2] * dtau
@@ -1169,10 +1168,10 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
 
     ### Last three stages ###
     for stage in 1:2
-        @threaded for u_ind in eachindex(u_ode)
-            u_ode_tmp[u_ind] = u_ode[u_ind] +
-                               alg.a_matrix_constant[1, stage] * k1[u_ind] +
-                               alg.a_matrix_constant[2, stage] * k_higher[u_ind]
+        @threaded for i in eachindex(u_ode)
+            u_ode_tmp[i] = u_ode[i] +
+                           alg.a_matrix_constant[1, stage] * k1[i] +
+                           alg.a_matrix_constant[2, stage] * k_higher[i]
         end
         tau_stage = tau + alg.c[alg.num_stages - 3 + stage] * dtau
 
@@ -1181,8 +1180,8 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
         @threaded for i in 1:n_elements
             @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end
-        @threaded for u_ind in eachindex(u_ode)
-            k_higher[u_ind] = du_ode[u_ind] * dtau
+        @threaded for i in eachindex(u_ode)
+            k_higher[i] = du_ode[i] * dtau
         end
     end
 
@@ -1199,11 +1198,11 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
-    @threaded for u_ind in eachindex(u_ode)
+    @threaded for i in eachindex(u_ode)
         # "Own" PairedExplicitRK based on SSPRK33.
         # Note that 'k_higher' carries the values of K_{S-1}
         # and that we construct 'K_S' "in-place" from 'du_ode'
-        u_ode[u_ind] += 0.5 * (k_higher[u_ind] + du_ode[u_ind] * dtau)
+        u_ode[i] += 0.5 * (k_higher[i] + du_ode[i] * dtau)
     end
 end
 
@@ -1251,8 +1250,8 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
     end
 
     # Update finest level only
-    @threaded for u_ind in level_u_gravity_indices_elements[1]
-        k_higher[u_ind] = du_ode[u_ind] * dtau
+    @threaded for i in level_u_gravity_indices_elements[1]
+        k_higher[i] = du_ode[i] * dtau
     end
 
     for stage in 3:(alg.num_stages - 3)
@@ -1260,31 +1259,31 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
         ### General implementation: Not own method for each grid level ###
         # Loop over different methods with own associated level
         for level in 1:min(alg.num_methods, n_levels)
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] = u_ode[u_ind] +
-                                   alg.a_matrices[level, 1, stage - 2] * k1[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] = u_ode[i] +
+                               alg.a_matrices[level, 1, stage - 2] * k1[i]
             end
         end
         for level in 1:min(alg.max_eval_levels[stage], n_levels)
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] += alg.a_matrices[level, 2, stage - 2] *
-                                    k_higher[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] += alg.a_matrices[level, 2, stage - 2] *
+                                k_higher[i]
             end
         end
 
         # "Remainder": Non-efficiently integrated
         for level in (alg.num_methods + 1):(n_levels)
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] = u_ode[u_ind] +
-                                   alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                   k1[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] = u_ode[i] +
+                               alg.a_matrices[alg.num_methods, 1, stage - 2] *
+                               k1[i]
             end
         end
         if alg.max_eval_levels[stage] == alg.num_methods
             for level in (alg.max_eval_levels[stage] + 1):(n_levels)
-                @threaded for u_ind in level_u_gravity_indices_elements[level]
-                    u_ode_tmp[u_ind] += alg.a_matrices[alg.num_methods, 2, stage - 2] *
-                                        k_higher[u_ind]
+                @threaded for i in level_u_gravity_indices_elements[level]
+                    u_ode_tmp[i] += alg.a_matrices[alg.num_methods, 2, stage - 2] *
+                                    k_higher[i]
                 end
             end
         end
@@ -1292,13 +1291,13 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
         ### Simplified implementation: Own method for each level ###
         #=
         for level in 1:n_levels
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] = u_ode[u_ind] + alg.a_matrices[level, 1, stage - 2] * k1[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] = u_ode[i] + alg.a_matrices[level, 1, stage - 2] * k1[i]
             end
         end
         for level in 1:alg.max_eval_levels[stage]
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] += alg.a_matrices[level, 2, stage - 2] * k_higher[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] += alg.a_matrices[level, 2, stage - 2] * k_higher[i]
             end
         end
         =#
@@ -1306,14 +1305,14 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
         #=
         ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
         for level in 1:alg.max_eval_levels[stage]
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] = u_ode[u_ind] + alg.a_matrices[level, 1, stage - 2] * k1[u_ind] + 
-                                                  alg.a_matrices[level, 2, stage - 2] * k_higher[u_ind]
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] = u_ode[i] + alg.a_matrices[level, 1, stage - 2] * k1[i] + 
+                                                  alg.a_matrices[level, 2, stage - 2] * k_higher[i]
             end
         end
         for level in alg.max_eval_levels[stage]+1:n_levels
-            @threaded for u_ind in level_u_gravity_indices_elements[level]
-                u_ode_tmp[u_ind] = u_ode[u_ind] + k1[u_ind] # * A[level, 1, stage] = c[level] = 1
+            @threaded for i in level_u_gravity_indices_elements[level]
+                u_ode_tmp[i] = u_ode[i] + k1[i] # * A[level, 1, stage] = c[level] = 1
             end
         end
         =#
@@ -1338,8 +1337,8 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
                 @views @. du_gravity[1, .., i] += grav_scale *
                                                   (u_euler[1, .., i] - rho0)
             end
-            @threaded for u_ind in eachindex(du_ode)
-                k_higher[u_ind] = du_ode[u_ind] * dtau
+            @threaded for i in eachindex(du_ode)
+                k_higher[i] = du_ode[i] * dtau
             end
         else
             # Joint RHS evaluation with all elements sharing this timestep
@@ -1356,8 +1355,8 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
             end
             # Update k_higher of relevant levels
             for level in 1:coarsest_lvl
-                @threaded for u_ind in level_u_gravity_indices_elements[level]
-                    k_higher[u_ind] = du_ode[u_ind] * dtau
+                @threaded for i in level_u_gravity_indices_elements[level]
+                    k_higher[i] = du_ode[i] * dtau
                 end
             end
         end
@@ -1365,10 +1364,10 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
 
     ### Last three stages ###
     for stage in 1:2
-        @threaded for u_ind in eachindex(u_ode)
-            u_ode_tmp[u_ind] = u_ode[u_ind] +
-                               alg.a_matrix_constant[1, stage] * k1[u_ind] +
-                               alg.a_matrix_constant[2, stage] * k_higher[u_ind]
+        @threaded for i in eachindex(u_ode)
+            u_ode_tmp[i] = u_ode[i] +
+                           alg.a_matrix_constant[1, stage] * k1[i] +
+                           alg.a_matrix_constant[2, stage] * k_higher[i]
         end
         tau_stage = tau + alg.c[alg.num_stages - 3 + stage] * dtau
 
@@ -1377,8 +1376,8 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
         @threaded for i in 1:n_elements
             @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end
-        @threaded for u_ind in eachindex(u_ode)
-            k_higher[u_ind] = du_ode[u_ind] * dtau
+        @threaded for i in eachindex(u_ode)
+            k_higher[i] = du_ode[i] * dtau
         end
     end
 
@@ -1395,11 +1394,11 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
         @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
-    @threaded for u_ind in eachindex(u_ode)
+    @threaded for i in eachindex(u_ode)
         # "Own" PairedExplicitRK based on SSPRK33.
         # Note that 'k_higher' carries the values of K_{S-1}
         # and that we construct 'K_S' "in-place" from 'du_ode'
-        u_ode[u_ind] += 0.5 * (k_higher[u_ind] + du_ode[u_ind] * dtau)
+        u_ode[i] += 0.5 * (k_higher[i] + du_ode[i] * dtau)
     end
 end
 
@@ -1437,32 +1436,34 @@ end
 @inline function (amr_callback::AMRCallback)(u_ode,
                                              semi::SemidiscretizationEulerGravity,
                                              t, iter; kwargs...)
-    passive_args = ((semi.cache.u_ode,
+    @unpack cache = semi
+    passive_args = ((cache.u_ode,
                      mesh_equations_solver_cache(semi.semi_gravity)...),)
     has_changed = amr_callback(u_ode, mesh_equations_solver_cache(semi.semi_euler)...,
                                semi, t, iter;
                                kwargs..., passive_args = passive_args)
 
     if has_changed
-        new_length = length(u_ode)
+        new_length = length(cache.u_ode)
         resize!(cache.du_ode, new_length)
 
+        fields_cache = fieldnames(typeof(cache))
         # 2N, 3S* integrators
-        if :u_tmp1_ode in fieldnames(typeof(cache))
+        if :u_tmp1_ode in fields_cache
             resize!(cache.u_tmp1_ode, new_length)
         end
-        if :u_tmp2_ode in fieldnames(typeof(cache))
+        if :u_tmp2_ode in fields_cache
             resize!(cache.u_tmp2_ode, new_length)
         end
         # TODO: Revisit!
         # PERK integrators
-        if :u_ode_tmp in fieldnames(typeof(cache))
+        if :u_ode_tmp in fields_cache
             resize!(cache.u_ode_tmp, new_length)
         end
-        if :k1 in fieldnames(typeof(cache))
+        if :k1 in fields_cache
             resize!(cache.k1, new_length)
         end
-        if :k_higher in fieldnames(typeof(cache))
+        if :k_higher in fields_cache
             resize!(cache.k_higher, new_length)
         end
     end

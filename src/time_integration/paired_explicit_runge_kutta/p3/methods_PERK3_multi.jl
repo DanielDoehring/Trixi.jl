@@ -5,9 +5,10 @@
 @muladd begin
 #! format: noindent
 
-function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::Int,
-                                           base_path_a_coeffs::AbstractString,
-                                           cS2::Float64)
+function compute_PairedExplicitRK3Multi_butcher_tableau(stages::Vector{Int64},
+                                                        num_stages::Int,
+                                                        base_path_a_coeffs::AbstractString,
+                                                        cS2::Float64)
 
     # c Vector form Butcher Tableau (defines timestep per stage)
     c = PERK3_compute_c_coeffs(num_stages, cS2)
@@ -35,14 +36,21 @@ function ComputePERK3_Multi_ButcherTableau(stages::Vector{Int64}, num_stages::In
 
     for level in eachindex(stages)
         num_stage_evals = stages[level]
-        path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * "_" *
-                        string(num_stages) * ".txt"
-        A = readdlm(path_a_coeffs, Float64)
-        num_a_coeffs = size(A, 1)
-        @assert num_a_coeffs == num_stage_evals - 2
 
-        a_matrices[level, 1, (num_coeffs_max - num_stage_evals + 3):end] -= A
-        a_matrices[level, 2, (num_coeffs_max - num_stage_evals + 3):end] = A
+        if num_stage_evals > 3
+            path_a_coeffs = base_path_a_coeffs * "a_" * string(num_stage_evals) * "_" *
+                            string(num_stages) * ".txt"
+
+            @assert isfile(path_a_coeffs) "Couldn't find file $path_a_coeffs"
+            A = readdlm(path_a_coeffs, Float64)
+            num_a_coeffs = size(A, 1)
+            @assert num_a_coeffs == num_stage_evals - 2
+
+            a_matrices[level, 1, (num_coeffs_max - num_stage_evals + 3):end] -= A
+            a_matrices[level, 2, (num_coeffs_max - num_stage_evals + 3):end] = A
+        else
+            num_a_coeffs = 0
+        end
 
         # Add active levels to stages
         for stage in num_stages:-1:(num_stages - num_a_coeffs)
@@ -85,10 +93,10 @@ function PairedExplicitRK3Multi(stages::Vector{Int64},
     a_matrices, c,
     active_levels,
     max_active_levels,
-    max_eval_levels = ComputePERK3_Multi_ButcherTableau(stages,
-                                                        num_stages,
-                                                        base_path_a_coeffs,
-                                                        cS2)
+    max_eval_levels = compute_PairedExplicitRK3Multi_butcher_tableau(stages,
+                                                                     num_stages,
+                                                                     base_path_a_coeffs,
+                                                                     cS2)
 
     return PairedExplicitRK3Multi(minimum(stages), length(stages), num_stages,
                                   dt_ratios,
