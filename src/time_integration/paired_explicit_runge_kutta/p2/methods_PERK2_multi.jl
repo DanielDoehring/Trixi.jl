@@ -88,7 +88,7 @@ end
 
 function PairedExplicitRK2Multi(stages::Vector{Int64},
                                 base_path_mon_coeffs::AbstractString,
-                                dt_ratios,
+                                dt_ratios;
                                 bS = 1.0, cS = 0.5)
     num_stages = maximum(stages)
 

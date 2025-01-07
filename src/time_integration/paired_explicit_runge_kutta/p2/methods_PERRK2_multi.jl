@@ -18,9 +18,9 @@ function PairedExplicitRelaxationRK2Multi(stages::Vector{Int64},
                                           relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK2Multi{typeof(relaxation_solver)}(PairedExplicitRK2Multi(stages,
                                                                                               base_path_mon_coeffs,
-                                                                                              dt_ratios,
-                                                                                              bS,
-                                                                                              cS),
+                                                                                              dt_ratios;
+                                                                                              bS = bS,
+                                                                                              cS = cS),
                                                                        relaxation_solver)
 end
 

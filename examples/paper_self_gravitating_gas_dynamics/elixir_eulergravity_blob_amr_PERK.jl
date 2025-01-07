@@ -120,22 +120,16 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity,
 
 base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/"
 
-b1 = 0.0
-bS = 1.0 - b1
-cEnd = 0.5 / bS
-
 dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
 
 cfl_gravity = 1.4
-alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/",
-                                           dtRatios, bS, cEnd)
+alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
 
-#=
+
 cfl_gravity = 1.4
-alg_gravity = PERK(5, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/HypDiff/p2/",
-                   bS, cEnd)                         
-=#
+alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")                         
+
 
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
@@ -143,8 +137,8 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
 
-                                    #timestep_gravity = timestep_gravity_PERK2!
-                                    timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK2!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)

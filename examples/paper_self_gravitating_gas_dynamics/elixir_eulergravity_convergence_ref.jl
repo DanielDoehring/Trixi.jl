@@ -58,39 +58,33 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 =#
 
+# NOTE: CFL numbers not necessarily at stability limit!
+
+base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/"
+dtRatios = [1, 0.5, 0.25]
+
 #=
 Stages_Gravity = 9
-cfl_gravity = 1.1 # NOTE: Probably not at stability limit 
-alg_gravity = PERK4(Stages_Gravity, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/")
+cfl_gravity = 1.1
+alg_gravity = Trixi.PairedExplicitRK4(Stages_Gravity, base_path * "HypDiff/p4/")
 =#
 
 
 Stages_Gravity = [9, 7, 5]
-dtRatios = [1, 0.5, 0.25]
-cfl_gravity = 1.1 # NOTE: Probably not at stability limit 
-
 cfl_gravity = 0.9
 
-alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, 
-                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p4/", 
-                          dtRatios)
+alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/p4/", dtRatios)
 
 
-#=
-b1   = 0.0
-bS   = 1.0 - b1
-cEnd = 0.5/bS
 
 Stages_Gravity = [5, 3, 2]
-dtRatios = [1, 0.5, 0.25]
 
-#cfl_gravity = 1.5 # NOTE: Probably not at stability limit 
-cfl_gravity = 0.3
+cfl_gravity = 0.5 # Multi
+#cfl_gravity = 2.0 # Single
 
-alg_gravity = PERK_Multi(Stages_Gravity, 
-                          "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/HypDiff/p2/", 
-                          dtRatios, bS, cEnd)
-=#
+alg_gravity = Trixi.PairedExplicitRK2Multi(Stages_Gravity, base_path * "HypDiff/p2/", dtRatios)
+#alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
+
 
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # rho0 is (ab)used to add a "+8π" term to the source terms
@@ -100,10 +94,11 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     resid_tol = 1.0e-5, # 1.0e-10
                                     n_iterations_max = 1000, # 1000
 
-                                    #timestep_gravity = timestep_gravity_PERK4!
-                                    timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK4!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!
 
-                                    #timestep_gravity = timestep_gravity_PERK2_Multi!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK2!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -115,8 +110,10 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-stepsize_callback = StepsizeCallback(cfl = 2.2) # CarpenterKennedy2N54
-stepsize_callback = StepsizeCallback(cfl = 3.0) # PERK8 NOTE: Needs maybe to reduced further for long convergence study
+cfl_euler = 3.0 # PERK4 + PERK2
+cfl_euler = 3.0 # PERK4 + PERK4
+
+stepsize_callback = StepsizeCallback(cfl = cfl_euler) # PERK8 NOTE: Needs maybe to reduced further for long convergence study
 
 save_solution = SaveSolutionCallback(interval = 10,
                                      save_initial_solution = true,
@@ -130,7 +127,6 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true)
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
-                        #save_solution,
                         analysis_callback, alive_callback)
 
 ###############################################################################
@@ -141,22 +137,14 @@ Stages = 8
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
 =#
 
-
-dtRatios = [1, 0.5, 0.25]
 Stages = [8, 6, 5]
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/", dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler/", dtRatios)
 
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
-
-#=
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-=#
 
 summary_callback() # print the timer summary
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)
