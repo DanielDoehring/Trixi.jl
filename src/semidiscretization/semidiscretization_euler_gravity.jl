@@ -168,15 +168,13 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
     u_ode = compute_coefficients(zero(real(semi_gravity)), semi_gravity)
     du_ode = similar(u_ode)
     u_ode_tmp = similar(u_ode)
-    # TODO: Revisit which registers are needed for PERK!
     k1 = similar(u_ode)
-    k_higher = similar(u_ode)
 
     # Association of unknowns of the gravity solver to levels
     level_u_gravity_indices_elements = [Vector{Int64}()
                                         for _ in 1:get_n_levels(semi_euler.mesh)]
 
-    cache = (; alg, u_ode, du_ode, u_ode_tmp, k1, k_higher,
+    cache = (; alg, u_ode, du_ode, u_ode_tmp, k1,
              level_u_gravity_indices_elements)
 
     SemidiscretizationEulerGravity{typeof(semi_euler), typeof(semi_gravity),
@@ -329,9 +327,6 @@ end
         end
         if :k1 in fields_cache
             resize!(cache.k1, new_length)
-        end
-        if :k_higher in fields_cache
-            resize!(cache.k_higher, new_length)
         end
     end
 
@@ -818,6 +813,24 @@ end
     rhs!(du, u_tmp, semi_gravity, tau + alg.c[2] * dtau)
 end
 
+@inline function PERK_k2!(du, u_tmp, u, k1, semi_gravity, dtau, tau, alg,
+                          level_info_elements_acc,
+                          level_info_interfaces_acc,
+                          level_info_boundaries_acc,
+                          #level_info_boundaries_orientation_acc,
+                          level_info_mortars_acc)
+    @threaded for i in eachindex(u)
+        u_tmp[i] = u[i] + alg.c[2] * dtau * k1[i]
+    end
+
+    rhs!(du, u_tmp, semi_gravity, tau + alg.c[2] * dtau,
+         level_info_elements_acc[1],
+         level_info_interfaces_acc[1],
+         level_info_boundaries_acc[1],
+         #level_info_boundaries_orientation_acc[1],
+         level_info_mortars_acc[1])
+end
+
 @inline function PERK_ki!(du, u_tmp, u, k1, semi_gravity, dtau, tau, alg, stage)
     # Construct current state
     @threaded for i in eachindex(u)
@@ -841,6 +854,102 @@ end
     end
 
     rhs!(du, u_tmp, semi_gravity, tau + alg.c[stage] * dtau)
+end
+
+@inline function PERKMulti_intermediate_stage!(du, u_tmp, u, k1, dtau, alg, stage,
+                                               level_u_indices_elements, n_levels)
+    ### General implementation: Not own method for each grid level ###
+    # Loop over different methods with own associated level
+
+    for level in 1:min(alg.num_methods, n_levels)
+        @threaded for i in level_u_indices_elements[level]
+            u_tmp[i] = u[i] +
+                       dtau * alg.a_matrices[level, 1, stage - 2] * k1[i]
+        end
+    end
+    for level in 1:min(alg.max_eval_levels[stage], n_levels)
+        @threaded for i in level_u_indices_elements[level]
+            u_tmp[i] += dtau * alg.a_matrices[level, 2, stage - 2] * du[i]
+        end
+    end
+
+    # "Remainder": Non-efficiently integrated
+    for level in (alg.num_methods + 1):(n_levels)
+        @threaded for i in level_u_indices_elements[level]
+            u_tmp[i] = u[i] +
+                       dtau * alg.a_matrices[alg.num_methods, 1, stage - 2] * k1[i]
+        end
+    end
+    if alg.max_eval_levels[stage] == alg.num_methods
+        for level in (alg.max_eval_levels[stage] + 1):n_levels
+            @threaded for i in level_u_indices_elements[level]
+                u_tmp[i] += dtau * alg.a_matrices[alg.num_methods, 2, stage - 2] * du[i]
+            end
+        end
+    end
+
+    ### Simplified implementation: Own method for each level ###
+    #=
+    for level in 1:n_levels
+        @threaded for i in level_u_indices_elements[level]
+            u_tmp[i] = u[i] + dtau * alg.a_matrices[level, 1, stage - 2] * k1[i]
+        end
+    end
+    for level in 1:alg.max_eval_levels[stage]
+        @threaded for i in level_u_indices_elements[level]
+            u_tmp[i] += dtau * alg.a_matrices[level, 2, stage - 2] * du[i]
+        end
+    end
+    =#
+
+    # For statically non-uniform meshes/characteristic speeds
+    #coarsest_lvl = alg.max_active_levels[stage]
+
+    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+    coarsest_lvl = min(alg.max_active_levels[stage], n_levels)
+
+    return coarsest_lvl
+end
+
+@inline function PERK_ki!(du, u_tmp, u, k1, semi_gravity, dtau, tau, alg, stage,
+                          level_info_elements_acc,
+                          level_info_interfaces_acc,
+                          level_info_boundaries_acc,
+                          #level_info_boundaries_orientation_acc,
+                          level_info_mortars_acc,
+                          level_u_indices_elements,
+                          n_levels,
+                          n_elements, grav_scale, rho0, u_euler)
+    coarsest_lvl = PERKMulti_intermediate_stage!(du, u_tmp, u, k1, dtau, alg, stage,
+                                                 level_u_indices_elements, n_levels)
+
+    du_wrap = wrap_array(du, semi_gravity)
+
+    # Check if there are fewer integrators than grid levels (non-optimal method)
+    if coarsest_lvl == alg.num_methods
+        # NOTE: This is supposedly more efficient than setting
+        #integrator.coarsest_lvl = integrator.n_levels
+        # and then using the level-dependent version
+
+        rhs!(du, u_tmp, semi_gravity, tau + alg.c[stage] * dtau)
+
+        @threaded for i in 1:n_elements
+            @views @. du_wrap[1, .., i] += grav_scale *
+                                           (u_euler[1, .., i] - rho0)
+        end
+    else
+        rhs!(du, u_tmp, semi_gravity, tau + alg.c[stage] * dtau,
+             level_info_elements_acc[coarsest_lvl],
+             level_info_interfaces_acc[coarsest_lvl],
+             level_info_boundaries_acc[coarsest_lvl],
+             #level_info_boundaries_orientation_acc[coarsest_lvl],
+             level_info_mortars_acc[coarsest_lvl])
+
+        @threaded for i in level_info_elements_acc[coarsest_lvl]
+            @views @. du_wrap[1, .., i] += grav_scale *
+                                           (u_euler[1, .., i] - rho0)
+        end
+    end
 end
 
 @inline function PERK4_kS2_to_kS!(du, u_tmp, u, k1, semi_gravity, dtau, tau, alg,
@@ -871,9 +980,7 @@ end
     end
 
     # Store K_{S-1} in `k1`:
-    @threaded for i in eachindex(u)
-        k1[i] = du[i]
-    end
+    k1 .= du
 
     rhs!(du, u_tmp, semi_gravity, tau + alg.c[alg.num_stages] * dtau)
     @threaded for i in 1:n_elements
@@ -911,7 +1018,6 @@ function timestep_gravity_PERK2!(cache, u_euler, tau, dtau,
         @views @. du_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
-    # Higher stages
     for stage in 3:(alg.num_stages)
         PERK_ki!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg, stage)
         @threaded for i in 1:n_elements
@@ -921,6 +1027,8 @@ function timestep_gravity_PERK2!(cache, u_euler, tau, dtau,
 
     @threaded for i in eachindex(u_ode)
         u_ode[i] += dtau * (alg.b1 * k1[i] + alg.bS * du_ode[i])
+        # Slightly more performant, hard-coded version for b1 = 0
+        #u_ode[i] += dtau * du_ode[i]
     end
 end
 
@@ -957,125 +1065,46 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
     grav_scale = -4 * G * pi
 
     # `u_ode` is `u_gravity` in coupled RHS above!
-    @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
-
-    tau_stage = tau # + dtau * c[1] = dtau * 0
-    ### Stage 1 ###
-    rhs!(du_ode, u_ode, semi_gravity, tau_stage)
+    @unpack alg, u_ode, du_ode, u_ode_tmp, k1 = cache
 
     n_elements = size(u_euler)[end]
-    @threaded for i in 1:n_elements
-        @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
-    end
+    du_wrap = wrap_array(du_ode, semi_gravity)
+    k1_wrap = wrap_array(k1, semi_gravity)
+
+    PERK_k1!(k1, u_ode, semi_gravity, tau)
     # Stage contains source from other semidiscretization, i.e., Euler.
-    @threaded for i in eachindex(du_ode)
-        k1[i] = du_ode[i] * dtau
+    @threaded for i in 1:n_elements
+        @views @. k1_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
-    tau_stage = tau + alg.c[2] * dtau
-    ### Stage 2 ###
-    @threaded for i in eachindex(u_ode)
-        u_ode_tmp[i] = u_ode[i] + alg.c[2] * k1[i]
-    end
-
-    rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage,
-         level_info_elements_acc[1],
-         level_info_interfaces_acc[1],
-         level_info_boundaries_acc[1],
-         #level_info_boundaries_orientation_acc[1],
-         level_info_mortars_acc[1])
+    PERK_k2!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg,
+             level_info_elements_acc,
+             level_info_interfaces_acc,
+             level_info_boundaries_acc,
+             #level_info_boundaries_orientation_acc,
+             level_info_mortars_acc)
 
     @threaded for i in level_info_elements_acc[1]
-        @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
-    end
-    # Update finest level only
-    @threaded for i in level_u_gravity_indices_elements[1] # Update finest level
-        k_higher[i] = du_ode[i] * dtau
+        @views @. du_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
     for stage in 3:(alg.num_stages)
-        # Loop over different methods with own associated level
-        for level in 1:min(alg.num_methods, n_levels)
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] = u_ode[i] +
-                               alg.a_matrices[level, 1, stage - 2] * k1[i]
-            end
-        end
-        for level in 1:min(alg.max_eval_levels[stage], n_levels)
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] += alg.a_matrices[level, 2, stage - 2] *
-                                k_higher[i]
-            end
-        end
-
-        # "Remainder": Non-efficiently integrated
-        for level in (alg.num_methods + 1):(n_levels)
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] = u_ode[i] +
-                               alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                               k1[i]
-            end
-        end
-        if alg.max_eval_levels[stage] == alg.num_methods
-            for level in (alg.max_eval_levels[stage] + 1):(n_levels)
-                @threaded for i in level_u_gravity_indices_elements[level]
-                    u_ode_tmp[i] += alg.a_matrices[alg.num_methods, 2, stage - 2] *
-                                    k_higher[i]
-                end
-            end
-        end
-
-        tau_stage = tau + alg.c[stage] * dtau
-
-        # For statically non-uniform meshes/characteristic speeds:
-        #coarsest_lvl = alg.max_active_levels[stage]
-
-        # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-        coarsest_lvl = min(alg.max_active_levels[stage], n_levels)
-
-        # Check if there are fewer integrators than grid levels (non-optimal method)
-        if coarsest_lvl == alg.num_methods
-            # NOTE: This is supposedly more efficient than setting
-            #coarsest_lvl = n_levels
-            # and then using the level-dependent version
-
-            rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage)
-
-            @threaded for i in 1:n_elements
-                @views @. du_gravity[1, .., i] += grav_scale *
-                                                  (u_euler[1, .., i] - rho0)
-            end
-            @threaded for i in eachindex(du_ode)
-                k_higher[i] = du_ode[i] * dtau
-            end
-        else
-            # Joint RHS evaluation with all elements sharing this timestep
-            rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage,
-                 level_info_elements_acc[coarsest_lvl],
-                 level_info_interfaces_acc[coarsest_lvl],
-                 level_info_boundaries_acc[coarsest_lvl],
-                 #level_info_boundaries_orientation_acc[coarsest_lvl],
-                 level_info_mortars_acc[coarsest_lvl])
-
-            @threaded for i in level_info_elements_acc[coarsest_lvl]
-                @views @. du_gravity[1, .., i] += grav_scale *
-                                                  (u_euler[1, .., i] - rho0)
-            end
-            # Update k_higher of relevant levels
-            for level in 1:coarsest_lvl
-                @threaded for i in level_u_gravity_indices_elements[level]
-                    k_higher[i] = du_ode[i] * dtau
-                end
-            end
-        end
+        PERK_ki!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg, stage,
+                 level_info_elements_acc,
+                 level_info_interfaces_acc,
+                 level_info_boundaries_acc,
+                 #level_info_boundaries_orientation_acc,
+                 level_info_mortars_acc,
+                 level_u_gravity_indices_elements,
+                 n_levels,
+                 n_elements, grav_scale, rho0, u_euler)
     end
 
     # u_{n+1} = u_n + b_S * k_S = u_n + 1 * k_S
     @threaded for i in eachindex(u_ode)
-        u_ode[i] += alg.b1 * k1[i] + alg.bS * k_higher[i]
+        u_ode[i] += dtau * (alg.b1 * k1[i] + alg.bS * du_ode[i])
         # Slightly more performant, hard-coded version for b1 = 0
-        #u_ode[i] += k_higher[i]
+        #u_ode[i] += dtau * du_ode[i]
     end
 end
 
@@ -1103,7 +1132,6 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau,
         @views @. du_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
-    ### Stage 3 to S-3 ###
     for stage in 3:(alg.num_stages - 3)
         PERK_ki!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg, stage)
         @threaded for i in 1:n_elements
@@ -1148,188 +1176,42 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
     grav_scale = -4 * G * pi
 
     # `u_ode` is `u_gravity` in coupled RHS above!
-    @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
-
-    tau_stage = tau # + dtau * c[1] = dtau * 0
-    ### Stage 1 ###
-    rhs!(du_ode, u_ode, semi_gravity, tau_stage)
+    @unpack alg, u_ode, du_ode, u_ode_tmp, k1 = cache
 
     n_elements = size(u_euler)[end]
+    du_wrap = wrap_array(du_ode, semi_gravity)
+    k1_wrap = wrap_array(k1, semi_gravity)
+
+    PERK_k1!(k1, u_ode, semi_gravity, tau)
     # Stage contains source from other semidiscretization, i.e., Euler.
     @threaded for i in 1:n_elements
-        @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
-    end
-    @threaded for i in eachindex(du_ode)
-        k1[i] = du_ode[i] * dtau
+        @views @. k1_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
-    ### Stage 2 ###
-    @threaded for i in eachindex(u_ode)
-        u_ode_tmp[i] = u_ode[i] + alg.c[2] * k1[i]
-    end
-
-    rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage,
-         level_info_elements_acc[1],
-         level_info_interfaces_acc[1],
-         level_info_boundaries_acc[1],
-         #level_info_boundaries_orientation_acc[1],
-         level_info_mortars_acc[1])
+    PERK_k2!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg,
+             level_info_elements_acc,
+             level_info_interfaces_acc,
+             level_info_boundaries_acc,
+             #level_info_boundaries_orientation_acc,
+             level_info_mortars_acc)
 
     @threaded for i in level_info_elements_acc[1]
-        @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
-    end
-
-    # Update finest level only
-    @threaded for i in level_u_gravity_indices_elements[1]
-        k_higher[i] = du_ode[i] * dtau
+        @views @. du_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
     end
 
     for stage in 3:(alg.num_stages - 3)
-
-        ### General implementation: Not own method for each grid level ###
-        # Loop over different methods with own associated level
-        for level in 1:min(alg.num_methods, n_levels)
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] = u_ode[i] +
-                               alg.a_matrices[level, 1, stage - 2] * k1[i]
-            end
-        end
-        for level in 1:min(alg.max_eval_levels[stage], n_levels)
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] += alg.a_matrices[level, 2, stage - 2] *
-                                k_higher[i]
-            end
-        end
-
-        # "Remainder": Non-efficiently integrated
-        for level in (alg.num_methods + 1):(n_levels)
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] = u_ode[i] +
-                               alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                               k1[i]
-            end
-        end
-        if alg.max_eval_levels[stage] == alg.num_methods
-            for level in (alg.max_eval_levels[stage] + 1):(n_levels)
-                @threaded for i in level_u_gravity_indices_elements[level]
-                    u_ode_tmp[i] += alg.a_matrices[alg.num_methods, 2, stage - 2] *
-                                    k_higher[i]
-                end
-            end
-        end
-
-        ### Simplified implementation: Own method for each level ###
-        #=
-        for level in 1:n_levels
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] = u_ode[i] + alg.a_matrices[level, 1, stage - 2] * k1[i]
-            end
-        end
-        for level in 1:alg.max_eval_levels[stage]
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] += alg.a_matrices[level, 2, stage - 2] * k_higher[i]
-            end
-        end
-        =#
-
-        #=
-        ### Optimized implementation for case: Own method for each level with c[i] = 1.0, i = 2, S - 4
-        for level in 1:alg.max_eval_levels[stage]
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] = u_ode[i] + alg.a_matrices[level, 1, stage - 2] * k1[i] + 
-                                                  alg.a_matrices[level, 2, stage - 2] * k_higher[i]
-            end
-        end
-        for level in alg.max_eval_levels[stage]+1:n_levels
-            @threaded for i in level_u_gravity_indices_elements[level]
-                u_ode_tmp[i] = u_ode[i] + k1[i] # * A[level, 1, stage] = c[level] = 1
-            end
-        end
-        =#
-
-        tau_stage = tau + alg.c[stage] * dtau
-
-        # For statically non-uniform meshes/characteristic speeds
-        #coarsest_lvl = alg.max_active_levels[stage]
-
-        # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-        coarsest_lvl = min(alg.max_active_levels[stage], n_levels)
-
-        # Check if there are fewer integrators than grid levels (non-optimal method)
-        if coarsest_lvl == alg.num_methods
-            # NOTE: This is supposedly more efficient than setting
-            #coarsest_lvl = n_levels
-            # and then using the level-dependent version
-
-            rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage)
-
-            @threaded for i in 1:n_elements
-                @views @. du_gravity[1, .., i] += grav_scale *
-                                                  (u_euler[1, .., i] - rho0)
-            end
-            @threaded for i in eachindex(du_ode)
-                k_higher[i] = du_ode[i] * dtau
-            end
-        else
-            # Joint RHS evaluation with all elements sharing this timestep
-            rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage,
-                 level_info_elements_acc[coarsest_lvl],
-                 level_info_interfaces_acc[coarsest_lvl],
-                 level_info_boundaries_acc[coarsest_lvl],
-                 #level_info_boundaries_orientation_acc[coarsest_lvl],
-                 level_info_mortars_acc[coarsest_lvl])
-
-            @threaded for i in level_info_elements_acc[coarsest_lvl]
-                @views @. du_gravity[1, .., i] += grav_scale *
-                                                  (u_euler[1, .., i] - rho0)
-            end
-            # Update k_higher of relevant levels
-            for level in 1:coarsest_lvl
-                @threaded for i in level_u_gravity_indices_elements[level]
-                    k_higher[i] = du_ode[i] * dtau
-                end
-            end
-        end
-    end # end loop over different stages
-
-    ### Last three stages ###
-    for stage in 1:2
-        @threaded for i in eachindex(u_ode)
-            u_ode_tmp[i] = u_ode[i] +
-                           alg.a_matrix_constant[1, stage] * k1[i] +
-                           alg.a_matrix_constant[2, stage] * k_higher[i]
-        end
-        tau_stage = tau + alg.c[alg.num_stages - 3 + stage] * dtau
-
-        rhs!(du_ode, u_ode_tmp, semi_gravity, tau_stage)
-
-        @threaded for i in 1:n_elements
-            @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
-        end
-        @threaded for i in eachindex(u_ode)
-            k_higher[i] = du_ode[i] * dtau
-        end
+        PERK_ki!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg, stage,
+                 level_info_elements_acc,
+                 level_info_interfaces_acc,
+                 level_info_boundaries_acc,
+                 #level_info_boundaries_orientation_acc,
+                 level_info_mortars_acc,
+                 level_u_gravity_indices_elements,
+                 n_levels,
+                 n_elements, grav_scale, rho0, u_euler)
     end
 
-    # Last stage
-    @threaded for i in eachindex(du_ode)
-        u_ode_tmp[i] = u_ode[i] +
-                       alg.a_matrix_constant[1, 3] * k1[i] +
-                       alg.a_matrix_constant[2, 3] * k_higher[i]
-    end
-
-    rhs!(du_ode, u_ode_tmp, semi_gravity, tau + alg.c[alg.num_stages] * dtau)
-
-    @threaded for i in 1:n_elements
-        @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
-    end
-
-    @threaded for i in eachindex(u_ode)
-        # "Own" PairedExplicitRK based on SSPRK33.
-        # Note that 'k_higher' carries the values of K_{S-1}
-        # and that we construct 'K_S' "in-place" from 'du_ode'
-        u_ode[i] += 0.5 * (k_higher[i] + du_ode[i] * dtau)
-    end
+    PERK4_kS2_to_kS!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg,
+                     n_elements, grav_scale, rho0, u_euler)
 end
 end # @muladd

@@ -76,7 +76,7 @@ cfl_gravity = 0.9
 alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/p4/", dtRatios)
 
 
-
+#=
 Stages_Gravity = [5, 3, 2]
 
 cfl_gravity = 0.5 # Multi
@@ -84,7 +84,7 @@ cfl_gravity = 0.5 # Multi
 
 alg_gravity = Trixi.PairedExplicitRK2Multi(Stages_Gravity, base_path * "HypDiff/p2/", dtRatios)
 #alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
-
+=#
 
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # rho0 is (ab)used to add a "+8π" term to the source terms
@@ -95,10 +95,10 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     n_iterations_max = 1000, # 1000
 
                                     #timestep_gravity = Trixi.timestep_gravity_PERK4!
-                                    #timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!
 
                                     #timestep_gravity = Trixi.timestep_gravity_PERK2!
-                                    timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -114,11 +114,6 @@ cfl_euler = 3.0 # PERK4 + PERK2
 cfl_euler = 3.0 # PERK4 + PERK4
 
 stepsize_callback = StepsizeCallback(cfl = cfl_euler) # PERK8 NOTE: Needs maybe to reduced further for long convergence study
-
-save_solution = SaveSolutionCallback(interval = 10,
-                                     save_initial_solution = true,
-                                     save_final_solution = true,
-                                     solution_variables = cons2prim)
 
 analysis_interval = 100
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
