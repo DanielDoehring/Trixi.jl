@@ -187,20 +187,20 @@ ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 =#
 
 # p = 3
-
+#=
 Stages = [16, 8, 4]
 path = basepath * "p3/"
 ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
-
+=#
 
 # p = 4
-#=
+
 Stages = [15, 9, 5]
 path = basepath * "p4/"
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
-=#
+
 
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
 
