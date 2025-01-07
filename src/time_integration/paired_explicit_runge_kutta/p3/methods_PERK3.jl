@@ -268,8 +268,6 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
         end
 
         # We need to store `du` of the S-1 stage in `kS1` for the final update:
-        println("size kS1: ", size(integrator.kS1))
-        println("size du: ", size(integrator.du))
         integrator.kS1 .= integrator.du
 
         PERK_ki!(integrator, prob.p, alg, alg.num_stages)

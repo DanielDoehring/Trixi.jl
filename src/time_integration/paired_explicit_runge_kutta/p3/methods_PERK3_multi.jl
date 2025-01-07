@@ -315,10 +315,10 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrat
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
-
+    # PERK stages
     resize!(integrator.k1, new_size)
     resize!(integrator.kS1, new_size)
-
+    # Addition for multirate PERK methods for parabolic problems
     resize!(integrator.du_tmp, new_size)
 end
 end # @muladd

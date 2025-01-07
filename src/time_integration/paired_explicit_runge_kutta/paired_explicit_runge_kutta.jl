@@ -299,13 +299,19 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrat
     resize!(integrator.du_tmp, new_size)
 end
 
+# This `resize!` targets the Euler-Gravity case where 
+# the unknowns of the gravity solver also need to be repartitioned after resizing.
 function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
                       new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
-    # PERK stage
+    # PERK stage(s)
     resize!(integrator.k1, new_size)
+    # Check for third-order
+    if :kS1 in fieldnames(typeof(integrator))
+        resize!(integrator.kS1, new_size)
+    end
     # Check if we have Euler-Gravity situation
     if :semi_gravity in fieldnames(typeof(integrator.p))
         partitioning_u_gravity!(integrator)
