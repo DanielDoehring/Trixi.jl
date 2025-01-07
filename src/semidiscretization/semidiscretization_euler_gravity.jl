@@ -745,7 +745,7 @@ function timestep_gravity_PERK2!(cache, u_euler, tau, dtau,
 
     # `u_ode` is `u_gravity` in coupled RHS above!
     @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effecively to `du_ode`
+    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
 
     tau_stage = tau # + dtau * c[1] = dtau * 0
     ### Stage 1 ###
@@ -812,7 +812,7 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
 
     # `u_ode` is `u_gravity` in coupled RHS above!
     @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effecively to `du_ode`
+    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
 
     tau_stage = tau # + dtau * c[1] = dtau * 0
     ### Stage 1 ###
@@ -885,7 +885,7 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
 
     # `u_ode` is `u_gravity` in coupled RHS above!
     @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effecively to `du_ode`
+    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
 
     tau_stage = tau # + dtau * c[1] = dtau * 0
     ### Stage 1 ###
@@ -1014,7 +1014,7 @@ function timestep_gravity_PERK4!(cache, u_euler, tau, dtau,
 
     # `u_ode` is `u_gravity` in coupled RHS above!
     @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effecively to `du_ode`
+    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
 
     tau_stage = tau # + dtau * c[1] = dtau * 0
     ### Stage 1 ###
@@ -1114,7 +1114,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau, gravity_parame
 
     # `u_ode` is `u_gravity` in coupled RHS above!
     @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effecively to `du_ode`
+    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
 
     tau_stage = tau # + dtau * c[1] = dtau * 0
     ### Stage 1 ###
@@ -1221,7 +1221,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
 
     # `u_ode` is `u_gravity` in coupled RHS above!
     @unpack alg, u_ode, du_ode, u_ode_tmp, k1, k_higher = cache
-    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effecively to `du_ode`
+    du_gravity = wrap_array(du_ode, semi_gravity) # When we add to `du_gravity` we add effectively to `du_ode`
 
     tau_stage = tau # + dtau * c[1] = dtau * 0
     ### Stage 1 ###
