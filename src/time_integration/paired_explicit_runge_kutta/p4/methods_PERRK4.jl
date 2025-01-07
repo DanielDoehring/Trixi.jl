@@ -133,10 +133,8 @@ end
                                alg.a_matrix_constant[2, 3] * integrator.du[i])
     end
 
-    # Safe K_{S-1} in `k1`:
-    @threaded for i in eachindex(integrator.u)
-        integrator.k1[i] = integrator.du[i]
-    end
+    # Store K_{S-1} in `k1`:
+    integrator.k1 .= integrator.du
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,
