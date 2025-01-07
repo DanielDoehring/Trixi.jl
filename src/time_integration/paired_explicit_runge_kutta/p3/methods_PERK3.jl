@@ -133,7 +133,8 @@ Multirate Time-Integration based on Dynamic ODE Partitioning through Adaptively 
 Note: To use this integrator, the user must import the `Convex`, `ECOS`, and `NLsolve` packages
 unless the A-matrix coefficients are provided in a "a_<num_stages>.txt" file.
 """
-struct PairedExplicitRK3 <: AbstractPairedExplicitRKSingle
+struct PairedExplicitRK3 <:
+       AbstractPairedExplicitRKSingle{3}
     num_stages::Int # S
 
     a_matrix::Matrix{Float64}

@@ -6,7 +6,8 @@
 @muladd begin
 #! format: noindent
 
-struct PairedExplicitRelaxationRK4{RelaxationSolver} <: AbstractPairedExplicitRKSingle
+struct PairedExplicitRelaxationRK4{RelaxationSolver} <:
+       AbstractPairedExplicitRKSingle{4}
     PERK4::PairedExplicitRK4
     relaxation_solver::RelaxationSolver
 end

@@ -71,7 +71,8 @@ function compute_PairedExplicitRK4Multi_butcher_tableau(stages::Vector{Int64},
            max_eval_levels
 end
 
-struct PairedExplicitRK4Multi <: AbstractPairedExplicitRKMulti
+struct PairedExplicitRK4Multi <:
+       AbstractPairedExplicitRKMulti{4}
     num_stage_evals_min::Int64
     num_methods::Int64
     num_stages::Int64

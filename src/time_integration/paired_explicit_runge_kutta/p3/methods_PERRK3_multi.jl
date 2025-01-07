@@ -6,7 +6,7 @@
 #! format: noindent
 
 struct PairedExplicitRelaxationRK3Multi{RelaxationSolver} <:
-       AbstractPairedExplicitRKMulti
+       AbstractPairedExplicitRKMulti{3}
     PERK3Multi::PairedExplicitRK3Multi
     relaxation_solver::RelaxationSolver
 end

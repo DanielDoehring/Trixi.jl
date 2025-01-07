@@ -153,13 +153,12 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
                                                                       parameters, cache)
 end
 
-# Version for PERK
+# Version for PERK. Currently only second and fourth-order methods are implemented!
 function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
                                         semi_gravity::SemiGravity,
                                         parameters,
-                                        # TODO: Revisit specializations for certain PERK schemes i.e., 
-                                        # p = 2, 3, 4
-                                        alg::AbstractPairedExplicitRK) where
+                                        alg::Union{AbstractPairedExplicitRK{2},
+                                                   AbstractPairedExplicitRK{4}}) where
          {Mesh,
           SemiEuler <:
           SemidiscretizationHyperbolic{Mesh, <:AbstractCompressibleEulerEquations},
@@ -320,7 +319,6 @@ end
         if :u_tmp2_ode in fields_cache
             resize!(cache.u_tmp2_ode, new_length)
         end
-        # TODO: Revisit!
         # PERK integrators
         if :u_ode_tmp in fields_cache
             resize!(cache.u_ode_tmp, new_length)
@@ -687,7 +685,6 @@ function timestep_gravity_3Sstar!(cache, u_euler, tau, dtau, gravity_parameters,
         # Source term: Jeans instability OR coupling convergence test OR blast wave
         # put in gravity source term proportional to Euler density
         # OBS! subtract off the background density ρ_0 around which the Jeans instability is perturbed
-        # TODO: Not sure if addition of sources to only part of the domain is correct (elliptic equation!)
         @threaded for i in 1:n_elements
             @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end

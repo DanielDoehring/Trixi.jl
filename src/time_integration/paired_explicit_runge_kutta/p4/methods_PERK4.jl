@@ -78,7 +78,8 @@ The method has been proposed in
   Fourth-Order Paired-Explicit Runge-Kutta Methods
   [DOI:10.48550/arXiv.2408.05470](https://doi.org/10.48550/arXiv.2408.05470)
 """
-struct PairedExplicitRK4 <: AbstractPairedExplicitRKSingle
+struct PairedExplicitRK4 <:
+       AbstractPairedExplicitRKSingle{4}
     num_stages::Int # S
 
     # Optimized coefficients, i.e., flexible part of the Butcher array matrix A.

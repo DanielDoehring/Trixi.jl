@@ -10,11 +10,11 @@ include("polynomial_optimizer.jl")
 
 # Abstract base type for both single/standalone and multi-level 
 # PERK (Paired Explicit Runge-Kutta) time integration schemes
-abstract type AbstractPairedExplicitRK end
+abstract type AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
-abstract type AbstractPairedExplicitRKSingle <: AbstractPairedExplicitRK end
+abstract type AbstractPairedExplicitRKSingle{ORDER} <: AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
-abstract type AbstractPairedExplicitRKMulti <: AbstractPairedExplicitRK end
+abstract type AbstractPairedExplicitRKMulti{ORDER} <: AbstractPairedExplicitRK{ORDER} end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
 mutable struct PairedExplicitRKOptions{Callback, TStops}
