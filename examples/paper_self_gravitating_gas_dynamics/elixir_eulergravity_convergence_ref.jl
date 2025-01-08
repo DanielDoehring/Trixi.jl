@@ -15,7 +15,6 @@ solver_euler = DGSEM(polydeg, FluxHLL(min_max_speed_naive))
 coordinates_min = (0.0, 0.0)
 coordinates_max = (2.0, 2.0)
 
-
 refinement_patches = ((type = "box", coordinates_min = (0.5, 0.5),
                        coordinates_max = (1.5, 1.5)),
                       (type = "box", coordinates_min = (0.75, 0.75),
@@ -136,10 +135,9 @@ Stages = [8, 6, 5]
 
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler/", dtRatios)
 
-
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
-                  save_everystep=false, callback=callbacks);
+                  save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)

@@ -201,7 +201,6 @@ path = basepath * "p4/"
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
 
-
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
 
 sol = Trixi.solve(ode, ode_algorithm,

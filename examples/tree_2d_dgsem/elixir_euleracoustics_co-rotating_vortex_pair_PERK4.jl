@@ -124,7 +124,8 @@ function source_term_sponge_layer(u, x, t, equations::AcousticPerturbationEquati
                     Val(2 * ndims(equations)))
     alpha_square = maximum(alphas)^2
 
-    return SVector(0.0, 0.0, -alpha_square * (u[3] - reference_values[1] / u[6]^2), 0.0, 0.0, 0.0, 0.0)
+    return SVector(0.0, 0.0, -alpha_square * (u[3] - reference_values[1] / u[6]^2), 0.0,
+                   0.0, 0.0, 0.0)
 end
 
 function source_term_sponge_layer(u, x, t, equations::CompressibleEulerEquations2D,
@@ -341,7 +342,8 @@ callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_ca
 base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/"
 
 Stages_Euler = [13, 8, 6, 5]
-ode_alg_Euler = Trixi.PairedExplicitRK4Multi(Stages_Euler, base_path * "Euler/Ref_3/", [42.0])
+dtRatios = [1, 0.5, 0.25, 0.125]
+ode_alg_Euler = Trixi.PairedExplicitRK4Multi(Stages_Euler, base_path * "Euler/Ref_3/", dtRatios)
 
 #ode_alg_Euler = Trixi.PairedExplicitRK4(13, base_path * "Euler/Ref_4/")
 
@@ -352,7 +354,6 @@ sol_averaging = Trixi.solve(ode_averaging, ode_alg_Euler,
 
 # Print the timer summary
 summary_callback()
-
 
 ###############################################################################
 # set up coupled semidiscretization
@@ -395,8 +396,8 @@ cfl_Acoustics = 5.0 # PERK4 Multi
 cfl_Euler_Coupling = 5.0 # PERK Multi
 #cfl_Euler_Coupling = 5.2 # PERK Single
 
-euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler, 
-                                                          #"out/averaging_PERK_Single.h5",
+euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler,
+                                                          #base_path *  "averaging_PERK_Single.h5",
                                                           base_path * "averaging_PERK_Multi.h5",
                                                           ode_alg_Euler,
                                                           cfl_Acoustics, cfl_Euler_Coupling)
@@ -407,11 +408,11 @@ euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler,
 analysis_interval = 20000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback, 
+callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback,
                         euler_acoustics_coupling)
 
 Stages_Acoustics = [14, 9, 6, 5]
-ode_alg_Acoustic = Trixi.PairedExplicitRK4Multi(Stages_Acoustics, base_path * "Acoustics/", [42.0])
+ode_alg_Acoustic = Trixi.PairedExplicitRK4Multi(Stages_Acoustics, base_path * "Acoustics/", dtRatios)
 
 #ode_alg_Acoustic = Trixi.PairedExplicitRK4(14, base_path * "Acoustics/")
 
@@ -427,4 +428,4 @@ using Plots
 pd = PlotData2D(sol)
 
 # See figure 7.7 from Michaels dissertation
-plot(pd["p_prime"], clims=(-0.0002, 0.0002), xlims=(-100,100), ylims=(-100,100))
+plot(pd["p_prime"], clims = (-0.0002, 0.0002), xlims = (-100, 100), ylims = (-100, 100))
