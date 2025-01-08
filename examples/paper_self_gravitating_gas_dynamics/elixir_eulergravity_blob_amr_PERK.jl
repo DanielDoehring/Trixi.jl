@@ -123,14 +123,22 @@ base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/
 dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
 
-cfl_gravity = 1.4
-alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
+### CFL Set-Ups ###
 
+# Gravity Multi + Euler Multi:
+cfl_gravity = 1.1
+cfl = 1.1
 
-#cfl_gravity = 1.4
+# Gravity Single + Euler Multi:
 cfl_gravity = 1.3
-alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")                         
+cfl = 1.1
 
+# Gravity Single + Euler Single:
+cfl_gravity = 1.3
+cfl = 1.1
+
+alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
+#alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
 
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
@@ -181,11 +189,11 @@ amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
                                               
                                               max_threshold_secondary = indicator_sc.alpha_max)
 
-#cfl = 1.1 # PERK 4 Multi, S_max = 9
-cfl = 1.1 # PERK 4 Standalone, S_max = 9
+cfl_ref = 1.1                                              
+N_AMR_ref = 15
 
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = Int(floor(15 * 1.1 / cfl)),
+                           interval = Int(floor(N_AMR_ref * cfl_ref / cfl)),
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
@@ -198,12 +206,11 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
+
 dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
-
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
-
-ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false,
                   callback = callbacks);
