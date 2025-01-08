@@ -218,7 +218,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRK3Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
+    integrator = PairedExplicitRK3Integrator(u0, du, u_tmp,
+                                             t0, tdir, dt, zero(dt),
                                              iter, ode.p,
                                              (prob = ode,), ode.f,
                                              alg,

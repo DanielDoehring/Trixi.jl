@@ -343,7 +343,7 @@ base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerAcoustic/"
 Stages_Euler = [13, 8, 6, 5]
 ode_alg_Euler = Trixi.PairedExplicitRK4Multi(Stages_Euler, base_path * "Euler/Ref_3/", [42.0])
 
-#ode_alg_Euler = PERK4(13, "/home/daniel/PERK4/EulerAcoustic/Euler/Ref_4/")
+#ode_alg_Euler = Trixi.PairedExplicitRK4(13, base_path * "Euler/Ref_4/")
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 sol_averaging = Trixi.solve(ode_averaging, ode_alg_Euler,
@@ -362,11 +362,11 @@ source_region(x) = sum(abs2, x) < 6.0^2 # calculate sources within radius 6 arou
 weights(x) = sum(abs2, x) < 5.0^2 ? 1.0 : cospi(0.5 * (norm(x) - 5.0))
 
 Euler_integrator = init(ode_averaging, ode_alg_Euler,
-                        dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                        dt = 42.0, # init needs some value here but it will be overwritten by the stepsize_callback
                         save_everystep = false, callback = callbacks_averaging);
 
 # For PERK4 Multi
-     
+
 semi = SemidiscretizationEulerAcoustics(semi_acoustics, semi_euler,
                                         Euler_integrator.level_info_elements_acc,
                                         source_region = source_region, weights = weights)
@@ -413,7 +413,7 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback,
 Stages_Acoustics = [14, 9, 6, 5]
 ode_alg_Acoustic = Trixi.PairedExplicitRK4Multi(Stages_Acoustics, base_path * "Acoustics/", [42.0])
 
-#ode_alg_Acoustic = PERK4(14, "/home/daniel/PERK4/EulerAcoustic/Acoustics/")
+#ode_alg_Acoustic = Trixi.PairedExplicitRK4(14, base_path * "Acoustics/")
 
 sol = Trixi.solve(ode, ode_alg_Acoustic,
                   dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback

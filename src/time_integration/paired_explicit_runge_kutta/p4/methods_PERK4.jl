@@ -132,7 +132,32 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType,
     k1::uType
 end
 
-# TODO: PairedExplicitRK4EulerAcousticIntegrator
+mutable struct PairedExplicitRK4EulerAcousticIntegrator{RealT <: Real, uType,
+                                                        Params, Sol, F, Alg,
+                                                        PairedExplicitRKOptions} <:
+               AbstractPairedExplicitRKEulerAcousticSingleIntegrator{4}
+    u::uType
+    du::uType
+    u_tmp::uType
+    t::RealT
+    tdir::RealT # DIRection of time integration, i.e, if one marches forward or backward in time
+    dt::RealT # current time step
+    dtcache::RealT # manually set time step
+    iter::Int # current number of time steps (iteration)
+    p::Params # will be the semidiscretization from Trixi
+    sol::Sol # faked
+    f::F # `rhs` of the semidiscretization
+    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    opts::PairedExplicitRKOptions
+    finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
+    # Additional PERK register
+    k1::uType
+    # Euler-acoustic coupling additions
+    u_prev::uType
+    t_prev::RealT
+end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK4;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
@@ -146,15 +171,32 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRK4Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
-                                             iter, ode.p,
-                                             (prob = ode,), ode.f,
-                                             alg,
-                                             PairedExplicitRKOptions(callback,
-                                                                     ode.tspan;
-                                                                     kwargs...),
-                                             false, true, false,
-                                             k1)
+    if isa(ode.p, SemidiscretizationEulerAcoustics)
+        u_prev = copy(u0)
+        t_prev = t0
+        integrator = PairedExplicitRK4EulerAcousticIntegrator(u0, du, u_tmp,
+                                                              t0, tdir, dt, zero(dt),
+                                                              iter, ode.p,
+                                                              (prob = ode,), ode.f,
+                                                              alg,
+                                                              PairedExplicitRKOptions(callback,
+                                                                                      ode.tspan;
+                                                                                      kwargs...),
+                                                              false, true, false,
+                                                              k1,
+                                                              u_prev, t_prev)
+    else
+        integrator = PairedExplicitRK4Integrator(u0, du, u_tmp,
+                                                 t0, tdir, dt, zero(dt),
+                                                 iter, ode.p,
+                                                 (prob = ode,), ode.f,
+                                                 alg,
+                                                 PairedExplicitRKOptions(callback,
+                                                                         ode.tspan;
+                                                                         kwargs...),
+                                                 false, true, false,
+                                                 k1)
+    end
 
     # initialize callbacks
     if callback isa CallbackSet

@@ -159,8 +159,8 @@ function get_coupled_element_ids(source_region, equations, dg::DGSEM, cache,
     return coupled_element_ids_acc
 end
 
-function precompute_weights(source_region, weights, 
-                            coupled_element_ids, 
+function precompute_weights(source_region, weights,
+                            coupled_element_ids,
                             equations, dg::DGSEM, cache)
     acoustic_source_weights = zeros(eltype(cache.elements),
                                     (nnodes(dg), nnodes(dg),
@@ -180,7 +180,7 @@ function precompute_weights(source_region, weights,
 end
 
 function precompute_weights(source_region, weights,
-                            coupled_element_ids_acc::Vector{Vector{Int64}}, 
+                            coupled_element_ids_acc::Vector{Vector{Int64}},
                             equations, dg::DGSEM, cache)
     acoustic_source_weights = zeros(eltype(cache.elements),
                                     (nnodes(dg), nnodes(dg),

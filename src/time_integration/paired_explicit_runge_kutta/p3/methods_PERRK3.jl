@@ -98,7 +98,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
     # For entropy relaxation
     gamma = one(eltype(u0))
 
-    integrator = PairedExplicitRelaxationRK3Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
+    integrator = PairedExplicitRelaxationRK3Integrator(u0, du, u_tmp,
+                                                       t0, tdir, dt, zero(dt),
                                                        iter, ode.p,
                                                        (prob = ode,), ode.f,
                                                        # Note that here the `PERK3` algorithm is passed on as 
