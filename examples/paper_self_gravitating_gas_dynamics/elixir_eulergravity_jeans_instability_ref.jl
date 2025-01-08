@@ -131,7 +131,7 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-# Use same CFL as in paper (maybe avoid overshoots)
+# Use same CFL as in paper (maybe avoid overshoots) [Not sure if same notion of CFL]
 cfl_euler = 0.5 # Can stable run with cfl = 3.0
 stepsize_callback = StepsizeCallback(cfl = cfl_euler)
 

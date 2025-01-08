@@ -140,6 +140,7 @@ cfl = 1.1
 alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
 #alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
 
+# TODO: Set `dens0 = 1.0` as background_density ?
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
