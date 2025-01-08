@@ -112,8 +112,8 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
-                                                Alg,
+mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType,
+                                                Params, Sol, F, Alg,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiIntegrator{4}
     u::uType
@@ -154,9 +154,8 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType, Params, So
     n_levels::Int64
 end
 
-mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType, Params,
-                                                         Sol, F,
-                                                         Alg,
+mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType,
+                                                         Params, Sol, F, Alg,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{4}
     u::uType
@@ -200,6 +199,52 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType, P
     # We need another register to temporarily store the changes due to the hyperbolic part only.
     # The changes due to the parabolic part are stored in the usual `du` register.
     du_tmp::uType
+end
+
+mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real, uType,
+                                                             Params, Sol, F, Alg,
+                                                             PairedExplicitRKOptions} <:
+               AbstractPairedExplicitRKEulerAcousticMultiIntegrator{4}
+    u::uType
+    du::uType
+    u_tmp::uType
+    t::RealT
+    tdir::Real
+    dt::RealT # current time step
+    dtcache::RealT # Used for euler-acoustic coupling
+    iter::Int # current number of time steps (iteration)
+    p::Params # will be the semidiscretization from Trixi
+    sol::Sol # faked
+    f::F
+    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    opts::PairedExplicitRKOptions
+    finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
+    # Additional PERK register
+    k1::uType
+
+    # Variables managing level-depending integration
+    level_info_elements::Vector{Vector{Int64}}
+    level_info_elements_acc::Vector{Vector{Int64}}
+
+    level_info_interfaces_acc::Vector{Vector{Int64}}
+    level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
+
+    level_info_boundaries_acc::Vector{Vector{Int64}}
+    level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}}
+
+    level_info_mortars_acc::Vector{Vector{Int64}}
+    level_info_mpi_mortars_acc::Vector{Vector{Int64}}
+
+    level_u_indices_elements::Vector{Vector{Int64}}
+
+    coarsest_lvl::Int64
+    n_levels::Int64
+
+    # Euler-acoustic coupling additions
+    u_prev::uType
+    t_prev::RealT
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
@@ -275,7 +320,31 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                level_u_indices_elements,
                                                                -1, n_levels,
                                                                du_tmp)
-    else
+    elseif isa(ode.p, SemidiscretizationEulerAcoustics)
+        u_prev = copy(u0)
+        t_prev = t0
+        integrator = PairedExplicitRK4EulerAcousticMultiIntegrator(u0, du, u_tmp, t0,
+                                                                   tdir,
+                                                                   dt, zero(dt), iter,
+                                                                   ode.p, (prob = ode,),
+                                                                   ode.f, alg,
+                                                                   PairedExplicitRKOptions(callback,
+                                                                                           ode.tspan;
+                                                                                           kwargs...),
+                                                                   false, true, false,
+                                                                   k1,
+                                                                   level_info_elements,
+                                                                   level_info_elements_acc,
+                                                                   level_info_interfaces_acc,
+                                                                   level_info_mpi_interfaces_acc,
+                                                                   level_info_boundaries_acc,
+                                                                   level_info_boundaries_orientation_acc,
+                                                                   level_info_mortars_acc,
+                                                                   level_info_mpi_mortars_acc,
+                                                                   level_u_indices_elements,
+                                                                   -1, n_levels,
+                                                                   u_prev, t_prev)
+    else # Hyperbolic case
         integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp, t0, tdir,
                                                       dt, zero(dt), iter,
                                                       ode.p, (prob = ode,),
