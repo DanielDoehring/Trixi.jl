@@ -255,10 +255,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     ### Done with setting up for handling of level-dependent integration ###
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
-        integrator = PairedExplicitRK3MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir,
-                                                               dt, zero(dt), iter,
-                                                               ode.p, (prob = ode,),
-                                                               ode.f, alg,
+        integrator = PairedExplicitRK3MultiParabolicIntegrator(u0, du, u_tmp,
+                                                               t0, tdir,
+                                                               dt, zero(dt),
+                                                               iter, ode.p,
+                                                               (prob = ode,),
+                                                               ode.f,
+                                                               alg,
                                                                PairedExplicitRKOptions(callback,
                                                                                        ode.tspan;
                                                                                        kwargs...),
@@ -276,10 +279,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                                -1, n_levels,
                                                                du_tmp)
     else
-        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp, t0, tdir,
-                                                      dt, zero(dt), iter,
-                                                      ode.p, (prob = ode,),
-                                                      ode.f, alg,
+        integrator = PairedExplicitRK3MultiIntegrator(u0, du, u_tmp,
+                                                      t0, tdir,
+                                                      dt, zero(dt),
+                                                      iter, ode.p,
+                                                      (prob = ode,),
+                                                      ode.f,
+                                                      alg,
                                                       PairedExplicitRKOptions(callback,
                                                                               ode.tspan;
                                                                               kwargs...),

@@ -224,9 +224,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRK2Integrator(u0, du, u_tmp, t0, tdir, dt, dt, iter,
-                                             ode.p,
-                                             (prob = ode,), ode.f, alg,
+    integrator = PairedExplicitRK2Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
+                                             iter, ode.p,
+                                             (prob = ode,), ode.f,
+                                             alg,
                                              PairedExplicitRKOptions(callback,
                                                                      ode.tspan;
                                                                      kwargs...),

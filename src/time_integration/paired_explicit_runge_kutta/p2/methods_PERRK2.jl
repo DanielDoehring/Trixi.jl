@@ -104,8 +104,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2;
     gamma = one(eltype(u0))
 
     integrator = PairedExplicitRelaxationRK2Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
-                                                       iter,
-                                                       ode.p,
+                                                       iter, ode.p,
                                                        (prob = ode,), ode.f,
                                                        # Note that here the `PERK4` algorithm is passed on as 
                                                        # `alg` of the integrator

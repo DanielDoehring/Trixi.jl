@@ -300,10 +300,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     ### Done with setting up for handling of level-dependent integration ###
     if isa(ode.p, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
-        integrator = PairedExplicitRK4MultiParabolicIntegrator(u0, du, u_tmp, t0, tdir,
-                                                               dt, zero(dt), iter,
-                                                               ode.p, (prob = ode,),
-                                                               ode.f, alg,
+        integrator = PairedExplicitRK4MultiParabolicIntegrator(u0, du, u_tmp,
+                                                               t0, tdir,
+                                                               dt, zero(dt),
+                                                               iter, ode.p,
+                                                               (prob = ode,),
+                                                               ode.f,
+                                                               alg,
                                                                PairedExplicitRKOptions(callback,
                                                                                        ode.tspan;
                                                                                        kwargs...),
@@ -323,11 +326,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     elseif isa(ode.p, SemidiscretizationEulerAcoustics)
         u_prev = copy(u0)
         t_prev = t0
-        integrator = PairedExplicitRK4EulerAcousticMultiIntegrator(u0, du, u_tmp, t0,
-                                                                   tdir,
-                                                                   dt, zero(dt), iter,
-                                                                   ode.p, (prob = ode,),
-                                                                   ode.f, alg,
+        integrator = PairedExplicitRK4EulerAcousticMultiIntegrator(u0, du, u_tmp,
+                                                                   t0, tdir,
+                                                                   dt, zero(dt),
+                                                                   iter, ode.p,
+                                                                   (prob = ode,),
+                                                                   ode.f,
+                                                                   alg,
                                                                    PairedExplicitRKOptions(callback,
                                                                                            ode.tspan;
                                                                                            kwargs...),
@@ -345,10 +350,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                    -1, n_levels,
                                                                    u_prev, t_prev)
     else # Hyperbolic case
-        integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp, t0, tdir,
-                                                      dt, zero(dt), iter,
-                                                      ode.p, (prob = ode,),
-                                                      ode.f, alg,
+        integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp,
+                                                      t0, tdir,
+                                                      dt, zero(dt),
+                                                      iter, ode.p,
+                                                      (prob = ode,),
+                                                      ode.f,
+                                                      alg,
                                                       PairedExplicitRKOptions(callback,
                                                                               ode.tspan;
                                                                               kwargs...),

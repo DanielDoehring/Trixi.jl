@@ -99,8 +99,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
     gamma = one(eltype(u0))
 
     integrator = PairedExplicitRelaxationRK3Integrator(u0, du, u_tmp, t0, tdir, dt, dt,
-                                                       iter,
-                                                       ode.p,
+                                                       iter, ode.p,
                                                        (prob = ode,), ode.f,
                                                        # Note that here the `PERK3` algorithm is passed on as 
                                                        # `alg` of the integrator

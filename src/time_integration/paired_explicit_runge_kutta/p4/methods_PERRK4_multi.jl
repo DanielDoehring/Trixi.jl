@@ -186,8 +186,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
         integrator = PairedExplicitRelaxationRK4MultiParabolicIntegrator(u0, du, u_tmp,
                                                                          t0, tdir,
                                                                          dt, zero(dt),
-                                                                         iter,
-                                                                         ode.p,
+                                                                         iter, ode.p,
                                                                          (prob = ode,),
                                                                          ode.f,
                                                                          # Note that here the `PERK4Multi` algorithm is passed on as 
@@ -216,8 +215,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
         integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp,
                                                                 t0, tdir,
                                                                 dt, zero(dt),
-                                                                iter,
-                                                                ode.p,
+                                                                iter, ode.p,
                                                                 (prob = ode,),
                                                                 ode.f,
                                                                 # Note that here the `PERK4Multi` algorithm is passed on as 
