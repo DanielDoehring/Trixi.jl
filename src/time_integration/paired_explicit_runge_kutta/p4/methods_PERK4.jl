@@ -108,7 +108,8 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
+mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType,
+                                           Params, Sol, F, Alg,
                                            PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSingleIntegrator{4}
     u::uType
@@ -130,6 +131,8 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType, Params, Sol, F,
     # Additional PERK register
     k1::uType
 end
+
+# TODO: PairedExplicitRK4EulerAcousticIntegrator
 
 function init(ode::ODEProblem, alg::PairedExplicitRK4;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)

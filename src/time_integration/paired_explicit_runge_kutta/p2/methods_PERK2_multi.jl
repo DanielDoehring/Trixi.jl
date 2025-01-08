@@ -110,8 +110,8 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType, Params, Sol, F,
-                                                Alg,
+mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType,
+                                                Params, Sol, F, Alg,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiIntegrator{2}
     u::uType
@@ -152,9 +152,8 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType, Params, So
     n_levels::Int64
 end
 
-mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType, Params,
-                                                         Sol, F,
-                                                         Alg,
+mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType,
+                                                         Params, Sol, F, Alg,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{2}
     u::uType
