@@ -59,6 +59,13 @@ abstract type AbstractPairedExplicitRelaxationRKSingleIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRelaxationRKMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRelaxationRKIntegrator{ORDER} end
 
+# Euler-Acoustic integrators
+abstract type AbstractPairedExplicitRKEulerAcousticSingleIntegrator{ORDER} <:
+              AbstractPairedExplicitRKSingleIntegrator{ORDER} end
+
+abstract type AbstractPairedExplicitRKEulerAcousticMultiIntegrator{ORDER} <:
+              AbstractPairedExplicitRKMultiIntegrator{ORDER} end
+
 # The relaxation-multi-prarabolic integrator "inherits" from the 
 # multi-parabolic integrator since the latter governs which stage functions, 
 # i.e., the `PERK_k...` are called.
@@ -132,6 +139,26 @@ function solve!(integrator::AbstractPairedExplicitRKIntegrator)
     integrator.finalstep = false
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
+        step!(integrator)
+    end
+
+    return TimeIntegratorSolution((first(prob.tspan), integrator.t),
+                                  (prob.u0, integrator.u),
+                                  integrator.sol.prob)
+end
+
+# Euler-Acoustic requires storing the previous time step
+function solve!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleIntegrator,
+                                  AbstractPairedExplicitRKEulerAcousticMultiIntegrator})
+    @unpack prob = integrator.sol
+
+    integrator.finalstep = false
+
+    @trixi_timeit timer() "main loop" while !integrator.finalstep
+        # Store variables of previous time step
+        integrator.t_prev = integrator.t
+        integrator.u_prev .= integrator.u
+
         step!(integrator)
     end
 
@@ -299,6 +326,22 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrat
     resize!(integrator.du_tmp, new_size)
 end
 
+function Base.resize!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleIntegrator,
+                                        AbstractPairedExplicitRKEulerAcousticMultiIntegrator},
+                      new_size)
+    resize!(integrator.u, new_size)
+    resize!(integrator.du, new_size)
+    resize!(integrator.u_tmp, new_size)
+    # PERK stage
+    resize!(integrator.k1, new_size)
+    # Check for third-order
+    if :kS1 in fieldnames(typeof(integrator))
+        resize!(integrator.kS1, new_size)
+    end
+    # Previous time step (required for Euler-Acoustic)
+    resize!(integrator.u_prev, new_size)
+end
+
 # This `resize!` targets the Euler-Gravity case where 
 # the unknowns of the gravity solver also need to be repartitioned after resizing.
 function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
@@ -338,6 +381,11 @@ end
 # stop the time integration
 function terminate!(integrator::AbstractPairedExplicitRKIntegrator)
     integrator.finalstep = true
+end
+
+# Needed for Euler-Acoustic coupling
+function check_error(integrator::AbstractPairedExplicitRKIntegrator)
+    return SciMLBase.ReturnCode.Success
 end
 
 """
@@ -402,6 +450,18 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                               #integrator.level_info_boundaries_orientation_acc[max_level],
                               integrator.level_info_mortars_acc[max_level],
                               integrator.level_u_indices_elements)
+end
+
+@inline function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerAcoustics, t,
+                      integrator::AbstractPairedExplicitRKEulerAcousticMultiIntegrator,
+                      max_level)
+    rhs!(du_ode, u_ode, semi, t,
+         max_level,
+         integrator.level_info_elements_acc[max_level],
+         integrator.level_info_interfaces_acc[max_level],
+         integrator.level_info_boundaries_acc[max_level],
+         #integrator.level_info_boundaries_orientation_acc[max_level],
+         integrator.level_info_mortars_acc[max_level])
 end
 
 # Multirate/partitioned helpers

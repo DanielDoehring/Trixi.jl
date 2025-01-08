@@ -128,6 +128,7 @@ function EulerAcousticsCouplingCallback(ode_euler, mean_values, alg, cfl_acousti
     # Set up ODE Integrator for Euler equations
     integrator_euler = init(ode_euler, alg, save_everystep = false, dt = 1.0; kwargs...) # dt will be overwritten
 
+    # Set up `EulerAcousticsCouplingCallback` struct
     euler_acoustics_coupling = EulerAcousticsCouplingCallback{typeof(cfl_acoustics),
                                                               typeof(mean_values),
                                                               typeof(integrator_euler)}(StepsizeCallback(cfl_acoustics),
