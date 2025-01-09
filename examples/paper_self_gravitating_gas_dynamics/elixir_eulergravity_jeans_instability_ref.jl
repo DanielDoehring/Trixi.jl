@@ -65,16 +65,34 @@ initial_condition = initial_condition_jeans_instability
 gamma = 5 / 3
 equations_euler = CompressibleEulerEquations2D(gamma)
 
-polydeg = 3
-solver_euler = DGSEM(polydeg, FluxHLL(min_max_speed_naive))
+#surf_flux_euler = FluxHLL(min_max_speed_naive) # As in paper
+surf_flux_euler = flux_hllc # Reduces oscillations
+solver_euler = DGSEM(polydeg, surf_flux_euler)
 
 coordinates_min = (0.0, 0.0)
 coordinates_max = (1.0, 1.0)
 
+#=
 refinement_patches = ((type = "box", coordinates_min = (0.25, 0.25),
                        coordinates_max = (0.75, 0.75)),
                       (type = "box", coordinates_min = (0.375, 0.375),
                        coordinates_max = (0.625, 0.625)))
+=#
+# This interestingly gives completely wrong results for the potential energy
+#=
+refinement_patches = ((type = "box", coordinates_min = (0.2, 0.2),
+                       coordinates_max = (0.8, 0.8)),
+                      (type = "box", coordinates_min = (0.4, 0.4),
+                       coordinates_max = (0.6, 0.6)))
+=#
+
+# No oscillations observed in x direction. Thus, we refine entrire "stripes"
+#=
+refinement_patches = ((type = "box", coordinates_min = (0.25, 0.0),
+                       coordinates_max = (0.75, 1.0)),
+                      (type = "box", coordinates_min = (0.375, 0.0),
+                       coordinates_max = (0.625, 1.0)))
+=#
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
@@ -131,11 +149,14 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-# Use same CFL as in paper (maybe avoid overshoots) [Not sure if same notion of CFL]
-cfl_euler = 0.5 # Can stable run with cfl = 3.0
-stepsize_callback = StepsizeCallback(cfl = cfl_euler)
+# Use same CFL = 0.5 as in paper (maybe avoid overshoots) [Not sure if same notion of CFL]
+cfl_euler = 0.5
+#analysis_interval = 6
 
-analysis_interval = 6
+#cfl_euler = 3.0 # Can stable run with cfl = 3.0
+analysis_interval = 1
+
+stepsize_callback = StepsizeCallback(cfl = cfl_euler)
 
 Trixi.pretty_form_utf(::Val{:energy_potential}) = "∑e_potential"
 Trixi.pretty_form_ascii(::Val{:energy_potential}) = "e_potential"
@@ -161,6 +182,7 @@ function Trixi.analyze(::Val{:energy_potential}, du, u_euler, t,
     return e_potential
 end
 
+# TODO: Plotscripts (maybe I can find them somewhere)
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
@@ -169,8 +191,11 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                                            energy_internal,
                                                            Val(:energy_potential)))
 
+alive_callback = AliveCallback(alive_interval = 100)                                                           
 callbacks = CallbackSet(summary_callback, stepsize_callback,
-                        analysis_callback)
+                        analysis_callback,
+                        alive_callback
+                        )
 
 ###############################################################################
 # run the simulation

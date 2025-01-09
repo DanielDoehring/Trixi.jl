@@ -66,7 +66,10 @@ gamma = 5 / 3
 equations_euler = CompressibleEulerEquations2D(gamma)
 
 polydeg = 3
-solver_euler = DGSEM(polydeg, FluxHLL(min_max_speed_naive))
+
+surf_flux_euler = FluxHLL(min_max_speed_naive) # As in paper
+#surf_flux_euler = flux_hllc # Reduces oscillations on non-unfiorm grids
+solver_euler = DGSEM(polydeg, surf_flux_euler)
 
 coordinates_min = (0.0, 0.0)
 coordinates_max = (1.0, 1.0)
@@ -115,8 +118,8 @@ save_solution = SaveSolutionCallback(interval = 10,
 save_restart = SaveRestartCallback(interval = 100,
                                    save_final_restart = true)
 
-analysis_interval = 100
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+analysis_interval = 1
+alive_callback = AliveCallback(alive_interval = 100)
 
 Trixi.pretty_form_utf(::Val{:energy_potential}) = "∑e_potential"
 Trixi.pretty_form_ascii(::Val{:energy_potential}) = "e_potential"
@@ -144,13 +147,14 @@ end
 
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
-                                     extra_analysis_integrals = (energy_total,
-                                                                 energy_kinetic,
-                                                                 energy_internal,
-                                                                 Val(:energy_potential)))
+                                     analysis_errors = Symbol[],
+                                     analysis_integrals = (energy_total, # Pretty much only sanity check
+                                                           energy_kinetic,
+                                                           energy_internal,
+                                                           Val(:energy_potential)))
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
-                        save_restart, save_solution,
+                        #save_restart, save_solution,
                         analysis_callback, alive_callback)
 
 ###############################################################################
