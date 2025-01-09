@@ -139,7 +139,8 @@ alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/
 parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-4, # 1.0e-4
+                                    # TODO: Try stricter gravity solver tolerance!
+                                    resid_tol = 1.0e-5, # 1.0e-4
                                     n_iterations_max = 1000,
                                     timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!)
 

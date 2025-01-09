@@ -67,7 +67,6 @@ equations_euler = CompressibleEulerEquations2D(gamma)
 
 polydeg = 3
 
-#surf_flux_euler = FluxHLL(min_max_speed_naive) # As in paper
 surf_flux_euler = flux_hllc # Reduces oscillations
 solver_euler = DGSEM(polydeg, surf_flux_euler)
 
@@ -85,7 +84,8 @@ semi_euler = SemidiscretizationHyperbolic(mesh, equations_euler, initial_conditi
 # semidiscretization of the hyperbolic diffusion equations
 equations_gravity = HyperbolicDiffusionEquations2D()
 
-solver_gravity = DGSEM(polydeg, flux_lax_friedrichs)
+surf_flux_gravity = flux_godunov
+solver_gravity = DGSEM(polydeg, surf_flux_gravity)
 
 semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_condition,
                                             solver_gravity,
@@ -104,18 +104,18 @@ parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 =#
 
-base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Jeans_Instab/"
+base_path = "/home/daniel/git/Paper_MultirateEulerPoisson/Data/EulerGravity/Jeans/PERK_Data/"
 
-Stages_Gravity = [10, 7, 5]
-dtRatios = [1, 0.5, 0.25]
+Stages_Gravity = reverse(collect(range(5, 18)))
+dtRatios = [42.0] # Does not matter here
 cfl_gravity = 0.9 # Seems to be stability limit
 
-alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/", dtRatios)
+alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "Gravity/", dtRatios)
 
 parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-4, # 1.0e-4
+                                    resid_tol = 1.0e-6, # 1.0e-4
                                     n_iterations_max = 1000,
                                     timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!)
 
@@ -130,9 +130,8 @@ summary_callback = SummaryCallback()
 
 # Use same CFL = 0.5 as in paper (maybe avoid overshoots) [Not sure if same notion of CFL]
 cfl_euler = 0.5
-#analysis_interval = 6
 
-#cfl_euler = 3.0 # Can stable run with cfl = 3.0
+cfl_euler = 1.0 # Can stable run with cfl = 3.0
 analysis_interval = 1
 
 stepsize_callback = StepsizeCallback(cfl = cfl_euler)
@@ -161,7 +160,6 @@ function Trixi.analyze(::Val{:energy_potential}, du, u_euler, t,
     return e_potential
 end
 
-# TODO: Plotscripts (maybe I can find them somewhere)
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
@@ -171,18 +169,17 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                                            Val(:energy_potential)))
 
 alive_callback = AliveCallback(alive_interval = 100)                                                           
-callbacks = CallbackSet(summary_callback, stepsize_callback,
+callbacks = CallbackSet(summary_callback, stepsize_callback, alive_callback,
                         analysis_callback,
-                        alive_callback
                         )
 
 ###############################################################################
 # run the simulation
 
-dtRatios = [1, 0.5, 0.25]
-Stages = [11, 7, 5]
+Stages = reverse(collect(range(5, 18)))
+dtRatios = [42.0]
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
