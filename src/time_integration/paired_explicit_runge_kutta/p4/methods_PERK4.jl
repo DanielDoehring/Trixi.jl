@@ -185,7 +185,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
                                                               false, true, false,
                                                               k1,
                                                               u_prev, t_prev)
-    else
+    else # Parabolic, purely hyperbolic, Euler-Gravity, ...
         integrator = PairedExplicitRK4Integrator(u0, du, u_tmp,
                                                  t0, tdir, dt, zero(dt),
                                                  iter, ode.p,

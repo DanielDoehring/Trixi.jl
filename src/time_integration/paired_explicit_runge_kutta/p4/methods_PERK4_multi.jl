@@ -349,7 +349,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                    level_u_indices_elements,
                                                                    -1, n_levels,
                                                                    u_prev, t_prev)
-    else # Hyperbolic case
+    else # Purely hyperbolic, Euler-Gravity, ...
         integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp,
                                                       t0, tdir,
                                                       dt, zero(dt),
@@ -372,6 +372,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                       level_info_mpi_mortars_acc,
                                                       level_u_indices_elements,
                                                       -1, n_levels)
+
+        if :semi_gravity in fieldnames(typeof(ode.p))
+            partitioning_u_gravity!(integrator)
+        end
     end
 
     # initialize callbacks

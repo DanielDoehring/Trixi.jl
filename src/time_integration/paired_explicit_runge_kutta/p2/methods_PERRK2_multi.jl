@@ -212,7 +212,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                                                          gamma,
                                                                          alg.relaxation_solver,
                                                                          du_tmp)
-    else
+    else # Hyperbolic case
         integrator = PairedExplicitRelaxationRK2MultiIntegrator(u0, du, u_tmp,
                                                                 t0, tdir,
                                                                 dt, zero(dt),
