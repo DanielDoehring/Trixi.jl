@@ -72,12 +72,12 @@ solver_euler = DGSEM(polydeg, surf_flux_euler)
 coordinates_min = (0.0, 0.0)
 coordinates_max = (1.0, 1.0)
 
-#=
+
 refinement_patches = ((type = "box", coordinates_min = (0.25, 0.25),
                        coordinates_max = (0.75, 0.75)),
                       (type = "box", coordinates_min = (0.375, 0.375),
                        coordinates_max = (0.625, 0.625)))
-=#
+
 # This interestingly gives completely wrong results for the potential energy
 #=
 refinement_patches = ((type = "box", coordinates_min = (0.2, 0.2),
@@ -87,6 +87,7 @@ refinement_patches = ((type = "box", coordinates_min = (0.2, 0.2),
 =#
 
 # No oscillations observed in x direction. Thus, we refine entrire "stripes"
+# => Still gives wrong results for the potential energy
 #=
 refinement_patches = ((type = "box", coordinates_min = (0.25, 0.0),
                        coordinates_max = (0.75, 1.0)),
