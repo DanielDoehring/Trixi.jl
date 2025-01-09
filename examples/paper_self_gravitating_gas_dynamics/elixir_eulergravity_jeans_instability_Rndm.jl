@@ -74,32 +74,8 @@ solver_euler = DGSEM(polydeg, surf_flux_euler)
 coordinates_min = (0.0, 0.0)
 coordinates_max = (1.0, 1.0)
 
-
-refinement_patches = ((type = "box", coordinates_min = (0.25, 0.25),
-                       coordinates_max = (0.75, 0.75)),
-                      (type = "box", coordinates_min = (0.375, 0.375),
-                       coordinates_max = (0.625, 0.625)))
-
-# This interestingly gives completely wrong results for the potential energy
-#=
-refinement_patches = ((type = "box", coordinates_min = (0.2, 0.2),
-                       coordinates_max = (0.8, 0.8)),
-                      (type = "box", coordinates_min = (0.4, 0.4),
-                       coordinates_max = (0.6, 0.6)))
-=#
-
-# No oscillations observed in x direction. Thus, we refine entrire "stripes"
-# => Still gives wrong results for the potential energy
-#=
-refinement_patches = ((type = "box", coordinates_min = (0.25, 0.0),
-                       coordinates_max = (0.75, 1.0)),
-                      (type = "box", coordinates_min = (0.375, 0.0),
-                       coordinates_max = (0.625, 1.0)))
-=#
-
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                refinement_patches = refinement_patches,
                 n_cells_max = 10_000)
 
 semi_euler = SemidiscretizationHyperbolic(mesh, equations_euler, initial_condition,
