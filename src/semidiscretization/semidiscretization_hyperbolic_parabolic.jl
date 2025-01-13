@@ -463,7 +463,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
     end
 end
 
-# `rhs!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
+# `rhs_hyperbolic_parabolic!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
                                    du_tmp,

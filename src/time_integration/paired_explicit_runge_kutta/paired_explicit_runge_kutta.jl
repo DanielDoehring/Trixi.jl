@@ -437,10 +437,11 @@ end
          integrator.level_info_mortars_acc[max_level])
 end
 
-function rhs_hyperbolic_parabolic!(du_ode, u_ode,
-                                   semi::SemidiscretizationHyperbolicParabolic, t,
-                                   integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
-                                   max_level)
+@inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                           semi::SemidiscretizationHyperbolicParabolic,
+                                           t,
+                                           integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
+                                           max_level)
     rhs_hyperbolic_parabolic!(du_ode, u_ode, semi, t,
                               integrator.du_tmp,
                               max_level,

@@ -68,7 +68,7 @@ abstract type RelaxationSolver end
 struct RelaxationSolverBisection{RealT <: Real} <: RelaxationSolver
     gamma_min::RealT    # Lower bound of the initial bracketing interval
     gamma_max::RealT    # Upper bound of the initial bracketing interval
-    gamma_tol::RealT    # Variable-tolerance for the relaxation parameter
+    gamma_tol::RealT    # Absolute tolerance for the bracketing interval length
     max_iterations::Int # Maximum number of bisection iterations
 end
 
@@ -78,14 +78,35 @@ function RelaxationSolverBisection(; gamma_min = 0.1, gamma_max = 1.2,
     return RelaxationSolverBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
-function Base.show(io::IO, relaxation_solver::RelaxationSolverBisection)
-    print(io, "RelaxationSolverBisection(gamma_min=", relaxation_solver.gamma_min,
+struct RelaxationSolverSecantMethod{RealT <: Real} <: RelaxationSolver
+    gamma_min::RealT    # Lower bound of the initial bracketing interval
+    gamma_max::RealT    # Upper bound of the initial bracketing interval
+    gamma_tol::RealT    # Absolute tolerance for the bracketing interval length
+    max_iterations::Int # Maximum number of bisection iterations
+end
+
+function RelaxationSolverSecantMethod(; gamma_min = 0.1, gamma_max = 1.2,
+                                      gamma_tol = 1e-14,
+                                      max_iterations = 15)
+    return RelaxationSolverSecantMethod(gamma_min, gamma_max, gamma_tol, max_iterations)
+end
+
+function Base.show(io::IO,
+                   relaxation_solver::Union{RelaxationSolverBisection,
+                                            RelaxationSolverSecantMethod})
+    if typeof(relaxation_solver) <: RelaxationSolverBisection
+        solver_type = "RelaxationSolverBisection"
+    elseif typeof(relaxation_solver) <: RelaxationSolverSecantMethod
+        solver_type = "RelaxationSolverSecantMethod"
+    end
+    print(io, "$solver_type(gamma_min=", relaxation_solver.gamma_min,
           ", gamma_max=", relaxation_solver.gamma_max,
           ", gamma_tol=", relaxation_solver.gamma_tol,
           ", max_iterations=", relaxation_solver.max_iterations, ")")
 end
 function Base.show(io::IO, ::MIME"text/plain",
-                   relaxation_solver::RelaxationSolverBisection)
+                   relaxation_solver::Union{RelaxationSolverBisection,
+                                            RelaxationSolverSecantMethod})
     if get(io, :compact, false)
         show(io, relaxation_solver)
     else
@@ -95,7 +116,12 @@ function Base.show(io::IO, ::MIME"text/plain",
             "gamma_tol" => relaxation_solver.gamma_tol,
             "max_iterations" => relaxation_solver.max_iterations
         ]
-        summary_box(io, "RelaxationSolverBisection", setup)
+        if typeof(relaxation_solver) <: RelaxationSolverBisection
+            solver_type = "RelaxationSolverBisection"
+        elseif typeof(relaxation_solver) <: RelaxationSolverSecantMethod
+            solver_type = "RelaxationSolverSecantMethod"
+        end
+        summary_box(io, solver_type, setup)
     end
 end
 
@@ -144,16 +170,14 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                            gamma_max *
-                                            dir_wrap[.., element]
+                                            gamma_max * dir_wrap[.., element]
     end
     r_max = entropy_difference(gamma_max, S_old, dS, u_tmp_wrap,
                                mesh, equations, dg, cache)
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
-                                            gamma_min *
-                                            dir_wrap[.., element]
+                                            gamma_min * dir_wrap[.., element]
     end
     r_min = entropy_difference(gamma_min, S_old, dS, u_tmp_wrap,
                                mesh, equations, dg, cache)
@@ -178,6 +202,67 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
                 gamma_max = integrator.gamma
             end
             iterations += 1
+        end
+    else
+        integrator.gamma = 1
+        # CARE: This is an experimental strategy: 
+        # Set gamma to smallest value s.t. convergence is still assured
+        #integrator.gamma = 1 - integrator.dt^(ORDER - 1)
+    end
+
+    return nothing
+end
+
+function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{ORDER},
+                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER}},
+                            u_tmp_wrap, u_wrap, dir_wrap,
+                            S_old, dS,
+                            mesh, equations, dg::DG, cache,
+                            relaxation_solver::RelaxationSolverSecantMethod) where {ORDER}
+    @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
+
+    # Naming aliases to avoid confusion
+    gamma_0, gamma_1 = gamma_min, gamma_max
+
+    @threaded for element in eachelement(dg, cache)
+        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                            gamma_1 * dir_wrap[.., element]
+    end
+    r_1 = entropy_difference(gamma_1, S_old, dS, u_tmp_wrap,
+                             mesh, equations, dg, cache)
+
+    @threaded for element in eachelement(dg, cache)
+        @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                            gamma_0 * dir_wrap[.., element]
+    end
+    r_0 = entropy_difference(gamma_0, S_old, dS, u_tmp_wrap,
+                             mesh, equations, dg, cache)
+
+    # Check if there exists a root for `r` in the interval [gamma_0, gamma_1] = [gamma_min, gamma_max]
+    if r_1 > 0 && r_0 < 0
+        # Perform first step which does not require extra evaluation of the `entropy_difference` function
+        # We consider `gamma_1 = gamma_max` as the better initial guess, as this is for the default values most likely closer to the root
+        gamma_0 = gamma_1 - r_1 * (gamma_1 - gamma_0) / (r_1 - r_0)
+        # Switch order of 0, 1:
+        gamma_0, gamma_1 = gamma_1, gamma_0
+
+        iterations = 1
+        integrator.gamma = gamma_1 # Write result back to integrator
+        while abs(gamma_1 - gamma_0) > gamma_tol && iterations < max_iterations
+            @threaded for element in eachelement(dg, cache)
+                @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
+                                                    gamma_1 * dir_wrap[.., element]
+            end
+            r_0 = r_1
+            r_1 = entropy_difference(gamma_1, S_old, dS, u_tmp_wrap,
+                                     mesh, equations, dg, cache)
+
+            gamma_0 = gamma_1 - r_1 * (gamma_1 - gamma_0) / (r_1 - r_0)
+            # Switch order of 0, 1:
+            gamma_0, gamma_1 = gamma_1, gamma_0
+
+            iterations += 1
+            integrator.gamma = gamma_1 # Write result back to integrator
         end
     else
         integrator.gamma = 1
