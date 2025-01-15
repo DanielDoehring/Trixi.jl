@@ -586,16 +586,15 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
             @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
                                                                                                 @views du_gravity[1,
                                                                                                                   ..,
-                                                                                                                  level_info_elements_acc[max_level]]) tau=tau dtau=dtau
+                                                                                                                  :]) tau=tau dtau=dtau
             =#
             finalstep = true
         end
 
-        # TODO: Not sure if convergence check on only the current elements is correct!
         # this is an absolute tolerance check
-        if maximum(abs,
-                   @views du_gravity[1, .., level_info_elements_acc[max_level]]) <=
-           resid_tol
+        # Note: Since the equation giving the gravitational acceleration is an elliptic equation, 
+        # we need to ensure convergence on the entire domain, i.e., NOT only on the current level!
+        if maximum(abs, @views du_gravity[1, .., :]) <= resid_tol
             finalstep = true
         end
     end
