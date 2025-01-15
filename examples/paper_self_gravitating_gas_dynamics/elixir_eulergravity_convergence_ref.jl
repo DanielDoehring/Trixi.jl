@@ -56,7 +56,9 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 =#
 
-base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Coupled_Convergence/"
+#base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Coupled_Convergence/"
+base_path = "/storage/home/daniel/PERK4/EulerGravity/Coupled_Convergence/"
+
 dtRatios = [1, 0.5, 0.25]
 
 Stages_Gravity = [9, 6, 5]
@@ -71,7 +73,7 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # for the manufactured solution
                                     gravitational_constant = 1.0, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-10, # 1.0e-10
+                                    resid_tol = 1.0e-5, # 1.0e-10
                                     n_iterations_max = 1000, # 1000
 
                                     #timestep_gravity = Trixi.timestep_gravity_PERK4!
@@ -82,17 +84,18 @@ semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_
 
 ###############################################################################
 # ODE solvers, callbacks etc.
-tspan = (0.0, 0.0)
+tspan = (0.0, 0.5)
 ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-cfl_euler = 0.5
+#cfl_euler = 0.5
+cfl_euler = 1.0
 
 stepsize_callback = StepsizeCallback(cfl = cfl_euler) # PERK8 NOTE: Needs maybe to reduced further for long convergence study
 
 analysis_interval = 10_000
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 10)
 
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true)

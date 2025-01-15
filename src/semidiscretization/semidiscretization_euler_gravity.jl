@@ -515,10 +515,12 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode)
 
         # check if we reached the maximum number of iterations
         if n_iterations_max > 0 && iter >= n_iterations_max
+            #=
             @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
                                                                                                 @views du_gravity[1,
                                                                                                                   ..,
                                                                                                                   :]) tau=tau dtau=dtau
+            =#
             finalstep = true
         end
 
@@ -580,10 +582,12 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
 
         # check if we reached the maximum number of iterations
         if n_iterations_max > 0 && iter >= n_iterations_max
+            #=
             @warn "Max iterations reached: Gravity solver failed to converge!" residual=maximum(abs,
                                                                                                 @views du_gravity[1,
                                                                                                                   ..,
                                                                                                                   level_info_elements_acc[max_level]]) tau=tau dtau=dtau
+            =#
             finalstep = true
         end
 
