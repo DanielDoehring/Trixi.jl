@@ -263,6 +263,13 @@ end
 
 @inline function calc_error_norms(func, u, t, analyzer,
                                   semi::SemidiscretizationEulerGravity, cache_analysis)
+    @unpack cache, semi_euler, semi_gravity = semi                                  
+    grav_l2, grav_linf, grav_l1 = calc_error_norms(func, cache.u_ode, t, analyzer, semi_gravity, cache_analysis)
+
+    println("Gravity L2 error: $grav_l2")
+    println("Gravity L∞ error: $grav_linf")
+    println("Gravity L1 error: $grav_l1")
+
     calc_error_norms(func, u, t, analyzer, semi.semi_euler, cache_analysis)
 end
 
