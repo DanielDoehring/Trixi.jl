@@ -10,7 +10,7 @@ gamma = 2.0
 equations_euler = CompressibleEulerEquations2D(gamma)
 
 polydeg = 3
-solver_euler = DGSEM(polydeg, FluxHLL(min_max_speed_naive))
+solver_euler = DGSEM(polydeg, flux_hll)
 
 coordinates_min = (0.0, 0.0)
 coordinates_max = (2.0, 2.0)
@@ -33,8 +33,7 @@ semi_euler = SemidiscretizationHyperbolic(mesh, equations_euler, initial_conditi
 # semidiscretization of the hyperbolic diffusion equations
 equations_gravity = HyperbolicDiffusionEquations2D()
 
-flux_gravity = flux_lax_friedrichs
-#flux_gravity = flux_godunov # TODO: Optimize also for this flux
+flux_gravity = flux_godunov
 solver_gravity = DGSEM(polydeg, flux_gravity)
 
 semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_condition,
@@ -57,47 +56,26 @@ parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
 =#
 
-# NOTE: CFL numbers not necessarily at stability limit!
-
-base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/"
+base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Coupled_Convergence/"
 dtRatios = [1, 0.5, 0.25]
 
-#=
-Stages_Gravity = 9
-cfl_gravity = 1.1
-alg_gravity = Trixi.PairedExplicitRK4(Stages_Gravity, base_path * "HypDiff/p4/")
-=#
+Stages_Gravity = [9, 6, 5]
+#Stages_Gravity = [15, 9, 6]
+cfl_gravity = 1.0
 
+alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/", dtRatios)
 
-Stages_Gravity = [9, 7, 5]
-cfl_gravity = 0.9
-
-alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/p4/", dtRatios)
-
-
-#=
-Stages_Gravity = [5, 3, 2]
-
-cfl_gravity = 0.5 # Multi
-#cfl_gravity = 2.0 # Single
-
-alg_gravity = Trixi.PairedExplicitRK2Multi(Stages_Gravity, base_path * "HypDiff/p2/", dtRatios)
-#alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
-=#
 
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # rho0 is (ab)used to add a "+8π" term to the source terms
                                     # for the manufactured solution
                                     gravitational_constant = 1.0, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-5, # 1.0e-10
+                                    resid_tol = 1.0e-10, # 1.0e-10
                                     n_iterations_max = 1000, # 1000
 
                                     #timestep_gravity = Trixi.timestep_gravity_PERK4!
                                     timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!
-
-                                    #timestep_gravity = Trixi.timestep_gravity_PERK2!
-                                    #timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -109,12 +87,11 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-cfl_euler = 3.0 # PERK4 + PERK2
-cfl_euler = 3.0 # PERK4 + PERK4
+cfl_euler = 0.5
 
 stepsize_callback = StepsizeCallback(cfl = cfl_euler) # PERK8 NOTE: Needs maybe to reduced further for long convergence study
 
-analysis_interval = 100
+analysis_interval = 10_000
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
@@ -131,7 +108,7 @@ Stages = 8
 ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
 =#
 
-Stages = [8, 6, 5]
+Stages = [13, 8, 5]
 
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler/", dtRatios)
 
