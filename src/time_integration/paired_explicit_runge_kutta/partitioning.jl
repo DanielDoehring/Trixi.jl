@@ -21,7 +21,7 @@ end
 
     # CARE: This is for testcase with special assignment
     #n_levels = alg.num_methods
-    println("CARE: This is for testcase with special (random/round-robin) assignment!")
+    #println("CARE: This is for testcase with special (random/round-robin) assignment!")
 
     return n_levels
 end
