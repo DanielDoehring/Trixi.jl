@@ -44,7 +44,7 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-resid_tol = 1.0e-10
+resid_tol = 1.0e-14 # To prevent the solver from stopping too early
 steady_state_callback = SteadyStateCallback(abstol = resid_tol, reltol = 0.0)
 
 # E = 11
