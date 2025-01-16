@@ -592,9 +592,9 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
         end
 
         # this is an absolute tolerance check
-        # Note: Since the equation giving the gravitational acceleration is an elliptic equation, 
-        # we need to ensure convergence on the entire domain, i.e., NOT only on the current level!
-        if maximum(abs, @views du_gravity[1, .., :]) <= resid_tol
+        # Note: Althugh the gravitational sources are given by an elliptic equation, 
+        # we do not really need global convergence as we add only the local contributions
+        if maximum(abs, @views du_gravity[1, .., level_info_elements_acc[max_level]]) <= resid_tol
             finalstep = true
         end
     end
