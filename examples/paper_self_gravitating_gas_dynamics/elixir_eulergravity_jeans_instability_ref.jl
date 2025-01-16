@@ -98,7 +98,7 @@ refinement_patches = ((type = "box", coordinates_min = (0.25, 0.0),
 =#
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 4,
+                initial_refinement_level = 5, # 4
                 refinement_patches = refinement_patches,
                 n_cells_max = 10_000)
 
@@ -139,8 +139,7 @@ alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/
 parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
-                                    # TODO: Try stricter gravity solver tolerance!
-                                    resid_tol = 1.0e-5, # 1.0e-4
+                                    resid_tol = 1.0e-7, # 1.0e-4
                                     n_iterations_max = 1000,
                                     timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!)
 
@@ -154,7 +153,7 @@ ode = semidiscretize(semi, tspan);
 summary_callback = SummaryCallback()
 
 # Use same CFL = 0.5 as in paper (maybe avoid overshoots) [Not sure if same notion of CFL]
-cfl_euler = 0.5
+cfl_euler = 3.0
 #analysis_interval = 6
 
 #cfl_euler = 3.0 # Can stable run with cfl = 3.0
@@ -188,7 +187,6 @@ function Trixi.analyze(::Val{:energy_potential}, du, u_euler, t,
     return e_potential
 end
 
-# TODO: Plotscripts (maybe I can find them somewhere)
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
