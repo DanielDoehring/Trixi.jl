@@ -20,8 +20,9 @@ refinement_patches = ((type = "box", coordinates_min = (0.5, 0.5),
                       (type = "box", coordinates_min = (0.75, 0.75),
                        coordinates_max = (1.25, 1.25)))
 
+ref_lvl = 2
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 2,
+                initial_refinement_level = ref_lvl,
                 refinement_patches = refinement_patches,
                 n_cells_max = 10_000)
 
@@ -43,42 +44,28 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 ###############################################################################
 # combining both semidiscretizations for Euler + self-gravity
 
-#=
-parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
-                                    # rho0 is (ab)used to add a "+8π" term to the source terms
-                                    # for the manufactured solution
-                                    gravitational_constant = 1.0, # aka G
-                                    cfl = 1.1,
-                                    resid_tol = 1.0e-5, # 1.0e-10
-                                    n_iterations_max = 1000, # 1000
-                                    timestep_gravity = timestep_gravity_erk52_3Sstar!)
-
-semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
-=#
-
 #base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Coupled_Convergence/"
 base_path = "/storage/home/daniel/PERK4/EulerGravity/Coupled_Convergence/"
 
 dtRatios = [1, 0.5, 0.25]
-
 Stages_Gravity = [9, 6, 5]
-#Stages_Gravity = [15, 9, 6]
-cfl_gravity = 1.0
-
 alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/", dtRatios)
 
+cfl_gravity = 1.0
+
+tolerance = 1e-5 
+if ref_lvl = 5
+  tolerance = 1e-6
+end
 
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
                                     # rho0 is (ab)used to add a "+8π" term to the source terms
                                     # for the manufactured solution
                                     gravitational_constant = 1.0, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-5, # 1.0e-10
-                                    n_iterations_max = 1000, # 1000
-
-                                    #timestep_gravity = Trixi.timestep_gravity_PERK4!
-                                    timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!
-                                    )
+                                    resid_tol = tolerance,
+                                    n_iterations_max = 1000,
+                                    timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!)
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
 
@@ -89,13 +76,11 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-#cfl_euler = 0.5
-cfl_euler = 1.0
-
-stepsize_callback = StepsizeCallback(cfl = cfl_euler) # PERK8 NOTE: Needs maybe to reduced further for long convergence study
+cfl_euler = 0.5
+stepsize_callback = StepsizeCallback(cfl = cfl_euler)
 
 analysis_interval = 10_000
-alive_callback = AliveCallback(alive_interval = 10)
+alive_callback = AliveCallback(alive_interval = 20)
 
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true)
@@ -105,11 +90,6 @@ callbacks = CallbackSet(summary_callback, stepsize_callback,
 
 ###############################################################################
 # run the simulation
-
-#=
-Stages = 8
-ode_algorithm = PERK4(Stages, "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/WeakBlastWave/Euler/")
-=#
 
 Stages = [13, 8, 5]
 
@@ -121,3 +101,4 @@ sol = Trixi.solve(ode, ode_algorithm,
 
 summary_callback() # print the timer summary
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)
+
