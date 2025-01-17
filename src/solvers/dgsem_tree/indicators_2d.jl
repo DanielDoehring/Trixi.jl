@@ -48,6 +48,7 @@ end
     for j in eachnode(dg), i in eachnode(dg)
         u_local = get_node_vars(u, equations, dg, i, j, element)
         indicator[i, j] = indicator_hg.variable(u_local, equations)
+        #indicator[i, j] = indicator_hg.variable(u_local, equations).value # For AD
     end
 
     # Convert to modal representation
