@@ -126,11 +126,6 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-cfl_euler = 3.0 # Relatively close to stability limit
-analysis_interval = 2
-
-stepsize_callback = StepsizeCallback(cfl = cfl_euler)
-
 Trixi.pretty_form_utf(::Val{:energy_potential}) = "∑e_potential"
 Trixi.pretty_form_ascii(::Val{:energy_potential}) = "e_potential"
 
@@ -157,6 +152,7 @@ function Trixi.analyze(::Val{:energy_potential}, du, u_euler, t,
     return e_potential
 end
 
+analysis_interval = 2
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
@@ -165,8 +161,7 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                                            energy_internal,
                                                            Val(:energy_potential)))
 
-callbacks = CallbackSet(summary_callback, 
-                        #stepsize_callback,
+callbacks = CallbackSet(summary_callback,
                         analysis_callback)
 
 ###############################################################################
