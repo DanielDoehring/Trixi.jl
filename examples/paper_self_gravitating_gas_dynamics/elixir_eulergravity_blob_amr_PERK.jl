@@ -67,9 +67,7 @@ indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 0.4,
                                          alpha_min = 0.0001,
                                          alpha_smooth = true,
-                                         #variable = pressure
-                                         variable = density_pressure
-                                         )
+                                         variable = density_pressure)
 
 volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
                                                  volume_flux_dg = volume_flux,
@@ -115,11 +113,11 @@ base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/
 dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
 
-cfl_gravity = 1.3 # Gravity Single
-#cfl_gravity = 1.1 # Gravity Multi
+#cfl_gravity = 1.3 # Gravity Single
+cfl_gravity = 1.1 # Gravity Multi
 
-alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
-#alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
+#alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
+alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
 
 # TODO: Set `dens0 = 1.0` as background_density ?
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
@@ -127,9 +125,8 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     cfl = cfl_gravity,
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
-
-                                    timestep_gravity = Trixi.timestep_gravity_PERK2!
-                                    #timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK2!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -176,9 +173,15 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
+save_solution = SaveSolutionCallback(interval = 500,
+                                     save_initial_solution = true,
+                                     save_final_solution = true,
+                                     solution_variables = cons2prim)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        amr_callback, stepsize_callback)
+                        amr_callback, stepsize_callback,
+                        save_solution)
 
 ###############################################################################
 # run the simulation
@@ -186,8 +189,8 @@ callbacks = CallbackSet(summary_callback,
 dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
 
-ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false,
                   callback = callbacks);
