@@ -115,22 +115,11 @@ base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/
 dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
 
-### CFL Set-Ups ###
+cfl_gravity = 1.3 # Gravity Single
+#cfl_gravity = 1.1 # Gravity Multi
 
-# Gravity Multi + Euler Multi:
-cfl_gravity = 1.1 # SMax = 5
-cfl = 1.1 # SMax = 9
-
-# Gravity Single + Euler Multi:
-#cfl_gravity = 1.3
-#cfl = 1.1
-
-# Gravity Single + Euler Single:
-#cfl_gravity = 1.3
-#cfl = 1.1
-
-#alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
-alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
+alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
+#alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
 
 # TODO: Set `dens0 = 1.0` as background_density ?
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
@@ -139,8 +128,8 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
 
-                                    #timestep_gravity = Trixi.timestep_gravity_PERK2!
-                                    timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK2!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -178,6 +167,8 @@ amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
 cfl_ref = 1.1                                              
 N_AMR_ref = 15
 
+cfl = 1.1 # Both Multi & Single
+
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = Int(floor(N_AMR_ref * cfl_ref / cfl)),
                            adapt_initial_condition = true,
@@ -195,8 +186,8 @@ callbacks = CallbackSet(summary_callback,
 dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
 
-#ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false,
                   callback = callbacks);
