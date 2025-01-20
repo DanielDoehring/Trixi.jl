@@ -1,5 +1,5 @@
 
-using OrdinaryDiffEq, Plots
+using OrdinaryDiffEq
 using Trixi
 
 ###############################################################################
@@ -55,7 +55,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100
+analysis_interval = 12 # Gives 250 data points
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      # Note: entropy defaults to mathematical entropy
@@ -72,11 +72,20 @@ callbacks = CallbackSet(summary_callback,
 
 path = "/home/daniel/git/Paper_PERRK/Data/Kelvin_Helmholtz/"
 
-ode_algorithm = Trixi.PairedExplicitRK3(7, path * "p3/")
-ode_algorithm = Trixi.PairedExplicitRelaxationRK3(7, path * "p3/")
+# For all orders of consistency
+Stages = reverse(collect(range(5, 16)))
+dt = 1e-3
+dtRatios = [42]
 
-# p = 3, S = 7
-dt = 3e-3
+ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path * "p2/", dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path * "p3/", dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path * "p4/", dtRatios)
+
+relaxation_solver = Trixi.RelaxationSolverSecantMethod(max_iterations = 10)
+
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path * "p2/", dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path * "p3/", dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path * "p4/", dtRatios; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
@@ -84,8 +93,12 @@ sol = Trixi.solve(ode, ode_algorithm,
 
 summary_callback() # print the timer summary
 
+
+###############################################################################
+# Plot section
+
+using Plots
 pd = PlotData2D(sol)
 
 plot(pd["rho"], title = "\$ρ, t_f = 3.0\$", xlabel = "\$x\$", ylabel = "\$y \$", c = :jet)
-plot!(getmesh(pd), xlabel = "\$x\$", ylabel="\$y\$", title = "Mesh at \$t_f = 3.0\$")
 
