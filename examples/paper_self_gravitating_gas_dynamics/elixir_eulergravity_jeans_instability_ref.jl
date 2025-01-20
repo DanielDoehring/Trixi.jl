@@ -80,23 +80,6 @@ refinement_patches = ((type = "box", coordinates_min = (0.25, 0.25),
                       (type = "box", coordinates_min = (0.375, 0.375),
                        coordinates_max = (0.625, 0.625)))
 
-# This interestingly gives completely wrong results for the potential energy
-#=
-refinement_patches = ((type = "box", coordinates_min = (0.2, 0.2),
-                       coordinates_max = (0.8, 0.8)),
-                      (type = "box", coordinates_min = (0.4, 0.4),
-                       coordinates_max = (0.6, 0.6)))
-=#
-
-# No oscillations observed in x direction. Thus, we refine entrire "stripes"
-# => Still gives wrong results for the potential energy
-#=
-refinement_patches = ((type = "box", coordinates_min = (0.25, 0.0),
-                       coordinates_max = (0.75, 1.0)),
-                      (type = "box", coordinates_min = (0.375, 0.0),
-                       coordinates_max = (0.625, 1.0)))
-=#
-
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 5, # 4
                 refinement_patches = refinement_patches,
@@ -117,16 +100,6 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 
 ###############################################################################
 # combining both semidiscretizations for Euler + self-gravity
-#=
-parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
-                                    gravitational_constant = 6.674e-8, # aka G
-                                    cfl = 0.8,
-                                    resid_tol = 1.0e-4,
-                                    n_iterations_max = 1000,
-                                    timestep_gravity = timestep_gravity_carpenter_kennedy_erk54_2N!)
-
-semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
-=#
 
 base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Jeans_Instab/"
 
@@ -139,7 +112,7 @@ alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/
 parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = cfl_gravity,
-                                    resid_tol = 1.0e-7, # 1.0e-4
+                                    resid_tol = 1.0e-7,
                                     n_iterations_max = 1000,
                                     timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!)
 
@@ -152,11 +125,7 @@ ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
 
-# Use same CFL = 0.5 as in paper (maybe avoid overshoots) [Not sure if same notion of CFL]
-cfl_euler = 3.0
-#analysis_interval = 6
-
-#cfl_euler = 3.0 # Can stable run with cfl = 3.0
+cfl_euler = 3.0 # Relatively lose to stability limit
 analysis_interval = 1
 
 stepsize_callback = StepsizeCallback(cfl = cfl_euler)
@@ -198,8 +167,7 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
 alive_callback = AliveCallback(alive_interval = 100)                                                           
 callbacks = CallbackSet(summary_callback, stepsize_callback,
                         analysis_callback,
-                        alive_callback
-                        )
+                        alive_callback)
 
 ###############################################################################
 # run the simulation
