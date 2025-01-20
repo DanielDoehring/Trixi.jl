@@ -81,14 +81,6 @@ solver = DGSEM(basis, surface_flux, volume_integral)
 coordinates_min = (-20.0, -20.0)
 coordinates_max = (20.0, 20.0)
 
-# Paper suggestion:
-#coordinates_min = (0.0, 0.0)
-#coordinates_max = (10.0, 10.0)
-
-# Try some middle-ground:
-#coordinates_min = (-10.0, -10.0)
-#coordinates_max = (10.0, 10.0)
-
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 6,
                 n_cells_max = 100_000)
@@ -126,19 +118,19 @@ StagesGravity = [5, 3, 2]
 ### CFL Set-Ups ###
 
 # Gravity Multi + Euler Multi:
-cfl_gravity = 1.1
-cfl = 1.1
+cfl_gravity = 1.1 # SMax = 5
+cfl = 1.1 # SMax = 9
 
 # Gravity Single + Euler Multi:
-cfl_gravity = 1.3
-cfl = 1.1
+#cfl_gravity = 1.3
+#cfl = 1.1
 
 # Gravity Single + Euler Single:
-cfl_gravity = 1.3
-cfl = 1.1
+#cfl_gravity = 1.3
+#cfl = 1.1
 
-alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
-#alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
+#alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
+alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
 
 # TODO: Set `dens0 = 1.0` as background_density ?
 parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
@@ -147,8 +139,8 @@ parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
                                     resid_tol = 1.0e-4,
                                     n_iterations_max = 500,
 
-                                    timestep_gravity = Trixi.timestep_gravity_PERK2!
-                                    #timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK2!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
                                     )
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
@@ -175,19 +167,12 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_max = 1.0,
                                           alpha_min = 0.0001,
                                           alpha_smooth = false,
-                                          #variable = Trixi.density
-                                          variable = Trixi.density_pressure
-                                          )
+                                          variable = Trixi.density_pressure)
 
 amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
-                                              base_level = 4, # 5
-
-                                              med_level = 0, # 0
-                                              med_threshold = 0.0003, 
-
-                                              max_level = 8, # 7
-                                              max_threshold = 0.0003, # 0.0003 when max_level = 7
-                                              
+                                              base_level = 4,
+                                              max_level = 8,
+                                              max_threshold = 0.0003,
                                               max_threshold_secondary = indicator_sc.alpha_max)
 
 cfl_ref = 1.1                                              
@@ -207,11 +192,11 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
-
 dtRatios = [1, 0.5, 0.25]
 Stages = [9, 6, 5]
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
+
+#ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false,
                   callback = callbacks);
