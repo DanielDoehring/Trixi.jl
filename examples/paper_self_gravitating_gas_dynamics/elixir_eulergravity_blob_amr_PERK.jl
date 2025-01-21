@@ -40,10 +40,6 @@ function initial_condition_blob(x, t, equations::CompressibleEulerEquations2D)
 
     # initial center of the blob (Trixi style)
     inicenter = [-15, 0]
-    # Paper setup:
-    #inicenter = [5, 5]
-    # Try some middle ground:
-    #inicenter = [-5, 0]
 
     x_rel = x - inicenter
     r = sqrt(x_rel[1]^2 + x_rel[2]^2)
@@ -114,7 +110,7 @@ dtRatios = [1, 0.5, 0.25]
 StagesGravity = [5, 3, 2]
 
 #cfl_gravity = 1.3 # Gravity Single
-cfl_gravity = 1.1 # Gravity Multi
+cfl_gravity = 1.2 # Gravity Multi
 
 #alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
 alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
@@ -161,10 +157,10 @@ amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
                                               max_threshold = 0.0003,
                                               max_threshold_secondary = indicator_sc.alpha_max)
 
-cfl_ref = 1.1                                              
+cfl_ref = 1.1
 N_AMR_ref = 15
 
-cfl = 1.1 # Both Multi & Single
+cfl = 1.0 # Both Multi & Single # 1.1; 1.0 for more symmetric results
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = Int(floor(N_AMR_ref * cfl_ref / cfl)),
@@ -173,7 +169,7 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-save_solution = SaveSolutionCallback(interval = 500,
+save_solution = SaveSolutionCallback(interval = 10_000,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)

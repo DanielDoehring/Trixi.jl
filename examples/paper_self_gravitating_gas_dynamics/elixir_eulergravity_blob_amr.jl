@@ -40,10 +40,6 @@ function initial_condition_blob(x, t, equations::CompressibleEulerEquations2D)
 
     # initial center of the blob (Trixi style)
     inicenter = [-15, 0]
-    # Paper setup:
-    #inicenter = [5, 5]
-    # Try some middle ground:
-    #inicenter = [-5, 0]
 
     x_rel = x - inicenter
     r = sqrt(x_rel[1]^2 + x_rel[2]^2)
@@ -67,7 +63,6 @@ indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 0.4,
                                          alpha_min = 0.0001,
                                          alpha_smooth = true,
-                                         #variable = pressure
                                          variable = density_pressure)
 
 volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
@@ -112,9 +107,9 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity,
 cfl_gravity = 1.8 # CarpenterKennedy2N54
 cfl_gravity = 1.9 # SSPRK104
 cfl_gravity = 1.9 # SSPRK54
-cfl_gravity = 1.8 # DGLDDRK84_F
-cfl_gravity = 1.8 # ParsaniKetchesonDeconinck3S94
-cfl_gravity = 1.8 # NDBLSRK124
+#cfl_gravity = 1.8 # DGLDDRK84_F
+#cfl_gravity = 1.8 # ParsaniKetchesonDeconinck3S94
+#cfl_gravity = 1.8 # NDBLSRK124
 
 parameters = ParametersEulerGravity(background_density = 0.0, # taken from above
                                     gravitational_constant = 6.674e-8, # aka G
@@ -163,9 +158,9 @@ N_AMR_ref = 15
 cfl = 0.7 # CarpenterKennedy2N54 # tested
 cfl = 3.2 # SSPRK104 # tested
 cfl = 1.2  # SSPRK54 # tested 
-cfl = 0.9 # DGLDDRK84_F # tested
-cfl = 0.6 # ParsaniKetchesonDeconinck3S94
-cfl = 0.6 # NDBLSRK124 # tested
+#cfl = 0.9 # DGLDDRK84_F # tested
+#cfl = 0.6 # ParsaniKetchesonDeconinck3S94
+#cfl = 0.6 # NDBLSRK124 # tested
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = Int(floor(N_AMR_ref * cfl_ref / cfl)),
@@ -174,16 +169,22 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
+save_solution = SaveSolutionCallback(interval = 10_000,
+                                     save_initial_solution = true,
+                                     save_final_solution = true,
+                                     solution_variables = cons2prim)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        amr_callback, stepsize_callback)
+                        amr_callback, stepsize_callback,
+                        save_solution)
 
 ode_alg = CarpenterKennedy2N54(thread = OrdinaryDiffEq.True())
 ode_alg = SSPRK104(thread = OrdinaryDiffEq.True())
 ode_alg = SSPRK54(thread = OrdinaryDiffEq.True())
-ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
-ode_alg = ParsaniKetchesonDeconinck3S94(thread = OrdinaryDiffEq.True())
-ode_alg = NDBLSRK124(thread = OrdinaryDiffEq.True())
+#ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
+#ode_alg = ParsaniKetchesonDeconinck3S94(thread = OrdinaryDiffEq.True())
+#ode_alg = NDBLSRK124(thread = OrdinaryDiffEq.True())
 
 sol = solve(ode, ode_alg,
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
