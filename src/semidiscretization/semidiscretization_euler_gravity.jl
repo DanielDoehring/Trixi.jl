@@ -263,8 +263,9 @@ end
 
 @inline function calc_error_norms(func, u, t, analyzer,
                                   semi::SemidiscretizationEulerGravity, cache_analysis)
-    @unpack cache, semi_euler, semi_gravity = semi                                  
-    grav_l2, grav_linf, grav_l1 = calc_error_norms(func, cache.u_ode, t, analyzer, semi_gravity, cache_analysis)
+    @unpack cache, semi_euler, semi_gravity = semi
+    grav_l2, grav_linf, grav_l1 = calc_error_norms(func, cache.u_ode, t, analyzer,
+                                                   semi_gravity, cache_analysis)
 
     println("Gravity L2 error: $grav_l2")
     println("Gravity L∞ error: $grav_linf")
@@ -594,7 +595,8 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
         # this is an absolute tolerance check
         # Note: Althugh the gravitational sources are given by an elliptic equation, 
         # we do not really need global convergence as we add only the local contributions
-        if maximum(abs, @views du_gravity[1, .., level_info_elements_acc[max_level]]) <= resid_tol
+        if maximum(abs, @views du_gravity[1, .., level_info_elements_acc[max_level]]) <=
+           resid_tol
             finalstep = true
         end
     end
