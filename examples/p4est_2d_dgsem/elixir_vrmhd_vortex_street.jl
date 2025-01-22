@@ -94,14 +94,14 @@ boundary_conditions = Dict(:Bottom => bc_freestream,
 velocity_bc_free = NoSlip((x, t, equations) -> SVector(v_in(), 0.0, 0.0))
 heat_bc_free = Adiabatic((x, t, equations) -> 0.0)
 magnetic_bc_free = Isomagnetic((x, t, equations) -> SVector(B_in(), 0.0, 0.0))
+#magnetic_bc_free = Insulating((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 
 boundary_condition_free = BoundaryConditionVRMHDWall(velocity_bc_free, heat_bc_free,
                                                      magnetic_bc_free)
 
 velocity_bc_cylinder = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc_cylinder = Adiabatic((x, t, equations) -> 0.0)
-magnetic_bc_cylinder = Isomagnetic((x, t, equations) -> SVector(B_in(), 0.0, 0.0))
-#magnetic_bc_cylinder = Insulating((x, t, equations) -> SVector(0.0, 0.0, 0.0))
+magnetic_bc_cylinder = Isomagnetic((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 
 boundary_condition_cylinder = BoundaryConditionVRMHDWall(velocity_bc_cylinder,
                                                          heat_bc_cylinder,
