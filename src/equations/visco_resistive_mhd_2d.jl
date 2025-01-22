@@ -205,10 +205,10 @@ end
     v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
                                                                                         t,
                                                                                         equations)
-    B = boundary_condition.boundary_condition_magnetic.boundary_value_function(x,
+    B1, B2, B3 = boundary_condition.boundary_condition_magnetic.boundary_value_function(x,
                                                                                t,
                                                                                equations)
-    return SVector(u_inner[1], v1, v2, v3, u_inner[5], B..., u_inner[9])
+    return SVector(u_inner[1], v1, v2, v3, u_inner[5], B1, B2, B3, u_inner[9])
 end
 
 @inline function (boundary_condition::BoundaryConditionVRMHDWall{<:NoSlip,
