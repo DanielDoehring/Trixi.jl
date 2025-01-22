@@ -90,17 +90,11 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_min = 0.001,
                                           alpha_smooth = false,
                                           variable = density_pressure)
-#=                                 
+                             
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level=5,
                                       med_level =7, med_threshold=0.04,
                                       max_level =9, max_threshold=0.4)
-=#
-
-amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level = 4,
-                                      med_level = 5, med_threshold = 0.04,
-                                      max_level = 9, max_threshold = 0.4)
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 10, # PERK
@@ -128,9 +122,9 @@ dtRatios = [1.0, 0.5, 0.25]
 
 path = "/home/daniel/git/paper-2024-amr-paired-rk/elixirs/sec7_applications/sec_7.1_hyperbolic_parabolic/visco_resistive_orszag_tang/data/"
 
-ode_algorithm = Trixi.PairedExplicitRK3(Stages[1], path)
+#ode_algorithm = Trixi.PairedExplicitRK3(Stages[1], path)
 
-#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
 
