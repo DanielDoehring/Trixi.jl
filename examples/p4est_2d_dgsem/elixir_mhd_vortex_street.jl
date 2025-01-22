@@ -5,19 +5,37 @@ using Trixi
 # Semidiscretization of the compressible Euler equations
 
 # Setup the governing equations, initial condition and boundary conditions
-gamma = 5 / 3 # Not specified by Warburton and Karniadakis
-equations = IdealGlmMhdEquations2D(gamma)
+# Fluid parameters
+gamma() = 5 / 3 # Not specified by Warburton and Karniadakis
+
+# Parameters for compressible von-Karman vortex street
+Ma() = 0.5f0
+D() = 1 # Diameter of the cylinder as in the mesh file
+
+# Parameters that can be freely chosen
+v_in() = 1
+p_in() = 1
+
+# Parameters that follow from Reynolds and Mach number + adiabatic index gamma
+c() = v_in() / Ma()
+p_over_rho() = c()^2 / gamma()
+rho_in() = p_in() / p_over_rho()
+
+# MHD additions
+Alfven() = 0.1
+B_in() = Alfven() * rho_in()
+
+equations = IdealGlmMhdEquations2D(gamma())
 
 @inline function initial_condition_mach05_flow(x, t, equations::IdealGlmMhdEquations2D)
-  # set the freestream flow parameters
-  rho = 1.4
-  v1 = 0.5
+  rho = rho_in()
+  v1 = v_in()
   v2 = 0.0
   v3 = 0.0
-  p = 1.0
+  p = p_in()
 
   A = 0.1
-  B1 = A * rho
+  B1 = B_in()
   B2 = 0.0
   B3 = 0.0
   psi = 0.0
@@ -26,9 +44,9 @@ equations = IdealGlmMhdEquations2D(gamma)
   return prim2cons(prim, equations)
 end
 
-# Create the unstructured quad mesh from the mesh file that
-# was created by the interactive HOHQMesh.jl.
-mesh_file = joinpath("out/Cylinder.inp")
+# Mesh which is refined around the cylinder and the wake region
+mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/7312faba9a50ef506b13f01716b4ec26/raw/8e68f9006e634905544207ca322bc0a03a9313ad/cylinder_vortex_street.inp",
+                           joinpath(@__DIR__, "cylinder_vortex_street.inp"))
 mesh = P4estMesh{2}(mesh_file)
 
 bc_freestream = BoundaryConditionDirichlet(initial_condition_mach05_flow)
@@ -69,11 +87,6 @@ volume_flux = (flux_hindenlang_gassner, flux_nonconservative_powell)
 polydeg = 3
 
 # Need stabilization for Mach 0.5 (inviscid)
-#=
-solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
-=#
-
 basis = LobattoLegendreBasis(polydeg)
 indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 0.5,
@@ -91,7 +104,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_mach05_fl
 
 ###############################################################################
 # Setup an ODE problem
-tspan = (0.0, 20.0)
+tspan = (0.0, 100.0)
 ode = semidiscretize(semi, tspan)
 
 # Callbacks
@@ -108,7 +121,7 @@ save_solution = SaveSolutionCallback(interval=1000,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 
-cfl = 0.8
+cfl = 1.5
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
