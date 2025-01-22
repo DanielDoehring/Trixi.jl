@@ -90,8 +90,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
 semi = SemidiscretizationHyperbolic(mesh, equations,
-                                             initial_condition, solver,
-                                             boundary_conditions = boundary_conditions)
+                                    initial_condition, solver,
+                                    boundary_conditions = boundary_conditions)
 
 ###############################################################################
 # Setup an ODE problem
@@ -113,7 +113,7 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        alive_callback,
+                        alive_callback
                         #save_solution
                         )
 

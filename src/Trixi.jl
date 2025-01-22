@@ -217,7 +217,7 @@ export boundary_condition_do_nothing,
        boundary_condition_wall,
        BoundaryConditionNavierStokesWall, NoSlip, Adiabatic, Isothermal,
        BoundaryConditionCoupled,
-       BoundaryConditionVRMHDWall, Isomagnetic
+       BoundaryConditionVRMHDWall, Isomagnetic, Insulating
 
 export initial_condition_convergence_test, source_terms_convergence_test,
        source_terms_lorentz

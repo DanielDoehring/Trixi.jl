@@ -52,15 +52,17 @@ addCurveToInnerBoundary!(cylinder_flow, cylinder, "inner1")
 # Add a refinement line for the wake region.
 wake_region_mesh_size = 0.5
 wake_region_width = 5.0
-ref_wake_region = newRefinementLine("wake_region", "smooth", [0.0,0.0,0.0], [40.0,0.0,0.0], 
-                                wake_region_mesh_size, wake_region_width)
+ref_wake_region = newRefinementLine("wake_region", "smooth", 
+                                    [0.0, 0.0, 0.0], [40.0, 0.0, 0.0],
+                                    wake_region_mesh_size, wake_region_width)
 
 addRefinementRegion!(cylinder_flow, ref_wake_region)
 
 # Smaller refinement for farfield wake region
 wake_region_far_mesh_size = 1.0
 wake_region_far_width = 2.5
-ref_wake_region_far = newRefinementLine("wake_region", "smooth", [40.0,0.0,0.0], [60.0,0.0,0.0], 
+ref_wake_region_far = newRefinementLine("wake_region", "smooth", 
+                                        [40.0, 0.0, 0.0], [60.0, 0.0, 0.0],
                                         wake_region_far_mesh_size, wake_region_far_width)
 
 addRefinementRegion!(cylinder_flow, ref_wake_region_far)
@@ -68,14 +70,14 @@ addRefinementRegion!(cylinder_flow, ref_wake_region_far)
 # Add refinement around cylinder
 cylinder_region_mesh_size = 0.25
 cylinder_region_radius = 4.0
-refine_circle = newRefinementCenter("cylinder", "smooth", [0.0,0.0,0.0], 
+refine_circle = newRefinementCenter("cylinder", "smooth", [0.0, 0.0, 0.0],
                                     cylinder_region_mesh_size, cylinder_region_radius)
 
 addRefinementRegion!(cylinder_flow, refine_circle)
 
 # Visualize the model, refinement region and background grid
 # prior to meshing.
-plotProject!(cylinder_flow, MODEL+REFINEMENTS+GRID)
+plotProject!(cylinder_flow, MODEL + REFINEMENTS + GRID)
 
 # Generate the mesh. Saves the mesh file to the directory "out".
 generate_mesh(cylinder_flow)
