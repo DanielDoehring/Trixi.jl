@@ -166,6 +166,21 @@ function flux(u, gradients, orientation::Integer,
     end
 end
 
+# Convert conservative variables to primitive
+@inline function cons2prim(u, equations::ViscoResistiveMhdDiffusion2D)
+    rho, rho_v1, rho_v2, rho_v3, rho_e, B1, B2, B3, psi = u
+
+    v1 = rho_v1 / rho
+    v2 = rho_v2 / rho
+    v3 = rho_v3 / rho
+    p = (equations.gamma - 1) * (rho_e -
+         0.5f0 * (rho_v1 * v1 + rho_v2 * v2 + rho_v3 * v3
+          + B1 * B1 + B2 * B2 + B3 * B3
+          + psi * psi))
+
+    return SVector(rho, v1, v2, v3, p, B1, B2, B3, psi)
+end
+
 # the `flux` function takes in transformed variables `u` which depend on the type of the gradient variables.
 # For CNS, it is simplest to formulate the viscous terms in primitive variables, so we transform the transformed
 # variables into primitive variables.
@@ -291,6 +306,30 @@ end
                    normal_energy_flux, 
                    B1_n, B2_n, B3_n,
                    flux_inner[9])
+end
+
+# Dirichlet Boundary Condition for P4est mesh
+@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner,
+                                                                  u_inner,
+                                                                  normal::AbstractVector,
+                                                                  x, t,
+                                                                  operator_type::Gradient,
+                                                                  equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
+    # BCs are usually specified as conservative variables so we convert them to primitive variables
+    #  because the gradients are assumed to be with respect to the primitive variables
+    u_boundary = boundary_condition.boundary_value_function(x, t, equations)
+
+    return cons2prim(u_boundary, equations)
+end
+
+@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner,
+                                                                  u_inner,
+                                                                  normal::AbstractVector,
+                                                                  x, t,
+                                                                  operator_type::Divergence,
+                                                                  equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
+    # for Dirichlet boundary conditions, we do not impose any conditions on the viscous fluxes
+    return flux_inner
 end
 
 end # @muladd
