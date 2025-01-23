@@ -46,7 +46,7 @@ equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
                                                    eta = eta(),
                                                    gradient_variables = GradientVariablesPrimitive())
 
-@inline function initial_condition_mach05_flow(x, t, equations)
+@inline function initial_condition(x, t, equations)
     # set the freestream flow parameters
     rho = rho_in()
     v1 = v_in()
@@ -64,19 +64,20 @@ equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
 end
 
 # Mesh which is refined around the cylinder and the wake region
-#=
+
 mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/7312faba9a50ef506b13f01716b4ec26/raw/8e68f9006e634905544207ca322bc0a03a9313ad/cylinder_vortex_street.inp",
                            joinpath(@__DIR__, "cylinder_vortex_street.inp"))
-=#
-mesh_file = "out/Cylinder.inp"
+
+#mesh_file = "out/Cylinder.inp"
+
 mesh = P4estMesh{2}(mesh_file)
 
-bc_freestream = BoundaryConditionDirichlet(initial_condition_mach05_flow)
+bc_freestream = BoundaryConditionDirichlet(initial_condition)
 
 using LinearAlgebra: norm, dot # for use in the MHD boundary condition
-function boundary_condition_velocity_slip_wall(u_inner, normal_direction::AbstractVector,
-                                               x, t, surface_flux_function,
-                                               equations)
+function bc_slip_wall_no_mag(u_inner, normal_direction::AbstractVector,
+                             x, t, surface_flux_function,
+                             equations)
 
     # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
     norm_ = norm(normal_direction)
@@ -97,18 +98,34 @@ function boundary_condition_velocity_slip_wall(u_inner, normal_direction::Abstra
     return surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
 end
 
+@inline function boundary_condition_copy(flux_inner,
+                                         u_inner,
+                                         normal::AbstractVector,
+                                         x, t,
+                                         operator_type::Trixi.Gradient,
+                                         equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
+    return u_inner
+end
+
+@inline function boundary_condition_copy(flux_inner,
+                                         u_inner,
+                                         normal::AbstractVector,
+                                         x, t,
+                                         operator_type::Trixi.Divergence,
+                                         equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
+    return flux_inner
+end
+
 # Boundary names are those we assigned in HOHQMesh.jl
 boundary_conditions = Dict(:Bottom => bc_freestream,
-                           :Circle => boundary_condition_velocity_slip_wall,
+                           :Circle => bc_slip_wall_no_mag,
                            :Top => bc_freestream,
                            :Right => bc_freestream,
                            :Left => bc_freestream)
 
 velocity_bc_free = NoSlip((x, t, equations) -> SVector(v_in(), 0.0, 0.0))
 heat_bc_free = Adiabatic((x, t, equations) -> 0.0)
-#magnetic_bc_free = Isomagnetic((x, t, equations) -> SVector(B_in(), 0.0, 0.0))
-magnetic_bc_free = Insulating((x, t, equations) -> SVector(0.0, 0.0, 0.0))
-
+magnetic_bc_free = Isomagnetic((x, t, equations) -> SVector(B_in(), 0.0, 0.0))
 boundary_condition_free = BoundaryConditionVRMHDWall(velocity_bc_free, heat_bc_free,
                                                      magnetic_bc_free)
 
@@ -120,9 +137,9 @@ boundary_condition_cylinder = BoundaryConditionVRMHDWall(velocity_bc_cylinder,
                                                          heat_bc_cylinder,
                                                          magnetic_bc_cylinder)
 
-boundary_conditions_para = Dict(:Bottom => boundary_condition_free,
+boundary_conditions_para = Dict(:Bottom => boundary_condition_copy,
                                 :Circle => boundary_condition_cylinder,
-                                :Top => boundary_condition_free,
+                                :Top => boundary_condition_copy,
                                 :Right => boundary_condition_free,
                                 :Left => boundary_condition_free)
 
@@ -149,7 +166,7 @@ solver = DGSEM(basis, surface_flux, volume_integral)
 
 # Combine all the spatial discretization components into a high-level descriptions.
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                             initial_condition_mach05_flow, solver,
+                                             initial_condition, solver,
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_para))
 
@@ -196,4 +213,4 @@ sol = solve(ode, SSPRK54(thread = OrdinaryDiffEq.True()),
 summary_callback() # print the timer summary
 
 using Plots
-pd = PlotData2D(sol)
+pd = PlotData2D(sol);

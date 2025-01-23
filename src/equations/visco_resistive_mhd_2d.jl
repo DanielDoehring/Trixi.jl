@@ -221,8 +221,8 @@ end
                                                                                         t,
                                                                                         equations)
     B1, B2, B3 = boundary_condition.boundary_condition_magnetic.boundary_value_function(x,
-                                                                               t,
-                                                                               equations)
+                                                                                        t,
+                                                                                        equations)
     return SVector(u_inner[1], v1, v2, v3, u_inner[5], B1, B2, B3, u_inner[9])
 end
 
@@ -251,60 +251,10 @@ end
     # This is the Navier-Stokes part
     normal_energy_flux = (v1 * tau_1n + v2 * tau_2n + v3 * tau_3n + normal_heat_flux +
                           # This is the MHD part
-                          B1 * Bvisc_1n + B2 * Bvisc_2n + B3 * Bvisc_3n)                  
+                          B1 * Bvisc_1n + B2 * Bvisc_2n + B3 * Bvisc_3n)
 
     return SVector(flux_inner[1], flux_inner[2], flux_inner[3], flux_inner[4],
                    normal_energy_flux, flux_inner[6], flux_inner[7], flux_inner[8],
-                   flux_inner[9])
-end
-
-@inline function (boundary_condition::BoundaryConditionVRMHDWall{<:NoSlip,
-                                                                 <:Adiabatic,
-                                                                 <:Insulating})(flux_inner,
-                                                                                 u_inner,
-                                                                                 normal::AbstractVector,
-                                                                                 x,
-                                                                                 t,
-                                                                                 operator_type::Gradient,
-                                                                                 equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
-    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
-                                                                                        t,
-                                                                                        equations)
-    return SVector(u_inner[1], v1, v2, v3, u_inner[5], u_inner[6], u_inner[7], u_inner[8], u_inner[9])
-end
-
-@inline function (boundary_condition::BoundaryConditionVRMHDWall{<:NoSlip,
-                                                                 <:Adiabatic,
-                                                                 <:Insulating})(flux_inner,
-                                                                                 u_inner,
-                                                                                 normal::AbstractVector,
-                                                                                 x,
-                                                                                 t,
-                                                                                 operator_type::Divergence,
-                                                                                 equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
-    normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x,
-                                                                                                           t,
-                                                                                                           equations)
-    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
-                                                                                        t,
-                                                                                        equations)
-
-    B1_n, B2_n, B3_n = boundary_condition.boundary_condition_magnetic.boundary_value_normal_flux_function(x,
-                                                                                        t,
-                                                                                        equations)
-
-    _, tau_1n, tau_2n, tau_3n = flux_inner # extract fluxes for 2nd and 3rd equations
-
-    _, _, _, _, _, B1, B2, B3, _ = u_inner
-
-    # This is the Navier-Stokes part
-    normal_energy_flux = (v1 * tau_1n + v2 * tau_2n + v3 * tau_3n + normal_heat_flux +
-                          # This is the MHD part
-                          B1 * B1_n + B2 * B2_n + B3 * B3_n)                  
-
-    return SVector(flux_inner[1], flux_inner[2], flux_inner[3], flux_inner[4],
-                   normal_energy_flux, 
-                   B1_n, B2_n, B3_n,
                    flux_inner[9])
 end
 end # @muladd

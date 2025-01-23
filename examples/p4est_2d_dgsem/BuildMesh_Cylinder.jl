@@ -48,7 +48,7 @@ addCurveToInnerBoundary!(cylinder_flow, cylinder, "inner1")
 # Add a refinement line for the wake region.
 wake_region_mesh_size = 0.5
 wake_region_width = 5.0
-ref_wake_region = newRefinementLine("wake_region", "smooth", 
+ref_wake_region = newRefinementLine("wake_region", "smooth",
                                     [0.0, 0.0, 0.0], [40.0, 0.0, 0.0],
                                     wake_region_mesh_size, wake_region_width)
 
@@ -57,7 +57,7 @@ addRefinementRegion!(cylinder_flow, ref_wake_region)
 # Smaller refinement for farfield wake region
 wake_region_far_mesh_size = 1.0
 wake_region_far_width = 2.5
-ref_wake_region_far = newRefinementLine("wake_region", "smooth", 
+ref_wake_region_far = newRefinementLine("wake_region", "smooth",
                                         [40.0, 0.0, 0.0], [60.0, 0.0, 0.0],
                                         wake_region_far_mesh_size, wake_region_far_width)
 

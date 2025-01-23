@@ -66,11 +66,13 @@ heat_bc_cylinder = Adiabatic((x, t, equations) -> 0)
 boundary_condition_cylinder = BoundaryConditionNavierStokesWall(velocity_bc_cylinder,
                                                                 heat_bc_cylinder)
 
-boundary_conditions_para = Dict(:Bottom => bc_freestream, # boundary_condition_free
+# TODO: Check "copy" BC from VRMHD also here (comparison)                                                                
+boundary_conditions_para = Dict(:Bottom => boundary_condition_free,
                                 :Circle => boundary_condition_cylinder,
-                                :Top => bc_freestream, # boundary_condition_free
-                                :Right => bc_freestream, # boundary_condition_free,
-                                :Left => bc_freestream) #boundary_condition_free)
+                                :Top => boundary_condition_free,
+                                :Right => boundary_condition_free,
+                                :Left => boundary_condition_free)
+
 # Standard DGSEM sufficient here
 solver = DGSEM(polydeg = 3, surface_flux = flux_hll)
 
@@ -109,7 +111,7 @@ time_int_tol = 1e-6
 sol = solve(ode,
             # Moderate number of threads (e.g. 4) advisable to speed things up
             RDPK3SpFSAL49(thread = OrdinaryDiffEq.True());
-            dt = 1e-3, abstol = time_int_tol, reltol = time_int_tol,
+            abstol = time_int_tol, reltol = time_int_tol,
             ode_default_options()..., callback = callbacks)
 
 summary_callback() # print the timer summary
