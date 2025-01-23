@@ -66,10 +66,28 @@ heat_bc_cylinder = Adiabatic((x, t, equations) -> 0)
 boundary_condition_cylinder = BoundaryConditionNavierStokesWall(velocity_bc_cylinder,
                                                                 heat_bc_cylinder)
 
-# TODO: Check "copy" BC from VRMHD also here (comparison)                                                                
-boundary_conditions_para = Dict(:Bottom => boundary_condition_free,
+# Boundary conditions for comparison with VRMHD                                                                
+@inline function boundary_condition_copy(flux_inner,
+                                         u_inner,
+                                         normal::AbstractVector,
+                                         x, t,
+                                         operator_type::Trixi.Gradient,
+                                         equations::CompressibleNavierStokesDiffusion2D{GradientVariablesPrimitive})
+    return u_inner
+end
+
+@inline function boundary_condition_copy(flux_inner,
+                                         u_inner,
+                                         normal::AbstractVector,
+                                         x, t,
+                                         operator_type::Trixi.Divergence,
+                                         equations::CompressibleNavierStokesDiffusion2D{GradientVariablesPrimitive})
+    return flux_inner
+end
+                                                               
+boundary_conditions_para = Dict(:Bottom => boundary_condition_copy,
                                 :Circle => boundary_condition_cylinder,
-                                :Top => boundary_condition_free,
+                                :Top => boundary_condition_copy,
                                 :Right => boundary_condition_free,
                                 :Left => boundary_condition_free)
 
