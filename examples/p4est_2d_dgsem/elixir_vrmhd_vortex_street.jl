@@ -4,7 +4,15 @@ using Trixi
 ###############################################################################
 # Semidiscretization of the compressible Euler equations
 
-# Fluid parameters
+# Resource for this testcase:
+#=
+A Discontinuous Galerkin Method for the Viscous MHD Equations
+T. C. Warburton and G. E. Karniadakis
+Journal of Computational Physics 152.2, 608-641 (1999)
+https://doi.org/10.1006/jcph.1999.6248
+=#
+
+# Fluid parameters (Warburton & Karniadakis give no value for these)
 gamma() = 5 / 3
 prandtl_number() = 0.72
 
@@ -13,22 +21,24 @@ Re() = 500
 Ma() = 0.5f0
 D() = 1 # Diameter of the cylinder as in the mesh file
 
-eta() = 1 / Re() # TODO: As of now arbitrary value
-
 # Parameters that can be freely chosen
 v_in() = 1
 p_in() = 1
 
 # Parameters that follow from Reynolds and Mach number + adiabatic index gamma
 mu() = v_in() * D() / Re()
+eta() = mu() # Follow Warburton & Karniadakis (same values for Lundquist numbers)
 
 c() = v_in() / Ma()
+
 p_over_rho() = c()^2 / gamma()
 rho_in() = p_in() / p_over_rho()
 
 # MHD additions
-Alfven() = 0.1
-B_in() = Alfven() * rho_in()
+Alfven_Mach_number() = 0.1
+# Use definition of Alven (Mach) number as in Warburton & Karniadakis
+Alfven_speed() = v_in() * Alfven_Mach_number()
+B_in() = Alfven_speed() * sqrt(rho_in())
 
 equations = IdealGlmMhdEquations2D(gamma())
 equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
@@ -42,7 +52,7 @@ equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
     v1 = v_in()
     v2 = 0.0
     v3 = 0.0
-    p = 1.0
+    p = p_in()
 
     B1 = B_in()
     B2 = 0.0
@@ -54,8 +64,11 @@ equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
 end
 
 # Mesh which is refined around the cylinder and the wake region
+#=
 mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/7312faba9a50ef506b13f01716b4ec26/raw/8e68f9006e634905544207ca322bc0a03a9313ad/cylinder_vortex_street.inp",
                            joinpath(@__DIR__, "cylinder_vortex_street.inp"))
+=#
+mesh_file = "out/Cylinder.inp"
 mesh = P4estMesh{2}(mesh_file)
 
 bc_freestream = BoundaryConditionDirichlet(initial_condition_mach05_flow)
@@ -93,8 +106,8 @@ boundary_conditions = Dict(:Bottom => bc_freestream,
 
 velocity_bc_free = NoSlip((x, t, equations) -> SVector(v_in(), 0.0, 0.0))
 heat_bc_free = Adiabatic((x, t, equations) -> 0.0)
-magnetic_bc_free = Isomagnetic((x, t, equations) -> SVector(B_in(), 0.0, 0.0))
-#magnetic_bc_free = Insulating((x, t, equations) -> SVector(0.0, 0.0, 0.0))
+#magnetic_bc_free = Isomagnetic((x, t, equations) -> SVector(B_in(), 0.0, 0.0))
+magnetic_bc_free = Insulating((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 
 boundary_condition_free = BoundaryConditionVRMHDWall(velocity_bc_free, heat_bc_free,
                                                      magnetic_bc_free)
@@ -142,7 +155,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 ###############################################################################
 # Setup an ODE problem
-tspan = (0.0, 10.0) # 100
+tspan = (0.0, 100.0) # 100
 ode = semidiscretize(semi, tspan)
 
 # Callbacks
