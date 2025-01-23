@@ -16,10 +16,17 @@ addBackgroundGrid!(cylinder_flow, [base_size, base_size, 0.0])
 
 # Add outer boundary curves in counter-clockwise order.
 # Note, the curve names are those that will be present in the mesh file.
-left = newEndPointsLineCurve("Left", [-10.0, 10.0, 0.0], [-10.0, -10.0, 0.0])
-bottom = newEndPointsLineCurve("Bottom", [-10.0, -10.0, 0.0], [60.0, -10.0, 0.0])
-right = newEndPointsLineCurve("Right", [60.0, -10.0, 0.0], [60.0, 10.0, 0.0])
-top = newEndPointsLineCurve("Top", [60.0, 10.0, 0.0], [-10.0, 10.0, 0.0])
+
+x_min = -5.0 # -10.0
+x_max = 60.0 # 60.0
+
+y_min = -20.0 # -10.0
+y_max = 20.0 # 10.0
+
+left = newEndPointsLineCurve("Left", [x_min, y_max, 0.0], [x_min, y_min, 0.0])
+bottom = newEndPointsLineCurve("Bottom", [x_min, y_min, 0.0], [x_max, y_min, 0.0])
+right = newEndPointsLineCurve("Right", [x_max, y_min, 0.0], [x_max, y_max, 0.0])
+top = newEndPointsLineCurve("Top", [x_max, y_max, 0.0], [x_min, y_max, 0.0])
 
 # Outer boundary curve chain is created to have counter-clockwise
 # orientation, as required by HOHQMesh generator
