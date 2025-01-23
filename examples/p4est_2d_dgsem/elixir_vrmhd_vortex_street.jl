@@ -181,3 +181,6 @@ sol = solve(ode, SSPRK54(thread = OrdinaryDiffEq.True()),
             save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
+
+using Plots
+pd = PlotData2D(sol)

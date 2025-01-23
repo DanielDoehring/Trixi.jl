@@ -31,7 +31,7 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
                                                           gradient_variables = GradientVariablesPrimitive())
 
 # Freestream configuration
-@inline function initial_condition(x, t, equations::CompressibleEulerEquations2D)
+@inline function initial_condition(x, t, equations)
     rho = rho_in()
     v1 = v_in()
     v2 = 0.0
@@ -66,11 +66,11 @@ heat_bc_cylinder = Adiabatic((x, t, equations) -> 0)
 boundary_condition_cylinder = BoundaryConditionNavierStokesWall(velocity_bc_cylinder,
                                                                 heat_bc_cylinder)
 
-boundary_conditions_para = Dict(:Bottom => boundary_condition_free,
+boundary_conditions_para = Dict(:Bottom => bc_freestream, # boundary_condition_free
                                 :Circle => boundary_condition_cylinder,
-                                :Top => boundary_condition_free,
-                                :Right => boundary_condition_free,
-                                :Left => boundary_condition_free)
+                                :Top => bc_freestream, # boundary_condition_free
+                                :Right => bc_freestream, # boundary_condition_free,
+                                :Left => bc_freestream) #boundary_condition_free)
 # Standard DGSEM sufficient here
 solver = DGSEM(polydeg = 3, surface_flux = flux_hll)
 

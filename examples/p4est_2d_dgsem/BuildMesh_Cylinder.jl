@@ -1,17 +1,6 @@
-# Box around a cylinder with sinusoidal walls
-#
-# Create an outer boundary with two vertical sides and two sinusoidal
-# "wobbly" sides. Inner boundary is a circle with a refinement line
-# placed behind the cylinder to capture the wake region.
-#
-# Keywords: Outer boundary, inner boundary, paramteric equations,
-#           circular arc, manual refinement region
-
 using HOHQMesh, GLMakie
 
-# Create a new HOHQMesh model project. The project name
-# "cylinder_sine_walls" will be the name of the mesh file
-# saved in the directory "out".
+# Create a new HOHQMesh model project.
 cylinder_flow = newProject("Cylinder", "out")
 
 # Reset polynomial order of the mesh model curves and output format.
@@ -21,7 +10,7 @@ setPolynomialOrder!(cylinder_flow, 3)
 setMeshFileFormat!(cylinder_flow, "ABAQUS")
 
 # A background grid is required for the mesh generation. In this example we lay a
-# background grid of Cartesian boxes with size 0.4.
+# background grid of Cartesian boxes with size 2.0
 base_size = 2.0
 addBackgroundGrid!(cylinder_flow, [base_size, base_size, 0.0])
 
