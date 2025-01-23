@@ -307,29 +307,4 @@ end
                    B1_n, B2_n, B3_n,
                    flux_inner[9])
 end
-
-# Dirichlet Boundary Condition for P4est mesh
-@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner,
-                                                                  u_inner,
-                                                                  normal::AbstractVector,
-                                                                  x, t,
-                                                                  operator_type::Gradient,
-                                                                  equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
-    # BCs are usually specified as conservative variables so we convert them to primitive variables
-    #  because the gradients are assumed to be with respect to the primitive variables
-    u_boundary = boundary_condition.boundary_value_function(x, t, equations)
-
-    return cons2prim(u_boundary, equations)
-end
-
-@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner,
-                                                                  u_inner,
-                                                                  normal::AbstractVector,
-                                                                  x, t,
-                                                                  operator_type::Divergence,
-                                                                  equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
-    # for Dirichlet boundary conditions, we do not impose any conditions on the viscous fluxes
-    return flux_inner
-end
-
 end # @muladd
