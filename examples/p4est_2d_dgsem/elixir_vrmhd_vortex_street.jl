@@ -65,10 +65,8 @@ end
 
 # Mesh which is refined around the cylinder and the wake region
 
-mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/7312faba9a50ef506b13f01716b4ec26/raw/8e68f9006e634905544207ca322bc0a03a9313ad/cylinder_vortex_street.inp",
+mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/7312faba9a50ef506b13f01716b4ec26/raw/f08b4610491637d80947f1f2df483c81bd2cb071/cylinder_vortex_street.inp",
                            joinpath(@__DIR__, "cylinder_vortex_street.inp"))
-
-#mesh_file = "out/Cylinder.inp"
 
 mesh = P4estMesh{2}(mesh_file)
 
@@ -182,6 +180,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Setup an ODE problem
 tspan = (0.0, 100.0)
 ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false)
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -197,7 +196,7 @@ save_solution = SaveSolutionCallback(interval = 1000,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-cfl = 1.5
+cfl = 2.0 # CarpenterKennedy2N54
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
@@ -214,7 +213,22 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, SSPRK54(thread = OrdinaryDiffEq.True()),
+path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
+
+dtRatios = [0.0771545666269958, # 13
+            0.0362618269398808, #  8
+            0.0154481055215001, #  6
+            0.00702102510258555] / 0.0771545666269958 # 5
+Stages = [13, 8, 6, 5]
+
+#ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = 42.0,
+                  save_everystep = false, callback = callbacks);
+
+sol = solve(ode, CarpenterKennedy2N54(thread = OrdinaryDiffEq.True()),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
 
