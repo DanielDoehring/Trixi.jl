@@ -117,11 +117,14 @@ end
 end
 
 # Boundary names are those we assigned in HOHQMesh.jl
-boundary_conditions = Dict(:Bottom => bc_freestream,
-                           :Circle => bc_slip_wall_no_mag,
+boundary_conditions = Dict(:Circle => bc_slip_wall_no_mag, # top half of the cylinder
+                           :Circle_R => bc_slip_wall_no_mag, # bottom half of the cylinder
                            :Top => bc_freestream,
+                           :Top_R => bc_freestream, # aka bottom
                            :Right => bc_freestream,
-                           :Left => bc_freestream)
+                           :Right_R => bc_freestream, 
+                           :Left => bc_freestream,
+                           :Left_R => bc_freestream)
 
 velocity_bc_free = NoSlip((x, t, equations) -> SVector(v_in(), 0.0, 0.0))
 heat_bc_free = Adiabatic((x, t, equations) -> 0.0)
@@ -137,11 +140,16 @@ boundary_condition_cylinder = BoundaryConditionVRMHDWall(velocity_bc_cylinder,
                                                          heat_bc_cylinder,
                                                          magnetic_bc_cylinder)
 
-boundary_conditions_para = Dict(:Bottom => boundary_condition_copy,
-                                :Circle => boundary_condition_cylinder,
-                                :Top => boundary_condition_copy,
+boundary_conditions_para = Dict(:Circle => boundary_condition_cylinder, # top half of the cylinder
+                                :Circle_R => boundary_condition_cylinder, # bottom half of the cylinder
+
+                                :Top => boundary_condition_copy, #boundary_condition_free,
+                                :Top_R => boundary_condition_copy, #boundary_condition_free, # aka bottom
+
                                 :Right => boundary_condition_free,
-                                :Left => boundary_condition_free)
+                                :Right_R => boundary_condition_free,
+                                :Left => boundary_condition_free,
+                                :Left_R => boundary_condition_free)
 
 # Set the numerical fluxes for the volume and the surface contributions.
 surface_flux = (flux_hll, flux_nonconservative_powell)
@@ -172,7 +180,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 ###############################################################################
 # Setup an ODE problem
-tspan = (0.0, 100.0) # 100
+tspan = (0.0, 100.0)
 ode = semidiscretize(semi, tspan)
 
 # Callbacks
