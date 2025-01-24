@@ -173,6 +173,12 @@ end
     integrator.f(integrator.k1, integrator.u, p, integrator.t, integrator)
 end
 
+# For Single PERK with Split problem (Hyperbolic-Parabolic)
+@inline function PERK_k1!(integrator::AbstractPairedExplicitRKSingleIntegrator,
+                          p)
+    integrator.f(integrator.k1, integrator.u, p, integrator.t)
+end
+
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
                                             AbstractPairedExplicitRelaxationRKSingleIntegrator},
                           p, alg)
@@ -375,7 +381,8 @@ function set_proposed_dt!(integrator::AbstractPairedExplicitRKIntegrator,
 end
 
 function get_proposed_dt(integrator::AbstractPairedExplicitRKIntegrator)
-    return ifelse(integrator.opts.adaptive, integrator.dt, integrator.dtcache)
+    #return ifelse(integrator.opts.adaptive, integrator.dt, integrator.dtcache)
+    return integrator.dt
 end
 
 # stop the time integration
