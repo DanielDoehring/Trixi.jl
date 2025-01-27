@@ -11,8 +11,11 @@
 Update the divergence cleaning wave speed `c_h` according to the time step
 computed in [`StepsizeCallback`](@ref) for the ideal GLM-MHD equations, the multi-component
 GLM-MHD equations, and the multi-ion GLM-MHD equations.
-The `cfl` number should be set to the same value as for the time step size calculation. The
-`glm_scale` ensures that the GLM wave speed is lower than the fastest physical waves in the MHD
+The `cfl` number should be set to the same value as for the time step size calculation. 
+As for standard [`StepsizeCallback`](@ref) `cfl` can be either set to a `Real` number or
+a function of time `t` returning a `Real` number.
+
+The `glm_scale` ensures that the GLM wave speed is lower than the fastest physical waves in the MHD
 solution and should thus be set to a value within the interval [0,1]. Note that `glm_scale = 0`
 deactivates the divergence cleaning.
 
@@ -75,7 +78,8 @@ function (glm_speed_callback::GlmSpeedCallback)(u, t, integrator)
     return true
 end
 
-function update_cleaning_speed!(semi, glm_speed_callback, dt, t)
+# Case for constant cfl number.
+function update_cleaning_speed!(semi, glm_speed_callback, dt)
     @unpack glm_scale, cfl = glm_speed_callback
 
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
@@ -108,6 +112,7 @@ end
     return nothing
 end
 
+# Case for time-dependent CFL number.
 function update_cleaning_speed!(semi, glm_speed_callback, dt, t)
     @unpack glm_scale, cfl = glm_speed_callback
 
