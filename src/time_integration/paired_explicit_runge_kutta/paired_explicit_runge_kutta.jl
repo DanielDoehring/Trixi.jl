@@ -5,6 +5,8 @@
 @muladd begin
 #! format: noindent
 
+using SciMLBase: SplitFunction
+
 # Define all of the functions necessary for polynomial optimizations
 include("polynomial_optimizer.jl")
 
@@ -171,12 +173,6 @@ end
 @inline function PERK_k1!(integrator::AbstractPairedExplicitRKIntegrator,
                           p)
     integrator.f(integrator.k1, integrator.u, p, integrator.t, integrator)
-end
-
-# For Single PERK with Split problem (Hyperbolic-Parabolic)
-@inline function PERK_k1!(integrator::AbstractPairedExplicitRKSingleIntegrator,
-                          p)
-    integrator.f(integrator.k1, integrator.u, p, integrator.t)
 end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
@@ -425,9 +421,14 @@ end
 function solve_a_butcher_coeffs_unknown! end
 
 # Dummy argument `integrator` for same signature as `rhs_hyperbolic_parabolic!` for non-split ODE problems
+# TODO: Not sure if still needed
 @inline function rhs!(du_ode, u_ode, semi::AbstractSemidiscretization, t,
                       integrator)
     rhs!(du_ode, u_ode, semi, t)
+end
+@inline function (f::SplitFunction)(du_ode, u_ode, semi::AbstractSemidiscretization, t,
+                                    integrator)
+    f(du_ode, u_ode, semi, t)
 end
 
 # Depending on the `semi`, different fields from `integrator` need to be passed on.

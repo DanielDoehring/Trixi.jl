@@ -182,12 +182,14 @@ tspan = (0.0, 10.0)
 ode = semidiscretize(semi, tspan)
 #ode = semidiscretize(semi, tspan; split_problem = false)
 
+#=
 restart_file = "restart_vrmhd_vs_t10.h5"
 restart_filename = joinpath("out", restart_file)
 
 tspan = (load_time(restart_filename), 120.0)
 #ode = semidiscretize(semi, tspan, restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+=#
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -203,8 +205,17 @@ save_solution = SaveSolutionCallback(interval = 1000,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
+# Plain initial simulation
+
 cfl = 2.4 # SSPRK54
-cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
+
+cfl = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
+cfl = 1.4 # PE (Relaxation) RK 4 13
+
+# Restarted simulation
+
+#cfl = 6.6 # Restarted PERK3 11, 7, 6, 5, 4, 3
+#cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -226,8 +237,26 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+base_path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
 
-path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
+#=
+# p = 3
+path = base_path * "p3/"
+
+dtRatios = [0.0750386656628689, # 11
+            0.0345058372411586, # 6
+            0.0252875152909837, # 5
+            0.0144227260476328, # 4
+            0.00603983449109364] / 0.0750386656628689 # 3
+Stages = [11, 6, 5, 4, 3]
+
+ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
+=#
+
+
+# p = 4
+path = base_path * "p4/"
 
 dtRatios = [0.0771545666269958, # 13
             0.0362618269398808, #  8
@@ -235,12 +264,14 @@ dtRatios = [0.0771545666269958, # 13
             0.00702102510258555] / 0.0771545666269958 # 5
 Stages = [13, 8, 6, 5]
 
-#ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
+ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
+
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; 
-                                                       relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
