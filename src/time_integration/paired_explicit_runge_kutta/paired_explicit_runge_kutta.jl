@@ -381,7 +381,6 @@ function set_proposed_dt!(integrator::AbstractPairedExplicitRKIntegrator,
 end
 
 function get_proposed_dt(integrator::AbstractPairedExplicitRKIntegrator)
-    #return ifelse(integrator.opts.adaptive, integrator.dt, integrator.dtcache)
     return integrator.dt
 end
 

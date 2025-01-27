@@ -178,9 +178,16 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 ###############################################################################
 # Setup an ODE problem
-tspan = (0.0, 100.0)
+tspan = (0.0, 10.0)
 ode = semidiscretize(semi, tspan)
-ode = semidiscretize(semi, tspan; split_problem = false)
+#ode = semidiscretize(semi, tspan; split_problem = false)
+
+restart_file = "restart_vrmhd_vs_t10.h5"
+restart_filename = joinpath("out", restart_file)
+
+tspan = (load_time(restart_filename), 120.0)
+#ode = semidiscretize(semi, tspan, restart_filename)
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -196,15 +203,21 @@ save_solution = SaveSolutionCallback(interval = 1000,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-cfl = 2.0 # CarpenterKennedy2N54
+cfl = 2.4 # SSPRK54
+cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
+
+save_restart = SaveRestartCallback(interval = 10_000,
+                                   save_final_restart = true)
 
 # Combine all the callbacks into a description.
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
+                        #save_restart,
                         glm_speed_callback,
                         stepsize_callback
                         #save_solution
@@ -212,6 +225,7 @@ callbacks = CallbackSet(summary_callback,
 
 ###############################################################################
 # run the simulation
+
 
 path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
 
@@ -222,15 +236,21 @@ dtRatios = [0.0771545666269958, # 13
 Stages = [13, 8, 6, 5]
 
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; 
+                                                       relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
-sol = solve(ode, CarpenterKennedy2N54(thread = OrdinaryDiffEq.True()),
+#=
+sol = solve(ode, SSPRK54(thread = OrdinaryDiffEq.True()),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
+=#
 
 summary_callback() # print the timer summary
 

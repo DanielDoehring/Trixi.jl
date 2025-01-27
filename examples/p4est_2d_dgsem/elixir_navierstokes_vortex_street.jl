@@ -121,19 +121,18 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 ###############################################################################
 # Setup an ODE problem
-tspan = (0.0, 10.0)
+tspan = (0.0, 10.0) # For restart file
 ode = semidiscretize(semi, tspan)
 #ode = semidiscretize(semi, tspan; split_problem = false)
 
-#=
-restart_file = "restart_000000478.h5"
-restart_filename = joinpath("out", restart_file)
-mesh = load_mesh(restart_filename)
 
-tspan = (load_time(restart_filename), 100.0)
-ode = semidiscretize(semi, tspan, restart_filename)
+restart_file = "restart_nsf_vs_t10.h5"
+restart_filename = joinpath("out", restart_file)
+
+tspan = (load_time(restart_filename), 120.0)
+#ode = semidiscretize(semi, tspan, restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-=#
+
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -150,9 +149,9 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
 
 cfl = 12.0 # Restarted PERK4 Single 16
 cfl = 7.4 # Restarted PERK4 Multi 16, 10, 7, 6, 5
-#cfl = 7.5 # Restarted PE Relaxation RK4 Multi 16, 10, 7, 6, 5
+cfl = 7.5 # Restarted PE Relaxation RK4 Multi 16, 10, 7, 6, 5
 
-cfl = 1.5
+#cfl = 1.5 # Non-restarted PERK4 Multi 16, 10, 7, 6, 5
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -162,7 +161,7 @@ save_restart = SaveRestartCallback(interval = 10_000,
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
-                        #save_restart
+                        #save_restart,
                         stepsize_callback,
                         #save_solution
                         )
@@ -180,26 +179,26 @@ dtRatios = [0.0571712958370335, # 16
             0.00620427457615733] / 0.0571712958370335 # 5
 Stages = [16, 10, 7, 6, 5]
 
-ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
-#=
+
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; 
                                                        relaxation_solver = relaxation_solver)
-=#
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
-#=                  
+             
 time_int_tol = 1e-7
 sol = solve(ode,
             # Moderate number of threads (e.g. 4) advisable to speed things up
             RDPK3SpFSAL49(thread = OrdinaryDiffEq.True());
             abstol = time_int_tol, reltol = time_int_tol,
             ode_default_options()..., callback = callbacks);
-=#
+
 
 summary_callback() # print the timer summary
