@@ -22,9 +22,9 @@ semidiscretization, the divergence cleaning should be applied. See also
 Note: `SemidiscretizationCoupled` and all related features are considered experimental and
 may change at any time.
 """
-struct GlmSpeedCallback{RealT <: Real}
+struct GlmSpeedCallback{RealT <: Real, CflType}
     glm_scale::RealT
-    cfl::RealT
+    cfl::CflType
     semi_indices::Vector{Int}
 end
 
@@ -58,7 +58,7 @@ end
 function GlmSpeedCallback(; glm_scale = 0.5, cfl, semi_indices = Int[])
     @assert 0<=glm_scale<=1 "glm_scale must be between 0 and 1"
 
-    glm_speed_callback = GlmSpeedCallback(glm_scale, cfl, semi_indices)
+    glm_speed_callback = GlmSpeedCallback{typeof(glm_scale), typeof(cfl)}(glm_scale, cfl, semi_indices)
 
     DiscreteCallback(glm_speed_callback, glm_speed_callback, # the first one is the condition, the second the affect!
                      save_positions = (false, false),
@@ -75,7 +75,7 @@ function (glm_speed_callback::GlmSpeedCallback)(u, t, integrator)
     return true
 end
 
-function update_cleaning_speed!(semi, glm_speed_callback, dt)
+function update_cleaning_speed!(semi, glm_speed_callback, dt, t)
     @unpack glm_scale, cfl = glm_speed_callback
 
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
@@ -93,13 +93,47 @@ function update_cleaning_speed!(semi, glm_speed_callback, dt)
 end
 
 # This method is called as callback after the StepsizeCallback during the time integration.
-@inline function (glm_speed_callback::GlmSpeedCallback)(integrator)
+# Case for constant cfl number.
+@inline function (glm_speed_callback::GlmSpeedCallback{RealT, CflType})(integrator) where {RealT, CflType <: Real}
     dt = get_proposed_dt(integrator)
     semi = integrator.p
 
     # Call the appropriate update function (this indirection allows to specialize on,
     # e.g., the semidiscretization type)
     update_cleaning_speed!(semi, glm_speed_callback, dt)
+
+    # avoid re-evaluating possible FSAL stages
+    u_modified!(integrator, false)
+
+    return nothing
+end
+
+function update_cleaning_speed!(semi, glm_speed_callback, dt, t)
+    @unpack glm_scale, cfl = glm_speed_callback
+
+    mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
+
+    # compute time step for GLM linear advection equation with c_h=1 (redone due to the possible AMR)
+    c_h_deltat = calc_dt_for_cleaning_speed(cfl(t), mesh, equations, solver, cache)
+
+    # c_h is proportional to its own time step divided by the complete MHD time step
+    # We use @reset here since the equations are immutable (to work on GPUs etc.).
+    # Thus, we need to modify the equations field of the semidiscretization.
+    @reset equations.c_h = glm_scale * c_h_deltat / dt
+    semi.equations = equations
+
+    return semi
+end
+
+# This method is called as callback after the StepsizeCallback during the time integration.
+# Case for time-dependent CFL number.
+@inline function (glm_speed_callback::GlmSpeedCallback)(integrator)
+    dt = get_proposed_dt(integrator)
+    semi = integrator.p
+
+    # Call the appropriate update function (this indirection allows to specialize on,
+    # e.g., the semidiscretization type)
+    update_cleaning_speed!(semi, glm_speed_callback, dt, integrator.t)
 
     # avoid re-evaluating possible FSAL stages
     u_modified!(integrator, false)

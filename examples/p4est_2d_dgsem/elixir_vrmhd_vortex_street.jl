@@ -178,18 +178,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 ###############################################################################
 # Setup an ODE problem
-tspan = (0.0, 10.0)
-ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false)
 
-#=
-restart_file = "restart_vrmhd_vs_t10.h5"
-restart_filename = joinpath("out", restart_file)
-
-tspan = (load_time(restart_filename), 120.0)
-#ode = semidiscretize(semi, tspan, restart_filename)
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-=#
+tspan = (0.0, 120.0)
+#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false)
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -207,15 +199,20 @@ save_solution = SaveSolutionCallback(interval = 1000,
 
 # Plain initial simulation
 
-cfl = 2.4 # SSPRK54
+#cfl = 2.4 # SSPRK54
 
-cfl = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
-cfl = 1.4 # PE (Relaxation) RK 4 13
+#cfl = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
+#cfl = 1.4 # PE (Relaxation) RK 4 13
 
 # Restarted simulation
 
-#cfl = 6.6 # Restarted PERK3 11, 7, 6, 5, 4, 3
+#cfl = 6.6 # Restarted PERK3 11, 6, 5, 4, 3
 #cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
+
+t_ramp_up() = 5.5 # Relaxation PERK
+t_ramp_up() = 5.6 # Standard PERK
+
+cfl(t) = min(6.7, 1.4 + t/t_ramp_up() * 5.3)
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -250,8 +247,16 @@ dtRatios = [0.0750386656628689, # 11
             0.00603983449109364] / 0.0750386656628689 # 3
 Stages = [11, 6, 5, 4, 3]
 
+dtRatios = [0.0750386656628689, # 11
+            0.043664172391218,  #  7
+            0.0345058372411586, #  6
+            0.0252875152909837, #  5
+            0.0144227260476328, #  4
+            0.00603983449109364] / 0.0750386656628689 # 3
+Stages = [11, 7, 6, 5, 4, 3]
+
 ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
 =#
 
 
@@ -265,11 +270,11 @@ dtRatios = [0.0771545666269958, # 13
 Stages = [13, 8, 6, 5]
 
 ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
 

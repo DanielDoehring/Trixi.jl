@@ -430,6 +430,10 @@ end
                                     integrator)
     f(du_ode, u_ode, semi, t)
 end
+@inline function (f::SplitFunction)(du_ode, u_ode, semi::AbstractSemidiscretization, t,
+                                    integrator, level)
+    f(du_ode, u_ode, semi, t, integrator)
+end
 
 # Depending on the `semi`, different fields from `integrator` need to be passed on.
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
