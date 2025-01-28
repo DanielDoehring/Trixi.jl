@@ -27,7 +27,6 @@ p_in() = 1
 
 # Parameters that follow from Reynolds and Mach number + adiabatic index gamma
 mu() = v_in() * D() / Re()
-eta() = mu() # Follow Warburton & Karniadakis (same values for Lundquist numbers)
 
 c() = v_in() / Ma()
 
@@ -39,6 +38,9 @@ Alfven_Mach_number() = 0.1
 # Use definition of Alven (Mach) number as in Warburton & Karniadakis
 Alfven_speed() = v_in() * Alfven_Mach_number()
 B_in() = Alfven_speed() * sqrt(rho_in())
+
+S() = Re() # Use same Lundquist & Reynolds number as in Warburton & Karniadakis
+eta() = D() * Alfven_speed() / S()
 
 equations = IdealGlmMhdEquations2D(gamma())
 equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
@@ -144,8 +146,12 @@ boundary_conditions_para = Dict(:Circle => boundary_condition_cylinder, # top ha
                                 :Top => boundary_condition_copy, #boundary_condition_free,
                                 :Top_R => boundary_condition_copy, #boundary_condition_free, # aka bottom
 
-                                :Right => boundary_condition_free,
-                                :Right_R => boundary_condition_free,
+                                # TODO: Try offstream also for the right boundary!
+                                #:Right => boundary_condition_free,
+                                #:Right_R => boundary_condition_free,
+                                 :Right => boundary_condition_copy,
+                                 :Right_R => boundary_condition_copy,
+
                                 :Left => boundary_condition_free,
                                 :Left_R => boundary_condition_free)
 
@@ -209,8 +215,7 @@ save_solution = SaveSolutionCallback(interval = 1000,
 #cfl = 6.6 # Restarted PERK3 11, 6, 5, 4, 3
 #cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
 
-t_ramp_up() = 5.5 # Relaxation PERK
-t_ramp_up() = 5.6 # Standard PERK
+t_ramp_up() = 5.5 # Relaxation PERK # 5.5
 
 cfl(t) = min(6.7, 1.4 + t/t_ramp_up() * 5.3)
 
@@ -292,3 +297,5 @@ summary_callback() # print the timer summary
 
 using Plots
 pd = PlotData2D(sol);
+
+plot(getmesh(pd), xlabel = "\$x\$", ylabel = "\$y \$")

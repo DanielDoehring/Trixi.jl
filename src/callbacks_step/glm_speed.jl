@@ -98,7 +98,7 @@ end
 
 # This method is called as callback after the StepsizeCallback during the time integration.
 # Case for constant cfl number.
-@inline function (glm_speed_callback::GlmSpeedCallback{RealT, CflType})(integrator) where {RealT, CflType <: Real}
+@inline function (glm_speed_callback::GlmSpeedCallback{RealT, CflType})(integrator) where {RealT <: Real, CflType <: Real}
     dt = get_proposed_dt(integrator)
     semi = integrator.p
 

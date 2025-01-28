@@ -94,11 +94,15 @@ end
 boundary_conditions_para = Dict(:Circle => boundary_condition_cylinder, # top half of the cylinder
                                 :Circle_R => boundary_condition_cylinder, # bottom half of the cylinder
 
-                                :Top => boundary_condition_copy, #boundary_condition_free,
-                                :Top_R => boundary_condition_copy, #boundary_condition_free, # aka bottom
+                                :Top => boundary_condition_copy, 
+                                :Top_R => boundary_condition_copy, # aka bottom
 
-                                :Right => boundary_condition_free,
-                                :Right_R => boundary_condition_free,
+                                #:Right => boundary_condition_free,
+                                #:Right_R => boundary_condition_free,
+                                # TODO: Try extending domain also for right boundary
+                                :Right => boundary_condition_copy,
+                                :Right_R => boundary_condition_copy,
+
                                 :Left => boundary_condition_free,
                                 :Left_R => boundary_condition_free)
 # Standard DGSEM sufficient here
@@ -152,6 +156,8 @@ cfl = 7.4 # Restarted PERK4 Multi 16, 10, 7, 6, 5
 cfl = 7.5 # Restarted PE Relaxation RK4 Multi 16, 10, 7, 6, 5
 
 #cfl = 1.5 # Non-restarted PERK4 Multi 16, 10, 7, 6, 5
+
+# TODO: CFL Ramp-up
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
