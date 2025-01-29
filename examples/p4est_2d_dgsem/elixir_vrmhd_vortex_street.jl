@@ -39,8 +39,9 @@ Alfven_Mach_number() = 0.1
 Alfven_speed() = v_in() * Alfven_Mach_number()
 B_in() = Alfven_speed() * sqrt(rho_in())
 
-S() = Re() # Use same Lundquist & Reynolds number as in Warburton & Karniadakis
-eta() = D() * Alfven_speed() / S()
+S_v() = Alfven_Mach_number() * Re() # viscous Lundquist number
+S_r() = S_v() # Use resistive = viscous Lundquist number as in Warburton & Karniadakis
+eta() = D() * Alfven_speed() / S_r()
 
 equations = IdealGlmMhdEquations2D(gamma())
 equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
@@ -146,11 +147,8 @@ boundary_conditions_para = Dict(:Circle => boundary_condition_cylinder, # top ha
                                 :Top => boundary_condition_copy, #boundary_condition_free,
                                 :Top_R => boundary_condition_copy, #boundary_condition_free, # aka bottom
 
-                                # TODO: Try offstream also for the right boundary!
-                                #:Right => boundary_condition_free,
-                                #:Right_R => boundary_condition_free,
-                                 :Right => boundary_condition_copy,
-                                 :Right_R => boundary_condition_copy,
+                                :Right => boundary_condition_copy,
+                                :Right_R => boundary_condition_copy,
 
                                 :Left => boundary_condition_free,
                                 :Left_R => boundary_condition_free)
@@ -215,7 +213,8 @@ save_solution = SaveSolutionCallback(interval = 1000,
 #cfl = 6.6 # Restarted PERK3 11, 6, 5, 4, 3
 #cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
 
-t_ramp_up() = 5.5 # Relaxation PERK # 5.5
+t_ramp_up() = 5.05 # PE Relaxation RK 4
+t_ramp_up() = 5.4 # PERK 4
 
 cfl(t) = min(6.7, 1.4 + t/t_ramp_up() * 5.3)
 

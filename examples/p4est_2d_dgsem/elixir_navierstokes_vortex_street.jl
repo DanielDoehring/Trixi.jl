@@ -97,24 +97,23 @@ boundary_conditions_para = Dict(:Circle => boundary_condition_cylinder, # top ha
                                 :Top => boundary_condition_copy, 
                                 :Top_R => boundary_condition_copy, # aka bottom
 
-                                #:Right => boundary_condition_free,
-                                #:Right_R => boundary_condition_free,
-                                # TODO: Try extending domain also for right boundary
                                 :Right => boundary_condition_copy,
                                 :Right_R => boundary_condition_copy,
 
                                 :Left => boundary_condition_free,
                                 :Left_R => boundary_condition_free)
-# Standard DGSEM sufficient here
-solver = DGSEM(polydeg = 3, surface_flux = flux_hll)
+
+polydeg = 3
+surface_flux = flux_hll
+volume_flux = flux_ranocha
+solver = DGSEM(polydeg = polydeg, surface_flux = flux_hll)
 
 # NOTE: EC Setup. Gives somewhat oscillatory results, though.
 #=
 surface_flux = flux_ranocha
-volume_flux = flux_ranocha
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
-solver = DGSEM(polydeg = 3, surface_flux = surface_flux,
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 =#
 
@@ -125,18 +124,9 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 ###############################################################################
 # Setup an ODE problem
-tspan = (0.0, 10.0) # For restart file
+tspan = (0.0, 120.0) # For restart file
 ode = semidiscretize(semi, tspan)
 #ode = semidiscretize(semi, tspan; split_problem = false)
-
-
-restart_file = "restart_nsf_vs_t10.h5"
-restart_filename = joinpath("out", restart_file)
-
-tspan = (load_time(restart_filename), 120.0)
-#ode = semidiscretize(semi, tspan, restart_filename)
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -175,7 +165,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-
+#=
 path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/NavierStokes/"
 
 dtRatios = [0.0571712958370335, # 16
@@ -197,7 +187,7 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios;
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
-
+=#
              
 time_int_tol = 1e-7
 sol = solve(ode,
