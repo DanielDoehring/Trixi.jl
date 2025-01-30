@@ -107,7 +107,6 @@ end
                                          equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
     return u_inner
 end
-
 @inline function boundary_condition_copy(flux_inner,
                                          u_inner,
                                          normal::AbstractVector,
@@ -160,8 +159,6 @@ volume_flux = (flux_hindenlang_gassner, flux_nonconservative_powell)
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 
-volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
-
 indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 0.5,
                                          alpha_min = 0.001,
@@ -171,7 +168,7 @@ volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
 
-# Need stabilization for Mach 0.5
+# Need stabilization for VRMHD case
 solver = DGSEM(basis, surface_flux, volume_integral)
 
 # Combine all the spatial discretization components into a high-level descriptions.
@@ -191,12 +188,12 @@ ode = semidiscretize(semi, tspan; split_problem = false)
 summary_callback = SummaryCallback()
 
 # Prints solution errors to the screen at check-in intervals.
-analysis_interval = 1000
+analysis_interval = 10_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 200)
 
-save_solution = SaveSolutionCallback(interval = 1000,
+save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
@@ -222,17 +219,13 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
 
-save_restart = SaveRestartCallback(interval = 10_000,
-                                   save_final_restart = true)
-
 # Combine all the callbacks into a description.
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
-                        #save_restart,
                         glm_speed_callback,
-                        stepsize_callback
-                        #save_solution
+                        stepsize_callback,
+                        save_solution
                         )
 
 ###############################################################################

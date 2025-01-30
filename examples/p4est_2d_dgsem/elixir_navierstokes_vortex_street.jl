@@ -81,7 +81,6 @@ boundary_condition_cylinder = BoundaryConditionNavierStokesWall(velocity_bc_cyli
                                          equations::CompressibleNavierStokesDiffusion2D{GradientVariablesPrimitive})
     return u_inner
 end
-
 @inline function boundary_condition_copy(flux_inner,
                                          u_inner,
                                          normal::AbstractVector,
@@ -117,6 +116,21 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 =#
 
+#=
+# Run also once with SC to compare results
+basis = LobattoLegendreBasis(polydeg)
+indicator_sc = IndicatorHennemannGassner(equations, basis,
+                                         alpha_max = 0.5,
+                                         alpha_min = 0.001,
+                                         alpha_smooth = true,
+                                         variable = density_pressure)
+volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
+                                                 volume_flux_dg = volume_flux,
+                                                 volume_flux_fv = surface_flux)
+
+solver = DGSEM(basis, surface_flux, volume_integral)
+=#
+
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver,
                                              boundary_conditions = (boundary_conditions,
@@ -125,47 +139,45 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # Setup an ODE problem
 tspan = (0.0, 120.0) # For restart file
-ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false)
+#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false)
 
 # Callbacks
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 10_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 200)
 
 save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-cfl = 12.0 # Restarted PERK4 Single 16
-cfl = 7.4 # Restarted PERK4 Multi 16, 10, 7, 6, 5
-cfl = 7.5 # Restarted PE Relaxation RK4 Multi 16, 10, 7, 6, 5
+#cfl = 12.0 # Restarted PERK4 Single 16
+#cfl = 7.4 # Restarted PERK4 Multi 16, 10, 7, 6, 5
 
 #cfl = 1.5 # Non-restarted PERK4 Multi 16, 10, 7, 6, 5
 
-# TODO: CFL Ramp-up
+# CFL Ramp-up
+t_ramp_up() = 4.55 # PE Relaxation RK 4
+
+cfl(t) = min(7.4, 1.5 + t/t_ramp_up() * 5.9)
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
-
-save_restart = SaveRestartCallback(interval = 10_000,
-                                   save_final_restart = true)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
-                        #save_restart,
                         stepsize_callback,
-                        #save_solution
+                        save_solution
                         )
 
 ###############################################################################
 # run the simulation
 
-#=
+
 path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/NavierStokes/"
 
 dtRatios = [0.0571712958370335, # 16
@@ -180,21 +192,23 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; 
-                                                       relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
-=#
-             
+
+#=             
 time_int_tol = 1e-7
 sol = solve(ode,
             # Moderate number of threads (e.g. 4) advisable to speed things up
             RDPK3SpFSAL49(thread = OrdinaryDiffEq.True());
             abstol = time_int_tol, reltol = time_int_tol,
             ode_default_options()..., callback = callbacks);
-
+=#
 
 summary_callback() # print the timer summary
+
+using Plots
+pd = PlotData2D(sol);
