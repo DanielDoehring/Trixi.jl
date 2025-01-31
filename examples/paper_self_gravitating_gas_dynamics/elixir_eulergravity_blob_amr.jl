@@ -107,9 +107,9 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity,
 cfl_gravity = 1.8 # CarpenterKennedy2N54
 cfl_gravity = 1.9 # SSPRK104
 cfl_gravity = 1.9 # SSPRK54
-#cfl_gravity = 1.8 # DGLDDRK84_F
-#cfl_gravity = 1.8 # ParsaniKetchesonDeconinck3S94
-#cfl_gravity = 1.8 # NDBLSRK124
+cfl_gravity = 1.8 # DGLDDRK84_F
+cfl_gravity = 1.8 # ParsaniKetchesonDeconinck3S94
+cfl_gravity = 1.8 # NDBLSRK124
 
 parameters = ParametersEulerGravity(background_density = 0.0, # taken from above
                                     gravitational_constant = 6.674e-8, # aka G
@@ -130,13 +130,13 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 200
+analysis_interval = 20_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      save_analysis = false,
                                      analysis_integrals = ())
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 200)
 
 amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_max = 1.0,
@@ -158,9 +158,9 @@ N_AMR_ref = 15
 cfl = 0.7 # CarpenterKennedy2N54 # tested
 cfl = 3.2 # SSPRK104 # tested
 cfl = 1.2  # SSPRK54 # tested 
-#cfl = 0.9 # DGLDDRK84_F # tested
-#cfl = 0.6 # ParsaniKetchesonDeconinck3S94
-#cfl = 0.6 # NDBLSRK124 # tested
+cfl = 0.8 # DGLDDRK84_F # tested
+cfl = 0.6 # ParsaniKetchesonDeconinck3S94
+cfl = 0.6 # NDBLSRK124 # tested
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = Int(floor(N_AMR_ref * cfl_ref / cfl)),
@@ -182,9 +182,9 @@ callbacks = CallbackSet(summary_callback,
 ode_alg = CarpenterKennedy2N54(thread = OrdinaryDiffEq.True())
 ode_alg = SSPRK104(thread = OrdinaryDiffEq.True())
 ode_alg = SSPRK54(thread = OrdinaryDiffEq.True())
-#ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
-#ode_alg = ParsaniKetchesonDeconinck3S94(thread = OrdinaryDiffEq.True())
-#ode_alg = NDBLSRK124(thread = OrdinaryDiffEq.True())
+ode_alg = DGLDDRK84_F(thread = OrdinaryDiffEq.True())
+ode_alg = ParsaniKetchesonDeconinck3S94(thread = OrdinaryDiffEq.True())
+ode_alg = NDBLSRK124(thread = OrdinaryDiffEq.True())
 
 sol = solve(ode, ode_alg,
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
