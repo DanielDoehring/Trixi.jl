@@ -11,7 +11,7 @@
 Set the time step size according to a CFL condition with CFL number `cfl`
 if the time integration method isn't adaptive itself.
 
-The supplied keyword should either be either a `Real` number or
+The supplied keyword argument `cfl` must be either a `Real` number or
 a function of time `t` returning a `Real` number.
 """
 mutable struct StepsizeCallback{CflType}
@@ -96,10 +96,8 @@ function (cb::DiscreteCallback{Condition, Affect!})(ode::ODEProblem) where {Cond
     u_ode = ode.u0
     t = first(ode.tspan)
     semi = ode.p
-    mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
-    u = wrap_array(u_ode, mesh, equations, solver, cache)
 
-    dt = calculate_dt(u, t, cfl_number, semi)
+    dt = calculate_dt(u_ode, t, cfl_number, semi)
 end
 
 # General case for a single (i.e., non-coupled) semidiscretization
