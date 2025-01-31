@@ -194,7 +194,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 alive_callback = AliveCallback(alive_interval = 200)
 
 save_solution = SaveSolutionCallback(interval = analysis_interval,
-                                     save_initial_solution = true,
+                                     save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
@@ -211,7 +211,7 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
 #cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
 
 t_ramp_up() = 5.05 # PE Relaxation RK 4
-t_ramp_up() = 5.4 # PERK 4
+#t_ramp_up() = 5.4 # PERK 4
 
 cfl(t) = min(6.7, 1.4 + t/t_ramp_up() * 5.3)
 
@@ -272,7 +272,7 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
 
 sol = Trixi.solve(ode, ode_algorithm,
@@ -291,3 +291,6 @@ using Plots
 pd = PlotData2D(sol);
 
 plot(getmesh(pd), xlabel = "\$x\$", ylabel = "\$y \$")
+
+# For level distribution
+Trixi2Vtk.trixi2vtk(semi.cache, dtRatios, Stages, "out/solution_000000001.h5")
