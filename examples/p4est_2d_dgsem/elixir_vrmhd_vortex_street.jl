@@ -198,10 +198,10 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-# Plain initial simulation
-
 #cfl = 2.4 # SSPRK54
+cfl(t) = min(3.5, 2.4 + t/10 * 1.1)
 
+#=
 #cfl = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
 #cfl = 1.4 # PE (Relaxation) RK 4 13
 
@@ -214,6 +214,7 @@ t_ramp_up() = 5.05 # PE Relaxation RK 4
 #t_ramp_up() = 5.4 # PERK 4
 
 cfl(t) = min(6.7, 1.4 + t/t_ramp_up() * 5.3)
+=#
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -234,29 +235,6 @@ callbacks = CallbackSet(summary_callback,
 base_path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
 
 #=
-# p = 3
-path = base_path * "p3/"
-
-dtRatios = [0.0750386656628689, # 11
-            0.0345058372411586, # 6
-            0.0252875152909837, # 5
-            0.0144227260476328, # 4
-            0.00603983449109364] / 0.0750386656628689 # 3
-Stages = [11, 6, 5, 4, 3]
-
-dtRatios = [0.0750386656628689, # 11
-            0.043664172391218,  #  7
-            0.0345058372411586, #  6
-            0.0252875152909837, #  5
-            0.0144227260476328, #  4
-            0.00603983449109364] / 0.0750386656628689 # 3
-Stages = [11, 7, 6, 5, 4, 3]
-
-ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
-=#
-
-
 # p = 4
 path = base_path * "p4/"
 
@@ -278,12 +256,12 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; r
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
+=#
 
-#=
 sol = solve(ode, SSPRK54(thread = OrdinaryDiffEq.True()),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);
-=#
+
 
 summary_callback() # print the timer summary
 
