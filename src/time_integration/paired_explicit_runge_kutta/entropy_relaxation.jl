@@ -160,12 +160,11 @@ function Base.show(io::IO, ::MIME"text/plain",
     end
 end
 
-function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{ORDER},
-                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER}},
+function relaxation_solver!(integrator,
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
-                            relaxation_solver::RelaxationSolverBisection) where {ORDER}
+                            relaxation_solver::RelaxationSolverBisection)
     @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
 
     @threaded for element in eachelement(dg, cache)
@@ -213,12 +212,11 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
     return nothing
 end
 
-function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{ORDER},
-                                              AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER}},
+function relaxation_solver!(integrator,
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
-                            relaxation_solver::RelaxationSolverSecantMethod) where {ORDER}
+                            relaxation_solver::RelaxationSolverSecantMethod)
     @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
 
     # Naming aliases to avoid confusion
@@ -274,12 +272,19 @@ function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRK
     return nothing
 end
 
+#=
 function relaxation_solver!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{ORDER},
                                               AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER}},
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
                             relaxation_solver::RelaxationSolverNewton) where {ORDER}
+=#
+function relaxation_solver!(integrator,
+                            u_tmp_wrap, u_wrap, dir_wrap,
+                            S_old, dS,
+                            mesh, equations, dg::DG, cache,
+                            relaxation_solver::RelaxationSolverNewton)
     @unpack step_scaling, root_tol, max_iterations, gamma_min = relaxation_solver
 
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
