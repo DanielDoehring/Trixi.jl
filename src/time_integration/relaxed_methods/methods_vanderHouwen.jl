@@ -8,16 +8,16 @@
 abstract type vanderHouwenAlgorithm end
 
 """
-    RCKL54()
+    CKL54()
 
-Relaxation version of the Carpenter-Kennedy-Lewis 5-stage, 4th-order Runge-Kutta method.
+Carpenter-Kennedy-Lewis 5-stage, 4th-order Runge-Kutta method.
 """
-struct RCKL54 <: vanderHouwenAlgorithm
+struct CKL54 <: vanderHouwenAlgorithm
     a::SVector{5, Float64}
     b::SVector{5, Float64}
     c::SVector{5, Float64}
 
-    function RCKL54()
+    function CKL54()
         a = SVector(0.0,
                     970286171893 / 4311952581923,
                     6584761158862 / 12103376702013,
@@ -91,7 +91,7 @@ function init(ode::ODEProblem, alg::vanderHouwenAlgorithm;
     # initialize callbacks
     if callback isa CallbackSet
         foreach(callback.continuous_callbacks) do cb
-            throw(ArgumentError("Continuous callbacks are unsupported with the 2N storage time integration methods."))
+            throw(ArgumentError("Continuous callbacks are unsupported with van-der-Houwen time integration methods."))
         end
         foreach(callback.discrete_callbacks) do cb
             cb.initialize(cb, integrator.u, integrator.t, integrator)

@@ -41,7 +41,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000 # 1
+analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      # Note: entropy defaults to mathematical entropy
@@ -107,9 +107,9 @@ ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxat
 
 # Test comparison algorithms
 
-#ode_alg = Trixi.RRK44()
-#ode_alg = Trixi.RTS64()
-ode_alg = Trixi.RCKL54()
+ode_alg = Trixi.RelaxationRK44()
+ode_alg = Trixi.RelaxationTS64()
+#ode_alg = Trixi.RCKL54()
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
