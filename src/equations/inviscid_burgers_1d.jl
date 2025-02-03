@@ -189,6 +189,9 @@ end
 @inline entropy(u::Real, ::InviscidBurgersEquation1D) = 0.5f0 * u^2
 @inline entropy(u, equation::InviscidBurgersEquation1D) = entropy(u[1], equation)
 
+@inline entropy_math(u::Real, ::InviscidBurgersEquation1D) = 0.5f0 * u^2
+@inline entropy_math(u, equation::InviscidBurgersEquation1D) = entropy(u, equation)
+
 # Calculate total energy for a conservative state `cons`
 @inline energy_total(u::Real, ::InviscidBurgersEquation1D) = 0.5f0 * u^2
 @inline function energy_total(u, equation::InviscidBurgersEquation1D)
