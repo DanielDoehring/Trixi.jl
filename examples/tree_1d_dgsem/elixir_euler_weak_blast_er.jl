@@ -41,7 +41,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1
+analysis_interval = 1000 # 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      # Note: entropy defaults to mathematical entropy
@@ -51,6 +51,8 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = true)
 
 cfl = 1.0 # Probably not maxed out
+
+cfl = 0.25 # RK4
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -102,6 +104,12 @@ path = basepath * "p4/"
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
+
+# Test comparison algorithms
+
+#ode_alg = Trixi.RRK44()
+#ode_alg = Trixi.RTS64()
+ode_alg = Trixi.RCKL54()
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
