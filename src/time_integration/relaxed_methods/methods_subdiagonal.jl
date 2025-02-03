@@ -28,7 +28,6 @@ struct RelaxationRK44{RelaxationSolver} <: SubDiagonalRelaxationAlgorithm
     sub_diag_alg::RK44
     relaxation_solver::RelaxationSolver
 end
-
 function RelaxationRK44(; relaxation_solver = RelaxationSolverNewton())
     return RelaxationRK44{typeof(relaxation_solver)}(RK44(), relaxation_solver)
 end
@@ -66,7 +65,6 @@ struct RelaxationTS64{RelaxationSolver} <: SubDiagonalRelaxationAlgorithm
     sub_diag_alg::TS64
     relaxation_solver::RelaxationSolver
 end
-
 function RelaxationTS64(; relaxation_solver = RelaxationSolverNewton())
     return RelaxationTS64{typeof(relaxation_solver)}(TS64(), relaxation_solver)
 end
@@ -175,7 +173,7 @@ function init(ode::ODEProblem, alg::SubDiagonalRelaxationAlgorithm;
                                                                        ode.tspan;
                                                                        kwargs...),
                                              false,
-                                             direction, 
+                                             direction,
                                              gamma, alg.relaxation_solver)
 
     # initialize callbacks
@@ -201,7 +199,7 @@ function solve(ode::ODEProblem,
     solve!(integrator)
 end
 
-function solve!(integrator::Union{SubDiagIntegrator, SubDiagRelaxationIntegrator})
+function solve!(integrator)
     @unpack prob = integrator.sol
 
     integrator.finalstep = false
@@ -312,7 +310,7 @@ function step!(integrator::SubDiagRelaxationIntegrator)
     du_wrap = wrap_array(integrator.du, prob.p)
     # Entropy change due to first stage
     dS = alg.b[1] * integrator.dt *
-            int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
+         int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
 
     # Second to last stage
     for stage in 2:length(alg.c)
@@ -333,12 +331,12 @@ function step!(integrator::SubDiagRelaxationIntegrator)
     direction_wrap = wrap_array(integrator.direction, prob.p)
 
     @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
-                                                                u_tmp_wrap, u_wrap,
-                                                                direction_wrap,
-                                                                S_old, dS,
-                                                                mesh, equations,
-                                                                dg, cache,
-                                                                integrator.relaxation_solver)
+                                                                 u_tmp_wrap, u_wrap,
+                                                                 direction_wrap,
+                                                                 S_old, dS,
+                                                                 mesh, equations,
+                                                                 dg, cache,
+                                                                 integrator.relaxation_solver)
 
     integrator.iter += 1
     # Check if due to entropy relaxation the final step is not reached
@@ -377,26 +375,24 @@ function step!(integrator::SubDiagRelaxationIntegrator)
 end
 
 # get a cache where the RHS can be stored
-get_du(integrator::Union{SubDiagIntegrator, SubDiagRelaxationIntegrator}) = integrator.du
-get_tmp_cache(integrator::Union{SubDiagIntegrator, SubDiagRelaxationIntegrator}) = (integrator.u_tmp,)
+get_du(integrator) = integrator.du
+get_tmp_cache(integrator) = (integrator.u_tmp,)
 
 # some algorithms from DiffEq like FSAL-ones need to be informed when a callback has modified u
-u_modified!(integrator::Union{SubDiagIntegrator, SubDiagRelaxationIntegrator}, ::Bool) = false
+u_modified!(integrator, ::Bool) = false
 
 # used by adaptive timestepping algorithms in DiffEq
-function set_proposed_dt!(integrator::Union{SubDiagIntegrator,
-                                            SubDiagRelaxationIntegrator}, dt)
+function set_proposed_dt!(integrator, dt)
     integrator.dt = dt
 end
 
 # Required e.g. for `glm_speed_callback` 
-function get_proposed_dt(integrator::Union{SubDiagIntegrator,
-                                           SubDiagRelaxationIntegrator})
+function get_proposed_dt(integrator)
     return integrator.dt
 end
 
 # stop the time integration
-function terminate!(integrator::Union{SubDiagIntegrator, SubDiagRelaxationIntegrator})
+function terminate!(integrator)
     integrator.finalstep = true
     empty!(integrator.opts.tstops)
 end

@@ -106,10 +106,13 @@ ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxat
 =#
 
 # Test comparison algorithms
+ode_alg = Trixi.RK44()
+ode_alg = Trixi.TS64()
+ode_alg = Trixi.CKL54()
 
-ode_alg = Trixi.RelaxationRK44()
-ode_alg = Trixi.RelaxationTS64()
-#ode_alg = Trixi.RCKL54()
+#ode_alg = Trixi.RelaxationRK44()
+#ode_alg = Trixi.RelaxationTS64()
+ode_alg = Trixi.RelaxationCKL54()
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
