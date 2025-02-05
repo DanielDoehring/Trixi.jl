@@ -394,7 +394,7 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator{4},
                                                                  AbstractPairedExplicitRelaxationRKMultiIntegrator{4}},
                                                alg, stage)
-
+    #=
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
     for level in 1:min(alg.num_methods, integrator.n_levels)
@@ -432,8 +432,9 @@ end
             end
         end
     end
+    =#
 
-    #=
+    
     ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
     for level in 1:alg.max_eval_levels[stage]
         @threaded for i in integrator.level_u_indices_elements[level]
@@ -451,7 +452,7 @@ end
                                   integrator.dt * integrator.k1[i] # * A[stage, 1, level] = c[level] = 1
         end
     end
-    =#
+    
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]

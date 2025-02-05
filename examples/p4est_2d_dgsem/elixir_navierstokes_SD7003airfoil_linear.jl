@@ -84,8 +84,17 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 
-ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
-#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+
+#=
+# For PERK Multi coefficient measurements
+restart_file = "restart_000126960.h5"
+restart_filename = joinpath("out", restart_file)
+
+tspan = (30 * t_c, 35 * t_c)
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+=#
 
 summary_callback = SummaryCallback()
 
@@ -122,7 +131,14 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 #stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Multi E = 5, ..., 14
 #stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
 
-stepsize_callback = StepsizeCallback(cfl = 7.4) # PEERRK_4 Multi E = 5, ..., 14
+cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
+cfl = 7.6 # Single PERK 14
+
+cfl = 1.9 # R-RK44
+cfl = 2.5 # R-TS64
+cfl = 2.8 # R-CKL54
+
+stepsize_callback = StepsizeCallback(cfl = cfl)
 
 # For plots etc
 save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
@@ -139,7 +155,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
                         #save_solution, # For plotting during measurement run
-                        save_restart, # For restart with measurements
+                        #save_restart, # For restart with measurements
                         #analysis_callback,
                         summary_callback);
 
@@ -158,9 +174,20 @@ Stages = [14, 12, 10, 8, 7, 6, 5]
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios;
-                                                       relaxation_solver = relaxation_solver)
 
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
+
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+
+#ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
+
+#ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.TS64()
+
+ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.CKL54()
+
+# For measurement run
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
 sol = Trixi.solve(ode, ode_algorithm,
