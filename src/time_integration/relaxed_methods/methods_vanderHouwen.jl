@@ -201,31 +201,41 @@ function step!(integrator::vanderHouwenIntegrator)
         terminate!(integrator)
     end
 
-    num_stages = length(alg.c)
+    @trixi_timeit timer() "VdH RK integration step" begin
+        num_stages = length(alg.c)
 
-    # First stage
-    integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
-    integrator.k_prev .= integrator.du
-
-    # Second to last stage
-    for stage in 2:num_stages
-        @threaded for i in eachindex(integrator.u)
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  alg.a[stage] * integrator.dt * integrator.du[i]
+        # First stage
+        integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
+        #integrator.k_prev .= integrator.du
+        # Following code seems to be faster
+        @threaded for i in eachindex(integrator.du)
+            integrator.k_prev[i] = integrator.du[i]
         end
 
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[stage] * integrator.dt)
+        # Second to last stage
+        for stage in 2:num_stages
+            @threaded for i in eachindex(integrator.u)
+                integrator.u_tmp[i] = integrator.u[i] +
+                                    alg.a[stage] * integrator.dt * integrator.du[i]
+            end
 
-        @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += alg.b[stage - 1] * integrator.dt * integrator.k_prev[i]
+            integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                        integrator.t + alg.c[stage] * integrator.dt)
+
+            @threaded for i in eachindex(integrator.u)
+                integrator.u[i] += alg.b[stage - 1] * integrator.dt * integrator.k_prev[i]
+            end
+            #integrator.k_prev .= integrator.du
+            # Following code seems to be faster
+            @threaded for i in eachindex(integrator.du)
+                integrator.k_prev[i] = integrator.du[i]
+            end
         end
-        integrator.k_prev .= integrator.du
-    end
 
-    # Update solution
-    @threaded for i in eachindex(integrator.u)
-        integrator.u[i] += integrator.dt * alg.b[num_stages] * integrator.du[i]
+        # Update solution
+        @threaded for i in eachindex(integrator.u)
+            integrator.u[i] += integrator.dt * alg.b[num_stages] * integrator.du[i]
+        end
     end
 
     integrator.iter += 1
@@ -268,73 +278,94 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
         terminate!(integrator)
     end
 
-    num_stages = length(alg.c)
+    @trixi_timeit timer() "Relaxation vdH RK integration step" begin
+        num_stages = length(alg.c)
 
-    mesh, equations, dg, cache = mesh_equations_solver_cache(prob.p)
+        mesh, equations, dg, cache = mesh_equations_solver_cache(prob.p)
 
-    u_wrap = wrap_array(integrator.u, prob.p)
-    S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+        u_wrap = wrap_array(integrator.u, prob.p)
+        S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
 
-    u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
+        u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
 
-    # First stage
-    integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
-    @threaded for i in eachindex(integrator.u)
-        integrator.direction[i] = alg.b[1] * integrator.du[i] * integrator.dt
-    end
-    integrator.k_prev .= integrator.du
-
-    du_wrap = wrap_array(integrator.du, prob.p)
-    # Entropy change due to first stage
-    dS = alg.b[1] * integrator.dt *
-         int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
-
-    integrator.u_tmp .= integrator.u         
-    # Second to last stage
-    for stage in 2:num_stages
+        # First stage
+        integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
         @threaded for i in eachindex(integrator.u)
-            integrator.u_tmp[i] += alg.a[stage] * integrator.dt * integrator.du[i]
+            integrator.direction[i] = alg.b[1] * integrator.du[i] * integrator.dt
+        end
+        #integrator.k_prev .= integrator.du
+        # Following code seems to be faster
+        @threaded for i in eachindex(integrator.du)
+            integrator.k_prev[i] = integrator.du[i]
         end
 
+        du_wrap = wrap_array(integrator.du, prob.p)
+        # Entropy change due to first stage
+        dS = alg.b[1] * integrator.dt *
+            int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
+
+        @threaded for i in eachindex(integrator.u)
+            integrator.u_tmp[i] = integrator.u[i] + alg.a[2] * integrator.dt * integrator.du[i]
+        end
+
+        # Second to last stage
+        for stage in 2:num_stages - 1
+            integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                        integrator.t + alg.c[stage] * integrator.dt)
+
+            dS += alg.b[stage] * integrator.dt *
+                int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+
+            @threaded for i in eachindex(integrator.u)
+                integrator.direction[i] += alg.b[stage] * integrator.du[i] * integrator.dt
+
+                integrator.u_tmp[i] += integrator.dt * ( (alg.b[stage - 1] - alg.a[stage]) * integrator.k_prev[i] + 
+                                                        alg.a[stage + 1] * integrator.du[i])
+            end
+            #integrator.k_prev .= integrator.du
+            # Following code seems to be faster
+            @threaded for i in eachindex(integrator.du)
+                integrator.k_prev[i] = integrator.du[i]
+            end
+        end
+
+        # Last stage
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[stage] * integrator.dt)
+                    integrator.t + alg.c[num_stages] * integrator.dt)
 
-        dS = alg.b[stage] * integrator.dt *
-             int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+        dS += alg.b[num_stages] * integrator.dt *
+            int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
         @threaded for i in eachindex(integrator.u)
-            integrator.direction[i] += alg.b[stage] * integrator.du[i] * integrator.dt
-
-            integrator.u_tmp[i] += (alg.b[stage - 1] - alg.a[stage]) * integrator.dt * integrator.k_prev[i]
+            integrator.direction[i] += alg.b[num_stages] * integrator.du[i] * integrator.dt
         end
-        integrator.k_prev .= integrator.du
-    end
 
-    direction_wrap = wrap_array(integrator.direction, prob.p)
+        direction_wrap = wrap_array(integrator.direction, prob.p)
 
-    @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
-                                                                u_tmp_wrap, u_wrap,
-                                                                direction_wrap,
-                                                                S_old, dS,
-                                                                mesh, equations,
-                                                                dg, cache,
-                                                                integrator.relaxation_solver)
+        @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
+                                                                    u_tmp_wrap, u_wrap,
+                                                                    direction_wrap,
+                                                                    S_old, dS,
+                                                                    mesh, equations,
+                                                                    dg, cache,
+                                                                    integrator.relaxation_solver)
 
-    integrator.iter += 1
-    # Check if due to entropy relaxation the final step is not reached
-    if integrator.finalstep == true && integrator.gamma != 1
-        # If we would go beyond the final time, clip gamma at 1.0
-        if integrator.gamma > 1.0
-            integrator.gamma = 1.0
-        else # If we are below the final time, reset finalstep flag
-            integrator.finalstep = false
+        integrator.iter += 1
+        # Check if due to entropy relaxation the final step is not reached
+        if integrator.finalstep == true && integrator.gamma != 1
+            # If we would go beyond the final time, clip gamma at 1.0
+            if integrator.gamma > 1.0
+                integrator.gamma = 1.0
+            else # If we are below the final time, reset finalstep flag
+                integrator.finalstep = false
+            end
         end
-    end
-    integrator.t += integrator.gamma * integrator.dt
+        integrator.t += integrator.gamma * integrator.dt
 
-    # Do relaxed update
-    @threaded for i in eachindex(integrator.u)
-        integrator.u[i] += integrator.gamma * integrator.direction[i]
+        # Do relaxed update
+        @threaded for i in eachindex(integrator.u)
+            integrator.u[i] += integrator.gamma * integrator.direction[i]
+        end
     end
 
     @trixi_timeit timer() "Step-Callbacks" begin

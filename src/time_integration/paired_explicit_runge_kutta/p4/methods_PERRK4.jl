@@ -135,7 +135,7 @@ end
     end
 
     # Store K_{S-1} in `k1`:
-    integrator.k1 .= integrator.du
+    integrator.k1 .= integrator.du # TODO: Not sure if faster than @threaded loop!
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,

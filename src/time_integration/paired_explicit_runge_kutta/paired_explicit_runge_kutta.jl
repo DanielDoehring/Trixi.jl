@@ -159,7 +159,7 @@ function solve!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleInt
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # Store variables of previous time step
         integrator.t_prev = integrator.t
-        integrator.u_prev .= integrator.u
+        integrator.u_prev .= integrator.u # TODO: Not sure if faster than @threaded loop!
 
         step!(integrator)
     end

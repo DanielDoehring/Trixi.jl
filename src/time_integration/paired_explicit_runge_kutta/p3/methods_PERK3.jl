@@ -272,7 +272,7 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
         end
 
         # We need to store `du` of the S-1 stage in `kS1` for the final update:
-        integrator.kS1 .= integrator.du
+        integrator.kS1 .= integrator.du # TODO: Not sure if faster than @threaded loop!
 
         PERK_ki!(integrator, prob.p, alg, alg.num_stages)
 
