@@ -236,10 +236,10 @@ end
                               integrator.dt *
                               (alg.a_matrix_constant[1, 3] * integrator.k1[i] +
                                alg.a_matrix_constant[2, 3] * integrator.du[i])
+        
+        # Store K_{S-1} in `k1`
+        integrator.k1[i] = integrator.du[i] # Faster than broadcasted version (with .=)
     end
-
-    # Store K_{S-1} in `k1`:
-    integrator.k1 .= integrator.du # TODO: Not sure if faster than @threaded loop!
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[alg.num_stages] * integrator.dt,
