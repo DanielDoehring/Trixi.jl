@@ -64,8 +64,14 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_filename = "entropy_ER.dat",
                                      save_analysis = true)
 
+save_solution = SaveSolutionCallback(interval = 10_000,
+                                     save_initial_solution = false,
+                                     save_final_solution = true,
+                                     solution_variables = cons2prim)
+
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback)
+                        #analysis_callback,
+                        save_solution)
 
 ###############################################################################
 # run the simulation
@@ -83,9 +89,9 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path * "p4/", dtRatios)
 
 relaxation_solver = Trixi.RelaxationSolverSecantMethod(max_iterations = 10)
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path * "p2/", dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path * "p2/", dtRatios; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path * "p3/", dtRatios; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path * "p4/", dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path * "p4/", dtRatios; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
