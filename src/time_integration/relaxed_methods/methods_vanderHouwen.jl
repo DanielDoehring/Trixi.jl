@@ -206,10 +206,8 @@ function step!(integrator::vanderHouwenIntegrator)
 
         # First stage
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
-        #integrator.k_prev .= integrator.du
-        # Following code seems to be faster
         @threaded for i in eachindex(integrator.du)
-            integrator.k_prev[i] = integrator.du[i]
+            integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
         end
 
         # Second to last stage
@@ -224,11 +222,7 @@ function step!(integrator::vanderHouwenIntegrator)
 
             @threaded for i in eachindex(integrator.u)
                 integrator.u[i] += alg.b[stage - 1] * integrator.dt * integrator.k_prev[i]
-            end
-            #integrator.k_prev .= integrator.du
-            # Following code seems to be faster
-            @threaded for i in eachindex(integrator.du)
-                integrator.k_prev[i] = integrator.du[i]
+                integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
             end
         end
 
@@ -292,11 +286,8 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
         @threaded for i in eachindex(integrator.u)
             integrator.direction[i] = alg.b[1] * integrator.du[i] * integrator.dt
-        end
-        #integrator.k_prev .= integrator.du
-        # Following code seems to be faster
-        @threaded for i in eachindex(integrator.du)
-            integrator.k_prev[i] = integrator.du[i]
+
+            integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
         end
 
         du_wrap = wrap_array(integrator.du, prob.p)
@@ -321,11 +312,8 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
 
                 integrator.u_tmp[i] += integrator.dt * ( (alg.b[stage - 1] - alg.a[stage]) * integrator.k_prev[i] + 
                                                         alg.a[stage + 1] * integrator.du[i])
-            end
-            #integrator.k_prev .= integrator.du
-            # Following code seems to be faster
-            @threaded for i in eachindex(integrator.du)
-                integrator.k_prev[i] = integrator.du[i]
+
+                integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
             end
         end
 
