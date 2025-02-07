@@ -180,9 +180,18 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # Setup an ODE problem
 
-tspan = (0.0, 120.0)
-#ode = semidiscretize(semi, tspan)
-ode = semidiscretize(semi, tspan; split_problem = false)
+tspan = (0.0, 10.0) # 120
+ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan; split_problem = false)
+
+# For finding final CFL
+#=
+restart_file = "restart_000000531.h5"
+restart_filename = joinpath("out", restart_file)
+
+tspan = (10.0, 120.0)
+ode = semidiscretize(semi, tspan, restart_filename)
+=#
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -198,27 +207,42 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-#cfl = 2.4 # SSPRK54
-cfl(t) = min(3.5, 2.4 + t/10 * 1.1)
+### Initial CFL ###                                     
+cfl_0() = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
+#cfl_0() = 1.4 # PE (Relaxation) RK 4 13
 
-#=
-#cfl = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
-#cfl = 1.4 # PE (Relaxation) RK 4 13
+#cfl_0() = 1.3 # R-RK44
+#cfl_0() = 1.3 # R-TS64
+#cfl_0() = 2.2 # R-CKL54
 
-# Restarted simulation
+### Restared CFL ###
 
-#cfl = 6.6 # Restarted PERK3 11, 6, 5, 4, 3
-#cfl = 6.7 # Restarted PERK4 13, 8, 6, 5
+cfl_max() = 6.7 # PERRK4 13, 8, 6, 5
+#cfl_max() = 7.5 # Standalone PERRK4 13
 
-t_ramp_up() = 5.05 # PE Relaxation RK 4
-#t_ramp_up() = 5.4 # PERK 4
+#cfl_max() = 1.6 # R-RK44
+#cfl_max() = 2.2 # R-TS64
+#cfl_max() = 2.8 # R-CKL54
 
-cfl(t) = min(6.7, 1.4 + t/t_ramp_up() * 5.3)
-=#
+### Ramp-Up CFL ###
+t_ramp_up() = 5.05 # PE Relaxation RK 4 13, 8, 6, 5
+t_ramp_up() = 5.40 # PERK 4 13, 8, 6, 5
+
+# TODO: Single PERK Ramp-up
+#t_ramp_up() = 4.50 # PE Relaxation RK 4 13
+
+#t_ramp_up() = 0.75 # R-RK44
+#t_ramp_up() = 2.35 # R-TS64
+#t_ramp_up() = 1.10 # R-CKL54
+
+cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
+
+save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
+                                   save_final_restart = true)
 
 # Combine all the callbacks into a description.
 callbacks = CallbackSet(summary_callback,
@@ -226,6 +250,7 @@ callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         glm_speed_callback,
                         stepsize_callback,
+                        #save_restart, # For finding max CFL
                         save_solution
                         )
 
@@ -233,8 +258,9 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 base_path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 
-#=
+
 # p = 4
 path = base_path * "p4/"
 
@@ -247,24 +273,22 @@ Stages = [13, 8, 6, 5]
 ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
-
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
+
+#ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
-=#
-
-sol = solve(ode, SSPRK54(thread = OrdinaryDiffEq.True()),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
 
 
 summary_callback() # print the timer summary
 
+#=
 using Plots
 pd = PlotData2D(sol);
 
@@ -272,3 +296,4 @@ plot(getmesh(pd), xlabel = "\$x\$", ylabel = "\$y \$")
 
 # For level distribution
 Trixi2Vtk.trixi2vtk(semi.cache, dtRatios, Stages, "out/solution_000000001.h5")
+=#
