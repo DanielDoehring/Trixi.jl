@@ -55,7 +55,9 @@ function compute_PairedExplicitRK2_butcher_tableau(num_stages, eig_vals, tspan,
                                                           dteps,
                                                           eig_vals; verbose)
 
-    if num_stages != consistency_order
+    if coeffs_max > 0
+        monomial_coeffs = undo_normalization!(monomial_coeffs, consistency_order,
+                                              num_stages)
         num_monomial_coeffs = length(monomial_coeffs)
         @assert num_monomial_coeffs == num_coeffs_max
         A = compute_a_coeffs(num_stages, stage_scaling_factors, monomial_coeffs)
@@ -77,10 +79,9 @@ function compute_PairedExplicitRK2_butcher_tableau(num_stages,
     # - 2 Since first entry of A is always zero (explicit method) and second is given by c_2 (consistency)
     coeffs_max = num_stages - 2
     a_matrix = zeros(2, coeffs_max)
+    a_matrix[1, :] = c[3:end]
 
     if coeffs_max > 0
-        a_matrix[1, :] = c[3:end]
-
         path_monomial_coeffs = joinpath(base_path_monomial_coeffs,
                                         "gamma_" * string(num_stages) * ".txt")
 
@@ -99,7 +100,7 @@ function compute_PairedExplicitRK2_butcher_tableau(num_stages,
 end
 
 @doc raw"""
-    PairedExplicitRK2(num_stages, base_path_monomial_coeffs::AbstractString, dt_opt = nothing;
+    PairedExplicitRK2(num_stages, base_path_monomial_coeffs::AbstractString; dt_opt = nothing,
                       bS = 1.0, cS = 0.5)
     PairedExplicitRK2(num_stages, tspan, semi::AbstractSemidiscretization;
                       verbose = false, bS = 1.0, cS = 0.5)
@@ -147,8 +148,8 @@ struct PairedExplicitRK2 <:
 end
 
 # Constructor that reads the coefficients from a file
-function PairedExplicitRK2(num_stages, base_path_monomial_coeffs::AbstractString,
-                           dt_opt = nothing;
+function PairedExplicitRK2(num_stages, base_path_monomial_coeffs::AbstractString;
+                           dt_opt = nothing,
                            bS = 1.0, cS = 0.5)
     @assert num_stages>=2 "PERK2 requires at least two stages"
     # If the user has the monomial coefficients, they also must have the optimal time step

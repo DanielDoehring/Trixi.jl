@@ -12,7 +12,7 @@ include("polynomial_optimizer.jl")
 
 # Abstract base type for both single/standalone and multi-level 
 # PERK (Paired Explicit Runge-Kutta) time integration schemes
-abstract type AbstractPairedExplicitRK{ORDER} end
+abstract type AbstractPairedExplicitRK{ORDER} <: AbstractTimeIntegrator end
 # Abstract base type for single/standalone PERK time integration schemes
 abstract type AbstractPairedExplicitRKSingle{ORDER} <: AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
@@ -392,7 +392,7 @@ end
 
 """
     modify_dt_for_tstops!(integrator::PairedExplicitRK)
- 
+
 Modify the time-step size to match the time stops specified in integrator.opts.tstops.
 To avoid adding OrdinaryDiffEq to Trixi's dependencies, this routine is a copy of
 https://github.com/SciML/OrdinaryDiffEq.jl/blob/d76335281c540ee5a6d1bd8bb634713e004f62ee/src/integrators/integrator_utils.jl#L38-L54
