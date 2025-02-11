@@ -493,6 +493,12 @@ include("compressible_euler_2d.jl")
 include("compressible_euler_3d.jl")
 include("compressible_euler_quasi_1d.jl")
 
+# CompressibleEulerMultiIonEquations
+abstract type AbstractCompressibleEulerMultiIonEquations{NDIMS, NVARS, NCOMP} <:
+              AbstractEquations{NDIMS, NVARS} end
+include("compressible_euler_multiion_1d.jl")
+include("compressible_euler_multiion_2d.jl")
+
 # CompressibleEulerMulticomponentEquations
 abstract type AbstractCompressibleEulerMulticomponentEquations{NDIMS, NVARS, NCOMP} <:
               AbstractEquations{NDIMS, NVARS} end
@@ -514,6 +520,7 @@ include("polytropic_euler_2d.jl")
                                                                                                }
     NCOMP
 end
+
 """
     eachcomponent(equations::AbstractCompressibleEulerMulticomponentEquations)
 
@@ -522,6 +529,27 @@ for the components in `AbstractCompressibleEulerMulticomponentEquations`.
 In particular, not the components themselves are returned.
 """
 @inline function eachcomponent(equations::AbstractCompressibleEulerMulticomponentEquations)
+    Base.OneTo(ncomponents(equations))
+end
+
+# Retrieve number of components from equation instance for the multicomponent case
+@inline function ncomponents(::AbstractCompressibleEulerMultiIonEquations{NDIMS,
+                                                                          NVARS,
+                                                                          NCOMP}) where {
+                                                                                         NDIMS,
+                                                                                         NVARS,
+                                                                                         NCOMP
+                                                                                         }
+    NCOMP
+end
+"""
+    eachcomponent(equations::AbstractCompressibleEulerMultiIonEquationsEquations)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the components in `AbstractCompressibleEulerMultiIonEquationsEquations`.
+In particular, not the components themselves are returned.
+"""
+@inline function eachcomponent(equations::AbstractCompressibleEulerMultiIonEquations)
     Base.OneTo(ncomponents(equations))
 end
 
