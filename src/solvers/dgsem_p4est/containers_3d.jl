@@ -20,12 +20,11 @@ function init_elements!(elements, mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                     node_coordinates, basis)
 
         calc_inverse_jacobian!(inverse_jacobian, element, jacobian_matrix, basis)
-        #=
         skip_element = false
         for k in eachnode(basis), j in eachnode(basis), i in eachnode(basis)
-            if abs(inverse_jacobian[i, j, k, element]) > 1e12 || isnan(inverse_jacobian[i, j, k, element])
+            if abs(inverse_jacobian[i, j, k, element]) > 1e12 || isnan(inverse_jacobian[i, j, k, element]) || isinf(inverse_jacobian[i, j, k, element])
             #if isnan(inverse_jacobian[i, j, k, element])
-                @warn "Jacobian of element $element is very large"
+                @warn "Jacobian of element $element is very large with value $(inverse_jacobian[i, j, k, element])"
                 skip_element = true
                 break
             end
@@ -33,7 +32,6 @@ function init_elements!(elements, mesh::Union{P4estMesh{3}, T8codeMesh{3}},
         if skip_element
             continue
         end
-        =#
     end
 
     return nothing
