@@ -7,7 +7,7 @@ using OrdinaryDiffEq
 equations = CompressibleEulerEquations3D(1.4)
 
 advection_velocity = (1.0, 1.0, 1.0)
-equations = LinearScalarAdvectionEquation3D(advection_velocity)
+#equations = LinearScalarAdvectionEquation3D(advection_velocity)
 
 @inline function initial_condition(x, t, equations::CompressibleEulerEquations3D)
     # set the freestream flow parameters
@@ -93,24 +93,24 @@ boundary_symbols = [:PhysicalSurface2, # "symm1"
                     #:PhysicalSurface24, # "B4J1"
                     ]
 
-#mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
-mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, initial_refinement_level = 0)
+mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
+#mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, initial_refinement_level = 0)
 
-boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symmetry
+boundary_conditions = Dict(:PhysicalSurface2 => bc_farfield, # Symmetry: bc_symmetry
                            :PhysicalSurface4 => bc_farfield, # Farfield: bc_farfield
                            :PhysicalSurface7 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface8 => bc_symmetry, # Symmetry: bc_symmetry
-                           :PhysicalSurface12 => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                           :PhysicalSurface8 => bc_farfield, # Symmetry: bc_symmetry
+                           :PhysicalSurface12 => bc_farfield, # Wing: bc_slip_wall
                            :PhysicalSurface13 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface14 => bc_symmetry, # Symmetry: bc_symmetry
-                           :PhysicalSurface18 => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                           :PhysicalSurface14 => bc_farfield, # Symmetry: bc_symmetry
+                           :PhysicalSurface18 => bc_farfield, # Wing: bc_slip_wall
                            :PhysicalSurface19 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface20 => bc_symmetry, # Symmetry: bc_symmetry
+                           :PhysicalSurface20 => bc_farfield, # Symmetry: bc_symmetry
                            :PhysicalSurface23 => bc_farfield, # Farfield: bc_farfield
                            :PhysicalSurface25 => bc_farfield, # Farfield: bc_farfield
                           )
 
-boundary_conditions = Dict(:all => bc_farfield) # For testing of mesh quality
+#boundary_conditions = Dict(:all => bc_farfield) # For testing of mesh quality
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
@@ -120,7 +120,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 50
+analysis_interval = 1
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 100)
