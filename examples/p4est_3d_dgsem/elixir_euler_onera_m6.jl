@@ -61,7 +61,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/mesh_ONERAM6_turb_hexa_43008_Trixi.inp"
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/mesh_ONERAM6_turb_hexa_43008_rev_Trixi.inp"
 
-mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi.inp"
+#mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi.inp"
+mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_p4est_ready.inp"
 
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Turbulent/sd7003_straight_Trixi.inp"
 
@@ -96,16 +97,16 @@ boundary_symbols = [:PhysicalSurface2, # "symm1"
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 #mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, initial_refinement_level = 0)
 
-boundary_conditions = Dict(:PhysicalSurface2 => bc_farfield, # Symmetry: bc_symmetry
+boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symmetry
                            :PhysicalSurface4 => bc_farfield, # Farfield: bc_farfield
                            :PhysicalSurface7 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface8 => bc_farfield, # Symmetry: bc_symmetry
-                           :PhysicalSurface12 => bc_farfield, # Wing: bc_slip_wall
+                           :PhysicalSurface8 => bc_symmetry, # Symmetry: bc_symmetry
+                           :PhysicalSurface12 => boundary_condition_slip_wall, # Wing: bc_slip_wall
                            :PhysicalSurface13 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface14 => bc_farfield, # Symmetry: bc_symmetry
-                           :PhysicalSurface18 => bc_farfield, # Wing: bc_slip_wall
+                           :PhysicalSurface14 => bc_symmetry, # Symmetry: bc_symmetry
+                           :PhysicalSurface18 => boundary_condition_slip_wall, # Wing: bc_slip_wall
                            :PhysicalSurface19 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface20 => bc_farfield, # Symmetry: bc_symmetry
+                           :PhysicalSurface20 => bc_symmetry, # Symmetry: bc_symmetry
                            :PhysicalSurface23 => bc_farfield, # Farfield: bc_farfield
                            :PhysicalSurface25 => bc_farfield, # Farfield: bc_farfield
                           )
@@ -120,7 +121,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1
+analysis_interval = 50
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 100)
