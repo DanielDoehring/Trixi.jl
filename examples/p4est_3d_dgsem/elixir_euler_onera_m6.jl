@@ -6,6 +6,8 @@ using OrdinaryDiffEq
 
 equations = CompressibleEulerEquations3D(1.4)
 
+# TODO: AoA: 3.06 deg or 6.06 deg
+
 @inline function initial_condition(x, t, equations::CompressibleEulerEquations3D)
     # set the freestream flow parameters
     rho_freestream = 1.4
@@ -29,7 +31,7 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
     return flux
 end
 
-polydeg = 1
+polydeg = 2
 
 surface_flux = flux_lax_friedrichs
 volume_flux = flux_ranocha
@@ -50,7 +52,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 =#
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
-mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
+#mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
+mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
 boundary_symbols = [:PhysicalSurface2, # "symm1"
                     :PhysicalSurface4, # "out1"
@@ -67,7 +70,6 @@ boundary_symbols = [:PhysicalSurface2, # "symm1"
                     ]
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
-#mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, initial_refinement_level = 0)
 
 boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symmetry
                            :PhysicalSurface4 => bc_farfield, # Farfield: bc_farfield
@@ -83,8 +85,6 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
                            :PhysicalSurface25 => bc_farfield, # Farfield: bc_farfield
                           )
 
-#boundary_conditions = Dict(:all => bc_farfield) # For testing of mesh quality
-
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
@@ -93,14 +93,16 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 50
+analysis_interval = 100_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 100)
 
+# Works for SSPRK54 (but probably not maxed out)
 stepsize_callback = StepsizeCallback(cfl = 5.0)
 
-save_solution = SaveSolutionCallback(interval = analysis_interval,
+save_sol_interval = 1000
+save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
@@ -108,14 +110,14 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        stepsize_callback,
-                        #save_solution
+                        #stepsize_callback,
+                        save_solution
                         )
 
 # Run the simulation
 ###############################################################################
 
-sol = solve(ode, SSPRK104(; thread = OrdinaryDiffEq.True());
+sol = solve(ode, SSPRK43(; thread = OrdinaryDiffEq.True());
             dt = 1e-10, # overwritten by the `stepsize_callback`
             save_everystep = false, callback = callbacks);
 
