@@ -9,6 +9,43 @@ abstract type vanderHouwenAlgorithm end
 abstract type vanderHouwenRelaxationAlgorithm end
 
 """
+    CKL43()
+
+Carpenter-Kennedy-Lewis 4-stage, 3rd-order Runge-Kutta method.
+"""
+struct CKL43 <: vanderHouwenAlgorithm
+    a::SVector{4, Float64}
+    b::SVector{4, Float64}
+    c::SVector{4, Float64}
+end
+function CKL43()
+    a = SVector(0.0,
+                11847461282814 / 36547543011857,
+                3943225443063 / 7078155732230,
+                -346793006927 / 4029903576067)
+
+    b = SVector(1017324711453 / 9774461848756,
+                8237718856693 / 13685301971492,
+                57731312506979 / 19404895981398,
+                -101169746363290 / 37734290219643)
+    c = SVector(0.0,
+                a[2],
+                b[1] + a[3],
+                b[1] + b[2] + a[4])
+
+    return CKL43(a, b, c)
+end
+
+struct RelaxationCKL43{RelaxationSolver} <: vanderHouwenRelaxationAlgorithm
+    van_der_houwen_alg::CKL43
+    relaxation_solver::RelaxationSolver
+end
+function RelaxationCKL43(; relaxation_solver = RelaxationSolverNewton())
+    return RelaxationCKL43{typeof(relaxation_solver)}(CKL43(), relaxation_solver)
+end
+
+
+"""
     CKL54()
 
 Carpenter-Kennedy-Lewis 5-stage, 4th-order Runge-Kutta method.
@@ -214,14 +251,15 @@ function step!(integrator::vanderHouwenIntegrator)
         for stage in 2:num_stages
             @threaded for i in eachindex(integrator.u)
                 integrator.u_tmp[i] = integrator.u[i] +
-                                    alg.a[stage] * integrator.dt * integrator.du[i]
+                                      alg.a[stage] * integrator.dt * integrator.du[i]
             end
 
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                        integrator.t + alg.c[stage] * integrator.dt)
+                         integrator.t + alg.c[stage] * integrator.dt)
 
             @threaded for i in eachindex(integrator.u)
-                integrator.u[i] += alg.b[stage - 1] * integrator.dt * integrator.k_prev[i]
+                integrator.u[i] += alg.b[stage - 1] * integrator.dt *
+                                   integrator.k_prev[i]
                 integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
             end
         end
@@ -293,25 +331,29 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
         du_wrap = wrap_array(integrator.du, prob.p)
         # Entropy change due to first stage
         dS = alg.b[1] * integrator.dt *
-            int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
+             int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
 
         @threaded for i in eachindex(integrator.u)
-            integrator.u_tmp[i] = integrator.u[i] + alg.a[2] * integrator.dt * integrator.du[i]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  alg.a[2] * integrator.dt * integrator.du[i]
         end
 
         # Second to last stage
-        for stage in 2:num_stages - 1
+        for stage in 2:(num_stages - 1)
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                        integrator.t + alg.c[stage] * integrator.dt)
+                         integrator.t + alg.c[stage] * integrator.dt)
 
             dS += alg.b[stage] * integrator.dt *
-                int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+                  int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
             @threaded for i in eachindex(integrator.u)
-                integrator.direction[i] += alg.b[stage] * integrator.du[i] * integrator.dt
+                integrator.direction[i] += alg.b[stage] * integrator.du[i] *
+                                           integrator.dt
 
-                integrator.u_tmp[i] += integrator.dt * ( (alg.b[stage - 1] - alg.a[stage]) * integrator.k_prev[i] + 
-                                                        alg.a[stage + 1] * integrator.du[i])
+                integrator.u_tmp[i] += integrator.dt *
+                                       ((alg.b[stage - 1] - alg.a[stage]) *
+                                        integrator.k_prev[i] +
+                                        alg.a[stage + 1] * integrator.du[i])
 
                 integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
             end
@@ -319,24 +361,25 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
 
         # Last stage
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                    integrator.t + alg.c[num_stages] * integrator.dt)
+                     integrator.t + alg.c[num_stages] * integrator.dt)
 
         dS += alg.b[num_stages] * integrator.dt *
-            int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+              int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
         @threaded for i in eachindex(integrator.u)
-            integrator.direction[i] += alg.b[num_stages] * integrator.du[i] * integrator.dt
+            integrator.direction[i] += alg.b[num_stages] * integrator.du[i] *
+                                       integrator.dt
         end
 
         direction_wrap = wrap_array(integrator.direction, prob.p)
 
         @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
-                                                                    u_tmp_wrap, u_wrap,
-                                                                    direction_wrap,
-                                                                    S_old, dS,
-                                                                    mesh, equations,
-                                                                    dg, cache,
-                                                                    integrator.relaxation_solver)
+                                                                     u_tmp_wrap, u_wrap,
+                                                                     direction_wrap,
+                                                                     S_old, dS,
+                                                                     mesh, equations,
+                                                                     dg, cache,
+                                                                     integrator.relaxation_solver)
 
         integrator.iter += 1
         # Check if due to entropy relaxation the final step is not reached
