@@ -1,5 +1,6 @@
 using Trixi
 using OrdinaryDiffEq
+using LinearAlgebra: norm
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -11,9 +12,15 @@ equations = CompressibleEulerEquations3D(1.4)
 @inline function initial_condition(x, t, equations::CompressibleEulerEquations3D)
     # set the freestream flow parameters
     rho_freestream = 1.4
-    v1 = 0.1 # 0.84
-    v2 = 0.0
+
+    #v_total = 0.84
+
+    # AoA = 6.06
+    v1 = 0.8353059860291301
+    v2 = 0.0886786879915508
+
     v3 = 0.0
+
     p_freestream = 1.0
 
     prim = SVector(rho_freestream, v1, v2, v3, p_freestream)
@@ -22,12 +29,28 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-# Use simple outflow/extended domain at symmetry line
+# Ensure that rho and p are the same across symmetry line and allow only 
+# tangential velocity
 @inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
                               surface_flux_function,
                               equations::CompressibleEulerEquations3D)
 
-    flux = Trixi.flux(u_inner, normal_direction, equations)
+    norm_ = norm(normal_direction)
+    normal = normal_direction / norm_
+
+    # compute the primitive variables
+    rho, v1, v2, v3, p = cons2prim(u_inner, equations)
+
+    v_normal = normal[1] * v1 + normal[2] * v2 + normal[3] * v3
+
+    u_mirror = prim2cons(SVector(rho,
+                                v1 - 2 * v_normal * normal[1],
+                                v2 - 2 * v_normal * normal[2],
+                                v3 - 2 * v_normal * normal[3],
+                                p), equations)
+
+    flux = surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
+
     return flux
 end
 
@@ -35,6 +58,8 @@ polydeg = 2
 
 surface_flux = flux_lax_friedrichs
 volume_flux = flux_ranocha
+
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
@@ -46,12 +71,9 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
 
-# DG Solver
-#=
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
-=#
-solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
 mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
@@ -93,32 +115,44 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100_000
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+analysis_interval = 200
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     analysis_errors = Symbol[],
+                                     analysis_integrals = ())
 
-alive_callback = AliveCallback(alive_interval = 100)
+alive_callback = AliveCallback(alive_interval = 200)
 
 # Works for SSPRK54 (but probably not maxed out)
 stepsize_callback = StepsizeCallback(cfl = 5.0)
 
-save_sol_interval = 1000
+save_sol_interval = 20_000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
-                                     save_initial_solution = true,
+                                     save_initial_solution = false,
                                      save_final_solution = true,
-                                     solution_variables = cons2prim)
+                                     solution_variables = cons2prim,
+                                     output_directory="/storage/home/daniel/OneraM6/")
+
+save_restart = SaveRestartCallback(interval = save_sol_interval,
+                                   save_final_restart = true,
+                                   output_directory="/storage/home/daniel/OneraM6/")
 
 callbacks = CallbackSet(summary_callback,
-                        alive_callback,
+                        #alive_callback,
                         analysis_callback,
                         #stepsize_callback,
-                        save_solution
+                        save_solution,
+                        save_restart
                         )
 
 # Run the simulation
 ###############################################################################
 
-sol = solve(ode, SSPRK43(; thread = OrdinaryDiffEq.True());
-            dt = 1e-10, # overwritten by the `stepsize_callback`
+ode_alg = SSPRK43(; thread = OrdinaryDiffEq.True())
+
+time_int_tol = 1e-7
+sol = solve(ode, ode_alg;
+            dt = 1e-8, # overwritten by the `stepsize_callback`
+            abstol = time_int_tol, reltol = time_int_tol,
             save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
