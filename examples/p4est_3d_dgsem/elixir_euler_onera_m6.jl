@@ -110,8 +110,15 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-tspan = (0.0, 10.0)
-ode = semidiscretize(semi, tspan)
+#tspan = (0.0, 10.0)
+#dt = 1e-8
+#ode = semidiscretize(semi, tspan)
+
+restart_file = "restart_000180000.h5"
+restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
+tspan = (load_time(restart_filename), 10.0)
+dt = load_dt(restart_filename)
+ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
 
@@ -120,10 +127,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = ())
 
-alive_callback = AliveCallback(alive_interval = 200)
-
-# Works for SSPRK54 (but probably not maxed out)
-stepsize_callback = StepsizeCallback(cfl = 5.0)
+alive_callback = AliveCallback(alive_interval = analysis_interval)
 
 save_sol_interval = 20_000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
@@ -137,9 +141,8 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
 callbacks = CallbackSet(summary_callback,
-                        #alive_callback,
-                        analysis_callback,
-                        #stepsize_callback,
+                        alive_callback,
+                        #analysis_callback,
                         save_solution,
                         save_restart
                         )
@@ -151,7 +154,7 @@ ode_alg = SSPRK43(; thread = OrdinaryDiffEq.True())
 
 time_int_tol = 1e-7
 sol = solve(ode, ode_alg;
-            dt = 1e-8, # overwritten by the `stepsize_callback`
+            dt = dt,
             abstol = time_int_tol, reltol = time_int_tol,
             save_everystep = false, callback = callbacks);
 
