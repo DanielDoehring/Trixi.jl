@@ -9,6 +9,32 @@ abstract type SubDiagonalAlgorithm end
 abstract type SubDiagonalRelaxationAlgorithm end
 
 """
+    RK33()
+
+Relaxation version of Ralston's third-order Runge-Kutta method.
+This method has minimum local error bound among the S=p=3 methods.
+"""
+struct RK33 <: SubDiagonalAlgorithm
+    b::SVector{3, Float64}
+    c::SVector{3, Float64}
+end
+function RK33()
+    b = SVector(2 / 9, 1 / 3, 4 / 9)
+    c = SVector(0.0, 0.5, 0.75)
+
+    return RK33(b, c)
+end
+
+struct RelaxationRK33{RelaxationSolver} <: SubDiagonalRelaxationAlgorithm
+    sub_diag_alg::RK33
+    relaxation_solver::RelaxationSolver
+end
+function RelaxationRK33(; relaxation_solver = RelaxationSolverNewton())
+    return RelaxationRK33{typeof(relaxation_solver)}(RK33(), relaxation_solver)
+end
+
+
+"""
     RK44()
 
 Relaxation version of the classical fourth-order Runge-Kutta method.
@@ -242,12 +268,13 @@ function step!(integrator::SubDiagIntegrator)
         for stage in 2:length(alg.c)
             @threaded for i in eachindex(integrator.u)
                 integrator.u_tmp[i] = integrator.u[i] +
-                                    alg.c[stage] * integrator.dt * integrator.du[i]
+                                      alg.c[stage] * integrator.dt * integrator.du[i]
             end
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                        integrator.t + alg.c[stage] * integrator.dt)
+                         integrator.t + alg.c[stage] * integrator.dt)
             @threaded for i in eachindex(integrator.u)
-                integrator.direction[i] += alg.b[stage] * integrator.du[i] * integrator.dt
+                integrator.direction[i] += alg.b[stage] * integrator.du[i] *
+                                           integrator.dt
             end
         end
 
@@ -313,33 +340,34 @@ function step!(integrator::SubDiagRelaxationIntegrator)
         du_wrap = wrap_array(integrator.du, prob.p)
         # Entropy change due to first stage
         dS = alg.b[1] * integrator.dt *
-            int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
+             int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
 
         # Second to last stage
         for stage in 2:length(alg.c)
             @threaded for i in eachindex(integrator.u)
                 integrator.u_tmp[i] = integrator.u[i] +
-                                    alg.c[stage] * integrator.dt * integrator.du[i]
+                                      alg.c[stage] * integrator.dt * integrator.du[i]
             end
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                        integrator.t + alg.c[stage] * integrator.dt)
+                         integrator.t + alg.c[stage] * integrator.dt)
             @threaded for i in eachindex(integrator.u)
-                integrator.direction[i] += alg.b[stage] * integrator.du[i] * integrator.dt
+                integrator.direction[i] += alg.b[stage] * integrator.du[i] *
+                                           integrator.dt
             end
 
             dS += alg.b[stage] * integrator.dt *
-                int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+                  int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
         end
 
         direction_wrap = wrap_array(integrator.direction, prob.p)
 
         @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
-                                                                    u_tmp_wrap, u_wrap,
-                                                                    direction_wrap,
-                                                                    S_old, dS,
-                                                                    mesh, equations,
-                                                                    dg, cache,
-                                                                    integrator.relaxation_solver)
+                                                                     u_tmp_wrap, u_wrap,
+                                                                     direction_wrap,
+                                                                     S_old, dS,
+                                                                     mesh, equations,
+                                                                     dg, cache,
+                                                                     integrator.relaxation_solver)
 
         integrator.iter += 1
         # Check if due to entropy relaxation the final step is not reached
