@@ -1,20 +1,16 @@
-
 using OrdinaryDiffEq
 using Trixi
 
 ###############################################################################
-# semidiscretization of the compressible Euler equations
-
-# NOTE: Tied to 1D somewhat as mortars are not EC (yet)!
-
-equations = CompressibleEulerEquations1D(1.4)
+# semidiscretization of the ideal MHD equations
+gamma = 2
+equations = IdealGlmMhdEquations1D(gamma)
 
 initial_condition = initial_condition_weak_blast_wave
 
-# Volume flux adds some (minimal) disspation, thus stabilizing the simulation - 
-# in contrast to standard DGSEM only
-solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
-               volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+volume_flux = flux_hindenlang_gassner
+solver = DGSEM(polydeg = 3, surface_flux = flux_hindenlang_gassner,
+               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 coordinates_min = -2.0
 coordinates_max = 2.0
@@ -51,7 +47,6 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = true)
 
 cfl = 1.0 # Probably not maxed out
-
 cfl = 0.25 # RK4
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -63,6 +58,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+# TODO: Do optimization for the MHD case?
 basepath = "/home/daniel/git/Paper_PERRK/Data/WeakBlastWave/"
 dtRatios = [1, 0.5, 0.25]
 
