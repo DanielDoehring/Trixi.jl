@@ -55,11 +55,10 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 end
 
 polydeg = 2
-
 surface_flux = flux_lax_friedrichs
-volume_flux = flux_ranocha
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+
 
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
@@ -67,12 +66,15 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_min = 0.001,
                                             alpha_smooth = true,
                                             variable = density_pressure)
+
+volume_flux = flux_ranocha
 volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
+
 
 mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
 #mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
@@ -114,13 +116,18 @@ tspan = (0.0, 10.0)
 #dt = 1e-8 # Something to start with SSPRK43
 ode = semidiscretize(semi, tspan)
 
-#=
+
 restart_file = "restart_000180000.h5"
-restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
+
+#restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
+restart_filename = joinpath("out/", restart_file)
+
 tspan = (load_time(restart_filename), 10.0)
 dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
-=#
+
+# Callbacks
+###############################################################################
 
 summary_callback = SummaryCallback()
 
@@ -129,7 +136,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = ())
 
-alive_callback = AliveCallback(alive_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 2)
 
 save_sol_interval = 20_000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
@@ -142,11 +149,14 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
-stepsize_callback = StepsizeCallback(cfl = 10.0)
+stepsize_callback = StepsizeCallback(cfl = 2.0) # PERK3 Single
+stepsize_callback = StepsizeCallback(cfl = 13.0) # PERK 12 Single (Not maxed out yet)
+
+stepsize_callback = StepsizeCallback(cfl = 9.0) # PERK 3-12 Multi
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         #save_solution,
                         #save_restart,
                         stepsize_callback
@@ -180,10 +190,26 @@ dtRatios_complete = [
     0.049830001997907,
     0.0277705298096407
                       ] ./ 0.309106167859536
-
 Stages_complete = reverse(collect(range(3, 15)))
 
+dtRatios_max12 = [ 
+    0.227924538183834,
+    0.208627714631148,
+    0.185006311046563,
+    0.160520186060157,
+    0.138423712472468,
+    0.111143939499652,
+    0.0970369001773179,
+    0.079403361283903,
+    0.049830001997907,
+    0.0277705298096407
+                      ] ./ 0.227924538183834
+Stages_max12 = reverse(collect(range(3, 12)))
+
 base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
+
+#ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
+#ode_alg = Trixi.PairedExplicitRK3(12, base_path)
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete, base_path, dtRatios_complete)
 

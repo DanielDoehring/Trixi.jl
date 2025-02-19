@@ -587,16 +587,16 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
     hmin_per_element = zeros(n_elements)
 
     for element_id in 1:n_elements
-        # pull the four corners numbered as right-handed
+        # pull the four corners numbered as
 
         #            <----
-        #        4-----------3
+        #        3-----------2
         #        |           |
         #     |  |           |  ^
         #     |  |           |  |
         #     v  |           |  |
         #        |           |
-        #        1-----------2
+        #        0-----------1
         #            ---->    
         #  ^ η
         #  |
@@ -607,18 +607,19 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
         P2 = elements.node_coordinates[:, nnodes, nnodes, element_id]
         P3 = elements.node_coordinates[:, 1, nnodes, element_id]
 
-        # compute the four side lengths and get the smallest
-        L0 = sqrt(sum((P1 - P0) .^ 2))
-        L1 = sqrt(sum((P2 - P1) .^ 2))
-        L2 = sqrt(sum((P3 - P2) .^ 2))
-        L3 = sqrt(sum((P0 - P3) .^ 2))
-        h = min(L0, L1, L2, L3)
+        # In 2D four edges need to be checked
+        L0 = norm(P1 - P0)
+        L1 = norm(P2 - P1)
+        L2 = norm(P3 - P2)
+        L3 = norm(P0 - P3)
 
+        h = min(L0, L1, L2, L3)
         # For square elements (RTI)
         #L0 = abs(P1[1] - P0[1])
         #h = L0
-
         hmin_per_element[element_id] = h
+
+        # Set global `h_min` and `h_max`, i.e., for the entire mesh
         if h > h_max
             h_max = h
         end
@@ -628,8 +629,84 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
     end
 
     println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min)
-    println("\n")
+    println("h_max/h_min: ", h_max / h_min, "\n")
+
+    return hmin_per_element, h_min, h_max
+end
+
+function get_hmin_per_element(mesh::P4estMesh{3}, elements,
+                              n_elements, nnodes, RealT)
+    h_min = floatmax(RealT)
+    h_max = zero(RealT)
+
+    hmin_per_element = zeros(n_elements)
+
+    for element_id in 1:n_elements
+        # pull the eight corners numbered as
+
+        #            7----------6
+        #          / |         /|
+        #         /  |        / | 
+        #        3-----------2  |
+        #        |   |       |  |
+        #        |   |       |  |
+        #        |   4-------|--5
+        #        |  /        | /
+        #        | /         |/
+        #        0-----------1
+        #           
+        #  ^ η
+        #  |   ζ
+        #  |  / 
+        #  | / 
+        #  |----> ξ
+
+        # "Front face"
+        P0 = elements.node_coordinates[:, 1, 1, 1, element_id]
+        P1 = elements.node_coordinates[:, nnodes, 1, 1, element_id]
+        P2 = elements.node_coordinates[:, nnodes, nnodes, 1, element_id]
+        P3 = elements.node_coordinates[:, 1, nnodes, 1, element_id]
+
+        # "Back face"
+        P4 = elements.node_coordinates[:, 1, 1, nnodes, element_id]
+        P5 = elements.node_coordinates[:, nnodes, 1, nnodes, element_id]
+        P6 = elements.node_coordinates[:, nnodes, nnodes, nnodes, element_id]
+        P7 = elements.node_coordinates[:, 1, nnodes, nnodes, element_id]
+
+        # In 3D, there are 12 edges that need to be checked
+
+        # "Front" face
+        L0 = norm(P1 - P0)
+        L1 = norm(P2 - P1)
+        L2 = norm(P3 - P2)
+        L3 = norm(P0 - P3)
+
+        # "Back" face
+        L4 = norm(P5 - P4)
+        L5 = norm(P6 - P5)
+        L6 = norm(P7 - P6)
+        L7 = norm(P4 - P7)
+
+        # "Connecting" edges
+        L8 = norm(P0 - P4)
+        L9 = norm(P1 - P5)
+        L10 = norm(P2 - P6)
+        L11 = norm(P3 - P7)
+
+        h = min(L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11)
+        hmin_per_element[element_id] = h
+
+        # Set global `h_min` and `h_max`, i.e., for the entire mesh
+        if h > h_max
+            h_max = h
+        end
+        if h < h_min
+            h_min = h
+        end
+    end
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
 
     return hmin_per_element, h_min, h_max
 end
