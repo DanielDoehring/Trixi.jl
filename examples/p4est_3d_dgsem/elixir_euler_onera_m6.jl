@@ -7,7 +7,7 @@ using LinearAlgebra: norm
 
 equations = CompressibleEulerEquations3D(1.4)
 
-# TODO: AoA: 3.06 deg or 6.06 deg
+# NOTE: AoA: 3.06 deg or 6.06 deg
 
 @inline function initial_condition(x, t, equations::CompressibleEulerEquations3D)
     # set the freestream flow parameters
@@ -74,8 +74,8 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-#mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
-mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
+mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
+#mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
 boundary_symbols = [:PhysicalSurface2, # "symm1"
                     :PhysicalSurface4, # "out1"
@@ -110,15 +110,17 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-#tspan = (0.0, 10.0)
-#dt = 1e-8
-#ode = semidiscretize(semi, tspan)
+tspan = (0.0, 10.0)
+#dt = 1e-8 # Something to start with SSPRK43
+ode = semidiscretize(semi, tspan)
 
+#=
 restart_file = "restart_000180000.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 tspan = (load_time(restart_filename), 10.0)
 dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
+=#
 
 summary_callback = SummaryCallback()
 
@@ -140,16 +142,20 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
+stepsize_callback = StepsizeCallback(cfl = 10.0)
+
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         #analysis_callback,
-                        save_solution,
-                        save_restart
+                        #save_solution,
+                        #save_restart,
+                        stepsize_callback
                         )
 
 # Run the simulation
 ###############################################################################
 
+#=
 ode_alg = SSPRK43(; thread = OrdinaryDiffEq.True())
 
 time_int_tol = 1e-7
@@ -157,5 +163,31 @@ sol = solve(ode, ode_alg;
             dt = dt,
             abstol = time_int_tol, reltol = time_int_tol,
             save_everystep = false, callback = callbacks);
+=#
+
+dtRatios_complete = [ 
+    0.309106167859536,
+    0.276830675004967,
+    0.24960460981194,
+    0.227924538183834,
+    0.208627714631148,
+    0.185006311046563,
+    0.160520186060157,
+    0.138423712472468,
+    0.111143939499652,
+    0.0970369001773179,
+    0.079403361283903,
+    0.049830001997907,
+    0.0277705298096407
+                      ] ./ 0.309106167859536
+
+Stages_complete = reverse(collect(range(3, 15)))
+
+base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
+
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete, base_path, dtRatios_complete)
+
+sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
+                  save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary

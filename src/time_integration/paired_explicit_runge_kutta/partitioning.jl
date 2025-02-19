@@ -578,6 +578,7 @@ function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nno
     return hmin_per_element, h_min, h_max
 end
 
+# TODO: 3D Version
 function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements,
                               n_elements, nnodes, RealT)
     h_min = floatmax(RealT)
@@ -587,10 +588,25 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
 
     for element_id in 1:n_elements
         # pull the four corners numbered as right-handed
+
+        #            <----
+        #        4-----------3
+        #        |           |
+        #     |  |           |  ^
+        #     |  |           |  |
+        #     v  |           |  |
+        #        |           |
+        #        1-----------2
+        #            ---->    
+        #  ^ η
+        #  |
+        #  |----> ξ
+
         P0 = elements.node_coordinates[:, 1, 1, element_id]
         P1 = elements.node_coordinates[:, nnodes, 1, element_id]
         P2 = elements.node_coordinates[:, nnodes, nnodes, element_id]
         P3 = elements.node_coordinates[:, 1, nnodes, element_id]
+
         # compute the four side lengths and get the smallest
         L0 = sqrt(sum((P1 - P0) .^ 2))
         L1 = sqrt(sum((P2 - P1) .^ 2))
