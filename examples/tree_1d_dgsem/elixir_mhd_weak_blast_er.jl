@@ -1,20 +1,16 @@
-
 using OrdinaryDiffEq
 using Trixi
 
 ###############################################################################
-# semidiscretization of the compressible Euler equations
-
-# NOTE: Tied to 1D somewhat as mortars are not EC (yet)!
-
-equations = CompressibleEulerEquations1D(1.4)
+# semidiscretization of the ideal MHD equations
+gamma = 2
+equations = IdealGlmMhdEquations1D(gamma)
 
 initial_condition = initial_condition_weak_blast_wave
 
-# Volume flux adds some (minimal) disspation, thus stabilizing the simulation - 
-# in contrast to standard DGSEM only
-solver = DGSEM(polydeg = 3, surface_flux = flux_ranocha,
-               volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+volume_flux = flux_hindenlang_gassner
+solver = DGSEM(polydeg = 3, surface_flux = flux_hindenlang_gassner,
+               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 coordinates_min = -2.0
 coordinates_max = 2.0
@@ -46,13 +42,12 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      # Note: entropy defaults to mathematical entropy
                                      analysis_integrals = (entropy,),
-                                     #analysis_filename = "entropy_standard.dat",
-                                     analysis_filename = "entropy_ER.dat",
+                                     analysis_filename = "entropy_standard.dat",
+                                     #analysis_filename = "entropy_ER.dat",
                                      save_analysis = true)
 
 cfl = 1.0 # Probably not maxed out
-
-cfl = 0.25 # RK4
+#cfl = 0.25 # RK4
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -63,35 +58,36 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+# TODO: Do optimization for the MHD case?
 basepath = "/home/daniel/git/Paper_PERRK/Data/WeakBlastWave/"
 dtRatios = [1, 0.5, 0.25]
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 #relaxation_solver = Trixi.RelaxationSolverSecantMethod()
 
-#=
 # p = 2
+
 Stages = [9, 5, 3]
 path = basepath * "p2/"
 
 #ode_alg = Trixi.PairedExplicitRK2(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK2(Stages[1], path, relaxation_solver = relaxation_solver)
 
-#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+
 
 # p = 3
-
+#=
 Stages = [13, 7, 4]
 path = basepath * "p3/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(Stages[1], path, relaxation_solver = relaxation_solver)
 
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios,
-                                                 relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+=#
 
 # p = 4
 #=
@@ -101,18 +97,18 @@ path = basepath * "p4/"
 #ode_alg = Trixi.PairedExplicitRK4(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages[1], path, relaxation_solver = relaxation_solver)
 
-#ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
 # Test comparison algorithms for entropy conservation property
-ode_alg = Trixi.RK44()
-ode_alg = Trixi.TS64()
-ode_alg = Trixi.CKL54()
+#ode_alg = Trixi.RK44()
+#ode_alg = Trixi.TS64()
+#ode_alg = Trixi.CKL54()
 
 #ode_alg = Trixi.RelaxationRK44()
 #ode_alg = Trixi.RelaxationTS64()
-ode_alg = Trixi.RelaxationCKL54()
+#ode_alg = Trixi.RelaxationCKL54()
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
