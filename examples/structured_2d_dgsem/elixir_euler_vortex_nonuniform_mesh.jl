@@ -13,7 +13,7 @@ volume_flux = flux_ranocha
 solver = DGSEM(polydeg = polydeg, surface_flux = flux_ranocha,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
-EdgeLength = 20.0
+EdgeLength() = 20.0
 """
     initial_condition_isentropic_vortex(x, t, equations::CompressibleEulerEquations2D)
 
@@ -59,8 +59,10 @@ end
 initial_condition = initial_condition_isentropic_vortex
 
 N_passes = 4
-T_end = EdgeLength * N_passes
+T_end = EdgeLength() * N_passes
 tspan = (0.0, T_end)
+
+tspan = (0.0, 0.0) # For plotting of IC
 
 function mapping(xi_, eta_)
     exponent = 1.4
@@ -70,8 +72,11 @@ function mapping(xi_, eta_)
     eta_transformed = sign(eta_) * abs(eta_)^(exponent + abs(eta_))
 
     # Scale the transformed coordinates to maintain the original domain size
-    x = xi_transformed * EdgeLength / 2
-    y = eta_transformed * EdgeLength / 2
+    #x = xi_transformed * EdgeLength() / 2
+    x = xi_transformed * 10
+    
+    #y = eta_transformed * EdgeLength() / 2
+    y = eta_transformed * 10
 
     return SVector(x, y)
 end
@@ -104,8 +109,15 @@ analysis_callback = AnalysisCallback(semi, interval = 1_000_000,
 
 alive_callback = AliveCallback(alive_interval = 1000)
 
+# For plotting IC
+save_solution = SaveSolutionCallback(interval = 100,
+                                     save_initial_solution = true,
+                                     save_final_solution = false,
+                                     solution_variables = cons2prim)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_cb_entropy,
+                        save_solution, # For plotting of IC
                         #analysis_callback,
                         alive_callback)
 
