@@ -132,7 +132,7 @@ pd = PlotData1D(sol)
 
 plot(getmesh(pd), label = "", ylim = (-0.3, 1.4))
 
-plot!(pd["rho"], xlabel = "\$x\$", ylabel = "\$y\$",
+plot!(pd["rho"], xlabel = "\$x\$",
       label = "\$\\rho\$",
       linewidth = 3, color = RGB(0, 84 / 256, 159 / 256),
       guidefont = font("Computer Modern", 16), tickfont = font("Computer Modern", 14),

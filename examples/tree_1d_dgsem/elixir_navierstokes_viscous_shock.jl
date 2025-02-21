@@ -160,6 +160,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
+tspan = (0.0, 0.0) # For plotting of IC
+
 ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
@@ -218,3 +220,30 @@ sol = Trixi.solve(ode, ode_algorithm,
                   maxiters = typemax(Int));
 
 summary_callback() # print the timer summary
+
+###############################################################################
+
+# Plot IC & grid
+
+using Plots
+
+pd = PlotData1D(sol)
+
+plot(getmesh(pd), label = "")
+
+plot!(pd["rho"], xlabel = "\$x\$",
+      label = "\$\\rho\$",
+      linewidth = 3, color = RGB(0, 84 / 256, 159 / 256),
+      guidefont = font("Computer Modern", 16), tickfont = font("Computer Modern", 14),
+      legend = true)
+
+plot!(pd["v1"],
+      label = "\$u\$",
+      linewidth = 3, color = RGB(246 / 256, 169 / 256, 0), legend = true)
+
+plot!(pd["p"], title = "Viscous Shock: Initial Solution",
+      label = "\$p\$",
+      linewidth = 3, color = RGB(70 / 256, 171 / 256, 39 / 256),
+      titlefont = font("Computer Modern", 18),
+      legendfont = font("Computer Modern", 16),
+      legend = :topright)
