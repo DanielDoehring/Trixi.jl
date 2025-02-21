@@ -84,8 +84,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 
-ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
 
 #=
 # For PERK Multi coefficient measurements
@@ -128,11 +128,11 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
 
-#stepsize_callback = StepsizeCallback(cfl = 6.2) # PERK_4 Multi E = 5, ..., 14
-#stepsize_callback = StepsizeCallback(cfl = 6.5) # PERK_4 Single, 12
+cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
+#cfl = 6.5 # PERK 4 Single 12
 
-cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
-cfl = 7.6 # Single PERK 14
+#cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
+#cfl = 7.6 # Single PERK 14
 
 #cfl = 1.9 # R-RK44
 #cfl = 2.5 # R-TS64
@@ -171,13 +171,13 @@ dtRatios = [0.208310160790890, # 14
     0.030629777558366] / 0.208310160790890 #= 5 =#
 Stages = [14, 12, 10, 8, 7, 6, 5]
 
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 #ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
