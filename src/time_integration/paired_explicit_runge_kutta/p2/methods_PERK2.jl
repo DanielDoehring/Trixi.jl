@@ -280,9 +280,13 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{2})
         end
 
         @threaded for i in eachindex(integrator.u)
+            #=
             integrator.u[i] += integrator.dt *
                                (alg.b1 * integrator.k1[i] +
                                 alg.bS * integrator.du[i])
+            =#
+            # More performant version for b1 = 0
+            integrator.u[i] += integrator.dt * alg.bS * integrator.du[i]
         end
     end
 

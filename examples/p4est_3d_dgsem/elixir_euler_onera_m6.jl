@@ -68,6 +68,8 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             variable = density_pressure)
 
 volume_flux = flux_ranocha
+#volume_flux = flux_ranocha_turbo # Not sure if this has any benefit
+
 volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
@@ -112,12 +114,12 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-tspan = (0.0, 10.0)
+tspan = (0.0, 1.0)
 #dt = 1e-8 # Something to start with SSPRK43
 ode = semidiscretize(semi, tspan)
 
 
-restart_file = "restart_000180000.h5"
+restart_file = "restart_t0034.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("out/", restart_file)
@@ -138,7 +140,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(alive_interval = analysis_interval)
 
-save_sol_interval = 20_000
+save_sol_interval = 10_000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
@@ -152,7 +154,8 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 stepsize_callback = StepsizeCallback(cfl = 2.0) # PERK3 Single
 stepsize_callback = StepsizeCallback(cfl = 13.0) # PERK 12 Single (Not maxed out yet)
 
-stepsize_callback = StepsizeCallback(cfl = 9.0) # PERK 3-15 Multi
+stepsize_callback = StepsizeCallback(cfl = 9.0) # PERK p3 3-15 Multi
+stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
@@ -175,7 +178,7 @@ sol = solve(ode, ode_alg;
             save_everystep = false, callback = callbacks);
 =#
 
-dtRatios_complete = [ 
+dtRatios_complete_p3 = [ 
     0.309106167859536,
     0.276830675004967,
     0.24960460981194,
@@ -190,17 +193,41 @@ dtRatios_complete = [
     0.049830001997907,
     0.0277705298096407
                       ] ./ 0.309106167859536
-Stages_complete = reverse(collect(range(3, 15)))
+Stages_complete_p3 = reverse(collect(range(3, 15)))
 
 base_path = "/storage/home/daniel/OneraM6/LLF_only/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
 #ode_alg = Trixi.PairedExplicitRK3(12, base_path)
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete, base_path, dtRatios_complete)
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path * "p3/", dtRatios_complete_p3)
 
+dtRatios_complete_p2 = [ 
+    0.331201171875,
+    0.306915056315193,
+    0.269114136027347,
+    0.235234180184198,
+    0.211859241781931,
+    0.18767583250301,
+    0.163116095269797,
+    0.139683004342951,
+    0.107970862171496,
+    0.0893285596367787,
+    0.0724456112395274,
+    0.0487721351819346,
+    0.0221037361116032
+                      ] ./ 0.331201171875
+Stages_complete_p2 = reverse(collect(range(2, 14)))
 
-sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
+ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, base_path * "p2/", dtRatios_complete_p2)
+
+relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 5)
+#=
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtRatios_complete;
+                                                 relaxation_solver = relaxation_solver)
+=#
+
+sol = Trixi.solve(ode, ode_alg, dt = 2.3e-07, 
                   save_everystep = false, callback = callbacks);
 
 
