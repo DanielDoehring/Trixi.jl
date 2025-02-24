@@ -25,7 +25,26 @@ end
 # as an "element variable".
 function get_node_variables!(node_variables, mesh, equations,
                              volume_integral::AbstractVolumeIntegral, dg, cache)
-    nothing
+    if isempty(node_variables) 
+        return nothing
+    else
+        n_nodes = nnodes(dg)
+        n_elements = nelements(dg, cache)
+        if :vorticity in keys(node_variables)
+            vorticity = zeros(eltype(cache.elements),
+                                               n_nodes, n_nodes, n_elements)
+
+            @threaded for element in eachelement(dg, cache)
+                for j in eachnode(dg), i in eachnode(dg)
+                    vorticity_nodal = calc_vorticity_node(u, mesh, equations, dg, cache, i, j,
+                                                    element)
+                    vorticity_prev[i, j, element] = vorticity_nodal
+                end
+            end
+
+            node_variables[:vorticity] = vorticity
+        end
+    end
 end
 
 """

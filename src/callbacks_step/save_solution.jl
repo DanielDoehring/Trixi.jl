@@ -27,6 +27,7 @@ mutable struct SaveSolutionCallback{IntervalType, SolutionVariablesType}
     save_final_solution::Bool
     output_directory::String
     solution_variables::SolutionVariablesType
+    node_variables::Dict{Symbol, Any}
 end
 
 function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:SaveSolutionCallback})
@@ -96,7 +97,8 @@ function SaveSolutionCallback(; interval::Integer = 0,
                               save_initial_solution = true,
                               save_final_solution = true,
                               output_directory = "out",
-                              solution_variables = cons2prim)
+                              solution_variables = cons2prim,
+                              node_variables = Dict{Symbol, Any}())
     if !isnothing(dt) && interval > 0
         throw(ArgumentError("You can either set the number of steps between output (using `interval`) or the time between outputs (using `dt`) but not both simultaneously"))
     end
@@ -219,8 +221,8 @@ end
         end
     end
 
-    node_variables = Dict{Symbol, Any}()
-    @trixi_timeit timer() "get node variables" get_node_variables!(node_variables,
+    #node_variables = Dict{Symbol, Any}()
+    @trixi_timeit timer() "get node variables" get_node_variables!(solution_callback.node_variables,
                                                                    semi)
 
     @trixi_timeit timer() "save solution" save_solution_file(u_ode, t, dt, iter, semi,
