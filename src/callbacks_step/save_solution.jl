@@ -112,7 +112,8 @@ function SaveSolutionCallback(; interval::Integer = 0,
 
     solution_callback = SaveSolutionCallback(interval_or_dt,
                                              save_initial_solution, save_final_solution,
-                                             output_directory, solution_variables)
+                                             output_directory, solution_variables,
+                                             node_variables)
 
     # Expected most frequent behavior comes first
     if isnothing(dt)
@@ -223,12 +224,12 @@ end
 
     #node_variables = Dict{Symbol, Any}()
     @trixi_timeit timer() "get node variables" get_node_variables!(solution_callback.node_variables,
-                                                                   semi)
+                                                                   u_ode, semi)
 
     @trixi_timeit timer() "save solution" save_solution_file(u_ode, t, dt, iter, semi,
                                                              solution_callback,
                                                              element_variables,
-                                                             node_variables,
+                                                             solution_callback.node_variables,
                                                              system = system)
 end
 

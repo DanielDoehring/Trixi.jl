@@ -44,7 +44,6 @@ function RelaxationCKL43(; relaxation_solver = RelaxationSolverNewton())
     return RelaxationCKL43{typeof(relaxation_solver)}(CKL43(), relaxation_solver)
 end
 
-
 """
     CKL54()
 

@@ -33,7 +33,6 @@ function RelaxationRK33(; relaxation_solver = RelaxationSolverNewton())
     return RelaxationRK33{typeof(relaxation_solver)}(RK33(), relaxation_solver)
 end
 
-
 """
     RK44()
 

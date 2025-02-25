@@ -150,10 +150,13 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 200)
 
+node_variables = Dict{Symbol, Any}()
+node_variables[:vorticity] = nothing
 save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
-                                     solution_variables = cons2prim)
+                                     solution_variables = cons2prim,
+                                     node_variables = node_variables)
 
 #cfl = 12.0 # Restarted PERK4 Single 16
 #cfl = 7.4 # Restarted PERK4 Multi 16, 10, 7, 6, 5
