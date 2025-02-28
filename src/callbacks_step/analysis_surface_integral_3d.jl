@@ -74,13 +74,9 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
         j_node_start, j_node_step = index_to_start_step_3d(node_indices[2], index_range)
         k_node_start, k_node_step = index_to_start_step_3d(node_indices[3], index_range)
 
-        #=
-        i_node = i_node_start
-        j_node = j_node_start
-        k_node = k_node_start
-        =#
+        # In 3D, boundaries are surfaces => `node_index1`, `node_index2`
         for node_index1 in index_range
-          # TODO: Do I need to reset the indices here?
+          # Reset node indices
           i_node = i_node_start
           j_node = j_node_start
           k_node = k_node_start

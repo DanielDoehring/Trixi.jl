@@ -13,7 +13,11 @@ equations = CompressibleEulerEquations3D(1.4)
     # set the freestream flow parameters
     rho_freestream = 1.4
 
-    #v_total = 0.84
+    # v_total = 0.84 = Mach
+
+    # AoA = 3.03
+    #v1 = 0.8388256756515233
+    #v2 = 0.04440141740716601
 
     # AoA = 6.06
     v1 = 0.8353059860291301
@@ -55,18 +59,15 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 end
 
 polydeg = 2
-surface_flux = flux_lax_friedrichs
-
-solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
-
-
 basis = LobattoLegendreBasis(polydeg)
+
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 0.5,
                                             alpha_min = 0.001,
                                             alpha_smooth = true,
                                             variable = density_pressure)
 
+surface_flux = flux_lax_friedrichs
 volume_flux = flux_ranocha
 #volume_flux = flux_ranocha_turbo # Not sure if this has any benefit
 
@@ -78,8 +79,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
 
-mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
-#mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
+#mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
+mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
 boundary_symbols = [:PhysicalSurface2, # "symm1"
                     :PhysicalSurface4, # "out1"
@@ -114,32 +115,31 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-tspan = (0.0, 1.0)
-#dt = 1e-8 # Something to start with SSPRK43
-ode = semidiscretize(semi, tspan)
+#tspan = (0.0, 0.5)
+#ode = semidiscretize(semi, tspan)
 
-#=
-restart_file = "restart_t0034.h5"
+restart_file = "restart_002000000.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("out/", restart_file)
 
-tspan = (load_time(restart_filename), 10.0)
+tspan = (load_time(restart_filename), 0.5)
 dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
-=#
+
 
 # Callbacks
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 200
+analysis_interval = 10
 
 force_boundary_names = (:PhysicalSurface12, :PhysicalSurface18)
-aoa() = 6.06
+aoa() = 6.06 # 3.03
 rho_inf() = 1.4
 u_inf(equations) = 0.84
+# Area calculated from information given at https://www.grc.nasa.gov/www/wind/valid/m6wing/m6wing.html
 a_inf() = 0.7534524697
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
@@ -171,24 +171,14 @@ stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        analysis_callback,
-                        #save_solution,
-                        #save_restart,
+                        #analysis_callback,
+                        save_solution,
+                        save_restart,
                         stepsize_callback
                         )
 
 # Run the simulation
 ###############################################################################
-
-#=
-ode_alg = SSPRK43(; thread = OrdinaryDiffEq.True())
-
-time_int_tol = 1e-7
-sol = solve(ode, ode_alg;
-            dt = dt,
-            abstol = time_int_tol, reltol = time_int_tol,
-            save_everystep = false, callback = callbacks);
-=#
 
 dtRatios_complete_p3 = [ 
     0.309106167859536,
@@ -207,13 +197,13 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309106167859536
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
-#base_path = "/storage/home/daniel/OneraM6/LLF_only/"
-base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
+base_path = "/storage/home/daniel/OneraM6/LLF_only/"
+#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
 #ode_alg = Trixi.PairedExplicitRK3(12, base_path)
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path * "p3/", dtRatios_complete_p3)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path * "p3/", dtRatios_complete_p3)
 
 dtRatios_complete_p2 = [ 
     0.331201171875,
@@ -240,7 +230,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtR
                                                  relaxation_solver = relaxation_solver)
 =#
 
-sol = Trixi.solve(ode, ode_alg, dt = 2.3e-07, 
+sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
 
 
