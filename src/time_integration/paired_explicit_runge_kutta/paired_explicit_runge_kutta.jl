@@ -221,7 +221,7 @@ end
                                                alg, stage)
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
-
+    #=
     for level in 1:min(alg.num_methods, integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
@@ -257,9 +257,9 @@ end
             end
         end
     end
-
+    =#
     ### Simplified implementation: Own method for each level ###
-    #=
+    
     for level in 1:integrator.n_levels
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
@@ -275,7 +275,7 @@ end
                                        integrator.du[i]
         end
     end
-    =#
+    
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]
