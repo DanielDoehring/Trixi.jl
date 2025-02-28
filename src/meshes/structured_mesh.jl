@@ -366,12 +366,14 @@ function Base.show(io::IO, ::MIME"text/plain", mesh::StructuredMesh)
 
         if occursin("coordinates", mesh.mapping_as_string)
             summary_line(io, "mapping", "linear")
+            #=
             coordinates_min = eval(Meta.parse(split(mapping_lines[1], "= ")[2]))
             coordinates_max = eval(Meta.parse(split(mapping_lines[2], "= ")[2]))
             dims = length(coordinates_max)
             summary_line(increment_indent(io), "domain",
                          join(["[$(coordinates_min[i]), $(coordinates_max[i])]"
                                for i in 1:dims], "x"))
+        =#
         elseif occursin("mapping", mesh.mapping_as_string)
             summary_line(io, "mapping", "custom mapping")
         else

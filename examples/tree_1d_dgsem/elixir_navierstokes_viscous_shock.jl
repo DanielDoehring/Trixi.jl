@@ -1,7 +1,7 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
-# This is the classic 1D viscous shock wave problem with analytical solution 
+# This is the classic 1D viscous shock wave problem with analytical solution
 # for a special value of the Prandtl number.
 # The original references are:
 #
@@ -16,13 +16,13 @@ using Trixi
 #   https://ntrs.nasa.gov/api/citations/19930090863/downloads/19930090863.pdf
 #
 # - M. Morduchow, P. A. Libby (1949)
-#   On a Complete Solution of the One-Dimensional Flow Equations 
+#   On a Complete Solution of the One-Dimensional Flow Equations
 #   of a Viscous, Head-Conducting, Compressible Gas
 #   [DOI: 10.2514/8.11882](https://doi.org/10.2514/8.11882)
 #
 #
 # The particular problem considered here is described in
-# - L. G. Margolin, J. M. Reisner, P. M. Jordan (2017) 
+# - L. G. Margolin, J. M. Reisner, P. M. Jordan (2017)
 #   Entropy in self-similar shock profiles
 #   [DOI: 10.1016/j.ijnonlinmec.2017.07.003](https://doi.org/10.1016/j.ijnonlinmec.2017.07.003)
 
@@ -56,7 +56,7 @@ l() = mu_bar() / (rho_0() * v()) * 2 * gamma() / (gamma() + 1) # Appropriate len
 """
     initial_condition_viscous_shock(x, t, equations)
 
-Classic 1D viscous shock wave problem with analytical solution 
+Classic 1D viscous shock wave problem with analytical solution
 for a special value of the Prandtl number.
 The version implemented here is described in
 - L. G. Margolin, J. M. Reisner, P. M. Jordan (2017)
@@ -160,6 +160,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
+tspan = (0.0, 0.0) # For plotting of IC
+
 ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
@@ -218,3 +220,30 @@ sol = Trixi.solve(ode, ode_algorithm,
                   maxiters = typemax(Int));
 
 summary_callback() # print the timer summary
+
+###############################################################################
+
+# Plot IC & grid
+
+using Plots
+
+pd = PlotData1D(sol)
+
+plot(getmesh(pd), label = "")
+
+plot!(pd["rho"], xlabel = "\$x\$",
+      label = "\$\\rho\$",
+      linewidth = 3, color = RGB(0, 84 / 256, 159 / 256),
+      guidefont = font("Computer Modern", 16), tickfont = font("Computer Modern", 14),
+      legend = true)
+
+plot!(pd["v1"],
+      label = "\$u\$",
+      linewidth = 3, color = RGB(246 / 256, 169 / 256, 0), legend = true)
+
+plot!(pd["p"], title = "Viscous Shock: Initial Solution",
+      label = "\$p\$",
+      linewidth = 3, color = RGB(70 / 256, 171 / 256, 39 / 256),
+      titlefont = font("Computer Modern", 18),
+      legendfont = font("Computer Modern", 16),
+      legend = :topright)

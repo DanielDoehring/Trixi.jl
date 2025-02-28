@@ -36,7 +36,9 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 1.0)
+tspan = (0.0, 0.0) # For plotting of IC
+#tspan = (0.0, 1.0)
+
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -119,3 +121,31 @@ sol = Trixi.solve(ode, ode_alg,
                   save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
+
+###############################################################################
+
+# Plot IC & grid
+
+using Plots
+
+pd = PlotData1D(sol)
+
+plot(getmesh(pd), label = "", ylim = (-0.3, 1.4))
+
+plot!(pd["rho"], xlabel = "\$x\$",
+      label = "\$\\rho\$",
+      linewidth = 3, color = RGB(0, 84 / 256, 159 / 256),
+      guidefont = font("Computer Modern", 16), tickfont = font("Computer Modern", 14),
+      yticks = -0.2:0.4:1.4,
+      legend = true)
+
+plot!(pd["v1"],
+      label = "\$v\$",
+      linewidth = 3, color = RGB(246 / 256, 169 / 256, 0), legend = true)
+
+plot!(pd["p"], title = "Weak Blast Wave: Initial Condition",
+      label = "\$p\$",
+      linewidth = 3, color = RGB(70 / 256, 171 / 256, 39 / 256),
+      titlefont = font("Computer Modern", 18),
+      legendfont = font("Computer Modern", 16),
+      legend = :left)

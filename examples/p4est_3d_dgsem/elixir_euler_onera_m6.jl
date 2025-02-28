@@ -78,8 +78,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
 
-#mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
-mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
+mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
+#mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
 boundary_symbols = [:PhysicalSurface2, # "symm1"
                     :PhysicalSurface4, # "out1"
@@ -118,7 +118,7 @@ tspan = (0.0, 1.0)
 #dt = 1e-8 # Something to start with SSPRK43
 ode = semidiscretize(semi, tspan)
 
-
+#=
 restart_file = "restart_t0034.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
@@ -127,6 +127,7 @@ restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 tspan = (load_time(restart_filename), 10.0)
 dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
+=#
 
 # Callbacks
 ###############################################################################
@@ -134,13 +135,24 @@ ode = semidiscretize(semi, tspan, restart_filename)
 summary_callback = SummaryCallback()
 
 analysis_interval = 200
+
+force_boundary_names = (:PhysicalSurface12, :PhysicalSurface18)
+aoa() = 6.06
+rho_inf() = 1.4
+u_inf(equations) = 0.84
+a_inf() = 0.7534524697
+lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
+                                           Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
+                                                                   u_inf(equations), a_inf()))
+
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = ())
+                                     analysis_integrals = (lift_coefficient,))
 
 alive_callback = AliveCallback(alive_interval = analysis_interval)
 
 save_sol_interval = 10_000
+
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
@@ -159,9 +171,9 @@ stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        #analysis_callback,
-                        save_solution,
-                        save_restart,
+                        analysis_callback,
+                        #save_solution,
+                        #save_restart,
                         stepsize_callback
                         )
 
@@ -195,7 +207,8 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309106167859536
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
-base_path = "/storage/home/daniel/OneraM6/LLF_only/"
+#base_path = "/storage/home/daniel/OneraM6/LLF_only/"
+base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
 #ode_alg = Trixi.PairedExplicitRK3(12, base_path)
