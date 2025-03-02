@@ -66,7 +66,7 @@ relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10)
 ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios;
                                                  relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 0.2,
@@ -206,11 +206,24 @@ using Plots
 
 # TODO: Compute x values of the DG nodes - what to do with the values at interfaces? Average?
 
-x_limits = [-2, 2]
+x_limits = [-1.5, 1.5]
+
+pd = PlotData1D(sol)
 
 scatter(all_nodes, sol.u[end],
-        xlims = x_limits) # For plain method
-#scatter!(sol.u[end]) # For relaxed method
+        title = "\$u (t_f ) \$", label = "P-ERK",
+        xlims = x_limits, color = RGB(246 / 256, 169 / 256, 0),
+        guidefont = font("Computer Modern", 16), tickfont = font("Computer Modern", 14),
+        legendfont = font("Computer Modern", 12), legendfontsize = 12,
+        legend = true) # For standard method
+        
+plot!(getmesh(pd),
+      xlims = x_limits, label = "")
+
+scatter!(all_nodes, sol.u[end],
+        title = "\$u (t_f ) \$", label = "P-ERRK",
+        xlims = x_limits, color = RGB(0, 84 / 256, 159 / 256),
+        legend = true) # For relaxed method
 
 minimum(sol.u[end])
 
@@ -228,9 +241,7 @@ plot!(sol, label = "P-ERK",
     legend = true)
 =#
 
-pd = PlotData1D(sol)
-plot!(getmesh(pd),
-      xlims = x_limits)
+
 #=
 plot(sol, 
     title = "\$u (t_f ) \$", label = "P-ERRK",
@@ -243,9 +254,5 @@ plot!(sol, label = "P-ERK",
     linewidth = 3, color = RGB(246 / 256, 169 / 256, 0),
     legend = true)
 =#
-
-pd = PlotData1D(sol)
-plot!(getmesh(pd),
-      xlims = x_limits)
 
 minimum(sol.u[end])
