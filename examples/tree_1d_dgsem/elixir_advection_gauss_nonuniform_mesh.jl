@@ -223,6 +223,7 @@ plot!(getmesh(pd),
 scatter!(all_nodes, sol.u[end],
         title = "\$u (t_f ) \$", label = "P-ERRK",
         xlims = x_limits, color = RGB(0, 84 / 256, 159 / 256),
+        xlabel = "\$x\$",
         legend = true) # For relaxed method
 
 minimum(sol.u[end])
