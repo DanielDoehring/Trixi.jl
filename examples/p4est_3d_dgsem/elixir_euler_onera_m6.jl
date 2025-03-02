@@ -140,7 +140,15 @@ aoa() = 6.06 # 3.03
 rho_inf() = 1.4
 u_inf(equations) = 0.84
 # Area calculated from information given at https://www.grc.nasa.gov/www/wind/valid/m6wing/m6wing.html
-a_inf() = 0.7534524697
+
+height = 1.1963
+g_I = tan(deg2rad(30)) * height
+base = 0.8059
+g_II = base - g_I
+g_III = tan(deg2rad(15.8)) * height
+A = height * (0.5 * (g_I + g_III) + g_II)
+
+a_inf() = 0.7534504665983046
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
                                                                    u_inf(equations), a_inf()))
