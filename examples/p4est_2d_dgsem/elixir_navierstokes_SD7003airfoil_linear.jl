@@ -59,8 +59,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
-path = "/storage/home/daniel/PERK4/SD7003/"
-#path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
+#path = "/storage/home/daniel/PERK4/SD7003/"
+path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
@@ -87,14 +87,15 @@ tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is
 #ode = semidiscretize(semi, tspan)
 ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
 
-#=
-# For PERK Multi coefficient measurements
-restart_file = "restart_000126960.h5"
-restart_filename = joinpath("out", restart_file)
 
-tspan = (30 * t_c, 35 * t_c)
+# For PERK Multi coefficient measurements
+restart_file = "restart_000126951.h5"
+restart_filename = joinpath("/home/daniel/git/Paper_PERRK/Data/SD7003/restart_data/", restart_file)
+
+#tspan = (30 * t_c, 35 * t_c)
+tspan = (load_time(restart_filename), load_time(restart_filename))
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-=#
+
 
 summary_callback = SummaryCallback()
 
@@ -147,6 +148,15 @@ save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      solution_variables = cons2prim,
                                      output_directory = "out")
 
+# For vorticity plot                                                           
+node_variables = Dict{Symbol, Any}()
+node_variables[:vorticity] = nothing
+save_solution = SaveSolutionCallback(interval = analysis_interval,
+                                    save_initial_solution = false,
+                                    save_final_solution = true,
+                                    solution_variables = cons2prim,
+                                    node_variables = node_variables)
+
 alive_callback = AliveCallback(alive_interval = 200)
 
 save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
@@ -154,7 +164,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        #save_solution, # For plotting during measurement run
+                        save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
                         #analysis_callback,
                         summary_callback);
@@ -175,6 +185,8 @@ Stages = [14, 12, 10, 8, 7, 6, 5]
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
+
+path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/SD7003/"
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
