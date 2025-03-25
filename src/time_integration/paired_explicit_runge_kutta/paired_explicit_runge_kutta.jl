@@ -144,6 +144,8 @@ function solve!(integrator::AbstractPairedExplicitRKIntegrator)
         step!(integrator)
     end
 
+    finalize_callbacks(integrator)
+
     return TimeIntegratorSolution((first(prob.tspan), integrator.t),
                                   (prob.u0, integrator.u),
                                   integrator.sol.prob)
@@ -259,23 +261,22 @@ end
     end
     =#
     ### Simplified implementation: Own method for each level ###
-    
-    for level in 1:integrator.n_levels
+
+    for level in 1:(integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[i]
+                                  integrator.dt *
+                                  alg.a_matrices[level, 1, stage - 2] *
+                                  integrator.k1[i]
         end
     end
     for level in 1:alg.max_eval_levels[stage]
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] += integrator.dt *
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i]
+                                   alg.a_matrices[level, 2, stage - 2] *
+                                   integrator.du[i]
         end
     end
-    
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]
