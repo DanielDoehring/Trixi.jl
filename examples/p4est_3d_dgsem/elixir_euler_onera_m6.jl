@@ -15,13 +15,13 @@ equations = CompressibleEulerEquations3D(1.4)
 
     # v_total = 0.84 = Mach
 
-    # AoA = 3.03
-    #v1 = 0.8388256756515233
-    #v2 = 0.04440141740716601
+    # AoA = 3.03 # TODO: 3.06!
+    v1 = 0.8388256756515233
+    v2 = 0.04440141740716601
 
     # AoA = 6.06
-    v1 = 0.8353059860291301
-    v2 = 0.0886786879915508
+    #v1 = 0.8353059860291301
+    #v2 = 0.0886786879915508
 
     v3 = 0.0
 
@@ -115,16 +115,16 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-#tspan = (0.0, 0.5)
-#ode = semidiscretize(semi, tspan)
+tspan = (0.0, 0.5)
+ode = semidiscretize(semi, tspan)
 
-restart_file = "restart_002000000.h5"
+restart_file = "restart_001895152.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("out/", restart_file)
 
-tspan = (load_time(restart_filename), 0.5)
-dt = load_dt(restart_filename)
+tspan = (load_time(restart_filename), 0.51) # 0.5
+#dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
 
 
@@ -136,7 +136,10 @@ summary_callback = SummaryCallback()
 analysis_interval = 10
 
 force_boundary_names = (:PhysicalSurface12, :PhysicalSurface18)
-aoa() = 6.06 # 3.03
+
+aoa() = deg2rad(3.03) # TODO: 3.06!
+#aoa() = deg2rad(6.06)
+
 rho_inf() = 1.4
 u_inf(equations) = 0.84
 # Area calculated from information given at https://www.grc.nasa.gov/www/wind/valid/m6wing/m6wing.html
@@ -157,9 +160,9 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,))
 
-alive_callback = AliveCallback(alive_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 200)
 
-save_sol_interval = 10_000
+save_sol_interval = 50_000
 
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
@@ -175,13 +178,15 @@ stepsize_callback = StepsizeCallback(cfl = 2.0) # PERK3 Single
 stepsize_callback = StepsizeCallback(cfl = 13.0) # PERK 12 Single (Not maxed out yet)
 
 stepsize_callback = StepsizeCallback(cfl = 9.0) # PERK p3 3-15 Multi
-stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi
+stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi AoA 6.06
+
+stepsize_callback = StepsizeCallback(cfl = 9.25) # PERK p2 2-14 Multi AoA 3.03
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        #analysis_callback,
-                        save_solution,
-                        save_restart,
+                        analysis_callback,
+                        #save_solution,
+                        #save_restart,
                         stepsize_callback
                         )
 
