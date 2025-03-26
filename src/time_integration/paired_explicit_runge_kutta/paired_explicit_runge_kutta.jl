@@ -12,7 +12,7 @@ include("polynomial_optimizer.jl")
 
 # Abstract base type for both single/standalone and multi-level 
 # PERK (Paired Explicit Runge-Kutta) time integration schemes
-abstract type AbstractPairedExplicitRK{ORDER} <: AbstractTimeIntegrator end
+abstract type AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
 abstract type AbstractPairedExplicitRKSingle{ORDER} <: AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
@@ -40,7 +40,7 @@ function PairedExplicitRKOptions(callback, tspan; maxiters = typemax(Int), kwarg
                                                                        tstops_internal)
 end
 
-abstract type AbstractPairedExplicitRKIntegrator{ORDER} end
+abstract type AbstractPairedExplicitRKIntegrator{ORDER} <: AbstractTimeIntegrator end
 
 abstract type AbstractPairedExplicitRKSingleIntegrator{ORDER} <:
               AbstractPairedExplicitRKIntegrator{ORDER} end

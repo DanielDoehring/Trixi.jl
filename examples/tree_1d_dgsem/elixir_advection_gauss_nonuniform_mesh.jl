@@ -202,6 +202,11 @@ end
 # Compute nodes for all cells
 all_nodes = compute_all_nodes()
 
+using DelimitedFiles
+writedlm("Inward_GLL_nodes.txt", all_nodes)
+writedlm("u_Relaxation.txt", sol.u[end])
+#writedlm("u_Standard.txt", sol.u[end])
+
 using Plots
 
 # TODO: Compute x values of the DG nodes - what to do with the values at interfaces? Average?
