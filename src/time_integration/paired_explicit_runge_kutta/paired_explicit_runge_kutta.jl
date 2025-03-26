@@ -261,6 +261,7 @@ end
     end
     =#
     ### Simplified implementation: Own method for each level ###
+    # TODO: Find a way to handle this automatically via an if-clause
 
     for level in 1:(integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]

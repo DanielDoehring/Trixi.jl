@@ -434,7 +434,7 @@ end
     end
     =#
 
-    
+    # TODO: Find a way to handle this automatically via an if-clause
     ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
     for level in 1:alg.max_eval_levels[stage]
         @threaded for i in integrator.level_u_indices_elements[level]
