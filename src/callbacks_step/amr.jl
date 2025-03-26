@@ -219,6 +219,7 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::TreeMesh,
                                      equations, dg::DG, cache, semi,
                                      t, iter;
                                      only_refine = false, only_coarsen = false,
+                                     #only_refine = true, only_coarsen = false, # For e.g. Kelvin-Helmholtz EC example
                                      passive_args = ())
     @unpack controller, adaptor = amr_callback
 
