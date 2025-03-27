@@ -267,6 +267,7 @@ row_sums = sum(K_Perk, dims = 2) # sanity check, should all be 1
 K_PERK_EigVals = eigvals(K_Perk)
 # Complex conjugate eigenvalues have same modulus
 K_PERK_EigVals = K_PERK_EigVals[imag(K_PERK_EigVals) .>= 0]
+writedlm("K_PERK_EigVals.txt", K_PERK_EigVals)
 spectral_radius = maximum(abs.(K_PERK_EigVals))
 
 minimum(K_Perk)
@@ -282,6 +283,7 @@ row_sums = sum(K_Perk_Relaxation, dims = 2) # sanity check, should all be 1
 K_PERK_EigVals = eigvals(K_Perk_Relaxation)
 # Complex conjugate eigenvalues have same modulus
 K_PERK_EigVals = K_PERK_EigVals[imag(K_PERK_EigVals) .>= 0]
+writedlm("K_PERK_Relaxation_1_EigVals.txt", K_PERK_EigVals)
 spectral_radius = maximum(abs.(K_PERK_EigVals))
 
 minimum(K_Perk_Relaxation)
