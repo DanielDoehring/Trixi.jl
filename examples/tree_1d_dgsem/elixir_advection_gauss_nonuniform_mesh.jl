@@ -63,7 +63,6 @@ Stages = [16, 8]
 #Stages = [32, 16]
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10)
-relaxation_solver = Trixi.RelaxationSolverSecant()
 
 ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios;
                                                  relaxation_solver = relaxation_solver)
@@ -74,9 +73,6 @@ dt = 0.2
 sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
-
-using Plots
-plot(sol)
 
 ###############################################################################
 
