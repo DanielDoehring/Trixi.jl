@@ -78,26 +78,26 @@ function RelaxationSolverBisection(; gamma_min = 0.1, gamma_max = 1.2,
     return RelaxationSolverBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
-struct RelaxationSolverSecantMethod{RealT <: Real} <: RelaxationSolver
+struct RelaxationSolverSecant{RealT <: Real} <: RelaxationSolver
     gamma_min::RealT    # Lower bound of the initial bracketing interval
     gamma_max::RealT    # Upper bound of the initial bracketing interval
     gamma_tol::RealT    # Absolute tolerance for the bracketing interval length
     max_iterations::Int # Maximum number of bisection iterations
 end
 
-function RelaxationSolverSecantMethod(; gamma_min = 0.1, gamma_max = 1.2,
-                                      gamma_tol = 1e-14,
-                                      max_iterations = 15)
-    return RelaxationSolverSecantMethod(gamma_min, gamma_max, gamma_tol, max_iterations)
+function RelaxationSolverSecant(; gamma_min = 0.1, gamma_max = 1.2,
+                                gamma_tol = 1e-14,
+                                max_iterations = 15)
+    return RelaxationSolverSecant(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
 function Base.show(io::IO,
                    relaxation_solver::Union{RelaxationSolverBisection,
-                                            RelaxationSolverSecantMethod})
+                                            RelaxationSolverSecant})
     if typeof(relaxation_solver) <: RelaxationSolverBisection
         solver_type = "RelaxationSolverBisection"
-    elseif typeof(relaxation_solver) <: RelaxationSolverSecantMethod
-        solver_type = "RelaxationSolverSecantMethod"
+    elseif typeof(relaxation_solver) <: RelaxationSolverSecant
+        solver_type = "RelaxationSolverSecant"
     end
     print(io, "$solver_type(gamma_min=", relaxation_solver.gamma_min,
           ", gamma_max=", relaxation_solver.gamma_max,
@@ -106,7 +106,7 @@ function Base.show(io::IO,
 end
 function Base.show(io::IO, ::MIME"text/plain",
                    relaxation_solver::Union{RelaxationSolverBisection,
-                                            RelaxationSolverSecantMethod})
+                                            RelaxationSolverSecant})
     if get(io, :compact, false)
         show(io, relaxation_solver)
     else
@@ -118,8 +118,8 @@ function Base.show(io::IO, ::MIME"text/plain",
         ]
         if typeof(relaxation_solver) <: RelaxationSolverBisection
             solver_type = "RelaxationSolverBisection"
-        elseif typeof(relaxation_solver) <: RelaxationSolverSecantMethod
-            solver_type = "RelaxationSolverSecantMethod"
+        elseif typeof(relaxation_solver) <: RelaxationSolverSecant
+            solver_type = "RelaxationSolverSecant"
         end
         summary_box(io, solver_type, setup)
     end
@@ -216,7 +216,7 @@ function relaxation_solver!(integrator,
                             u_tmp_wrap, u_wrap, dir_wrap,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
-                            relaxation_solver::RelaxationSolverSecantMethod)
+                            relaxation_solver::RelaxationSolverSecant)
     @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
 
     # Naming aliases to avoid confusion
