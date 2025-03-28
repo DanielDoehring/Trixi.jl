@@ -729,12 +729,12 @@ function p4est_connectivity_from_standard_abaqus(meshfile, mapping, polydeg,
     quadratic_hexes = r"^(C3D27).*$"
 
     meshfile_p4est_rdy = replace(meshfile, ".inp" => "_p4est_ready.inp")
-    
+
     # Define variables that are retrieved in the MPI-parallel case on root and then bcasted
-    mesh_polydeg = 1
     meshfile_preproc = ""
     elements_begin_idx = -1
     sets_begin_idx = -1
+    mesh_polydeg = 1
 
     if !mpi_isparallel() || (mpi_isparallel() && mpi_isroot())
         # Preprocess the meshfile to remove lower-dimensional elements
@@ -758,15 +758,24 @@ function p4est_connectivity_from_standard_abaqus(meshfile, mapping, polydeg,
     # Broadcast from meshfile retrieved variables across all MPI ranks
     if mpi_isparallel()
         if mpi_isroot()
-            MPI.Bcast!(Ref(mesh_polydeg), mpi_root(), mpi_comm())
-            MPI.Bcast!(Ref(meshfile_preproc), mpi_root(), mpi_comm())
+            # Convert the String to a Vector{UInt8} for broadcasting
+            meshfile_preproc_bytes = Vector{UInt8}(meshfile_preproc)
+            meshfile_preproc_length = length(meshfile_preproc_bytes)
+            MPI.Bcast!(Ref(meshfile_preproc_length), mpi_root(), mpi_comm())
+            MPI.Bcast!(meshfile_preproc_bytes, mpi_root(), mpi_comm())
+
             MPI.Bcast!(Ref(elements_begin_idx), mpi_root(), mpi_comm())
             MPI.Bcast!(Ref(sets_begin_idx), mpi_root(), mpi_comm())
+            MPI.Bcast!(Ref(mesh_polydeg), mpi_root(), mpi_comm())
         else
-            mesh_polydeg = MPI.Bcast!(Ref(0), mpi_root(), mpi_comm())[]
-            meshfile_preproc = MPI.Bcast!(Ref(0), mpi_root(), mpi_comm())[]
+            meshfile_preproc_length = MPI.Bcast!(Ref(0), mpi_root(), mpi_comm())[]
+            meshfile_preproc_bytes = Vector{UInt8}(undef, meshfile_preproc_length)
+            MPI.Bcast!(meshfile_preproc_bytes, mpi_root(), mpi_comm())
+            meshfile_preproc = String(meshfile_preproc_bytes)  # Reconstruct the String
+
             elements_begin_idx = MPI.Bcast!(Ref(0), mpi_root(), mpi_comm())[]
             sets_begin_idx = MPI.Bcast!(Ref(0), mpi_root(), mpi_comm())[]
+            mesh_polydeg = MPI.Bcast!(Ref(0), mpi_root(), mpi_comm())[]
         end
     end
 
