@@ -1,5 +1,5 @@
 using Trixi
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using LinearAlgebra: norm
 
 ###############################################################################
@@ -118,7 +118,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 tspan = (0.0, 0.5)
 ode = semidiscretize(semi, tspan)
 
-restart_file = "restart_001895152.h5"
+restart_file = "restart_aoa303_t_05.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("out/", restart_file)
@@ -160,7 +160,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,))
 
-alive_callback = AliveCallback(alive_interval = 200)
+alive_callback = AliveCallback(alive_interval = 2) # 200
 
 save_sol_interval = 50_000
 
@@ -175,12 +175,12 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
 stepsize_callback = StepsizeCallback(cfl = 2.0) # PERK3 Single
-stepsize_callback = StepsizeCallback(cfl = 13.0) # PERK 12 Single (Not maxed out yet)
+#stepsize_callback = StepsizeCallback(cfl = 13.0) # PERK 12 Single (Not maxed out yet)
 
-stepsize_callback = StepsizeCallback(cfl = 9.0) # PERK p3 3-15 Multi
-stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi AoA 6.06
+#stepsize_callback = StepsizeCallback(cfl = 9.0) # PERK p3 3-15 Multi
+#stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi AoA 6.06
 
-stepsize_callback = StepsizeCallback(cfl = 9.25) # PERK p2 2-14 Multi AoA 3.03
+#stepsize_callback = StepsizeCallback(cfl = 9.25) # PERK p2 2-14 Multi AoA 3.06
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
@@ -193,6 +193,7 @@ callbacks = CallbackSet(summary_callback,
 # Run the simulation
 ###############################################################################
 
+#=
 dtRatios_complete_p3 = [ 
     0.309106167859536,
     0.276830675004967,
@@ -245,6 +246,9 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtR
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
+=#
 
+sol = solve(ode, SSPRK54(thread = Trixi.True()), dt = 42.0, 
+            save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
