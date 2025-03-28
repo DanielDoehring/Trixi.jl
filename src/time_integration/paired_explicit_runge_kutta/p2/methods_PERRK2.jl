@@ -18,10 +18,10 @@ function PairedExplicitRelaxationRK2(num_stages,
                                      bS = 1.0, cS = 0.5,
                                      relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK2{typeof(relaxation_solver)}(PairedExplicitRK2(num_stages,
-                                                                                    base_path_monomial_coeffs,
-                                                                                    dt_opt,
-                                                                                    bS,
-                                                                                    cS),
+                                                                                    base_path_monomial_coeffs;
+                                                                                    dt_opt = dt_opt,
+                                                                                    bS = bS,
+                                                                                    cS = cS),
                                                                   relaxation_solver)
 end
 
