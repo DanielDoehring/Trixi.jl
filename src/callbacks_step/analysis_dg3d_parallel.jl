@@ -16,6 +16,7 @@ function calc_error_norms(func, u, t, analyzer,
     # Set up data structures
     l2_error = zero(func(get_node_vars(u, equations, dg, 1, 1, 1, 1), equations))
     linf_error = copy(l2_error)
+    l1_error = copy(l2_error)
     volume = zero(real(mesh))
 
     # Iterate over all elements for error calculations
@@ -42,6 +43,8 @@ function calc_error_norms(func, u, t, analyzer,
             l2_error += diff .^ 2 *
                         (weights[i] * weights[j] * weights[k] * abs_jacobian_local_ijk)
             linf_error = @. max(linf_error, abs(diff))
+            l1_error += abs.(diff) *
+                        (weights[i] * weights[j] * weights[k] * abs_jacobian_local_ijk)
             volume += weights[i] * weights[j] * weights[k] * abs_jacobian_local_ijk
         end
     end
@@ -49,21 +52,26 @@ function calc_error_norms(func, u, t, analyzer,
     # Accumulate local results on root process
     global_l2_error = Vector(l2_error)
     global_linf_error = Vector(linf_error)
+    global_l1_error = Vector(l1_error)
     MPI.Reduce!(global_l2_error, +, mpi_root(), mpi_comm())
     # Base.max instead of max needed, see comment in src/auxiliary/math.jl
     MPI.Reduce!(global_linf_error, Base.max, mpi_root(), mpi_comm())
+    MPI.Reduce!(global_l1_error, +, mpi_root(), mpi_comm())
     total_volume = MPI.Reduce(volume, +, mpi_root(), mpi_comm())
     if mpi_isroot()
         l2_error = convert(typeof(l2_error), global_l2_error)
         linf_error = convert(typeof(linf_error), global_linf_error)
-        # For L2 error, divide by total volume
+        l1_error = convert(typeof(l2_error), global_l1_error)
+        # For L2/L1 error, divide by total volume
         l2_error = @. sqrt(l2_error / total_volume)
+        l1_error /= total_volume
     else
         l2_error = convert(typeof(l2_error), NaN * global_l2_error)
         linf_error = convert(typeof(linf_error), NaN * global_linf_error)
+        l1_error = convert(typeof(l2_error), NaN * global_l1_error)
     end
 
-    return l2_error, linf_error
+    return l2_error, linf_error, l1_error
 end
 
 function integrate_via_indices(func::Func, u,
