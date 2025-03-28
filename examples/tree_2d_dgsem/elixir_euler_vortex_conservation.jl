@@ -1,5 +1,5 @@
 
-using OrdinaryDiffEq, Plots
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK, Plots
 using Trixi
 
 ###############################################################################

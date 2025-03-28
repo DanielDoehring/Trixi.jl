@@ -1,4 +1,4 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -229,7 +229,7 @@ cfl_max() = 6.7 # PER(R)K4 13, 8, 6, 5
 
 ### Ramp-Up CFL ###
 t_ramp_up() = 5.05 # PE Relaxation RK 4 13, 8, 6, 5
-t_ramp_up() = 5.40 # PERK 4 13, 8, 6, 5
+#t_ramp_up() = 5.40 # PERK 4 13, 8, 6, 5
 
 #t_ramp_up() = 4.50 # PE Relaxation RK 4 13
 
@@ -272,10 +272,10 @@ dtRatios = [0.0771545666269958, # 13
             0.00702102510258555] / 0.0771545666269958 # 5
 Stages = [13, 8, 6, 5]
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
 
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
 

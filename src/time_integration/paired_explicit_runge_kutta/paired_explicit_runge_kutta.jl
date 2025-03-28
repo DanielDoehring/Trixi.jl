@@ -12,7 +12,7 @@ include("polynomial_optimizer.jl")
 
 # Abstract base type for both single/standalone and multi-level 
 # PERK (Paired Explicit Runge-Kutta) time integration schemes
-abstract type AbstractPairedExplicitRK{ORDER} <: AbstractTimeIntegrator end
+abstract type AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
 abstract type AbstractPairedExplicitRKSingle{ORDER} <: AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
@@ -40,7 +40,7 @@ function PairedExplicitRKOptions(callback, tspan; maxiters = typemax(Int), kwarg
                                                                        tstops_internal)
 end
 
-abstract type AbstractPairedExplicitRKIntegrator{ORDER} end
+abstract type AbstractPairedExplicitRKIntegrator{ORDER} <: AbstractTimeIntegrator end
 
 abstract type AbstractPairedExplicitRKSingleIntegrator{ORDER} <:
               AbstractPairedExplicitRKIntegrator{ORDER} end
@@ -143,6 +143,8 @@ function solve!(integrator::AbstractPairedExplicitRKIntegrator)
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         step!(integrator)
     end
+
+    finalize_callbacks(integrator)
 
     return TimeIntegratorSolution((first(prob.tspan), integrator.t),
                                   (prob.u0, integrator.u),
@@ -259,23 +261,23 @@ end
     end
     =#
     ### Simplified implementation: Own method for each level ###
-    
-    for level in 1:integrator.n_levels
+    # TODO: Find a way to handle this automatically via an if-clause
+
+    for level in 1:(integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[i]
+                                  integrator.dt *
+                                  alg.a_matrices[level, 1, stage - 2] *
+                                  integrator.k1[i]
         end
     end
     for level in 1:alg.max_eval_levels[stage]
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] += integrator.dt *
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i]
+                                   alg.a_matrices[level, 2, stage - 2] *
+                                   integrator.du[i]
         end
     end
-    
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]

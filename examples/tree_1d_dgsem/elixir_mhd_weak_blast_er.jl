@@ -1,4 +1,4 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -63,7 +63,7 @@ basepath = "/home/daniel/git/Paper_PERRK/Data/WeakBlastWave/"
 dtRatios = [1, 0.5, 0.25]
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-#relaxation_solver = Trixi.RelaxationSolverSecantMethod()
+#relaxation_solver = Trixi.RelaxationSolverSecant()
 
 # p = 2
 
@@ -75,7 +75,6 @@ path = basepath * "p2/"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 #ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
 
 # p = 3
 #=

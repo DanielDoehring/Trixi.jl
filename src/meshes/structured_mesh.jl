@@ -373,7 +373,7 @@ function Base.show(io::IO, ::MIME"text/plain", mesh::StructuredMesh)
             summary_line(increment_indent(io), "domain",
                          join(["[$(coordinates_min[i]), $(coordinates_max[i])]"
                                for i in 1:dims], "x"))
-        =#
+            =#
         elseif occursin("mapping", mesh.mapping_as_string)
             summary_line(io, "mapping", "custom mapping")
         else

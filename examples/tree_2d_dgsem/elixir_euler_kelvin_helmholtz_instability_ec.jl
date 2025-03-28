@@ -1,5 +1,5 @@
 
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -87,7 +87,7 @@ ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path * "p2/", dtRatios)
 ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path * "p3/", dtRatios)
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path * "p4/", dtRatios)
 
-relaxation_solver = Trixi.RelaxationSolverSecantMethod(max_iterations = 10)
+relaxation_solver = Trixi.RelaxationSolverSecant(max_iterations = 10)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path * "p2/", dtRatios; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path * "p3/", dtRatios; relaxation_solver = relaxation_solver)
