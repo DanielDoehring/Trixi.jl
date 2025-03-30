@@ -158,9 +158,11 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = (lift_coefficient,))
+                                     #analysis_integrals = (lift_coefficient,)
+                                     analysis_integrals = ()
+                                     )
 
-alive_callback = AliveCallback(alive_interval = 2) # 200
+alive_callback = AliveCallback(alive_interval = 5) # 200
 
 save_sol_interval = 50_000
 
