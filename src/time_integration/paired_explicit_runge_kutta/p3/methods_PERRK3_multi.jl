@@ -165,6 +165,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
     # For entropy relaxation
     gamma = one(eltype(u0))
 
+    # TODO: Call different function for mpi_isparallel() == true
     partitioning_variables!(level_info_elements,
                             level_info_elements_acc,
                             level_info_interfaces_acc,

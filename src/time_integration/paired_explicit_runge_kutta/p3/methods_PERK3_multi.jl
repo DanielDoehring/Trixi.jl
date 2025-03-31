@@ -234,6 +234,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
+    # TODO: Call different function for mpi_isparallel() == true
     partitioning_variables!(level_info_elements,
                             level_info_elements_acc,
                             level_info_interfaces_acc,

@@ -279,6 +279,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
+    # TODO: Call different function for mpi_isparallel() == true
     partitioning_variables!(level_info_elements,
                             level_info_elements_acc,
                             level_info_interfaces_acc,
@@ -452,7 +453,6 @@ end
                                   integrator.dt * integrator.k1[i] # * A[stage, 1, level] = c[level] = 1
         end
     end
-    
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]
