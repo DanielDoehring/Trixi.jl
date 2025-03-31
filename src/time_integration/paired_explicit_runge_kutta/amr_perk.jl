@@ -73,14 +73,29 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                     end
                 end
 
-                partitioning_variables!(integrator.level_info_elements,
-                                        integrator.level_info_elements_acc,
-                                        integrator.level_info_interfaces_acc,
-                                        integrator.level_info_boundaries_acc,
-                                        integrator.level_info_boundaries_orientation_acc,
-                                        integrator.level_info_mortars_acc,
-                                        integrator.n_levels, n_dims, mesh, dg, cache,
-                                        integrator.alg)
+                # TODO: Call different function for mpi_isparallel() == true
+                if !mpi_isparallel()
+                    partitioning_variables!(integrator.level_info_elements,
+                                            integrator.level_info_elements_acc,
+                                            integrator.level_info_interfaces_acc,
+                                            integrator.level_info_boundaries_acc,
+                                            integrator.level_info_boundaries_orientation_acc,
+                                            integrator.level_info_mortars_acc,
+                                            integrator.n_levels, n_dims, mesh, dg,
+                                            cache, integrator.alg)
+                else
+                    partitioning_variables!(integrator.level_info_elements,
+                                            integrator.level_info_elements_acc,
+                                            integrator.level_info_interfaces_acc,
+                                            integrator.level_info_boundaries_acc,
+                                            integrator.level_info_boundaries_orientation_acc,
+                                            integrator.level_info_mortars_acc,
+                                            # MPI additions
+                                            integrator.level_info_mpi_interfaces_acc,
+                                            integrator.level_info_mpi_mortars_acc,
+                                            integrator.n_levels, n_dims, mesh, dg,
+                                            cache, integrator.alg)
+                end
 
                 partitioning_u!(integrator.level_u_indices_elements,
                                 integrator.level_info_elements,

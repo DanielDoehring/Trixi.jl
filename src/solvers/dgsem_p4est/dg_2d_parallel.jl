@@ -8,11 +8,12 @@
 function prolong2mpiinterfaces!(cache, u,
                                 mesh::Union{ParallelP4estMesh{2},
                                             ParallelT8codeMesh{2}},
-                                equations, surface_integral, dg::DG)
+                                equations, surface_integral, dg::DG,
+                                mpiinterface_indices = eachmpiinterface(dg, cache))
     @unpack mpi_interfaces = cache
     index_range = eachnode(dg)
 
-    @threaded for interface in eachmpiinterface(dg, cache)
+    @threaded for interface in mpiinterface_indices
         # Copy solution data from the local element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
         # Note that in the current implementation, the interface will be
@@ -47,13 +48,14 @@ function calc_mpi_interface_flux!(surface_flux_values,
                                   mesh::Union{ParallelP4estMesh{2},
                                               ParallelT8codeMesh{2}},
                                   nonconservative_terms,
-                                  equations, surface_integral, dg::DG, cache)
+                                  equations, surface_integral, dg::DG, cache,
+                                  mpiinterface_indices = eachmpiinterface(dg, cache))
     @unpack local_neighbor_ids, node_indices, local_sides = cache.mpi_interfaces
     @unpack contravariant_vectors = cache.elements
     index_range = eachnode(dg)
     index_end = last(index_range)
 
-    @threaded for interface in eachmpiinterface(dg, cache)
+    @threaded for interface in mpiinterface_indices
         # Get element and side index information on the local element
         local_element = local_neighbor_ids[interface]
         local_indices = node_indices[interface]
@@ -136,12 +138,12 @@ end
 function prolong2mpimortars!(cache, u,
                              mesh::Union{ParallelP4estMesh{2}, ParallelT8codeMesh{2}},
                              equations,
-                             mortar_l2::LobattoLegendreMortarL2,
-                             dg::DGSEM)
+                             mortar_l2::LobattoLegendreMortarL2, dg::DGSEM,
+                             mpimortar_indices = eachmpimortar(dg, cache))
     @unpack node_indices = cache.mpi_mortars
     index_range = eachnode(dg)
 
-    @threaded for mortar in eachmpimortar(dg, cache)
+    @threaded for mortar in mpimortar_indices
         local_neighbor_ids = cache.mpi_mortars.local_neighbor_ids[mortar]
         local_neighbor_positions = cache.mpi_mortars.local_neighbor_positions[mortar]
 
@@ -206,13 +208,14 @@ function calc_mpi_mortar_flux!(surface_flux_values,
                                mesh::Union{ParallelP4estMesh{2}, ParallelT8codeMesh{2}},
                                nonconservative_terms, equations,
                                mortar_l2::LobattoLegendreMortarL2,
-                               surface_integral, dg::DG, cache)
+                               surface_integral, dg::DG, cache,
+                               mpimortar_indices = eachmpimortar(dg, cache))
     @unpack local_neighbor_ids, local_neighbor_positions, node_indices = cache.mpi_mortars
     @unpack contravariant_vectors = cache.elements
     @unpack fstar_primary_upper_threaded, fstar_primary_lower_threaded = cache
     index_range = eachnode(dg)
 
-    @threaded for mortar in eachmpimortar(dg, cache)
+    @threaded for mortar in mpimortar_indices
         # Choose thread-specific pre-allocated container
         fstar = (fstar_primary_lower_threaded[Threads.threadid()],
                  fstar_primary_upper_threaded[Threads.threadid()])

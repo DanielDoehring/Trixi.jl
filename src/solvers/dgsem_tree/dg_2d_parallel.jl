@@ -451,19 +451,27 @@ function rhs!(du, u, t,
               mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2},
                           ParallelT8codeMesh{2}}, equations,
               boundary_conditions, source_terms::Source,
-              dg::DG, cache) where {Source}
+              dg::DG, cache,
+              element_indices = eachelement(dg, cache),
+              interface_indices = eachinterface(dg, cache),
+              boundary_indices = eachboundary(dg, cache),
+              mortar_indices = eachmortar(dg, cache),
+              # MPI additions
+              mpiinterface_indices = eachmpiinterface(dg, cache),
+              mpimortar_indices = eachmpimortar(dg, cache)) where {Source}
     # Start to receive MPI data
     @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
 
     # Prolong solution to MPI interfaces
     @trixi_timeit timer() "prolong2mpiinterfaces" begin
-        prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, dg)
+        prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, dg,
+                               mpiinterface_indices)
     end
 
     # Prolong solution to MPI mortars
     @trixi_timeit timer() "prolong2mpimortars" begin
         prolong2mpimortars!(cache, u, mesh, equations,
-                            dg.mortar, dg)
+                            dg.mortar, dg, mpimortar_indices)
     end
 
     # Start to send MPI data
@@ -472,35 +480,36 @@ function rhs!(du, u, t,
     end
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache, element_indices)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, u, mesh,
                               have_nonconservative_terms(equations), equations,
-                              dg.volume_integral, dg, cache)
+                              dg.volume_integral, dg, cache, element_indices)
     end
 
     # Prolong solution to interfaces
     # TODO: Taal decide order of arguments, consistent vs. modified cache first?
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache, u, mesh, equations,
-                            dg.surface_integral, dg)
+                            dg.surface_integral, dg, interface_indices)
     end
 
     # Calculate interface fluxes
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(cache.elements.surface_flux_values, mesh,
                              have_nonconservative_terms(equations), equations,
-                             dg.surface_integral, dg, cache)
+                             dg.surface_integral, dg, cache, interface_indices)
     end
 
     # Prolong solution to boundaries
     @trixi_timeit timer() "prolong2boundaries" begin
         prolong2boundaries!(cache, u, mesh, equations,
-                            dg.surface_integral, dg)
+                            dg.surface_integral, dg, boundary_indices)
     end
 
+    # TODO: boundary_orientation_indices?
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
         calc_boundary_flux!(cache, t, boundary_conditions, mesh, equations,
@@ -510,14 +519,14 @@ function rhs!(du, u, t,
     # Prolong solution to mortars
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars!(cache, u, mesh, equations,
-                         dg.mortar, dg)
+                         dg.mortar, dg, mortar_indices)
     end
 
     # Calculate mortar fluxes
     @trixi_timeit timer() "mortar flux" begin
         calc_mortar_flux!(cache.elements.surface_flux_values, mesh,
                           have_nonconservative_terms(equations), equations,
-                          dg.mortar, dg.surface_integral, dg, cache)
+                          dg.mortar, dg.surface_integral, dg, cache, mortar_indices)
     end
 
     # Finish to receive MPI data
@@ -529,28 +538,32 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "MPI interface flux" begin
         calc_mpi_interface_flux!(cache.elements.surface_flux_values, mesh,
                                  have_nonconservative_terms(equations), equations,
-                                 dg.surface_integral, dg, cache)
+                                 dg.surface_integral, dg, cache,
+                                 mpiinterface_indices)
     end
 
     # Calculate MPI mortar fluxes
     @trixi_timeit timer() "MPI mortar flux" begin
         calc_mpi_mortar_flux!(cache.elements.surface_flux_values, mesh,
                               have_nonconservative_terms(equations), equations,
-                              dg.mortar, dg.surface_integral, dg, cache)
+                              dg.mortar, dg.surface_integral, dg, cache,
+                              mpimortar_indices)
     end
 
     # Calculate surface integrals
     @trixi_timeit timer() "surface integral" begin
         calc_surface_integral!(du, u, mesh, equations,
-                               dg.surface_integral, dg, cache)
+                               dg.surface_integral, dg, cache,
+                               element_indices)
     end
 
     # Apply Jacobian from mapping to reference element
-    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache)
+    @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache,
+                                                     element_indices)
 
     # Calculate source terms
     @trixi_timeit timer() "source terms" begin
-        calc_sources!(du, u, t, source_terms, equations, dg, cache)
+        calc_sources!(du, u, t, source_terms, equations, dg, cache, element_indices)
     end
 
     # Finish to send MPI data
@@ -561,10 +574,11 @@ end
 
 function prolong2mpiinterfaces!(cache, u,
                                 mesh::ParallelTreeMesh{2},
-                                equations, surface_integral, dg::DG)
+                                equations, surface_integral, dg::DG,
+                                mpiinterface_indices = eachmpiinterface(dg, cache))
     @unpack mpi_interfaces = cache
 
-    @threaded for interface in eachmpiinterface(dg, cache)
+    @threaded for interface in mpiinterface_indices
         local_element = mpi_interfaces.local_neighbor_ids[interface]
 
         if mpi_interfaces.orientations[interface] == 1 # interface in x-direction
@@ -598,10 +612,11 @@ end
 function prolong2mpimortars!(cache, u,
                              mesh::ParallelTreeMesh{2}, equations,
                              mortar_l2::LobattoLegendreMortarL2,
-                             dg::DGSEM)
+                             dg::DGSEM,
+                             mpimortar_indices = eachmpimortar(dg, cache))
     @unpack mpi_mortars = cache
 
-    @threaded for mortar in eachmpimortar(dg, cache)
+    @threaded for mortar in mpimortar_indices
         local_neighbor_ids = mpi_mortars.local_neighbor_ids[mortar]
         local_neighbor_positions = mpi_mortars.local_neighbor_positions[mortar]
 
@@ -724,11 +739,12 @@ end
 function calc_mpi_interface_flux!(surface_flux_values,
                                   mesh::ParallelTreeMesh{2},
                                   nonconservative_terms::False, equations,
-                                  surface_integral, dg::DG, cache)
+                                  surface_integral, dg::DG, cache,
+                                  mpiinterface_indices = eachmpiinterface(dg, cache))
     @unpack surface_flux = surface_integral
     @unpack u, local_neighbor_ids, orientations, remote_sides = cache.mpi_interfaces
 
-    @threaded for interface in eachmpiinterface(dg, cache)
+    @threaded for interface in mpiinterface_indices
         # Get local neighboring element
         element = local_neighbor_ids[interface]
 
@@ -766,12 +782,13 @@ function calc_mpi_mortar_flux!(surface_flux_values,
                                mesh::ParallelTreeMesh{2},
                                nonconservative_terms::False, equations,
                                mortar_l2::LobattoLegendreMortarL2,
-                               surface_integral, dg::DG, cache)
+                               surface_integral, dg::DG, cache,
+                               mpimortar_indices = eachmpimortar(dg, cache))
     @unpack surface_flux = surface_integral
     @unpack u_lower, u_upper, orientations = cache.mpi_mortars
     @unpack fstar_primary_upper_threaded, fstar_primary_lower_threaded, fstar_secondary_upper_threaded, fstar_secondary_lower_threaded = cache
 
-    @threaded for mortar in eachmpimortar(dg, cache)
+    @threaded for mortar in mpimortar_indices
         # Choose thread-specific pre-allocated container
         fstar_primary_upper = fstar_primary_upper_threaded[Threads.threadid()]
         fstar_primary_lower = fstar_primary_lower_threaded[Threads.threadid()]
