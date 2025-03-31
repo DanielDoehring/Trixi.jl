@@ -468,6 +468,7 @@ function rhs!(du, u, t,
                                mpiinterface_indices)
     end
 
+    # CARE: Using the partitioned version (with `mpimortar_indices`) used to be wrong!
     # Prolong solution to MPI mortars
     @trixi_timeit timer() "prolong2mpimortars" begin
         prolong2mpimortars!(cache, u, mesh, equations,
