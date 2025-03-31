@@ -219,8 +219,6 @@ sol = Trixi.solve(ode, ode_algorithm,
                   save_everystep = false, callback = callbacks,
                   maxiters = typemax(Int));
 
-summary_callback() # print the timer summary
-
 ###############################################################################
 
 # Plot IC & grid

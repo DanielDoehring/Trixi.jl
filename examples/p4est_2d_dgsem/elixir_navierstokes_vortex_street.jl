@@ -208,7 +208,5 @@ sol = solve(ode,
             ode_default_options()..., callback = callbacks);
 =#
 
-summary_callback() # print the timer summary
-
 using Plots
 pd = PlotData2D(sol);

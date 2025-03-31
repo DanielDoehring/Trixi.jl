@@ -189,5 +189,3 @@ dt = 1e-3 # PERK4, dt_c = 2e-4
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
-
-summary_callback() # print the timer summary

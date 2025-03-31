@@ -287,9 +287,6 @@ sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
-
-summary_callback() # print the timer summary
-
 #=
 using Plots
 pd = PlotData2D(sol);

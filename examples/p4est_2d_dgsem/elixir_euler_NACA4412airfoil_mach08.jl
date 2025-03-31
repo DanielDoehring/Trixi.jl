@@ -155,5 +155,3 @@ sol = solve(ode, SSPRK43(thread = OrdinaryDiffEq.True());
             dt = 1e-6,
             ode_default_options()..., callback = callbacks);
 =#
-
-summary_callback() # print the timer summary

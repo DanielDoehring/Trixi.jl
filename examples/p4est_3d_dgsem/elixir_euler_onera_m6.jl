@@ -255,5 +255,3 @@ sol = Trixi.solve(ode, ode_alg, dt = 42.0,
 sol = solve(ode, SSPRK54(thread = Trixi.True()), dt = 42.0, 
             save_everystep = false, callback = callbacks);
 =#
-
-summary_callback() # print the timer summary

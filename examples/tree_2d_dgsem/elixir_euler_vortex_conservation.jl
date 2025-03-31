@@ -111,5 +111,3 @@ sol = Trixi.solve(ode, ode_algorithm,
 sol = solve(ode, SSPRK104(thread = OrdinaryDiffEq.True()),
             dt = dt, save_everystep = false, callback = callbacks,
             adaptive = false);
-
-summary_callback() # print the timer summary
