@@ -55,6 +55,7 @@ precompile(Base.reindex,
            (Tuple{Base.Slice{Base.OneTo{Int64}}, Int64, Base.Slice{Base.OneTo{Int64}},
                   Base.Slice{Base.OneTo{Int64}}, Int64}, Tuple{Int64, Int64, Int64}))
 
+# TODO: Partitioned/PERK version for this!
 function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations, dg, cache)
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
     n_small_elements = 2^(ndims(mesh) - 1)
@@ -123,6 +124,7 @@ function finish_mpi_send!(mpi_cache::P4estMPICache)
     MPI.Waitall(mpi_cache.mpi_send_requests, MPI.Status)
 end
 
+# TODO: Partitioned/PERK version for this!
 function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations, dg, cache)
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
     n_small_elements = 2^(ndims(mesh) - 1)
