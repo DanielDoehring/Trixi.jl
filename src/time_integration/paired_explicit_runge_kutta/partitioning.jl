@@ -499,7 +499,8 @@ function partitioning_variables!(level_info_elements,
                                  # MPI additions
                                  level_info_mpi_interfaces_acc,
                                  level_info_mpi_mortars_acc,
-                                 n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache, alg)
+                                 n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
+                                 alg)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
 
@@ -741,7 +742,6 @@ function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nno
     return hmin_per_element, h_min, h_max
 end
 
-# TODO: 3D Version
 function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements,
                               n_elements, nnodes, RealT)
     h_min = floatmax(RealT)
