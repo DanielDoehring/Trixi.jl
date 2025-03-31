@@ -79,13 +79,18 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
+semi = SemidiscretizationHyperbolic(mesh, equations,
+                                    initial_condition, solver;
+                                    boundary_conditions = boundary_conditions)
+
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
+tspan = (0.0, 1e-2) 
 
-#ode = semidiscretize(semi, tspan)
-ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
 
 #=
 # For PERK Multi coefficient measurements
@@ -123,10 +128,13 @@ lift_coefficient = AnalysisSurfaceIntegral((:Airfoil,),
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      save_analysis = true,
+                                     #=
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (drag_coefficient,
                                                            drag_coefficient_shear_force,
-                                                           lift_coefficient))
+                                                           lift_coefficient)
+                                     =#
+                                     )
 
 cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
 #cfl = 6.5 # PERK 4 Single 12
@@ -156,7 +164,7 @@ callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (d
                         alive_callback, # Not needed for measurement run
                         #save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
-                        #analysis_callback,
+                        analysis_callback,
                         summary_callback);
 
 ###############################################################################
