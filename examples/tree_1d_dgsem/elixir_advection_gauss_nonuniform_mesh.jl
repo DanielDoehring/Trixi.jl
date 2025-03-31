@@ -9,7 +9,14 @@ advection_velocity = 1.0
 equations = LinearScalarAdvectionEquation1D(advection_velocity)
 
 k = 3 # polynomial degree
+
+# Entropy-conservative flux:
+#num_flux = flux_central
+
+# Diffusive fluxes
 num_flux = flux_godunov
+#num_flux = flux_lax_friedrichs
+
 solver = DGSEM(polydeg = k, surface_flux = num_flux)
 
 coordinates_min = -4.0 # minimum coordinate
@@ -39,7 +46,7 @@ summary_callback = SummaryCallback()
 analysis_callback = AnalysisCallback(semi, interval = 1,
                                      extra_analysis_errors = (:conservation_error,),
                                      extra_analysis_integrals = (Trixi.entropy_math,),
-                                     #analysis_filename = "entropy_ER.dat",
+                                     analysis_filename = "entropy_ER.dat",
                                      #analysis_filename = "entropy_standard.dat",
                                      save_analysis = true)
 cfl = 3.5 # [16, 8]
@@ -60,7 +67,6 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
 
 dtRatios = [1, 0.5]
 Stages = [16, 8]
-#Stages = [32, 16]
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10)
 
@@ -68,6 +74,9 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios;
                                                  relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+
+#ode_alg = Trixi.PairedExplicitRelaxationRK2(16, path; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRK2(16, path)
 
 dt = 0.2
 sol = Trixi.solve(ode, ode_alg,
