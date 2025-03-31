@@ -234,14 +234,26 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    # TODO: Call different function for mpi_isparallel() == true
-    partitioning_variables!(level_info_elements,
-                            level_info_elements_acc,
-                            level_info_interfaces_acc,
-                            level_info_boundaries_acc,
-                            level_info_boundaries_orientation_acc,
-                            level_info_mortars_acc,
-                            n_levels, n_dims, mesh, dg, cache, alg)
+    if !mpi_isparallel()
+        partitioning_variables!(level_info_elements,
+                                level_info_elements_acc,
+                                level_info_interfaces_acc,
+                                level_info_boundaries_acc,
+                                level_info_boundaries_orientation_acc,
+                                level_info_mortars_acc,
+                                n_levels, n_dims, mesh, dg, cache, alg)
+    else
+        partitioning_variables!(level_info_elements,
+                                level_info_elements_acc,
+                                level_info_interfaces_acc,
+                                level_info_boundaries_acc,
+                                level_info_boundaries_orientation_acc,
+                                level_info_mortars_acc,
+                                # MPI additions
+                                level_info_mpi_interfaces_acc,
+                                level_info_mpi_mortars_acc,
+                                n_levels, n_dims, mesh, dg, cache, alg)
+    end
 
     for i in 1:n_levels
         println("#Number Elements integrated with level $i: ",

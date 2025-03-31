@@ -73,7 +73,6 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                     end
                 end
 
-                # TODO: Call different function for mpi_isparallel() == true
                 if !mpi_isparallel()
                     partitioning_variables!(integrator.level_info_elements,
                                             integrator.level_info_elements_acc,
