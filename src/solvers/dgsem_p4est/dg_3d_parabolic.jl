@@ -155,7 +155,7 @@ function calc_gradient!(gradients, u_transformed, t,
     # !!! should we have a separate mortars/u_threaded in cache_parabolic?
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars!(cache, u_transformed, mesh, equations_parabolic,
-                         dg.mortar, dg)
+                         dg.mortar, dg, mortar_indices)
     end
 
     # Calculate mortar fluxes. These should reuse the hyperbolic version of `calc_mortar_flux`,

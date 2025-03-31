@@ -996,7 +996,7 @@ function calc_gradient!(gradients, u_transformed, t,
     # NOTE: This re-uses the implementation for hyperbolic terms in "dg_3d.jl"
     @trixi_timeit timer() "prolong2mortars" begin
         prolong2mortars!(cache, u_transformed, mesh, equations_parabolic,
-                         dg.mortar, dg)
+                         dg.mortar, dg, mortar_indices)
     end
 
     # Calculate mortar fluxes
