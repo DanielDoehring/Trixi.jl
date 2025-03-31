@@ -65,8 +65,7 @@ mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
 
-mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols,
-                    initial_refinement_level = 0)
+mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
 boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
                            :Airfoil => boundary_condition_slip_wall)
@@ -79,15 +78,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
-semi = SemidiscretizationHyperbolic(mesh, equations,
-                                    initial_condition, solver;
-                                    boundary_conditions = boundary_conditions)
-
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
-tspan = (0.0, 1e-2) 
 
 ode = semidiscretize(semi, tspan)
 #ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
@@ -128,13 +122,10 @@ lift_coefficient = AnalysisSurfaceIntegral((:Airfoil,),
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      save_analysis = true,
-                                     #=
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (drag_coefficient,
                                                            drag_coefficient_shear_force,
-                                                           lift_coefficient)
-                                     =#
-                                     )
+                                                           lift_coefficient))
 
 cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
 #cfl = 6.5 # PERK 4 Single 12
