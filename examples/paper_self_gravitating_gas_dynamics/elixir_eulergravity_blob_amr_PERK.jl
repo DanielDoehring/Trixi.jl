@@ -190,5 +190,3 @@ ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], base_path * "Euler_only/")
 
 sol = Trixi.solve(ode, ode_algorithm, dt = 1.0, save_everystep = false,
                   callback = callbacks);
-
-summary_callback() # print the timer summary

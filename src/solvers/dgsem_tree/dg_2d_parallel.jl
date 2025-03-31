@@ -57,6 +57,7 @@ function start_mpi_receive!(mpi_cache::MPICache)
 end
 
 # TODO: MPI dimension agnostic
+# TODO: Partitioned/PERK version for this!
 function start_mpi_send!(mpi_cache::MPICache, mesh, equations, dg, cache)
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
 
@@ -158,6 +159,7 @@ function finish_mpi_send!(mpi_cache::MPICache)
 end
 
 # TODO: MPI dimension agnostic
+# TODO: Partitioned/PERK version for this!
 function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations, dg, cache)
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
 

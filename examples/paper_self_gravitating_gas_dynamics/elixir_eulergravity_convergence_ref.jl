@@ -101,6 +101,5 @@ sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
-summary_callback() # print the timer summary
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)
 

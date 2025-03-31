@@ -131,8 +131,6 @@ ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 sol = Trixi.solve(ode, ode_algorithm, dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
-summary_callback() # print the timer summary
-
 pd = PlotData2D(sol)
 
 plot(pd["rho"], c = :jet, title = "\$ ρ, t_f = 3.0 \$",

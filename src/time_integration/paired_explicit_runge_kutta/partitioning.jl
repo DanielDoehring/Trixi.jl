@@ -386,7 +386,7 @@ function partitioning_variables!(level_info_elements,
                                  level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
                                  level_info_mortars_acc,
                                  n_levels, n_dims, mesh::P4estMesh, dg, cache, alg)
-    @unpack elements, interfaces, boundaries = cache
+    @unpack elements, interfaces, boundaries, mortars = cache
 
     #nnodes = length(mesh.nodes)
     nnodes = length(dg.basis.nodes)
@@ -462,33 +462,195 @@ function partitioning_variables!(level_info_elements,
         end
     end
 
-    if n_dims > 1
-        @unpack mortars = cache # TODO: Could also make dimensionality check
-        n_mortars = last(size(mortars.u))
+    # p4est is always dimension 2 or 3
+    n_mortars = last(size(mortars.u))
+    for mortar_id in 1:n_mortars
+        # Get element ids
+        element_id_lower = mortars.neighbor_ids[1, mortar_id]
+        h_lower = h_min_per_element[element_id_lower]
 
-        for mortar_id in 1:n_mortars
-            # Get element ids
-            element_id_lower = mortars.neighbor_ids[1, mortar_id]
-            h_lower = h_min_per_element[element_id_lower]
+        element_id_higher = mortars.neighbor_ids[2, mortar_id]
+        h_higher = h_min_per_element[element_id_higher]
 
-            element_id_higher = mortars.neighbor_ids[2, mortar_id]
-            h_higher = h_min_per_element[element_id_higher]
+        h = min(h_lower, h_higher)
 
-            h = min(h_lower, h_higher)
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
 
-            # Beyond linear scaling of timestep
-            level = findfirst(x -> x < h_min / h, alg.dt_ratios)
-            # Catch case that cell is "too coarse" for method with fewest stage evals
-            if level === nothing
-                level = n_levels
-            else # Avoid reduction in timestep: Use next higher level
-                level = level - 1
-            end
+        # Add to accumulated container
+        for l in level:n_levels
+            push!(level_info_mortars_acc[l], mortar_id)
+        end
+    end
+end
 
-            # Add to accumulated container
-            for l in level:n_levels
-                push!(level_info_mortars_acc[l], mortar_id)
-            end
+function partitioning_variables!(level_info_elements,
+                                 level_info_elements_acc,
+                                 level_info_interfaces_acc,
+                                 level_info_boundaries_acc,
+                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
+                                 level_info_mortars_acc,
+                                 # MPI additions
+                                 level_info_mpi_interfaces_acc,
+                                 level_info_mpi_mortars_acc,
+                                 n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache, alg)
+    @unpack elements, interfaces, boundaries, mortars = cache
+    @unpack mpi_interfaces, mpi_mortars = cache
+
+    #nnodes = length(mesh.nodes)
+    nnodes = length(dg.basis.nodes)
+    n_elements = nelements(dg, cache)
+
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
+
+    for element_id in 1:n_elements
+        h = h_min_per_element[element_id]
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        append!(level_info_elements[level], element_id)
+
+        for l in level:n_levels
+            push!(level_info_elements_acc[l], element_id)
+        end
+    end
+
+    n_interfaces = last(size(interfaces.u))
+    # Determine level for each interface
+    for interface_id in 1:n_interfaces
+        # For p4est: Cells on same level do not necessarily have same size
+        element_id1 = interfaces.neighbor_ids[1, interface_id]
+        element_id2 = interfaces.neighbor_ids[2, interface_id]
+        h1 = h_min_per_element[element_id1]
+        h2 = h_min_per_element[element_id2]
+        h = min(h1, h2)
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        for l in level:n_levels
+            push!(level_info_interfaces_acc[l], interface_id)
+        end
+    end
+
+    n_mpi_interfaces = last(size(mpi_interfaces.u))
+    # Determine level for each interface
+    for interface_id in 1:n_mpi_interfaces
+        # For p4est: Cells on same level do not necessarily have same size
+        element_id1 = interfaces.neighbor_ids[1, interface_id]
+        element_id2 = interfaces.neighbor_ids[2, interface_id]
+        h1 = h_min_per_element[element_id1]
+        h2 = h_min_per_element[element_id2]
+        h = min(h1, h2)
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        for l in level:n_levels
+            push!(level_info_mpi_interfaces_acc[l], interface_id)
+        end
+    end
+
+    n_boundaries = last(size(boundaries.u))
+    # Determine level for each boundary
+    for boundary_id in 1:n_boundaries
+        # Get element id (boundaries have only one unique associated element)
+        element_id = boundaries.neighbor_ids[boundary_id]
+        h = h_min_per_element[element_id]
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        # Add to accumulated container
+        for l in level:n_levels
+            push!(level_info_boundaries_acc[l], boundary_id)
+        end
+    end
+
+    # p4est is always dimension 2 or 3
+    n_mortars = last(size(mortars.u))
+    for mortar_id in 1:n_mortars
+        # Get element ids
+        element_id_lower = mortars.neighbor_ids[1, mortar_id]
+        h_lower = h_min_per_element[element_id_lower]
+
+        element_id_higher = mortars.neighbor_ids[2, mortar_id]
+        h_higher = h_min_per_element[element_id_higher]
+
+        h = min(h_lower, h_higher)
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        # Add to accumulated container
+        for l in level:n_levels
+            push!(level_info_mortars_acc[l], mortar_id)
+        end
+    end
+
+    n_mpi_mortars = last(size(mpi_mortars.u))
+    for mortar_id in 1:n_mortars
+        # Get element ids
+        element_id_lower = mortars.neighbor_ids[1, mortar_id]
+        h_lower = h_min_per_element[element_id_lower]
+
+        element_id_higher = mortars.neighbor_ids[2, mortar_id]
+        h_higher = h_min_per_element[element_id_higher]
+
+        h = min(h_lower, h_higher)
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        # Add to accumulated container
+        for l in level:n_levels
+            push!(level_info_mpi_mortars_acc[l], mortar_id)
         end
     end
 end

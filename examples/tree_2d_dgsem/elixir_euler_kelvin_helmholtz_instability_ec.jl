@@ -97,9 +97,6 @@ sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
                   save_everystep=false, callback=callbacks);
 
-summary_callback() # print the timer summary
-
-
 ###############################################################################
 # Plot section
 

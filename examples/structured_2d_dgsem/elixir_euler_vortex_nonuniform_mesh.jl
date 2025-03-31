@@ -185,5 +185,3 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, r
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 7.25e-3,
                   save_everystep = false, callback = callbacks);
-
-summary_callback() # print the timer summary

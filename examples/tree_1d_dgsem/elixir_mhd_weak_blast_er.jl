@@ -112,5 +112,3 @@ ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
-
-summary_callback() # print the timer summary
