@@ -420,8 +420,7 @@ end
 
 function prolong2mortars!(cache, u,
                           mesh::Union{P4estMesh{3}, T8codeMesh{3}}, equations,
-                          mortar_l2::LobattoLegendreMortarL2,
-                          dg::DGSEM,
+                          mortar_l2::LobattoLegendreMortarL2, dg::DGSEM,
                           mortar_indices = eachmortar(dg, cache))
     @unpack fstar_tmp_threaded = cache
     @unpack neighbor_ids, node_indices = cache.mortars

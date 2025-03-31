@@ -877,8 +877,7 @@ end
 
 function prolong2mortars!(cache, u,
                           mesh::TreeMesh{3}, equations,
-                          mortar_l2::LobattoLegendreMortarL2,
-                          dg::DGSEM,
+                          mortar_l2::LobattoLegendreMortarL2, dg::DGSEM,
                           mortar_indices = eachmortar(dg, cache))
     # temporary buffer for projections
     @unpack fstar_tmp1_threaded = cache

@@ -425,7 +425,8 @@ function calc_gradient_interface_flux!(surface_flux_values,
                                        mesh::TreeMesh{1}, equations_parabolic, dg::DG,
                                        parabolic_scheme::ViscousFormulationBassiRebay1,
                                        cache, cache_parabolic,
-                                       interface_indices = eachinterface(dg, cache_parabolic))
+                                       interface_indices = eachinterface(dg,
+                                                                         cache_parabolic))
     @unpack neighbor_ids, orientations = cache_parabolic.interfaces
 
     @threaded for interface in interface_indices

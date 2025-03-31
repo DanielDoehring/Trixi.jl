@@ -304,8 +304,7 @@ end
 function prolong2mpimortars!(cache, u,
                              mesh::Union{ParallelP4estMesh{3}, ParallelT8codeMesh{3}},
                              equations,
-                             mortar_l2::LobattoLegendreMortarL2,
-                             dg::DGSEM)
+                             mortar_l2::LobattoLegendreMortarL2, dg::DGSEM)
     @unpack node_indices = cache.mpi_mortars
     index_range = eachnode(dg)
 

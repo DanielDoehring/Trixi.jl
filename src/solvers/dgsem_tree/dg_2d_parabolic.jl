@@ -543,8 +543,7 @@ end
 function prolong2mortars!(cache, flux_viscous::Vector{Array{uEltype, 4}},
                           mesh::TreeMesh{2},
                           equations_parabolic::AbstractEquationsParabolic,
-                          mortar_l2::LobattoLegendreMortarL2,
-                          dg::DGSEM,
+                          mortar_l2::LobattoLegendreMortarL2, dg::DGSEM,
                           mortar_indices = eachmortar(dg, cache)) where {uEltype <:
                                                                          Real}
     flux_viscous_x, flux_viscous_y = flux_viscous

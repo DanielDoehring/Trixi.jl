@@ -809,8 +809,7 @@ end
 
 function prolong2mortars!(cache, u,
                           mesh::TreeMesh{2}, equations,
-                          mortar_l2::LobattoLegendreMortarL2,
-                          dg::DGSEM,
+                          mortar_l2::LobattoLegendreMortarL2, dg::DGSEM,
                           mortar_indices = eachmortar(dg, cache))
     @threaded for mortar in mortar_indices
         large_element = cache.mortars.neighbor_ids[3, mortar]

@@ -699,8 +699,7 @@ end
 function prolong2mortars_divergence!(cache, flux_viscous::Vector{Array{uEltype, 4}},
                                      mesh::Union{P4estMesh{2}, T8codeMesh{2}},
                                      equations,
-                                     mortar_l2::LobattoLegendreMortarL2,
-                                     dg::DGSEM,
+                                     mortar_l2::LobattoLegendreMortarL2, dg::DGSEM,
                                      mortar_indices = eachmortar(dg, cache)) where {uEltype <:
                                                                                     Real}
     @unpack neighbor_ids, node_indices = cache.mortars
