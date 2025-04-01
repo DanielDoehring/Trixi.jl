@@ -2191,31 +2191,6 @@ function partition!(mesh::P4estMesh{2}; weight_fn = C_NULL)
                     weight_fn)
 end
 
-#=
-function weight_fn(p4est::Ptr{Cvoid}, which_tree::Cint, quadrant::Ptr{Cvoid})::Cint
-    # Example logic for assigning weights
-    # You can customize this logic based on your requirements
-    # For instance, assign weights based on the quadrant's position or tree index
-
-    # Convert the quadrant pointer to a usable Julia object if needed
-    # Example: Access quadrant properties (e.g., size, position)
-    # quadrant_data = unsafe_wrap(SomeType, quadrant)
-
-    # Assign a weight based on some criteria
-    weight = 1  # Replace with your logic
-
-    return Cint(weight)
-end
-
-# Create a C-compatible function pointer for `weight_fn`
-const weight_fn_c = @cfunction(weight_fn, Cint, (Ptr{Cvoid}, Cint, Ptr{Cvoid}))
-=#
-
-function partition!(mesh::P4estMesh{2}, rhs_evals_per_cell; weight_fn = C_NULL)
-    p4est_partition(mesh.p4est, Int(mesh.p4est_partition_allow_for_coarsening),
-                    weight_fn)
-end
-
 function partition!(mesh::P4estMesh{3}; weight_fn = C_NULL)
     p8est_partition(mesh.p4est, Int(mesh.p4est_partition_allow_for_coarsening),
                     weight_fn)
