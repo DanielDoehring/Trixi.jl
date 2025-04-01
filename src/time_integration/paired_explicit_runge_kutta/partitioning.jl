@@ -512,7 +512,10 @@ function partitioning_variables!(level_info_elements,
                                                            n_elements,
                                                            nnodes,
                                                            eltype(dg.basis.nodes))
-    # TODO: Synchronize `h_min`, `h_max` among ranks!
+    # Synchronize `h_min`, `h_max` among ranks
+    h_min = MPI.Allreduce!(Ref(h_min), Base.max, mpi_comm())[]
+    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
+    #h_min, h_max = h_min_global, h_max_global
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
