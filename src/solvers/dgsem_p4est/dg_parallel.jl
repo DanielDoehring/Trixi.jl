@@ -221,6 +221,24 @@ end
              index_base + 8 * data_size))
 end
 
+function weight_fn(p4est::Ptr{Cvoid}, which_tree::Cint, quadrant::Ptr{Cvoid})::Cint
+    # Example logic for assigning weights
+    # You can customize this logic based on your requirements
+    # For instance, assign weights based on the quadrant's position or tree index
+
+    # Convert the quadrant pointer to a usable Julia object if needed
+    # Example: Access quadrant properties (e.g., size, position)
+    # quadrant_data = unsafe_wrap(SomeType, quadrant)
+
+    # Assign a weight based on some criteria
+    weight = 1  # Replace with your logic
+
+    return Cint(weight)
+end
+
+# Create a C-compatible function pointer for `weight_fn`
+const weight_fn_c = @cfunction(weight_fn, Cint, (Ptr{Cvoid}, Cint, Ptr{Cvoid}))
+
 # This method is called when a SemidiscretizationHyperbolic is constructed.
 # It constructs the basic `cache` used throughout the simulation to compute
 # the RHS etc.
@@ -229,7 +247,8 @@ function create_cache(mesh::ParallelP4estMesh, equations::AbstractEquations, dg:
     # Make sure to balance and partition the p4est and create a new ghost layer before creating any
     # containers in case someone has tampered with the p4est after creating the mesh
     balance!(mesh)
-    partition!(mesh)
+    #partition!(mesh)
+    partition!(mesh; weight_fn = weight_fn_c)
     update_ghost_layer!(mesh)
 
     elements = init_elements(mesh, equations, dg.basis, uEltype)
