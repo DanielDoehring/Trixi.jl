@@ -115,7 +115,7 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-tspan = (0.0, 0.5)
+tspan = (0.0, 2e-5)
 ode = semidiscretize(semi, tspan)
 
 #=
@@ -133,8 +133,6 @@ ode = semidiscretize(semi, tspan, restart_filename)
 ###############################################################################
 
 summary_callback = SummaryCallback()
-
-analysis_interval = 10
 
 force_boundary_names = (:PhysicalSurface12, :PhysicalSurface18)
 
@@ -157,10 +155,11 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
                                                                    u_inf(equations), a_inf()))
 
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     analysis_errors = Symbol[],
+                                     #analysis_errors = Symbol[],
                                      #analysis_integrals = (lift_coefficient,)
-                                     analysis_integrals = ()
+                                     #analysis_integrals = ()
                                      )
 
 alive_callback = AliveCallback(alive_interval = 5) # 200
@@ -187,9 +186,9 @@ stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi AoA 3.06
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         #save_solution,
-                        save_restart,
+                        #save_restart,
                         stepsize_callback
                         )
 
