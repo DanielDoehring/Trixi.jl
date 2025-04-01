@@ -230,6 +230,9 @@ function weight_fn_custom(p4est, which_tree, quadrant)
     # Example: Access quadrant properties (e.g., size, position)
     # quadrant_data = unsafe_wrap(SomeType, quadrant)
 
+    # TODO: I think I need to access `user_data` here to make this work
+    # Need to set it first, though
+
     # Assign a weight based on some criteria
     weight = 1  # Replace with your logic
 
@@ -251,9 +254,8 @@ function create_cache(mesh::ParallelP4estMesh, equations::AbstractEquations, dg:
     balance!(mesh)
 
     weight_fn_c = cfunction(weight_fn_custom)
-    #partition!(mesh)
     partition!(mesh; weight_fn = weight_fn_c)
-
+    #partition!(mesh)
 
     update_ghost_layer!(mesh)
 

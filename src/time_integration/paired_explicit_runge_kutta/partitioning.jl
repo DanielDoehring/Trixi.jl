@@ -512,6 +512,7 @@ function partitioning_variables!(level_info_elements,
                                                            n_elements,
                                                            nnodes,
                                                            eltype(dg.basis.nodes))
+    # TODO: Synchronize `h_min`, `h_max` among ranks!
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
