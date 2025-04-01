@@ -742,7 +742,7 @@ function partitioning_variables!(level_info_elements,
     @boundscheck begin
         @assert axes(rhs_per_element)==(Base.OneTo(ncells(mesh)),) ("Indicator array (axes = $(axes(lambda))) and mesh cells (axes = $(Base.OneTo(ncells(mesh)))) have different axes")
     end
-    
+
     iter_volume_c = cfunction(save_rhs_evals_iter_volume, Val(ndims(mesh)))
     iterate_p4est(mesh.p4est, rhs_per_element; iter_volume_c = iter_volume_c)
 
