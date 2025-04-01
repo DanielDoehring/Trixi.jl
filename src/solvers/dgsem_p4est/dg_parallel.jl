@@ -221,66 +221,6 @@ end
              index_base + 8 * data_size))
 end
 
-function save_rhs_evals_iter_volume(info, user_data)
-    info_pw = PointerWrapper(info)
-
-    # Load tree from global trees array, one-based indexing
-    tree_pw = load_pointerwrapper_tree(info_pw.p4est, info_pw.treeid[] + 1)
-    # Quadrant numbering offset of this quadrant
-    offset = tree_pw.quadrants_offset[]
-    # Global quad ID
-    quad_id = offset + info_pw.quadid[]
-
-    # Access user_data = rhs_per_element
-    user_data_pw = PointerWrapper(Int, user_data)
-    # Load rhs_evals = rhs_per_element[quad_id + 1]
-    rhs_evals = user_data_pw[quad_id + 1]
-
-    # Access quadrant's user data ([global quad ID, rhs_evals])
-    quad_data_pw = PointerWrapper(Int, info_pw.quad.p.user_data[])
-    # Save number of rhs evaluations to quadrant's user data.
-    quad_data_pw[2] = rhs_evals
-
-    return nothing
-end
-
-# 2D
-function cfunction(::typeof(save_rhs_evals_iter_volume), ::Val{2})
-    @cfunction(save_rhs_evals_iter_volume, Cvoid,
-               (Ptr{p4est_iter_volume_info_t}, Ptr{Cvoid}))
-end
-# 3D
-function cfunction(::typeof(save_rhs_evals_iter_volume), ::Val{3})
-    @cfunction(save_rhs_evals_iter_volume, Cvoid,
-               (Ptr{p8est_iter_volume_info_t}, Ptr{Cvoid}))
-end
-
-function weight_fn_custom(p4est, which_tree, quadrant)
-    # Number of RHS evaluationshas been copied to the quadrant's user data storage before.
-    # Unpack quadrant's user data ([global quad ID, rhs_evals]).
-    # Use `unsafe_load` here since `quadrant.p.user_data isa Ptr{Ptr{Nothing}}`
-    # and we only need the first (second?) (only!) entry
-    pw = PointerWrapper(Int, unsafe_load(quadrant.p.user_data))
-    weight = pw[2] # rhs_evals
-
-    # Assign a weight based on some criteria
-    #weight = 1  # Replace with your logic
-
-    return Cint(weight)
-end
-
-# 2D
-function cfunction(::typeof(weight_fn_custom), ::Val{2})
-    @cfunction(refine_fn, Cint,
-               (Ptr{p4est_t}, Ptr{p4est_topidx_t}, Ptr{p4est_quadrant_t}))
-end
-
-# 3D
-function cfunction(::typeof(weight_fn_custom), ::Val{3})
-    @cfunction(refine_fn, Cint,
-               (Ptr{p8est_t}, Ptr{p4est_topidx_t}, Ptr{p8est_quadrant_t}))
-end
-
 # This method is called when a SemidiscretizationHyperbolic is constructed.
 # It constructs the basic `cache` used throughout the simulation to compute
 # the RHS etc.
@@ -289,26 +229,7 @@ function create_cache(mesh::ParallelP4estMesh, equations::AbstractEquations, dg:
     # Make sure to balance and partition the p4est and create a new ghost layer before creating any
     # containers in case someone has tampered with the p4est after creating the mesh
     balance!(mesh)
-
-    iter_volume_c = cfunction(save_rhs_evals_iter_volume, Val(ndims(mesh)))
-
-    rhs_per_element = Zeros(nelements(dg, cache))
-    for element in eachelement(dg, cache)
-        rhs_per_element[element] = 1
-    end
-
-    # The pointer to rhs_per_element will be interpreted as Ptr{Int} below
-    #@assert rhs_per_element isa Vector{Int}
-    @boundscheck begin
-        @assert axes(rhs_per_element)==(Base.OneTo(ncells(mesh)),) ("Indicator array (axes = $(axes(lambda))) and mesh cells (axes = $(Base.OneTo(ncells(mesh)))) have different axes")
-    end
-    
-    iterate_p4est(mesh.p4est, rhs_per_element; iter_volume_c = iter_volume_c)
-
-    weight_fn_c = cfunction(weight_fn_custom, Val(ndims(mesh)))
-    partition!(mesh; weight_fn = weight_fn_c)
-    #partition!(mesh)
-
+    partition!(mesh)
     update_ghost_layer!(mesh)
 
     elements = init_elements(mesh, equations, dg.basis, uEltype)

@@ -212,6 +212,8 @@ function partitioning_variables!(level_info_elements,
             end
         end
     end
+
+    return nothing
 end
 
 function partitioning_variables!(level_info_elements,
@@ -377,6 +379,8 @@ function partitioning_variables!(level_info_elements,
             end
         end
     end
+
+    return nothing
 end
 
 function partitioning_variables!(level_info_elements,
@@ -491,6 +495,69 @@ function partitioning_variables!(level_info_elements,
             push!(level_info_mortars_acc[l], mortar_id)
         end
     end
+
+    return nothing
+end
+
+# Functions for PERK-MPI load balancing
+function save_rhs_evals_iter_volume(info, user_data)
+    info_pw = PointerWrapper(info)
+
+    # Load tree from global trees array, one-based indexing
+    tree_pw = load_pointerwrapper_tree(info_pw.p4est, info_pw.treeid[] + 1)
+    # Quadrant numbering offset of this quadrant
+    offset = tree_pw.quadrants_offset[]
+    # Global quad ID
+    quad_id = offset + info_pw.quadid[]
+
+    # Access user_data = `rhs_per_element`
+    user_data_pw = PointerWrapper(Int, user_data)
+    # Load `rhs_evals = rhs_per_element[quad_id + 1]`
+    rhs_evals = user_data_pw[quad_id + 1]
+
+    # Access quadrant's user data (`[global quad ID, rhs_evals]`)
+    quad_data_pw = PointerWrapper(Int, info_pw.quad.p.user_data[])
+    # Save number of rhs evaluations to quadrant's user data.
+    quad_data_pw[2] = rhs_evals
+
+    return nothing
+end
+
+# 2D
+function cfunction(::typeof(save_rhs_evals_iter_volume), ::Val{2})
+    @cfunction(save_rhs_evals_iter_volume, Cvoid,
+               (Ptr{p4est_iter_volume_info_t}, Ptr{Cvoid}))
+end
+# 3D
+function cfunction(::typeof(save_rhs_evals_iter_volume), ::Val{3})
+    @cfunction(save_rhs_evals_iter_volume, Cvoid,
+               (Ptr{p8est_iter_volume_info_t}, Ptr{Cvoid}))
+end
+
+function weight_fn_perk(p4est, which_tree, quadrant)
+    # Number of RHS evaluationshas been copied to the quadrant's user data storage before.
+    # Unpack quadrant's user data ([global quad ID, rhs_evals]).
+    # Use `unsafe_load` here since `quadrant.p.user_data isa Ptr{Ptr{Nothing}}`
+    # and we only need the first (second?) (only!) entry
+    pw = PointerWrapper(Int, unsafe_load(quadrant.p.user_data))
+    weight = pw[2] # rhs_evals
+
+    # Assign a weight based on some criteria
+    #weight = 1
+
+    return Cint(weight)
+end
+
+# 2D
+function cfunction(::typeof(weight_fn_perk), ::Val{2})
+    @cfunction(refine_fn, Cint,
+               (Ptr{p4est_t}, Ptr{p4est_topidx_t}, Ptr{p4est_quadrant_t}))
+end
+
+# 3D
+function cfunction(::typeof(weight_fn_perk), ::Val{3})
+    @cfunction(refine_fn, Cint,
+               (Ptr{p8est_t}, Ptr{p4est_topidx_t}, Ptr{p8est_quadrant_t}))
 end
 
 function partitioning_variables!(level_info_elements,
@@ -663,6 +730,27 @@ function partitioning_variables!(level_info_elements,
             push!(level_info_mpi_mortars_acc[l], mortar_id)
         end
     end
+
+    #=
+    rhs_per_element = zeros(Int, ncells(mesh))
+    for element in 1:ncells(mesh)
+        rhs_per_element[element] = 1
+    end
+
+    # The pointer to rhs_per_element will be interpreted as Ptr{Int} below
+    #@assert rhs_per_element isa Vector{Int}
+    @boundscheck begin
+        @assert axes(rhs_per_element)==(Base.OneTo(ncells(mesh)),) ("Indicator array (axes = $(axes(lambda))) and mesh cells (axes = $(Base.OneTo(ncells(mesh)))) have different axes")
+    end
+    
+    iter_volume_c = cfunction(save_rhs_evals_iter_volume, Val(ndims(mesh)))
+    iterate_p4est(mesh.p4est, rhs_per_element; iter_volume_c = iter_volume_c)
+
+    weight_fn_c = cfunction(weight_fn_perk, Val(ndims(mesh)))
+    partition!(mesh; weight_fn = weight_fn_c)
+    =#
+
+    return nothing
 end
 
 function partitioning_variables!(level_info_elements,
@@ -724,6 +812,8 @@ function partitioning_variables!(level_info_elements,
     end
 
     # No interfaces, boundaries, mortars for structured meshes
+
+    return nothing
 end
 
 function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nnodes,
@@ -889,6 +979,8 @@ end
         append!(level_u_indices_elements[level], indices)
         sort!(level_u_indices_elements[level])
     end
+
+    return nothing
 end
 
 # Repartitioning of the DoF array of the gravity solver
@@ -913,5 +1005,7 @@ end
         append!(cache.level_u_gravity_indices_elements[level], indices)
         sort!(cache.level_u_gravity_indices_elements[level])
     end
+
+    return nothing
 end
 end # @muladd
