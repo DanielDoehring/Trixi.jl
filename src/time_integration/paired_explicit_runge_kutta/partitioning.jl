@@ -397,6 +397,9 @@ function partitioning_variables!(level_info_elements,
                                                            nnodes,
                                                            eltype(dg.basis.nodes))
 
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
+
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
@@ -515,6 +518,9 @@ function partitioning_variables!(level_info_elements,
     # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
     h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
     h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
@@ -674,6 +680,9 @@ function partitioning_variables!(level_info_elements,
                                                            nnodes,
                                                            eltype(dg.basis.nodes))
 
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
+
     # For "grid-based" partitioning approach
     #=
     S_min = alg.num_stage_evals_min
@@ -738,10 +747,6 @@ function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nno
         end
     end
 
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min)
-    println("\n")
-
     return hmin_per_element, h_min, h_max
 end
 
@@ -793,9 +798,6 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
             h_min = h
         end
     end
-
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
 
     return hmin_per_element, h_min, h_max
 end
@@ -870,9 +872,6 @@ function get_hmin_per_element(mesh::P4estMesh{3}, elements,
             h_min = h
         end
     end
-
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
 
     return hmin_per_element, h_min, h_max
 end
