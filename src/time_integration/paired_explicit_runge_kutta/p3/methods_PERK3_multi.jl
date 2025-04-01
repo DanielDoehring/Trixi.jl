@@ -73,6 +73,7 @@ struct PairedExplicitRK3Multi <:
     num_stage_evals_min::Int64
     num_methods::Int64
     num_stages::Int64
+    stages::Vector{Int64}
 
     dt_ratios::Vector{Float64}
 
@@ -99,7 +100,7 @@ function PairedExplicitRK3Multi(stages::Vector{Int64},
                                                                      base_path_a_coeffs,
                                                                      cS2)
 
-    return PairedExplicitRK3Multi(minimum(stages), length(stages), num_stages,
+    return PairedExplicitRK3Multi(minimum(stages), length(stages), num_stages, stages,
                                   dt_ratios,
                                   a_matrices, c, active_levels,
                                   max_active_levels, max_eval_levels)
@@ -253,6 +254,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                 level_info_mpi_interfaces_acc,
                                 level_info_mpi_mortars_acc,
                                 n_levels, n_dims, mesh, dg, cache, alg)
+
+        if mesh isa ParallelP4estMesh
+            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
+        end
     end
 
     for i in 1:n_levels

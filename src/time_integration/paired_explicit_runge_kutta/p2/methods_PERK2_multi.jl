@@ -74,7 +74,7 @@ struct PairedExplicitRK2Multi <:
     num_stage_evals_min::Int64
     num_methods::Int64
     num_stages::Int64
-    stages::Vector{Int64} # NOTE TODO: For load-balancing of MPI-parallel p4est simulations
+    stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
     dt_ratios::Vector{Float64}
 

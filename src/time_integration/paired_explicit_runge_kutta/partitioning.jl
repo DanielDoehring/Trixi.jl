@@ -967,12 +967,9 @@ function weight_fn_perk(p4est, which_tree, quadrant)
     # Number of RHS evaluationshas been copied to the quadrant's user data storage before.
     # Unpack quadrant's user data ([global quad ID, rhs_evals]).
     # Use `unsafe_load` here since `quadrant.p.user_data isa Ptr{Ptr{Nothing}}`
-    # and we only need the first (second?) (only!) entry
+    # and we only need the second entry
     pw = PointerWrapper(Int, unsafe_load(quadrant.p.user_data))
     weight = pw[2] # rhs_evals
-
-    # Assign a weight based on some criteria
-    #weight = 1
 
     return Cint(weight)
 end
@@ -994,6 +991,8 @@ function get_rhs_per_element(dg, cache,
     rhs_per_element = zeros(Int, nelements(dg, cache))
 
     for level in 1:length(level_info_elements)
+        # TODO: Question: Do I want to count the absolute number of RHS evals
+        # or just the offset from "base", i.e., 2 for p2, 3 for p3 and 5 for p4
         rhs_evals = stages[level]
         for element in level_info_elements[level]
             rhs_per_element[element] = rhs_evals
