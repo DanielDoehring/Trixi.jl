@@ -78,13 +78,21 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
+# For testing of MPI+p4est+PERK in 2D (hyperbolic only)
+#=
+semi = SemidiscretizationHyperbolic(mesh, equations,
+                                    initial_condition, solver;
+                                    boundary_conditions = boundary_conditions)
+=#
+
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
+#tspan = (0.0, 0.5) # For testing of MPI+p4est+PERK in 2D (hyperbolic only)
 
-ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
 
 #=
 # For PERK Multi coefficient measurements
@@ -99,6 +107,7 @@ summary_callback = SummaryCallback()
 
 # Choose analysis interval such that roughly every dt_c = 0.005 a record is taken
 analysis_interval = 25 # PERK4_Multi, PERKSingle
+#analysis_interval = 10_000 # PERK4_Multi, PERKSingle
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
@@ -141,7 +150,7 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 
 # For plots etc
 save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
-                                     save_initial_solution = true,
+                                     save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
                                      output_directory = "out")
@@ -153,7 +162,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        #save_solution, # For plotting during measurement run
+                        save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
                         analysis_callback,
                         summary_callback);
