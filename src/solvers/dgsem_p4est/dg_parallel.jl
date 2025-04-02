@@ -118,13 +118,8 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations, dg, cache,
     for rank in 1:length(mpi_cache.mpi_neighbor_ranks)
         send_buffer = mpi_cache.mpi_send_buffers[rank]
 
-        # These approaches allocate
-        #relevant_interfaces = intersect(Set(mpi_cache.mpi_neighbor_interfaces[rank]), Set(mpiinterfaces_indices))
-        #relevant_interfaces = findall(x -> x in mpiinterfaces_indices, mpi_cache.mpi_neighbor_interfaces[rank])
-
         index = 0
         interfaces_sent = 0
-        #for (index, interface) in enumerate(relevant_interfaces)
         for interface in mpi_cache.mpi_neighbor_interfaces[rank]
             if interface in mpiinterfaces_indices
                 first = index * data_size + 1
@@ -140,9 +135,9 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations, dg, cache,
 
         # Set send_buffer corresponding to mortar data to NaN and overwrite the parts where local
         # data exists
-        #interfaces_data_size = length(relevant_interfaces) *
-        interfaces_data_size = interfaces_sent *
-                               data_size
+        interfaces_data_size = interfaces_sent * data_size
+
+        # TODO: More efficient mortar handling!
         mortars_data_size = length(mpi_cache.mpi_neighbor_mortars[rank]) *
                             n_small_elements * 2 * data_size
         # `NaN |> eltype(...)` ensures that the NaN's are of the appropriate floating point type
@@ -253,13 +248,8 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations, dg, cach
     while data !== nothing
         recv_buffer = mpi_cache.mpi_recv_buffers[data]
 
-        # These approaches allocate
-        #relevant_interfaces = intersect(Set(mpi_cache.mpi_neighbor_interfaces[data]), Set(mpiinterfaces_indices))
-        #relevant_interfaces = findall(x -> x in mpiinterfaces_indices, mpi_cache.mpi_neighbor_interfaces[data])
-
         index = 0
         interfaces_received = 0
-        #for (index, interface) in enumerate(relevant_interfaces)
         for interface in mpi_cache.mpi_neighbor_interfaces[data]
             if interface in mpiinterfaces_indices
                 first = index * data_size + 1
@@ -275,11 +265,9 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations, dg, cach
                 interfaces_received += 1
             end
         end
+        interfaces_data_size = interfaces_received * data_size
 
-        #interfaces_data_size = length(mpi_cache.mpi_neighbor_interfaces[data]) *
-        #interfaces_data_size = length(relevant_interfaces) *
-        interfaces_data_size = interfaces_received *
-                               data_size
+        # TODO: More efficient mortar handling!
         for (index, mortar) in enumerate(mpi_cache.mpi_neighbor_mortars[data])
             index_base = interfaces_data_size +
                          (index - 1) * n_small_elements * 2 * data_size
