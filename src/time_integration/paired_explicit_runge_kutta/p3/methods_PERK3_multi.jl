@@ -270,6 +270,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
             resize!(du, n_new)
             resize!(u_tmp, n_new)
             resize!(k1, n_new)
+            resize!(kS1, n_new)
 
             # Reset `level_info_elements` after rebalancing
             level_info_elements = [Vector{Int64}() for _ in 1:n_levels]

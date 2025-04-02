@@ -498,6 +498,7 @@ function partitioning_variables!(level_info_elements,
     return nothing
 end
 
+# TODO: Adapt for load-balancing
 function partitioning_variables!(level_info_elements,
                                  level_info_elements_acc,
                                  level_info_interfaces_acc,
@@ -671,6 +672,7 @@ function partitioning_variables!(level_info_elements,
     return nothing
 end
 
+# TODO: Adapt for load-balancing
 function partitioning_variables!(level_info_elements,
                                  n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
                                  alg)
@@ -713,7 +715,7 @@ function partitioning_variables!(level_info_elements,
                                  level_info_elements_acc,
                                  level_info_interfaces_acc,
                                  level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for StructuredMesh
+                                 level_info_boundaries_orientation_acc,
                                  level_info_mortars_acc,
                                  n_levels, n_dims, mesh::StructuredMesh, dg, cache, alg)
     nnodes = length(dg.basis.nodes)
@@ -1027,8 +1029,6 @@ function get_rhs_per_element(dg, cache,
     rhs_per_element = zeros(Int, nelements(dg, cache))
 
     for level in 1:length(level_info_elements)
-        # TODO: Question: Do I want to count the absolute number of RHS evals
-        # or just the offset from "base", i.e., 2 for p2, 3 for p3 and 5 for p4
         rhs_evals = stages[level]
         for element in level_info_elements[level]
             rhs_per_element[element] = rhs_evals
