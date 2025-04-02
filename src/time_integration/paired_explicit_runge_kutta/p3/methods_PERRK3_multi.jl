@@ -143,7 +143,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
     iter = 0
 
     ### Set datastructures for handling of level-dependent integration ###
-    mesh, equations, dg, cache = mesh_equations_solver_cache(ode.p)
+    semi = ode.p
+    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     n_levels = get_n_levels(mesh, alg.PERK3Multi)
     n_dims = ndims(mesh) # Spatial dimension
@@ -186,12 +187,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
 
     ### Done with setting up for handling of level-dependent integration ###
 
-    if isa(ode.p, SemidiscretizationHyperbolicParabolic)
+    if isa(semi, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
         integrator = PairedExplicitRelaxationRK3MultiParabolicIntegrator(u0, du, u_tmp,
                                                                          t0, tdir,
                                                                          dt, zero(dt),
-                                                                         iter, ode.p,
+                                                                         iter, semi,
                                                                          (prob = ode,),
                                                                          ode.f,
                                                                          # Note that here the `PERK3Multi` algorithm is passed on as 
@@ -220,7 +221,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
         integrator = PairedExplicitRelaxationRK3MultiIntegrator(u0, du, u_tmp,
                                                                 t0, tdir,
                                                                 dt, zero(dt),
-                                                                iter, ode.p,
+                                                                iter, semi,
                                                                 (prob = ode,),
                                                                 ode.f,
                                                                 # Note that here the `PERK3Multi` algorithm is passed on as 

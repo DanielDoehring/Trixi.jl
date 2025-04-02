@@ -213,7 +213,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
     iter = 0
 
     ### Set datastructures for handling of level-dependent integration ###
-    mesh, equations, dg, cache = mesh_equations_solver_cache(ode.p)
+    semi = ode.p
+    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     n_levels = get_n_levels(mesh, alg)
     n_dims = ndims(mesh) # Spatial dimension
@@ -241,6 +242,36 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                 level_info_mortars_acc,
                                 n_levels, n_dims, mesh, dg, cache, alg)
     else
+        if mesh isa ParallelP4estMesh
+            # Get cell distribution for standard partitioning
+            global_first_quadrant = unsafe_wrap(Array,
+                                                unsafe_load(mesh.p4est).global_first_quadrant,
+                                                mpi_nranks() + 1)
+            # Need to copy `global_first_quadrant` to different variable as the former will change 
+            # due to the call to `partition!`
+            old_global_first_quadrant = copy(global_first_quadrant)
+
+            # Get (global) element distribution to accordingly balance the solver
+            partitioning_variables!(level_info_elements,
+                                    n_levels, n_dims, mesh, dg, cache, alg)
+
+            # Balance such that each rank has the same number of RHS calls                                    
+            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
+            # Actual move of elements across ranks
+            rebalance_solver!(u0, mesh, equations, dg, cache,
+                              old_global_first_quadrant)
+            reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
+
+            # Resize ode vectors
+            n_new = length(u0)
+            resize!(du, n_new)
+            resize!(u_tmp, n_new)
+            resize!(k1, n_new)
+
+            # Reset `level_info_elements` after rebalancing
+            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
+        end
+
         partitioning_variables!(level_info_elements,
                                 level_info_elements_acc,
                                 level_info_interfaces_acc,
@@ -251,14 +282,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                 level_info_mpi_interfaces_acc,
                                 level_info_mpi_mortars_acc,
                                 n_levels, n_dims, mesh, dg, cache, alg)
-
-        # TODO: Try out 
-        # 1) Finding global level distribution, i.e., number of elements per level
-        # 2) Retrieve stages for each level
-        # 3) Balance mesh accordingly, then partition all variables
-        if mesh isa ParallelP4estMesh
-            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
-        end
     end
 
     for i in 1:n_levels
@@ -272,12 +295,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                     u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
-    if isa(ode.p, SemidiscretizationHyperbolicParabolic)
+    if isa(semi, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
         integrator = PairedExplicitRK2MultiParabolicIntegrator(u0, du, u_tmp,
                                                                t0, tdir,
                                                                dt, zero(dt),
-                                                               iter, ode.p,
+                                                               iter, semi,
                                                                (prob = ode,),
                                                                ode.f,
                                                                alg,
@@ -301,7 +324,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
         integrator = PairedExplicitRK2MultiIntegrator(u0, du, u_tmp,
                                                       t0, tdir,
                                                       dt, zero(dt),
-                                                      iter, ode.p,
+                                                      iter, semi,
                                                       (prob = ode,),
                                                       ode.f,
                                                       alg,
@@ -321,7 +344,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                                       level_u_indices_elements,
                                                       -1, n_levels)
 
-        if :semi_gravity in fieldnames(typeof(ode.p))
+        if :semi_gravity in fieldnames(typeof(semi))
             partitioning_u_gravity!(integrator)
         end
     end

@@ -261,7 +261,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     iter = 0
 
     ### Set datastructures for handling of level-dependent integration ###
-    mesh, equations, dg, cache = mesh_equations_solver_cache(ode.p)
+    semi = ode.p
+    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     n_levels = get_n_levels(mesh, alg)
     n_dims = ndims(mesh) # Spatial dimension
@@ -307,7 +308,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
             # Actual move of elements across ranks
             rebalance_solver!(u0, mesh, equations, dg, cache,
                               old_global_first_quadrant)
-            reinitialize_boundaries!(ode.p.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
+            reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
 
             # Resize ode vectors
             n_new = length(u0)
@@ -342,12 +343,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                     u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
-    if isa(ode.p, SemidiscretizationHyperbolicParabolic)
+    if isa(semi, SemidiscretizationHyperbolicParabolic)
         du_tmp = zero(u0)
         integrator = PairedExplicitRK4MultiParabolicIntegrator(u0, du, u_tmp,
                                                                t0, tdir,
                                                                dt, zero(dt),
-                                                               iter, ode.p,
+                                                               iter, semi,
                                                                (prob = ode,),
                                                                ode.f,
                                                                alg,
@@ -367,13 +368,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                level_u_indices_elements,
                                                                -1, n_levels,
                                                                du_tmp)
-    elseif isa(ode.p, SemidiscretizationEulerAcoustics)
+    elseif isa(semi, SemidiscretizationEulerAcoustics)
         u_prev = copy(u0)
         t_prev = t0
         integrator = PairedExplicitRK4EulerAcousticMultiIntegrator(u0, du, u_tmp,
                                                                    t0, tdir,
                                                                    dt, zero(dt),
-                                                                   iter, ode.p,
+                                                                   iter, semi,
                                                                    (prob = ode,),
                                                                    ode.f,
                                                                    alg,
@@ -397,7 +398,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
         integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp,
                                                       t0, tdir,
                                                       dt, zero(dt),
-                                                      iter, ode.p,
+                                                      iter, semi,
                                                       (prob = ode,),
                                                       ode.f,
                                                       alg,
@@ -417,7 +418,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                       level_u_indices_elements,
                                                       -1, n_levels)
 
-        if :semi_gravity in fieldnames(typeof(ode.p))
+        if :semi_gravity in fieldnames(typeof(semi))
             partitioning_u_gravity!(integrator)
         end
     end
