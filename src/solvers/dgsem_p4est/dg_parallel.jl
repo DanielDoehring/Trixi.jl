@@ -119,22 +119,28 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations, dg, cache,
     for rank in 1:length(mpi_cache.mpi_neighbor_ranks)
         send_buffer = mpi_cache.mpi_send_buffers[rank]
 
+        # These approaches allocate
         #relevant_interfaces = intersect(Set(mpi_cache.mpi_neighbor_interfaces[rank]), Set(mpiinterfaces_indices))
         relevant_interfaces = findall(x -> x in mpiinterfaces_indices, mpi_cache.mpi_neighbor_interfaces[rank])
 
-        #for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[rank])
-        for (index, interface) in enumerate(relevant_interfaces)
-            first = (index - 1) * data_size + 1
-            last = (index - 1) * data_size + data_size
-            local_side = cache.mpi_interfaces.local_sides[interface]
-            @views send_buffer[first:last] .= vec(cache.mpi_interfaces.u[local_side, ..,
-                                                                         interface])
+        interfaces_sent = 0
+        for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[rank])
+        #for (index, interface) in enumerate(relevant_interfaces)
+            if interface in mpiinterfaces_indices
+                first = (index - 1) * data_size + 1
+                last = (index - 1) * data_size + data_size
+                local_side = cache.mpi_interfaces.local_sides[interface]
+                @views send_buffer[first:last] .= vec(cache.mpi_interfaces.u[local_side, ..,
+                                                                            interface])
+                interfaces_sent += 1                                                                            
+            end
         end
 
         # Set send_buffer corresponding to mortar data to NaN and overwrite the parts where local
         # data exists
         #interfaces_data_size = length(mpi_cache.mpi_neighbor_interfaces[rank]) *
-        interfaces_data_size = length(relevant_interfaces) *
+        #interfaces_data_size = length(relevant_interfaces) *
+        interfaces_data_size = interfaces_sent *
                                data_size
         mortars_data_size = length(mpi_cache.mpi_neighbor_mortars[rank]) *
                             n_small_elements * 2 * data_size
@@ -247,23 +253,30 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations, dg, cach
     while data !== nothing
         recv_buffer = mpi_cache.mpi_recv_buffers[data]
 
+        # These approaches allocate
         #relevant_interfaces = intersect(Set(mpi_cache.mpi_neighbor_interfaces[data]), Set(mpiinterfaces_indices))
-        relevant_interfaces = findall(x -> x in mpiinterfaces_indices, mpi_cache.mpi_neighbor_interfaces[data])
+        #relevant_interfaces = findall(x -> x in mpiinterfaces_indices, mpi_cache.mpi_neighbor_interfaces[data])
 
-        #for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[data])
-        for (index, interface) in enumerate(relevant_interfaces)
-            first = (index - 1) * data_size + 1
-            last = (index - 1) * data_size + data_size
+        interfaces_received = 0
+        for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[data])
+        #for (index, interface) in enumerate(relevant_interfaces)
+            if interface in mpiinterfaces_indices
+                first = (index - 1) * data_size + 1
+                last = (index - 1) * data_size + data_size
 
-            if cache.mpi_interfaces.local_sides[interface] == 1 # local element on primary side
-                @views vec(cache.mpi_interfaces.u[2, .., interface]) .= recv_buffer[first:last]
-            else # local element at secondary side
-                @views vec(cache.mpi_interfaces.u[1, .., interface]) .= recv_buffer[first:last]
+                if cache.mpi_interfaces.local_sides[interface] == 1 # local element on primary side
+                    @views vec(cache.mpi_interfaces.u[2, .., interface]) .= recv_buffer[first:last]
+                else # local element at secondary side
+                    @views vec(cache.mpi_interfaces.u[1, .., interface]) .= recv_buffer[first:last]
+                end
+
+                interfaces_received += 1
             end
         end
 
         #interfaces_data_size = length(mpi_cache.mpi_neighbor_interfaces[data]) *
-        interfaces_data_size = length(relevant_interfaces) *
+        #interfaces_data_size = length(relevant_interfaces) *
+        interfaces_data_size = interfaces_received *
                                data_size
         for (index, mortar) in enumerate(mpi_cache.mpi_neighbor_mortars[data])
             index_base = interfaces_data_size +
