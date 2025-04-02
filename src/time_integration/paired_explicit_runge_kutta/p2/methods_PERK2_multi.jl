@@ -252,6 +252,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                 level_info_mpi_mortars_acc,
                                 n_levels, n_dims, mesh, dg, cache, alg)
 
+        # TODO: Try out 
+        # 1) Finding global level distribution, i.e., number of elements per level
+        # 2) Retrieve stages for each level
+        # 3) Balance mesh accordingly, then partition all variables
         if mesh isa ParallelP4estMesh
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
         end
