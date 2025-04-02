@@ -186,7 +186,7 @@ end
 # This is the version used when calculating the divergence of the viscous fluxes
 function calc_interface_flux!(surface_flux_values,
                               mesh::TreeMesh{1}, equations_parabolic,
-                              dg::DG, parabolic_scheme::ViscousFormulationBassiRebay1,
+                              dg::DG, parabolic_scheme,
                               cache_parabolic,
                               interface_indices = eachinterface(dg, cache_parabolic))
     @unpack neighbor_ids, orientations = cache_parabolic.interfaces
@@ -206,8 +206,9 @@ function calc_interface_flux!(surface_flux_values,
                                                  equations_parabolic,
                                                  dg, interface)
 
-        # Compute BR1 interface flux as mean of left and right viscous fluxes
-        flux = 0.5f0 * (flux_ll + flux_rr)
+        # compute interface flux for the DG divergence 
+        flux = flux_parabolic(flux_ll, flux_rr, Divergence(),
+                              mesh, equations_parabolic, parabolic_scheme)
 
         # Copy flux to left and right element storage
         for v in eachvariable(equations_parabolic)
@@ -423,10 +424,9 @@ end
 
 function calc_gradient_interface_flux!(surface_flux_values,
                                        mesh::TreeMesh{1}, equations_parabolic, dg::DG,
-                                       parabolic_scheme::ViscousFormulationBassiRebay1,
+                                       parabolic_scheme,
                                        cache, cache_parabolic,
-                                       interface_indices = eachinterface(dg,
-                                                                         cache_parabolic))
+                                       interface_indices = eachinterface(dg, cache_parabolic))
     @unpack neighbor_ids, orientations = cache_parabolic.interfaces
 
     @threaded for interface in interface_indices
@@ -442,7 +442,9 @@ function calc_gradient_interface_flux!(surface_flux_values,
         # Call pointwise Riemann solver
         u_ll, u_rr = get_surface_node_vars(cache_parabolic.interfaces.u,
                                            equations_parabolic, dg, interface)
-        flux = 0.5f0 * (u_ll + u_rr) # Bassi-Rebay 1 (BR1)
+
+        flux = flux_parabolic(u_ll, u_rr, Gradient(),
+                              mesh, equations_parabolic, parabolic_scheme)
 
         # Copy flux to left and right element storage
         for v in eachvariable(equations_parabolic)
