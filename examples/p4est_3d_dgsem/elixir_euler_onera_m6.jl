@@ -115,7 +115,7 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-tspan = (0.0, 2e-5)
+tspan = (0.0, 1e-4)
 ode = semidiscretize(semi, tspan)
 
 #=
