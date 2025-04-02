@@ -479,7 +479,8 @@ function rhs!(du, u, t,
 
     # Start to send MPI data
     @trixi_timeit timer() "start MPI send" begin
-        start_mpi_send!(cache.mpi_cache, mesh, equations, dg, cache)
+        start_mpi_send!(cache.mpi_cache, mesh, equations, dg, cache,
+                        mpiinterface_indices, mpimortar_indices)
     end
 
     # Reset du
@@ -534,7 +535,8 @@ function rhs!(du, u, t,
 
     # Finish to receive MPI data
     @trixi_timeit timer() "finish MPI receive" begin
-        finish_mpi_receive!(cache.mpi_cache, mesh, equations, dg, cache)
+        finish_mpi_receive!(cache.mpi_cache, mesh, equations, dg, cache,
+                            mpiinterface_indices, mpimortar_indices)
     end
 
     # Calculate MPI interface fluxes
