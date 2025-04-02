@@ -289,6 +289,36 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                 level_info_mortars_acc,
                                 n_levels, n_dims, mesh, dg, cache, alg)
     else
+        if mesh isa ParallelP4estMesh
+            # Get cell distribution for standard partitioning
+            global_first_quadrant = unsafe_wrap(Array,
+                                                unsafe_load(mesh.p4est).global_first_quadrant,
+                                                mpi_nranks() + 1)
+            # Need to copy `global_first_quadrant` to different variable as the former will change 
+            # due to the call to `partition!`
+            old_global_first_quadrant = copy(global_first_quadrant)
+
+            # Get (global) element distribution to accordingly balance the solver
+            partitioning_variables!(level_info_elements,
+                                    n_levels, n_dims, mesh, dg, cache, alg)
+
+            # Balance such that each rank has the same number of RHS calls                                    
+            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
+            # Actual move of elements across ranks
+            rebalance_solver!(u0, mesh, equations, dg, cache,
+                              old_global_first_quadrant)
+            reinitialize_boundaries!(ode.p.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
+
+            # Resize ode vectors
+            n_new = length(u0)
+            resize!(du, n_new)
+            resize!(u_tmp, n_new)
+            resize!(k1, n_new)
+
+            # Reset `level_info_elements` after rebalancing
+            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
+        end
+
         partitioning_variables!(level_info_elements,
                                 level_info_elements_acc,
                                 level_info_interfaces_acc,
@@ -299,10 +329,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                 level_info_mpi_interfaces_acc,
                                 level_info_mpi_mortars_acc,
                                 n_levels, n_dims, mesh, dg, cache, alg)
-
-        if mesh isa ParallelP4estMesh
-            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
-        end
     end
 
     for i in 1:n_levels

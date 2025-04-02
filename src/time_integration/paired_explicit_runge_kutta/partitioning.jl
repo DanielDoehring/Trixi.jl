@@ -392,7 +392,6 @@ function partitioning_variables!(level_info_elements,
                                  n_levels, n_dims, mesh::P4estMesh, dg, cache, alg)
     @unpack elements, interfaces, boundaries, mortars = cache
 
-    #nnodes = length(mesh.nodes)
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
@@ -513,7 +512,6 @@ function partitioning_variables!(level_info_elements,
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
 
-    #nnodes = length(mesh.nodes)
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
@@ -668,6 +666,44 @@ function partitioning_variables!(level_info_elements,
         for l in level:n_levels
             push!(level_info_mpi_mortars_acc[l], mortar_id)
         end
+    end
+
+    return nothing
+end
+
+function partitioning_variables!(level_info_elements,
+                                 n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
+                                 alg)
+    @unpack elements, interfaces, boundaries, mortars = cache
+    @unpack mpi_interfaces, mpi_mortars = cache
+
+    nnodes = length(dg.basis.nodes)
+    n_elements = nelements(dg, cache)
+
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
+    # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
+    h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
+    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
+
+    for element_id in 1:n_elements
+        h = h_min_per_element[element_id]
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        append!(level_info_elements[level], element_id)
     end
 
     return nothing
@@ -944,10 +980,10 @@ function save_rhs_evals_iter_volume(info, user_data)
     # Load `rhs_evals = rhs_per_element[quad_id + 1]`
     rhs_evals = user_data_pw[quad_id + 1]
 
-    # Access quadrant's user data (`[global quad ID, rhs_evals]`)
+    # Access quadrant's user data (`[rhs_evals]`)
     quad_data_pw = PointerWrapper(Int, info_pw.quad.p.user_data[])
     # Save number of rhs evaluations to quadrant's user data.
-    quad_data_pw[2] = rhs_evals
+    quad_data_pw[1] = rhs_evals
 
     return nothing
 end
@@ -969,20 +1005,20 @@ function weight_fn_perk(p4est, which_tree, quadrant)
     # Use `unsafe_load` here since `quadrant.p.user_data isa Ptr{Ptr{Nothing}}`
     # and we only need the second entry
     pw = PointerWrapper(Int, unsafe_load(quadrant.p.user_data))
-    weight = pw[2] # rhs_evals
+    weight = pw[1] # rhs_evals
 
     return Cint(weight)
 end
 
 # 2D
 function cfunction(::typeof(weight_fn_perk), ::Val{2})
-    @cfunction(refine_fn, Cint,
+    @cfunction(weight_fn_perk, Cint,
                (Ptr{p4est_t}, Ptr{p4est_topidx_t}, Ptr{p4est_quadrant_t}))
 end
 
 # 3D
 function cfunction(::typeof(weight_fn_perk), ::Val{3})
-    @cfunction(refine_fn, Cint,
+    @cfunction(weight_fn_perk, Cint,
                (Ptr{p8est_t}, Ptr{p4est_topidx_t}, Ptr{p8est_quadrant_t}))
 end
 
