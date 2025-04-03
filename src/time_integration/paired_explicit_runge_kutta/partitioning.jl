@@ -1003,10 +1003,10 @@ function cfunction(::typeof(save_rhs_evals_iter_volume), ::Val{3})
 end
 
 function weight_fn_perk(p4est, which_tree, quadrant)
-    # Number of RHS evaluationshas been copied to the quadrant's user data storage before.
-    # Unpack quadrant's user data ([global quad ID, rhs_evals]).
+    # Number of RHS evaluations has been copied to the quadrant's user data storage before.
+    # Unpack quadrant's user data ([rhs_evals]).
     # Use `unsafe_load` here since `quadrant.p.user_data isa Ptr{Ptr{Nothing}}`
-    # and we only need the second entry
+    # and we only need the first entry
     pw = PointerWrapper(Int, unsafe_load(quadrant.p.user_data))
     weight = pw[1] # rhs_evals
 
