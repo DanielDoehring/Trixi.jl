@@ -107,7 +107,7 @@ summary_callback = SummaryCallback()
 
 # Choose analysis interval such that roughly every dt_c = 0.005 a record is taken
 analysis_interval = 25 # PERK4_Multi, PERKSingle
-#analysis_interval = 10_000 # PERK4_Multi, PERKSingle
+#analysis_interval = 10_000 # For testing of MPI+p4est+PERK in 2D (hyperbolic only)
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
