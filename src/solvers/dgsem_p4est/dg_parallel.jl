@@ -125,9 +125,10 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations, dg, cache,
                 first = index * data_size + 1
                 last = index * data_size + data_size
                 local_side = cache.mpi_interfaces.local_sides[interface]
-                @views send_buffer[first:last] .= vec(cache.mpi_interfaces.u[local_side, ..,
-                                                                            interface])
-                
+                @views send_buffer[first:last] .= vec(cache.mpi_interfaces.u[local_side,
+                                                                             ..,
+                                                                             interface])
+
                 index += 1
                 interfaces_sent += 1
             end
