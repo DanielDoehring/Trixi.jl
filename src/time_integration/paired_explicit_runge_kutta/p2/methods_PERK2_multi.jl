@@ -234,13 +234,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     if !mpi_isparallel()
-        partitioning_variables!(level_info_elements,
-                                level_info_elements_acc,
-                                level_info_interfaces_acc,
-                                level_info_boundaries_acc,
-                                level_info_boundaries_orientation_acc,
-                                level_info_mortars_acc,
-                                n_levels, n_dims, mesh, dg, cache, alg)
+        partition_variables!(level_info_elements,
+                             level_info_elements_acc,
+                             level_info_interfaces_acc,
+                             level_info_boundaries_acc,
+                             level_info_boundaries_orientation_acc,
+                             level_info_mortars_acc,
+                             n_levels, n_dims, mesh, dg, cache, alg)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
@@ -252,8 +252,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
             old_global_first_quadrant = copy(global_first_quadrant)
 
             # Get (global) element distribution to accordingly balance the solver
-            partitioning_variables!(level_info_elements,
-                                    n_levels, n_dims, mesh, dg, cache, alg)
+            partition_variables!(level_info_elements,
+                                 n_levels, n_dims, mesh, dg, cache, alg)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
@@ -272,16 +272,16 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
             level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
         end
 
-        partitioning_variables!(level_info_elements,
-                                level_info_elements_acc,
-                                level_info_interfaces_acc,
-                                level_info_boundaries_acc,
-                                level_info_boundaries_orientation_acc,
-                                level_info_mortars_acc,
-                                # MPI additions
-                                level_info_mpi_interfaces_acc,
-                                level_info_mpi_mortars_acc,
-                                n_levels, n_dims, mesh, dg, cache, alg)
+        partition_variables!(level_info_elements,
+                             level_info_elements_acc,
+                             level_info_interfaces_acc,
+                             level_info_boundaries_acc,
+                             level_info_boundaries_orientation_acc,
+                             level_info_mortars_acc,
+                             # MPI additions
+                             level_info_mpi_interfaces_acc,
+                             level_info_mpi_mortars_acc,
+                             n_levels, n_dims, mesh, dg, cache, alg)
     end
 
     for i in 1:n_levels
@@ -291,8 +291,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
 
     # Set initial distribution of DG Base function coefficients
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partitioning_u!(level_u_indices_elements, level_info_elements, n_levels,
-                    u0, mesh, equations, dg, cache)
+    partition_u!(level_u_indices_elements, level_info_elements, n_levels,
+                 u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
@@ -345,7 +345,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                                       -1, n_levels)
 
         if :semi_gravity in fieldnames(typeof(semi))
-            partitioning_u_gravity!(integrator)
+            partition_u_gravity!(integrator)
         end
     end
 

@@ -361,7 +361,7 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
     end
     # Check if we have Euler-Gravity situation
     if :semi_gravity in fieldnames(typeof(integrator.p))
-        partitioning_u_gravity!(integrator)
+        partition_u_gravity!(integrator)
     end
 end
 

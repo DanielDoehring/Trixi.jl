@@ -164,13 +164,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
     gamma = one(eltype(u0))
 
     # TODO: Call different function for mpi_isparallel() == true
-    partitioning_variables!(level_info_elements,
-                            level_info_elements_acc,
-                            level_info_interfaces_acc,
-                            level_info_boundaries_acc,
-                            level_info_boundaries_orientation_acc,
-                            level_info_mortars_acc,
-                            n_levels, n_dims, mesh, dg, cache, alg.PERK2Multi)
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_boundaries_orientation_acc,
+                         level_info_mortars_acc,
+                         n_levels, n_dims, mesh, dg, cache, alg.PERK2Multi)
 
     for i in 1:n_levels
         println("#Number Elements integrated with level $i: ",
@@ -179,8 +179,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
 
     # Set initial distribution of DG Base function coefficients
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partitioning_u!(level_u_indices_elements, level_info_elements, n_levels,
-                    u0, mesh, equations, dg, cache)
+    partition_u!(level_u_indices_elements, level_info_elements, n_levels,
+                 u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
 

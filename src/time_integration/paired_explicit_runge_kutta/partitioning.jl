@@ -34,13 +34,13 @@ end
 
 # TODO: Try out thread-parallelization of the assignment!
 
-function partitioning_variables!(level_info_elements,
-                                 level_info_elements_acc,
-                                 level_info_interfaces_acc,
-                                 level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc,
-                                 level_info_mortars_acc,
-                                 n_levels, n_dims, mesh::TreeMesh, dg, cache, alg)
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_boundaries_orientation_acc,
+                              level_info_mortars_acc,
+                              n_levels, n_dims, mesh::TreeMesh, dg, cache, alg)
     @unpack elements, interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)
@@ -216,17 +216,17 @@ function partitioning_variables!(level_info_elements,
     return nothing
 end
 
-function partitioning_variables!(level_info_elements,
-                                 level_info_elements_acc,
-                                 level_info_interfaces_acc,
-                                 level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc,
-                                 level_info_mortars_acc,
-                                 # MPI additions
-                                 level_info_mpi_interfaces_acc,
-                                 level_info_mpi_mortars_acc,
-                                 n_levels, n_dims, mesh::ParallelTreeMesh{2}, dg, cache,
-                                 alg)
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_boundaries_orientation_acc,
+                              level_info_mortars_acc,
+                              # MPI additions
+                              level_info_mpi_interfaces_acc,
+                              level_info_mpi_mortars_acc,
+                              n_levels, n_dims, mesh::ParallelTreeMesh{2}, dg, cache,
+                              alg)
     @unpack elements, interfaces, mpi_interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)
@@ -383,13 +383,13 @@ function partitioning_variables!(level_info_elements,
     return nothing
 end
 
-function partitioning_variables!(level_info_elements,
-                                 level_info_elements_acc,
-                                 level_info_interfaces_acc,
-                                 level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
-                                 level_info_mortars_acc,
-                                 n_levels, n_dims, mesh::P4estMesh, dg, cache, alg)
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
+                              level_info_mortars_acc,
+                              n_levels, n_dims, mesh::P4estMesh, dg, cache, alg)
     @unpack elements, interfaces, boundaries, mortars = cache
 
     nnodes = length(dg.basis.nodes)
@@ -498,18 +498,9 @@ function partitioning_variables!(level_info_elements,
     return nothing
 end
 
-# TODO: Adapt for load-balancing
-function partitioning_variables!(level_info_elements,
-                                 level_info_elements_acc,
-                                 level_info_interfaces_acc,
-                                 level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
-                                 level_info_mortars_acc,
-                                 # MPI additions
-                                 level_info_mpi_interfaces_acc,
-                                 level_info_mpi_mortars_acc,
-                                 n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
-                                 alg)
+function partition_variables!(level_info_elements,
+                              n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
+                              alg)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
 
@@ -526,6 +517,96 @@ function partitioning_variables!(level_info_elements,
 
     println("h_min: ", h_min, " h_max: ", h_max)
     println("h_max/h_min: ", h_max / h_min, "\n")
+
+    for element_id in 1:n_elements
+        h = h_min_per_element[element_id]
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        append!(level_info_elements[level], element_id)
+    end
+
+    return h_min_per_element, h_min, h_max
+end
+
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
+                              level_info_mortars_acc,
+                              # MPI additions
+                              level_info_mpi_interfaces_acc,
+                              level_info_mpi_mortars_acc,
+                              n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
+                              alg)
+    @unpack elements, interfaces, boundaries, mortars = cache
+    @unpack mpi_interfaces, mpi_mortars = cache
+
+    nnodes = length(dg.basis.nodes)
+    n_elements = nelements(dg, cache)
+
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
+    # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
+    h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
+    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
+
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_boundaries_orientation_acc,
+                         level_info_mortars_acc,
+                         level_info_mpi_interfaces_acc,
+                         level_info_mpi_mortars_acc,
+                         n_levels, n_dims, mesh, dg, cache, alg,
+                         h_min_per_element, h_min, h_max)
+end
+
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
+                              level_info_mortars_acc,
+                              # MPI additions
+                              level_info_mpi_interfaces_acc,
+                              level_info_mpi_mortars_acc,
+                              n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
+                              alg,
+                              h_min_per_element, h_min, h_max)
+    @unpack elements, interfaces, boundaries, mortars = cache
+    @unpack mpi_interfaces, mpi_mortars = cache
+
+    nnodes = length(dg.basis.nodes)
+    n_elements = nelements(dg, cache)
+
+    # CARE: Do I need to recompute `h_min_per_element` as the element index might change?
+    #=
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
+    # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
+    h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
+    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
+    =#
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
@@ -672,52 +753,13 @@ function partitioning_variables!(level_info_elements,
     return nothing
 end
 
-# TODO: Adapt for load-balancing
-function partitioning_variables!(level_info_elements,
-                                 n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
-                                 alg)
-    @unpack elements, interfaces, boundaries, mortars = cache
-    @unpack mpi_interfaces, mpi_mortars = cache
-
-    nnodes = length(dg.basis.nodes)
-    n_elements = nelements(dg, cache)
-
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
-    # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
-    h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
-    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
-
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
-
-    for element_id in 1:n_elements
-        h = h_min_per_element[element_id]
-
-        # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
-        # Catch case that cell is "too coarse" for method with fewest stage evals
-        if level === nothing
-            level = n_levels
-        else # Avoid reduction in timestep: Use next higher level
-            level = level - 1
-        end
-
-        append!(level_info_elements[level], element_id)
-    end
-
-    return nothing
-end
-
-function partitioning_variables!(level_info_elements,
-                                 level_info_elements_acc,
-                                 level_info_interfaces_acc,
-                                 level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc,
-                                 level_info_mortars_acc,
-                                 n_levels, n_dims, mesh::StructuredMesh, dg, cache, alg)
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_boundaries_orientation_acc,
+                              level_info_mortars_acc,
+                              n_levels, n_dims, mesh::StructuredMesh, dg, cache, alg)
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
@@ -926,8 +968,8 @@ end
 
 # TODO: T8Code extensions
 
-@inline function partitioning_u!(level_u_indices_elements, level_info_elements,
-                                 n_levels, u_ode, mesh, equations, dg, cache)
+@inline function partition_u!(level_u_indices_elements, level_info_elements,
+                              n_levels, u_ode, mesh, equations, dg, cache)
     u = wrap_array(u_ode, mesh, equations, dg, cache)
 
     for level in 1:n_levels
@@ -941,7 +983,7 @@ end
 end
 
 # Repartitioning of the DoF array of the gravity solver
-@inline function partitioning_u_gravity!(integrator::AbstractPairedExplicitRKMultiIntegrator)
+@inline function partition_u_gravity!(integrator::AbstractPairedExplicitRKMultiIntegrator)
     @unpack level_info_elements, n_levels = integrator
     @unpack semi_gravity, cache = integrator.p
 
