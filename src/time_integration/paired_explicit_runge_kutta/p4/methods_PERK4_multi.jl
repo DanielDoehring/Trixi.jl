@@ -302,9 +302,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
             old_global_first_quadrant = copy(global_first_quadrant)
 
             # Get (global) element distribution to accordingly balance the solver
-            h_min_per_element, h_min, h_max = partition_variables!(level_info_elements,
-                                                                   n_levels, n_dims,
-                                                                   mesh, dg, cache, alg)
+            partition_variables!(level_info_elements, n_levels, n_dims,
+                                 mesh, dg, cache, alg)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
@@ -312,25 +311,25 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
             rebalance_solver!(u0, mesh, equations, dg, cache, old_global_first_quadrant)
             reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
 
+            # Reset `level_info_elements` after rebalancing
+            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
+
             # Resize ODE vectors
             n_new = length(u0)
             resize!(du, n_new)
             resize!(u_tmp, n_new)
             resize!(k1, n_new)
-
-            # Reset `level_info_elements` after rebalancing
-            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
         end
-            partition_variables!(level_info_elements,
-                                 level_info_elements_acc,
-                                 level_info_interfaces_acc,
-                                 level_info_boundaries_acc,
-                                 level_info_boundaries_orientation_acc,
-                                 level_info_mortars_acc,
-                                 # MPI additions
-                                 level_info_mpi_interfaces_acc,
-                                 level_info_mpi_mortars_acc,
-                                 n_levels, n_dims, mesh, dg, cache, alg)
+        partition_variables!(level_info_elements,
+                             level_info_elements_acc,
+                             level_info_interfaces_acc,
+                             level_info_boundaries_acc,
+                             level_info_boundaries_orientation_acc,
+                             level_info_mortars_acc,
+                             # MPI additions
+                             level_info_mpi_interfaces_acc,
+                             level_info_mpi_mortars_acc,
+                             n_levels, n_dims, mesh, dg, cache, alg)
     end
 
     for i in 1:n_levels

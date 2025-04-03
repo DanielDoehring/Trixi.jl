@@ -257,15 +257,17 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
             old_global_first_quadrant = copy(global_first_quadrant)
 
             # Get (global) element distribution to accordingly balance the solver
-            partition_variables!(level_info_elements,
-                                 n_levels, n_dims, mesh, dg, cache, alg)
+            partition_variables!(level_info_elements, n_levels, n_dims,
+                                 mesh, dg, cache, alg)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
             # Actual move of elements across ranks
-            rebalance_solver!(u0, mesh, equations, dg, cache,
-                              old_global_first_quadrant)
+            rebalance_solver!(u0, mesh, equations, dg, cache, old_global_first_quadrant)
             reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
+
+            # Reset `level_info_elements` after rebalancing
+            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
 
             # Resize ODE vectors
             n_new = length(u0)
@@ -273,11 +275,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
             resize!(u_tmp, n_new)
             resize!(k1, n_new)
             resize!(kS1, n_new)
-
-            # Reset `level_info_elements` after rebalancing
-            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
         end
-
         partition_variables!(level_info_elements,
                              level_info_elements_acc,
                              level_info_interfaces_acc,

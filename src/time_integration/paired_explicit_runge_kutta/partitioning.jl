@@ -534,7 +534,7 @@ function partition_variables!(level_info_elements,
         append!(level_info_elements[level], element_id)
     end
 
-    return h_min_per_element, h_min, h_max
+    return nothing
 end
 
 function partition_variables!(level_info_elements,
