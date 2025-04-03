@@ -1029,7 +1029,7 @@ function get_rhs_per_element(dg, cache,
                              level_info_elements, stages)
     rhs_per_element = zeros(Int, nelements(dg, cache))
 
-    for level in 1:length(level_info_elements)
+    for level in eachindex(level_info_elements)
         rhs_evals = stages[level]
         for element in level_info_elements[level]
             rhs_per_element[element] = rhs_evals
