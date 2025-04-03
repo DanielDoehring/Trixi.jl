@@ -463,6 +463,7 @@ function rhs!(du, u, t,
               mpimortar_indices = eachmpimortar(dg, cache)) where {Source}
     # Start to receive MPI data
     @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
+    #@trixi_timeit timer() "MPI send/receive" start_mpi_receive!(cache.mpi_cache)
 
     # Prolong solution to MPI interfaces
     @trixi_timeit timer() "prolong2mpiinterfaces" begin
@@ -479,6 +480,7 @@ function rhs!(du, u, t,
 
     # Start to send MPI data
     @trixi_timeit timer() "start MPI send" begin
+    #@trixi_timeit timer() "MPI send/receive" begin
         start_mpi_send!(cache.mpi_cache, mesh, equations, dg, cache,
                         mpiinterface_indices, mpimortar_indices)
     end
@@ -535,6 +537,7 @@ function rhs!(du, u, t,
 
     # Finish to receive MPI data
     @trixi_timeit timer() "finish MPI receive" begin
+    #@trixi_timeit timer() "MPI send/receive" begin
         finish_mpi_receive!(cache.mpi_cache, mesh, equations, dg, cache,
                             mpiinterface_indices, mpimortar_indices)
     end
@@ -573,6 +576,7 @@ function rhs!(du, u, t,
 
     # Finish to send MPI data
     @trixi_timeit timer() "finish MPI send" finish_mpi_send!(cache.mpi_cache)
+    #@trixi_timeit timer() "MPI send/receive" finish_mpi_send!(cache.mpi_cache)
 
     return nothing
 end
