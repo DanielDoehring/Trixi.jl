@@ -150,7 +150,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
     level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
-    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
     level_info_boundaries_orientation_acc = [[Vector{Int64}()
@@ -158,6 +157,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                              for _ in 1:n_levels]
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+    # MPI additions
+    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     # For entropy relaxation
@@ -177,7 +179,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                 length(level_info_elements[i]))
     end
 
-    # Set initial distribution of DG Base function coefficients
+    # Set (initial) distribution of DG nodal values
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
     partition_u!(level_u_indices_elements, level_info_elements, n_levels,
                  u0, mesh, equations, dg, cache)

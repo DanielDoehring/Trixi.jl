@@ -498,6 +498,7 @@ function partition_variables!(level_info_elements,
     return nothing
 end
 
+# Assign number of stage evaluations to elements for stage-evaluations weighted MPI load balancing.
 function partition_variables!(level_info_elements,
                               n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
                               alg)
@@ -553,6 +554,8 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
+    # `h_min_per_element` needs to be recomputed after balancing as 
+    # the number of elements per rank may have changed
     h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
                                                            n_elements,
                                                            nnodes,
@@ -561,52 +564,8 @@ function partition_variables!(level_info_elements,
     h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
     h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
 
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
-
-    partition_variables!(level_info_elements,
-                         level_info_elements_acc,
-                         level_info_interfaces_acc,
-                         level_info_boundaries_acc,
-                         level_info_boundaries_orientation_acc,
-                         level_info_mortars_acc,
-                         level_info_mpi_interfaces_acc,
-                         level_info_mpi_mortars_acc,
-                         n_levels, n_dims, mesh, dg, cache, alg,
-                         h_min_per_element, h_min, h_max)
-end
-
-function partition_variables!(level_info_elements,
-                              level_info_elements_acc,
-                              level_info_interfaces_acc,
-                              level_info_boundaries_acc,
-                              level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
-                              level_info_mortars_acc,
-                              # MPI additions
-                              level_info_mpi_interfaces_acc,
-                              level_info_mpi_mortars_acc,
-                              n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
-                              alg,
-                              h_min_per_element, h_min, h_max)
-    @unpack elements, interfaces, boundaries, mortars = cache
-    @unpack mpi_interfaces, mpi_mortars = cache
-
-    nnodes = length(dg.basis.nodes)
-    n_elements = nelements(dg, cache)
-
-    # CARE: Do I need to recompute `h_min_per_element` as the element index might change?
-    #=
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
-    # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
-    h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
-    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
-
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
-    =#
+    #println("h_min: ", h_min, " h_max: ", h_max)
+    #println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
