@@ -552,6 +552,10 @@ include("compressible_euler_2d.jl")
 include("compressible_euler_3d.jl")
 include("compressible_euler_quasi_1d.jl")
 
+abstract type AbstractCompressibleEulerElectronIonsEquations{NDIMS, NVARS, NCOMP} <:
+              AbstractEquations{NDIMS, NVARS} end
+include("compressible_euler_electron_ions_1d.jl")
+
 # CompressibleEulerMulticomponentEquations
 abstract type AbstractCompressibleEulerMulticomponentEquations{NDIMS, NVARS, NCOMP} <:
               AbstractEquations{NDIMS, NVARS} end
@@ -573,6 +577,7 @@ include("polytropic_euler_2d.jl")
                                                                                                }
     NCOMP
 end
+
 """
     eachcomponent(equations::AbstractCompressibleEulerMulticomponentEquations)
 
