@@ -18,9 +18,10 @@ trixi_include(@__MODULE__, joinpath(@__DIR__, base_elixir), alg = alg,
 restart_filename = joinpath("out", "restart_000000040.h5")
 mesh = load_mesh(restart_filename)
 
+solver = DGSEM(polydeg = 4, surface_flux = flux_lax_friedrichs)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
-tspan = (load_time(restart_filename), 10.0)
+tspan = (load_time(restart_filename), 12.0)
 dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
 
