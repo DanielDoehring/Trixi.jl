@@ -9,7 +9,7 @@ const gamma = 5 / 3
 const prandtl_number = 0.72
 
 # Parameters for compressible von-Karman vortex street
-const Re = 500
+const Re = 200
 const Ma = 0.5f0
 const D = 1.0 # Diameter of the cylinder as in the mesh file
 
@@ -18,11 +18,12 @@ const v_in = 1.0
 const p_in = 1.0
 
 # Parameters that follow from Reynolds and Mach number + adiabatic index gamma
-const mu = v_in * D / Re
-
 const c = v_in / Ma
+
 const p_over_rho = c^2 / gamma
 const rho_in = p_in / p_over_rho
+
+const mu = rho_in * v_in * D / Re
 
 # Equations for this configuration
 equations = CompressibleEulerEquations2D(gamma)
@@ -192,7 +193,7 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
 
 sol = Trixi.solve(ode, ode_algorithm,

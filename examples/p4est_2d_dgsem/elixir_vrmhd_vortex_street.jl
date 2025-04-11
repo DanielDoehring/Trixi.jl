@@ -17,7 +17,7 @@ gamma() = 5 / 3
 prandtl_number() = 0.72
 
 # Parameters for compressible von-Karman vortex street
-Re() = 500
+Re() = 200
 Ma() = 0.5f0
 D() = 1 # Diameter of the cylinder as in the mesh file
 
@@ -26,12 +26,12 @@ v_in() = 1
 p_in() = 1
 
 # Parameters that follow from Reynolds and Mach number + adiabatic index gamma
-mu() = v_in() * D() / Re()
-
 c() = v_in() / Ma()
 
 p_over_rho() = c()^2 / gamma()
 rho_in() = p_in() / p_over_rho()
+
+mu() = rho_in() * v_in() * D() / Re()
 
 # MHD additions
 Alfven_Mach_number() = 0.1
@@ -211,8 +211,8 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      solution_variables = cons2prim)
 
 ### Initial CFL ###                                     
-cfl_0() = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
-#cfl_0() = 1.4 # PE (Relaxation) RK 4 13 (Standalone)
+#cfl_0() = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
+cfl_0() = 1.4 # PE (Relaxation) RK 4 13 (Standalone)
 
 #cfl_0() = 1.3 # R-RK44
 #cfl_0() = 1.3 # R-TS64
