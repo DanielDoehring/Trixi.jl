@@ -5,7 +5,8 @@
 @muladd begin
 #! format: noindent
 
-function apply_smoothing!(mesh::StructuredMesh{1}, alpha, alpha_tmp, dg, cache)
+function apply_smoothing!(mesh::StructuredMesh{1}, alpha, alpha_tmp, dg, cache,
+                          element_indices = eachelement(dg, cache))
     # Diffuse alpha values by setting each alpha to at least 50% of neighboring elements' alpha
     # Copy alpha values such that smoothing is indpedenent of the element access order
     alpha_tmp .= alpha
@@ -14,7 +15,7 @@ function apply_smoothing!(mesh::StructuredMesh{1}, alpha, alpha_tmp, dg, cache)
     @assert isperiodic(mesh) "alpha smoothing for structured meshes works only with periodic initial conditions so far"
 
     # Loop over elements, because there is no interface container
-    for element in eachelement(dg, cache)
+    for element in element_indices
         # Get neighboring element ids
         left = cache.elements.left_neighbors[1, element]
 

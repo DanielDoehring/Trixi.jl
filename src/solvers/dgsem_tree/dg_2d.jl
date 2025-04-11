@@ -125,7 +125,8 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, u, mesh,
                               have_nonconservative_terms(equations), equations,
-                              dg.volume_integral, dg, cache, element_indices)
+                              dg.volume_integral, dg, cache,
+                              element_indices, interface_indices, mortar_indices)
     end
 
     # Prolong solution to interfaces
@@ -192,7 +193,9 @@ function calc_volume_integral!(du, u,
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralWeakForm,
                                dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache))
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing)
     @threaded for element in element_indices
         weak_form_kernel!(du, u, element, mesh,
                           nonconservative_terms, equations,
@@ -248,7 +251,9 @@ function calc_volume_integral!(du, u,
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralFluxDifferencing,
                                dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache))
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing)
     @threaded for element in element_indices
         flux_differencing_kernel!(du, u, element, mesh,
                                   nonconservative_terms, equations,
@@ -340,18 +345,22 @@ end
 
 # TODO: Taal dimension agnostic
 function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                           UnstructuredMesh2D, P4estMesh{2},
+                               mesh::Union{TreeMesh{2},
+                                           P4estMesh{2},
                                            T8codeMesh{2}},
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralShockCapturingHG,
                                dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache))
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = eachinterface(dg, cache),
+                               mortar_indices = eachmortar(dg, cache))
     @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral
 
     # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
     alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations, dg,
-                                                               cache)
+                                                               cache, element_indices,
+                                                               interface_indices,
+                                                               mortar_indices)
 
     # For `Float64`, this gives 1.8189894035458565e-12
     # For `Float32`, this gives 1.1920929f-5
@@ -389,7 +398,9 @@ function calc_volume_integral!(du, u,
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralPureLGLFiniteVolume,
                                dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache))
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing)
     @unpack volume_flux_fv = volume_integral
 
     # Calculate LGL FV volume integral

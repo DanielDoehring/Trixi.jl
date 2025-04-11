@@ -92,14 +92,15 @@ end
     alpha[element] = min(alpha_max, alpha_element)
 end
 
+# TODO: Could be unified with `UnstructuredMesh2D`
 # Diffuse alpha values by setting each alpha to at least 50% of neighboring elements' alpha
-function apply_smoothing!(mesh::Union{TreeMesh{1}, P4estMesh{1}}, alpha, alpha_tmp, dg,
-                          cache)
+function apply_smoothing!(mesh::TreeMesh{1}, alpha, alpha_tmp, dg, cache,
+                          interface_indices = eachinterface(dg, cache))
     # Copy alpha values such that smoothing is indpedenent of the element access order
     alpha_tmp .= alpha
 
     # Loop over interfaces
-    for interface in eachinterface(dg, cache)
+    for interface in interface_indices
         # Get neighboring element ids
         left = cache.interfaces.neighbor_ids[1, interface]
         right = cache.interfaces.neighbor_ids[2, interface]

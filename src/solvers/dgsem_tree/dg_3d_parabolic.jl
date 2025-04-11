@@ -30,7 +30,9 @@ function calc_volume_integral!(du, flux_viscous,
                                mesh::TreeMesh{3},
                                equations_parabolic::AbstractEquationsParabolic,
                                dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache))
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing)
     @unpack derivative_dhat = dg.basis
     flux_viscous_x, flux_viscous_y, flux_viscous_z = flux_viscous
 

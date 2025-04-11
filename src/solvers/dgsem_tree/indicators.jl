@@ -101,7 +101,20 @@ function Base.show(io::IO, ::MIME"text/plain", indicator::IndicatorHennemannGass
     summary_box(io, "IndicatorHennemannGassner", setup)
 end
 
-function (indicator_hg::IndicatorHennemannGassner)(u, mesh, equations, dg::DGSEM, cache;
+function (indicator_hg::IndicatorHennemannGassner)(u,
+                                                   mesh::Union{TreeMesh{2},
+                                                               P4estMesh{2},
+                                                               T8codeMesh{2},
+                                                               TreeMesh{3},
+                                                               P4estMesh{3},
+                                                               T8codeMesh{3}},
+                                                   equations, dg::DGSEM, cache,
+                                                   element_indices = eachelement(dg,
+                                                                                 cache),
+                                                   interface_indices = eachinterface(dg,
+                                                                                     cache),
+                                                   mortar_indices = eachmortar(dg,
+                                                                               cache);
                                                    kwargs...)
     @unpack alpha_smooth = indicator_hg
     @unpack alpha, alpha_tmp = indicator_hg.cache
@@ -120,7 +133,8 @@ function (indicator_hg::IndicatorHennemannGassner)(u, mesh, equations, dg::DGSEM
     o_0001 = convert(RealT, 0.0001)
     parameter_s = log((1 - o_0001) / o_0001)
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
+    #@threaded for element in eachelement(dg, cache)
         # This is dispatched by mesh dimension.
         # Use this function barrier and unpack inside to avoid passing closures to
         # Polyester.jl with `@batch` (`@threaded`).
@@ -131,7 +145,93 @@ function (indicator_hg::IndicatorHennemannGassner)(u, mesh, equations, dg::DGSEM
     end
 
     if alpha_smooth
-        apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache)
+        apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache, 
+        interface_indices, mortar_indices)
+    end
+
+    return alpha
+end
+
+function (indicator_hg::IndicatorHennemannGassner)(u, mesh::StructuredMesh, equations,
+                                                   dg::DGSEM, cache,
+                                                   element_indices = eachelement(dg,
+                                                                                 cache);
+                                                   kwargs...)
+    @unpack alpha_smooth = indicator_hg
+    @unpack alpha, alpha_tmp = indicator_hg.cache
+    # TODO: Taal refactor, when to `resize!` stuff changed possibly by AMR?
+    #       Shall we implement `resize!(semi::AbstractSemidiscretization, new_size)`
+    #       or just `resize!` whenever we call the relevant methods as we do now?
+    resize!(alpha, nelements(dg, cache))
+    if alpha_smooth
+        resize!(alpha_tmp, nelements(dg, cache))
+    end
+
+    # magic parameters
+    # TODO: Are there better values for Float32?
+    RealT = real(dg)
+    threshold = 0.5f0 * 10^(convert(RealT, -1.8) * nnodes(dg)^convert(RealT, 0.25))
+    o_0001 = convert(RealT, 0.0001)
+    parameter_s = log((1 - o_0001) / o_0001)
+
+    @threaded for element in element_indices
+        # This is dispatched by mesh dimension.
+        # Use this function barrier and unpack inside to avoid passing closures to
+        # Polyester.jl with `@batch` (`@threaded`).
+        # Otherwise, `@threaded` does not work here with Julia ARM on macOS.
+        # See https://github.com/JuliaSIMD/Polyester.jl/issues/88.
+        calc_indicator_hennemann_gassner!(indicator_hg, threshold, parameter_s, u,
+                                          element, mesh, equations, dg, cache)
+    end
+
+    if alpha_smooth
+        apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache,
+                         element_indices)
+    end
+
+    return alpha
+end
+
+function (indicator_hg::IndicatorHennemannGassner)(u,
+                                                   mesh::Union{TreeMesh{1},
+                                                               UnstructuredMesh2D},
+                                                   equations,
+                                                   dg::DGSEM, cache,
+                                                   element_indices = eachelement(dg,
+                                                                                 cache),
+                                                   interface_indices = eachinterface(dg,
+                                                                                     cache);
+                                                   kwargs...)
+    @unpack alpha_smooth = indicator_hg
+    @unpack alpha, alpha_tmp = indicator_hg.cache
+    # TODO: Taal refactor, when to `resize!` stuff changed possibly by AMR?
+    #       Shall we implement `resize!(semi::AbstractSemidiscretization, new_size)`
+    #       or just `resize!` whenever we call the relevant methods as we do now?
+    resize!(alpha, nelements(dg, cache))
+    if alpha_smooth
+        resize!(alpha_tmp, nelements(dg, cache))
+    end
+
+    # magic parameters
+    # TODO: Are there better values for Float32?
+    RealT = real(dg)
+    threshold = 0.5f0 * 10^(convert(RealT, -1.8) * nnodes(dg)^convert(RealT, 0.25))
+    o_0001 = convert(RealT, 0.0001)
+    parameter_s = log((1 - o_0001) / o_0001)
+
+    @threaded for element in element_indices
+        # This is dispatched by mesh dimension.
+        # Use this function barrier and unpack inside to avoid passing closures to
+        # Polyester.jl with `@batch` (`@threaded`).
+        # Otherwise, `@threaded` does not work here with Julia ARM on macOS.
+        # See https://github.com/JuliaSIMD/Polyester.jl/issues/88.
+        calc_indicator_hennemann_gassner!(indicator_hg, threshold, parameter_s, u,
+                                          element, mesh, equations, dg, cache)
+    end
+
+    if alpha_smooth
+        apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache,
+                         interface_indices)
     end
 
     return alpha

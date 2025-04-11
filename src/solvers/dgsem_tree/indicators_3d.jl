@@ -102,15 +102,16 @@ end
 end
 
 function apply_smoothing!(mesh::Union{TreeMesh{3}, P4estMesh{3}, T8codeMesh{3}}, alpha,
-                          alpha_tmp, dg,
-                          cache)
+                          alpha_tmp, dg, cache,
+                          interface_indices = eachinterface(dg, cache),
+                          mortar_indices = eachmortar(dg, cache))
 
     # Diffuse alpha values by setting each alpha to at least 50% of neighboring elements' alpha
     # Copy alpha values such that smoothing is indpedenent of the element access order
     alpha_tmp .= alpha
 
     # Loop over interfaces
-    for interface in eachinterface(dg, cache)
+    for interface in interface_indices
         # Get neighboring element ids
         left = cache.interfaces.neighbor_ids[1, interface]
         right = cache.interfaces.neighbor_ids[2, interface]
@@ -121,7 +122,7 @@ function apply_smoothing!(mesh::Union{TreeMesh{3}, P4estMesh{3}, T8codeMesh{3}},
     end
 
     # Loop over L2 mortars
-    for mortar in eachmortar(dg, cache)
+    for mortar in mortar_indices
         # Get neighboring element ids
         lower_left = cache.mortars.neighbor_ids[1, mortar]
         lower_right = cache.mortars.neighbor_ids[2, mortar]

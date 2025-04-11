@@ -66,7 +66,7 @@ function rhs_parabolic!(du, u, t, mesh::TreeMesh{1},
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, flux_viscous, mesh, equations_parabolic, dg, cache,
-                              element_indices)
+                              element_indices, interface_indices)
     end
 
     # Prolong solution to interfaces
@@ -138,7 +138,8 @@ function calc_volume_integral!(du, flux_viscous,
                                mesh::TreeMesh{1},
                                equations_parabolic::AbstractEquationsParabolic,
                                dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache))
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing)
     @unpack derivative_dhat = dg.basis
 
     @threaded for element in element_indices

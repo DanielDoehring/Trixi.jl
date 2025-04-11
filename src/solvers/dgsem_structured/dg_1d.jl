@@ -54,6 +54,46 @@ function rhs!(du, u, t,
     return nothing
 end
 
+function calc_volume_integral!(du, u,
+                               mesh::StructuredMesh,
+                               nonconservative_terms, equations,
+                               volume_integral::VolumeIntegralShockCapturingHG,
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache))
+    @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral
+
+    # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
+    alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations, dg,
+                                                               cache, element_indices)
+
+    # For `Float64`, this gives 1.8189894035458565e-12
+    # For `Float32`, this gives 1.1920929f-5
+    RealT = eltype(alpha)
+    atol = max(100 * eps(RealT), eps(RealT)^convert(RealT, 0.75f0))
+    @threaded for element in element_indices
+        alpha_element = alpha[element]
+        # Clip blending factor for values close to zero (-> pure DG)
+        dg_only = isapprox(alpha_element, 0, atol = atol)
+
+        if dg_only
+            flux_differencing_kernel!(du, u, element, mesh,
+                                      nonconservative_terms, equations,
+                                      volume_flux_dg, dg, cache)
+        else
+            # Calculate DG volume integral contribution
+            flux_differencing_kernel!(du, u, element, mesh,
+                                      nonconservative_terms, equations,
+                                      volume_flux_dg, dg, cache, 1 - alpha_element)
+
+            # Calculate FV volume integral contribution
+            fv_kernel!(du, u, mesh, nonconservative_terms, equations, volume_flux_fv,
+                       dg, cache, element, alpha_element)
+        end
+    end
+
+    return nothing
+end
+
 function calc_interface_flux!(cache, u, mesh::StructuredMesh{1},
                               equations, surface_integral, dg::DG,
                               element_indices = eachelement(dg, cache))

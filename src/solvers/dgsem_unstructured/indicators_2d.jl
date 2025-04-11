@@ -5,13 +5,14 @@
 @muladd begin
 #! format: noindent
 
-function apply_smoothing!(mesh::UnstructuredMesh2D, alpha, alpha_tmp, dg, cache)
+function apply_smoothing!(mesh::UnstructuredMesh2D, alpha, alpha_tmp, dg, cache,
+                          interface_indices = eachinterface(dg, cache))
     # Diffuse alpha values by setting each alpha to at least 50% of neighboring elements' alpha
     # Copy alpha values such that smoothing is indpedenent of the element access order
     alpha_tmp .= alpha
 
     # Loop over interfaces
-    for interface in eachinterface(dg, cache)
+    for interface in interface_indices
         # Get neighboring element ids
         left = cache.interfaces.element_ids[1, interface]
         right = cache.interfaces.element_ids[2, interface]
