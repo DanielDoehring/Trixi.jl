@@ -58,7 +58,7 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
     return flux
 end
 
-polydeg = 2
+polydeg = 1
 basis = LobattoLegendreBasis(polydeg)
 
 shock_indicator = IndicatorHennemannGassner(equations, basis,
@@ -78,9 +78,10 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
+#solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
-#mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
-mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
+mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
+#mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
 boundary_symbols = [:PhysicalSurface2, # "symm1"
                     :PhysicalSurface4, # "out1"
@@ -115,7 +116,7 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-tspan = (0.0, 1e-4)
+tspan = (0.0, 5e-5)
 ode = semidiscretize(semi, tspan)
 
 #=
@@ -162,7 +163,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      #analysis_integrals = ()
                                      )
 
-alive_callback = AliveCallback(alive_interval = 5) # 200
+alive_callback = AliveCallback(alive_interval = 50) # 200
 
 save_sol_interval = 50_000
 
@@ -213,8 +214,8 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309106167859536
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
-base_path = "/storage/home/daniel/OneraM6/LLF_only/"
-#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
+#base_path = "/storage/home/daniel/OneraM6/LLF_only/"
+base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
 #ode_alg = Trixi.PairedExplicitRK3(12, base_path)
