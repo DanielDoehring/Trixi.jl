@@ -134,7 +134,7 @@ function (indicator_hg::IndicatorHennemannGassner)(u,
     parameter_s = log((1 - o_0001) / o_0001)
 
     @threaded for element in element_indices
-    #@threaded for element in eachelement(dg, cache)
+        #@threaded for element in eachelement(dg, cache)
         # This is dispatched by mesh dimension.
         # Use this function barrier and unpack inside to avoid passing closures to
         # Polyester.jl with `@batch` (`@threaded`).
@@ -145,8 +145,8 @@ function (indicator_hg::IndicatorHennemannGassner)(u,
     end
 
     if alpha_smooth
-        apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache, 
-        interface_indices, mortar_indices)
+        apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache,
+                         interface_indices, mortar_indices)
     end
 
     return alpha
