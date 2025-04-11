@@ -210,6 +210,10 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
+# TODO: Revisit! Crashes after optimizing IndicatorHennemannGassner in corresponding
+# Volume Integral Computation. 
+# Should be runnable again if you un-comment line 137 in `indicators.jl` .
+
 ### Initial CFL ###                                     
 #cfl_0() = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
 cfl_0() = 1.4 # PE (Relaxation) RK 4 13 (Standalone)
