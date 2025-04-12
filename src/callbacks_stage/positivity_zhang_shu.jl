@@ -101,6 +101,7 @@ function Base.show(io::IO, ::MIME"text/plain",
     else
         positivity_callback = cb.affect!
         @unpack thresholds, variables = positivity_callback.positivity_limiter
+
         setup = ["Variables" => variables
                  "Thresholds" => thresholds]
         summary_box(io, "PositivityPreservingCallbackZhangShu", setup)
