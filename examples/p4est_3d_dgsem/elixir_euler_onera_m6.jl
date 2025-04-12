@@ -58,16 +58,17 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
     return flux
 end
 
-polydeg = 2
+polydeg = 1
 basis = LobattoLegendreBasis(polydeg)
 
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 0.5,
                                             alpha_min = 0.001,
-                                            alpha_smooth = true,
+                                            alpha_smooth = false, # true
                                             variable = density_pressure)
 
 surface_flux = flux_lax_friedrichs
+
 volume_flux = flux_ranocha
 #volume_flux = flux_ranocha_turbo # Not sure if this has any benefit
 
@@ -78,6 +79,7 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
+#solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
 mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
@@ -115,19 +117,19 @@ boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symm
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-tspan = (0.0, 1e-4)
-ode = semidiscretize(semi, tspan)
+#tspan = (0.0, 1.0)
+#ode = semidiscretize(semi, tspan)
 
-#=
-restart_file = "restart_aoa306_t_05.h5"
+
+restart_file = "restart_000030000.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("out/", restart_file)
 
-tspan = (load_time(restart_filename), 0.5) # 0.5
+tspan = (load_time(restart_filename), 1.0)
 #dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
-=#
+
 
 # Callbacks
 ###############################################################################
@@ -155,16 +157,15 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
                                                                    u_inf(equations), a_inf()))
 
-analysis_interval = 1000
+analysis_interval = 30_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     #analysis_errors = Symbol[],
-                                     #analysis_integrals = (lift_coefficient,)
-                                     #analysis_integrals = ()
-                                     )
+                                     analysis_errors = Symbol[],
+                                     #analysis_integrals = (lift_coefficient,),
+                                     analysis_integrals = ())
 
-alive_callback = AliveCallback(alive_interval = 5) # 200
+alive_callback = AliveCallback(alive_interval = 200)
 
-save_sol_interval = 50_000
+save_sol_interval = analysis_interval
 
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
@@ -176,25 +177,30 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
-#stepsize_callback = StepsizeCallback(cfl = 2.0) # PERK3 Single
-stepsize_callback = StepsizeCallback(cfl = 13.0) # PERK 12 Single (Not maxed out yet)
 
-#stepsize_callback = StepsizeCallback(cfl = 9.0) # PERK p3 3-15 Multi
-#stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi AoA 6.06
+# k = 2
+                                
+#stepsize_callback = StepsizeCallback(cfl = 2.0, interval = 10) # PERK3 Single
+stepsize_callback = StepsizeCallback(cfl = 13.0, interval = 10) # PERK 12 Single (Not maxed out yet)
 
-stepsize_callback = StepsizeCallback(cfl = 9.5) # PERK p2 2-14 Multi AoA 3.06
+#stepsize_callback = StepsizeCallback(cfl = 9.0, interval = 10) # PERK p3 3-15 Multi
+#stepsize_callback = StepsizeCallback(cfl = 9.5, interval = 10) # PERK p2 2-14 Multi AoA 6.06
+
+stepsize_callback = StepsizeCallback(cfl = 9.5, interval = 10) # PERK p2 2-14 Multi AoA 3.06
+
+# k = 1
+stepsize_callback = StepsizeCallback(cfl = 12.0, interval = 10) # PERK p2 2-14 Multi AoA 3.06; probably still not maxed out
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
                         #save_solution,
-                        #save_restart,
+                        save_restart,
                         stepsize_callback
                         )
 
 # Run the simulation
 ###############################################################################
-
 
 dtRatios_complete_p3 = [ 
     0.309106167859536,
@@ -249,8 +255,3 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtR
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
 
-
-#=
-sol = solve(ode, SSPRK54(thread = Trixi.True()), dt = 42.0, 
-            save_everystep = false, callback = callbacks);
-=#
