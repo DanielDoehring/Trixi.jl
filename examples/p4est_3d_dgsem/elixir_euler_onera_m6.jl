@@ -121,7 +121,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 #ode = semidiscretize(semi, tspan)
 
 
-restart_file = "restart_000030000.h5"
+restart_file = "restart_000750000.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("out/", restart_file)
