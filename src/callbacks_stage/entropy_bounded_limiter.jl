@@ -64,6 +64,8 @@ end
     return p - rho^gamma * exp_entropy_prev
 end
 
+# TODO: DiscreteCallback implementation to make this step-callbakc ready
+
 include("entropy_bounded_limiter_1d.jl")
 include("entropy_bounded_limiter_2d.jl")
 include("entropy_bounded_limiter_3d.jl")

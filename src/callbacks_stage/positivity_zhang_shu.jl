@@ -65,6 +65,73 @@ function limiter_zhang_shu!(u, thresholds::Tuple{}, variables::Tuple{},
     nothing
 end
 
+### Re-use the Zhang-Shu limiter as a stage callback ###
+# TODO: Point to ODE.jl docs
+
+struct PositivityPreservingCallbackZhangShu{PositivityPreservingLimiterZhangShu}
+    positivity_limiter::PositivityPreservingLimiterZhangShu
+end
+
+function PositivityPreservingCallbackZhangShu(; thresholds, variables)
+    positivity_limiter = PositivityPreservingLimiterZhangShu(thresholds, variables)
+    positivity_callback = PositivityPreservingCallbackZhangShu(positivity_limiter)
+
+    DiscreteCallback(positivity_callback, positivity_callback, # the first one is the condition, the second the affect!
+                     save_positions = (false, false),
+                     initialize = initialize!)
+end
+
+function Base.show(io::IO,
+                   cb::DiscreteCallback{<:Any, <:PositivityPreservingCallbackZhangShu})
+    @nospecialize cb # reduce precompilation time
+
+    positivity_callback = cb.affect!
+    @unpack thresholds, variables = positivity_callback.positivity_limiter
+    print(io, "PositivityPreservingCallbackZhangShu(",
+          "variables=", variables, ", ",
+          "thresholds=", thresholds, ")")
+end
+
+function Base.show(io::IO, ::MIME"text/plain",
+                   cb::DiscreteCallback{<:Any, <:PositivityPreservingCallbackZhangShu})
+    @nospecialize cb # reduce precompilation time
+
+    if get(io, :compact, false)
+        show(io, cb)
+    else
+        positivity_callback = cb.affect!
+        @unpack thresholds, variables = positivity_callback.positivity_limiter
+        setup = ["Variables" => variables
+                 "Thresholds" => thresholds]
+        summary_box(io, "PositivityPreservingCallbackZhangShu", setup)
+    end
+end
+
+function initialize!(cb::DiscreteCallback{Condition, Affect!}, u, t,
+                     integrator) where {Condition,
+                                        Affect! <: PositivityPreservingCallbackZhangShu}
+    cb.affect!(integrator) # Enforce positivity (if possible) upon initialization
+end
+
+# this method is called to determine whether the callback should be activated
+function (positivity_callback::PositivityPreservingCallbackZhangShu)(u, t, integrator)
+    return true
+end
+
+# This method is called as callback during the time integration.
+@inline function (positivity_callback::PositivityPreservingCallbackZhangShu)(integrator)
+    t = integrator.t
+    u_ode = integrator.u
+    semi = integrator.p
+
+    positivity_callback.positivity_limiter(u_ode, integrator, semi, t)
+
+    # Since this is only called at the end of a Runge-Kutta step, 
+    # avoid re-evaluating possible FSAL stages
+    u_modified!(integrator, false)
+    return nothing
+end
+
 include("positivity_zhang_shu_dg1d.jl")
 include("positivity_zhang_shu_dg2d.jl")
 include("positivity_zhang_shu_dg3d.jl")

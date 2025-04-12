@@ -287,7 +287,8 @@ export load_mesh, load_time, load_timestep, load_timestep!, load_dt,
 export ControllerThreeLevel, ControllerThreeLevelCombined,
        IndicatorLöhner, IndicatorLoehner, IndicatorMax
 
-export PositivityPreservingLimiterZhangShu, EntropyBoundedLimiter
+export PositivityPreservingLimiterZhangShu, PositivityPreservingCallbackZhangShu,
+       EntropyBoundedLimiter
 
 export trixi_include, examples_dir, get_examples, default_example,
        default_example_unstructured, ode_default_options
