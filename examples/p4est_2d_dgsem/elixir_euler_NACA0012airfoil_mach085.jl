@@ -40,6 +40,8 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+
 mesh_file = Trixi.download("https://gist.githubusercontent.com/Arpit-Babbar/339662b4b46164a016e35c81c66383bb/raw/8bf94f5b426ba907ace87405cfcc1dcc2ef7cbda/NACA0012.inp",
                            joinpath(@__DIR__, "NACA0012.inp"))
 
@@ -120,8 +122,11 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
-callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback, save_solution,
-                        stepsize_callback, amr_callback)
+positivity_callback = PositivityPreservingCallbackZhangShu(thresholds = (5.0e-6, 5.0e-6),
+                                                            variables = (Trixi.density, pressure))
+
+callbacks = CallbackSet(summary_callback, alive_callback, #analysis_callback, save_solution,
+                        stepsize_callback, positivity_callback, amr_callback)
 
 ###############################################################################
 # run the simulation
