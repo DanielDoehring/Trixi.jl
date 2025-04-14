@@ -139,9 +139,13 @@ struct PairedExplicitRK4 <: AbstractPairedExplicitRKSingle{4}
 
     # Optimized coefficients, i.e., flexible part of the Butcher array matrix A.
     a_matrix::Union{Matrix{Float64}, Nothing}
+
     # This part of the Butcher array matrix A is constant for all PERK methods, i.e., 
     # regardless of the optimized coefficients.
-    a_matrix_constant::SMatrix{2, 3, Float64}
+    #a_matrix_constant::SMatrix{2, 3, Float64}
+    # NOTE: Somehow SMatrix allocates for Single PERK4, but not Multirate...
+    a_matrix_constant::Matrix{Float64}
+
     c::Vector{Float64}
 
     dt_opt::Union{Float64, Nothing}
