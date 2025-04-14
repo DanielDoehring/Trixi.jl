@@ -99,7 +99,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
 mutable struct SubDiagIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
-                                 SimpleIntegrator2NOptions}
+                                 SimpleIntegrator2NOptions} <: AbstractTimeIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -119,7 +119,7 @@ end
 
 mutable struct SubDiagRelaxationIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                            SimpleIntegrator2NOptions,
-                                           RelaxationSolver}
+                                           RelaxationSolver} <: AbstractTimeIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -232,6 +232,8 @@ function solve!(integrator)
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         step!(integrator)
     end # "main loop" timer
+
+    finalize_callbacks(integrator)
 
     return TimeIntegratorSolution((first(prob.tspan), integrator.t),
                                   (prob.u0, integrator.u),
