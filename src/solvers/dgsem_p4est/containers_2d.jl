@@ -19,6 +19,7 @@ function init_elements!(elements, mesh::Union{P4estMesh{2}, T8codeMesh{2}},
         calc_contravariant_vectors!(contravariant_vectors, element, jacobian_matrix)
 
         calc_inverse_jacobian!(inverse_jacobian, element, jacobian_matrix)
+        # NOTE: Distortion check could be implemented here
     end
 
     return nothing

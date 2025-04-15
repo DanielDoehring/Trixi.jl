@@ -20,6 +20,7 @@ function init_elements!(elements, mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                     node_coordinates, basis)
 
         calc_inverse_jacobian!(inverse_jacobian, element, jacobian_matrix, basis)
+        # NOTE: Distortion check could be implemented here
     end
 
     return nothing
