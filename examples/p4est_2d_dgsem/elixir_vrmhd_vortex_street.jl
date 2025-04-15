@@ -184,8 +184,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Setup an ODE problem
 
 tspan = (0.0, 120.0)
-ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multirate
+#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multirate
 
 # For finding final CFL
 #=
@@ -221,7 +221,7 @@ cfl_0() = 1.4 # PE (Relaxation) RK 4 13 (Standalone)
 ### Restared CFL ###
 
 cfl_max() = 6.5 # PER(R)K4 13, 8, 6, 5
-cfl_max() = 7.3 # Standalone PERRK4 13
+#cfl_max() = 7.3 # Standalone PERRK4 13
 
 #cfl_max() = 1.5 # R-RK44
 #cfl_max() = 2.1 # R-TS64
@@ -230,7 +230,7 @@ cfl_max() = 7.3 # Standalone PERRK4 13
 ### Ramp-Up CFL ###
 t_ramp_up() = 4.40 # PER(R)K4 4 13, 8, 6, 5 
 
-t_ramp_up() = 5.00 # PE Relaxation RK 4 13
+#t_ramp_up() = 5.00 # PE Relaxation RK 4 13
 
 #t_ramp_up() = 0.75 # R-RK44
 #t_ramp_up() = 2.40 # R-TS64
@@ -271,11 +271,11 @@ dtRatios = [0.0771545666269958, # 13
             0.00702102510258555] / 0.0771545666269958 # 5
 Stages = [13, 8, 6, 5]
 
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
 
 #ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
