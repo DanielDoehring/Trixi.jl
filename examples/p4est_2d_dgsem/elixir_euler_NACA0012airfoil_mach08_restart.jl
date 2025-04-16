@@ -59,45 +59,50 @@ restart_file = "restart_ref2_t100.h5"
 restart_filename = joinpath("out/", restart_file)
 
 tspan = (load_time(restart_filename), 200.0)
-#dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
-
 
 # Callbacks
 
 summary_callback = SummaryCallback()
-
-l_inf = 1.0 # Length of airfoil
-
-force_boundary_names = (:Airfoil,)
-u_inf(equations) = mach_inf()
-drag_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           DragCoefficientPressure(aoa(), rho_inf(),
-                                                                   u_inf(equations), l_inf))
-
-lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           LiftCoefficientPressure(aoa(), rho_inf(),
-                                                                   u_inf(equations), l_inf))
-
-# TODO: Compute also pointwise pressure coefficient
-analysis_interval = 10_000
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     output_directory = "out",
-                                     analysis_errors = Symbol[],
-                                     save_analysis = true,
-                                     analysis_integrals = (drag_coefficient,
-                                                           lift_coefficient))
-
-alive_callback = AliveCallback(alive_interval = 500)
 
 save_sol_interval = 50_000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
+
+l_inf = 1.0 # Length of airfoil
+force_boundary_names = (:Airfoil,)
+u_inf() = mach_inf()
+drag_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
+                                           DragCoefficientPressure(aoa(), rho_inf(),
+                                                                   u_inf(), l_inf))
+
+lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
+                                           LiftCoefficientPressure(aoa(), rho_inf(),
+                                                                   u_inf(), l_inf))
+
+pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
+                                                SurfacePressureCoefficient(p_inf(), rho_inf(),
+                                                                           u_inf(), l_inf))
+
+analysis_callback = AnalysisCallback(semi, interval = save_sol_interval,
+                                     output_directory = "out",
+                                     analysis_errors = Symbol[],
+                                     save_analysis = true,
+                                     analysis_integrals = (drag_coefficient,
+                                                           lift_coefficient),
+                                    analysis_pointwise = (pressure_coefficient,))
+
+alive_callback = AliveCallback(alive_interval = 1000)
+
 # AMR run
-#cfl = 2.8 # Standard PERK4
+cfl = 2.8 # Standard PERK4
 cfl = 2.7 # Relaxed PERK4
+
+cfl = 0.9 # R-RK44
+#cfl = 1.2 # R-TS64
+#cfl = 1.5 # R-CKL54
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -106,16 +111,18 @@ amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 0,
                                       med_level = 1, med_threshold = 0.05, # 1
                                       max_level = 3, max_threshold = 0.1)  # 3
-amr_interval = 200
+
+amr_ref_interval = 200
+cfl_ref = 2.7
+amr_interval = Int(ceil(amr_ref_interval * cfl_ref/cfl))
+
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = amr_interval,
                            adapt_initial_condition = true)
 
-# TODO: Restart callback: Run until shock is steady, then restart and turn on AMR (?)
-
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, 
-                        #alive_callback,
+                        alive_callback,
                         #save_solution,
                         stepsize_callback,
                         amr_callback)
@@ -146,10 +153,15 @@ Stages_p4 = [14, 12, 10, 8, 7, 6, 5]
 
 path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NACA0012_Mach08/rusanov_chandrashekar/"
 
+# NOTE: Use case for relaxation: Better accuracy of the lift/drag coefficients?
 relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 10, gamma_min = 0.8)
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
-ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+
+ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
