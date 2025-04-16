@@ -400,8 +400,8 @@ function partition_variables!(level_info_elements,
                                                            nnodes,
                                                            eltype(dg.basis.nodes))
 
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
+    #println("h_min: ", h_min, " h_max: ", h_max)
+    #println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]

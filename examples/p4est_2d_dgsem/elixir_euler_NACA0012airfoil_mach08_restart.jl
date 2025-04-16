@@ -55,9 +55,12 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 ###############################################################################
 # ODE solvers
 
-# Run for a long time to reach a steady state
-tspan = (0.0, 100.0) # 100 suffices for this mesh for stationary shock position
-ode = semidiscretize(semi, tspan)
+restart_file = "restart_ref2_t100.h5"
+restart_filename = joinpath("out/", restart_file)
+
+tspan = (load_time(restart_filename), 200.0)
+#dt = load_dt(restart_filename)
+ode = semidiscretize(semi, tspan, restart_filename)
 
 
 # Callbacks
@@ -76,6 +79,15 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            LiftCoefficientPressure(aoa(), rho_inf(),
                                                                    u_inf(equations), l_inf))
 
+# TODO: Compute also pointwise pressure coefficient
+analysis_interval = 10_000
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     output_directory = "out",
+                                     analysis_errors = Symbol[],
+                                     save_analysis = true,
+                                     analysis_integrals = (drag_coefficient,
+                                                           lift_coefficient))
+
 alive_callback = AliveCallback(alive_interval = 500)
 
 save_sol_interval = 50_000
@@ -83,28 +95,30 @@ save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
-save_restart = SaveRestartCallback(interval = save_sol_interval,
-                                   save_final_restart = true)
-
-# SSPRK54
-#cfl_0() = 1.5
-#cfl_max() = 2.1
-#t_ramp_up() = 1.5
-
-cfl_0() = 2.0
-cfl_max() = 4.8 # Seems to be stability limit for standard/relaxed PERK 4
-t_ramp_up() = 1.5
-
-cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+# AMR run
+#cfl = 2.8 # Standard PERK4
+cfl = 2.7 # Relaxed PERK4
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
+
+amr_indicator = shock_indicator
+amr_controller = ControllerThreeLevel(semi, amr_indicator,
+                                      base_level = 0,
+                                      med_level = 1, med_threshold = 0.05, # 1
+                                      max_level = 3, max_threshold = 0.1)  # 3
+amr_interval = 200
+amr_callback = AMRCallback(semi, amr_controller,
+                           interval = amr_interval,
+                           adapt_initial_condition = true)
+
+# TODO: Restart callback: Run until shock is steady, then restart and turn on AMR (?)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, 
                         #alive_callback,
                         #save_solution,
-                        #save_restart,
-                        stepsize_callback)
+                        stepsize_callback,
+                        amr_callback)
 
 ###############################################################################
 # run the simulation
