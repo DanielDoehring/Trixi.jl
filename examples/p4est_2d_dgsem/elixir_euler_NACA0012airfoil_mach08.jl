@@ -86,22 +86,29 @@ save_solution = SaveSolutionCallback(interval = save_sol_interval,
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true)
 
-# SSPRK54
-#cfl_0() = 1.5
-#cfl_max() = 2.1
-#t_ramp_up() = 1.5
-
-cfl_0() = 2.0
-cfl_max() = 4.8 # Seems to be stability limit for standard/relaxed PERK 4
 t_ramp_up() = 1.5
+# P-ER(R)K 4
+cfl_0() = 2.0
+cfl_max() = 4.8
+
+# R-RK44
+cfl_0() = 0.9
+cfl_max() = 1.1
+
+# R-TS64
+cfl_0() = 1.0
+cfl_max() = 1.5
+
+# R-RKCKL54
+cfl_0() = 1.5
+cfl_max() = 1.9
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback, 
-                        #alive_callback,
+                        alive_callback,
                         #save_solution,
                         #save_restart,
                         stepsize_callback)
@@ -137,12 +144,9 @@ relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 10, gamma_m
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
 ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
 
+#ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
-
-
-#=
-sol = solve(ode, SSPRK54(thread = Trixi.True());
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            ode_default_options()..., callback = callbacks);
-=#
