@@ -103,7 +103,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
 
                 resize!(integrator, length(u_ode)) # `resize!` integrator after PERK partitioning data structures
             end # "PERK stage identifiers update" timing
-        end # if has changed
+        end # if has_changed
     end # "AMR" timing
 
     return has_changed
