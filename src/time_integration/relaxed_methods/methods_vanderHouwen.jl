@@ -88,7 +88,8 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
 mutable struct vanderHouwenIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
-                                      SimpleIntegrator2NOptions} <: AbstractTimeIntegrator
+                                      SimpleIntegrator2NOptions} <:
+               AbstractTimeIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -109,7 +110,8 @@ end
 mutable struct vanderHouwenRelaxationIntegrator{RealT <: Real, uType, Params, Sol, F,
                                                 Alg,
                                                 SimpleIntegrator2NOptions,
-                                                RelaxationSolver} <: AbstractTimeIntegrator
+                                                RelaxationSolver} <:
+               AbstractTimeIntegrator
     u::uType
     du::uType
     u_tmp::uType
