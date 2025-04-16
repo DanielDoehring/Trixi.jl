@@ -53,9 +53,9 @@ alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/
 
 cfl_gravity = 1.0
 
-tolerance = 1e-5 
+tolerance = 1e-5
 if ref_lvl == 5
-  tolerance = 1e-6
+    tolerance = 1e-6
 end
 
 parameters = ParametersEulerGravity(background_density = 2.0, # aka rho0
@@ -84,8 +84,12 @@ alive_callback = AliveCallback(alive_interval = 20)
 
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
-                                     analysis_errors = [:l2_error_primitive, :linf_error_primitive, :l1_error_primitive],
-                                     analysis_integrals = (; ))
+                                     analysis_errors = [
+                                         :l2_error_primitive,
+                                         :linf_error_primitive,
+                                         :l1_error_primitive
+                                     ],
+                                     analysis_integrals = (;))
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
                         analysis_callback, alive_callback)
@@ -102,4 +106,3 @@ sol = Trixi.solve(ode, ode_algorithm,
                   save_everystep = false, callback = callbacks);
 
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)
-

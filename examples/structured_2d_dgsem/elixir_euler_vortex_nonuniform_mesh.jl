@@ -74,7 +74,7 @@ function mapping(xi_, eta_)
     # Scale the transformed coordinates to maintain the original domain size
     #x = xi_transformed * EdgeLength() / 2
     x = xi_transformed * 10
-    
+
     #y = eta_transformed * EdgeLength() / 2
     y = eta_transformed * 10
 
@@ -141,7 +141,8 @@ dtRatios = [
 ] ./ 0.631627607345581
 
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios,
+                                                       relaxation_solver = relaxation_solver)
 
 #=
 # p = 3

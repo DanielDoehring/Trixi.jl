@@ -284,7 +284,7 @@ maximum(K_Perk)
 
 # First steps' relaxation parameter gamma
 gamma = 0.7721910021820937
-K_Perk_Relaxation = I + gamma * ( b1 * K1 + bS * K_higher)
+K_Perk_Relaxation = I + gamma * (b1 * K1 + bS * K_higher)
 
 row_sums = sum(K_Perk_Relaxation, dims = 2) # sanity check, should all be 1
 
@@ -297,5 +297,3 @@ spectral_radius = maximum(abs.(K_PERK_EigVals))
 
 minimum(K_Perk_Relaxation)
 maximum(K_Perk_Relaxation)
-
-

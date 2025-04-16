@@ -14,7 +14,7 @@ c_inf(equations) = sqrt(equations.gamma * p_inf() / rho_inf())
 u_inf(equations) = mach_inf() * c_inf(equations)
 
 @inline function initial_condition_mach08_flow(x, t,
-                                                equations::CompressibleEulerEquations2D)
+                                               equations::CompressibleEulerEquations2D)
     v1 = u_inf(equations) * cos(aoa())
     v2 = u_inf(equations) * sin(aoa())
 
@@ -40,7 +40,7 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C1.2_quadgrids/naca_ref2_quadr_relabel.inp"               
+mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C1.2_quadgrids/naca_ref2_quadr_relabel.inp"
 
 boundary_symbols = [:Airfoil, :Inflow, :Outflow]
 mesh = P4estMesh{2}(mesh_file, boundary_symbols = boundary_symbols)
@@ -80,7 +80,7 @@ analysis_interval = 2000
 
 l_inf = 1.0 # Length of airfoil
 
-force_boundary_names = (:Airfoil, )
+force_boundary_names = (:Airfoil,)
 drag_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            DragCoefficientPressure(aoa(), rho_inf(),
                                                                    u_inf(equations), l_inf))
@@ -120,11 +120,11 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 # TODO: Restart callback (?)
 
-callbacks = CallbackSet(summary_callback, 
+callbacks = CallbackSet(summary_callback,
                         #analysis_callback, 
-                        alive_callback, 
+                        alive_callback,
                         #save_solution,
-                        stepsize_callback, 
+                        stepsize_callback,
                         amr_callback)
 
 ###############################################################################
