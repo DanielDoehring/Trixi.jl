@@ -64,19 +64,12 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-l_inf = 1.0 # Length of airfoil
+analysis_interval = 200_000
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     analysis_errors = Symbol[],
+                                     analysis_integrals = ())
 
-force_boundary_names = (:Airfoil,)
-u_inf(equations) = mach_inf()
-drag_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           DragCoefficientPressure(aoa(), rho_inf(),
-                                                                   u_inf(equations), l_inf))
-
-lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           LiftCoefficientPressure(aoa(), rho_inf(),
-                                                                   u_inf(equations), l_inf))
-
-alive_callback = AliveCallback(alive_interval = 500)
+alive_callback = AliveCallback(alive_interval = 1000)
 
 save_sol_interval = 50_000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
@@ -87,9 +80,14 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true)
 
 t_ramp_up() = 1.5
-# P-ER(R)K 4
+
+# P-ER(R)K 4 Multi
 cfl_0() = 2.0
 cfl_max() = 4.8
+
+# P-ER(R)K 4 Standalone
+#cfl_0() = 2.0
+#cfl_max() = 8.1
 
 # R-RK44
 cfl_0() = 0.9
@@ -109,6 +107,7 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
+                        analysis_callback,
                         #save_solution,
                         #save_restart,
                         stepsize_callback)
@@ -142,7 +141,9 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NACA0012_Mach08/rusanov
 relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 10, gamma_min = 0.8)
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
-ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+
+#ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
