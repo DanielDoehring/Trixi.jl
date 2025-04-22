@@ -145,6 +145,8 @@ function solve!(integrator::AbstractPairedExplicitRKIntegrator)
     end
 
     finalize_callbacks(integrator)
+    # For AMR: Counting RHS evals
+    #println("RHS Calls: ", integrator.RHSCalls)
 
     return TimeIntegratorSolution((first(prob.tspan), integrator.t),
                                   (prob.u0, integrator.u),

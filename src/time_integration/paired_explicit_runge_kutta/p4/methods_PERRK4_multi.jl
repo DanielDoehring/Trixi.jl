@@ -72,6 +72,8 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType,
     # Entropy Relaxation additions
     gamma::RealT
     relaxation_solver::RelaxationSolver
+    # For AMR: Counting RHS evals
+    #RHSCalls::Int64
 end
 
 mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real, uType,
@@ -243,6 +245,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                 -1, n_levels,
                                                                 gamma,
                                                                 alg.relaxation_solver)
+                                                                # For AMR: Counting RHS evals 
+                                                                # 0)
     end
 
     # initialize callbacks

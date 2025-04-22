@@ -101,13 +101,13 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                              integrator.n_levels,
                              u_ode, mesh, equations, dg, cache)
 
-                #=                             
-                for i in 1:integrator.n_levels
-                    println("#Number Elements integrated with level $i: ",
-                            length(integrator.level_info_elements[i]))
+                # For AMR: Counting RHS evals
+                #=
+                for level = 1:length(integrator.level_info_elements)
+                    integrator.RHSCalls += amr_callback.interval * integrator.alg.stages[level] * 
+                                           length(integrator.level_info_elements[level])
                 end
                 =#
-                # TODO: Compute actual number RHS evals
 
                 resize!(integrator, length(u_ode)) # `resize!` integrator after PERK partitioning data structures
             end # "PERK stage identifiers update" timing
