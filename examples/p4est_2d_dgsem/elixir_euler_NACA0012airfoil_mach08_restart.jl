@@ -65,7 +65,7 @@ ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
 
-save_sol_interval = 50_000
+save_sol_interval = 100_000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
@@ -86,13 +86,15 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
                                                                            u_inf(), l_inf))
 
-analysis_callback = AnalysisCallback(semi, interval = save_sol_interval,
+analysis_interval = 200                                                                           
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      analysis_errors = Symbol[],
                                      save_analysis = true,
                                      analysis_integrals = (drag_coefficient,
                                                            lift_coefficient),
-                                    analysis_pointwise = (pressure_coefficient,))
+                                     #analysis_pointwise = (pressure_coefficient,)
+                                    )
 
 alive_callback = AliveCallback(alive_interval = 1000)
 
@@ -102,9 +104,9 @@ cfl = 2.7 # Relaxed PERK4 Multi
 
 cfl = 2.7 # Relaxed PERK4 Standalone
 
-cfl = 0.9 # R-RK44
-cfl = 1.1 # R-TS64
-cfl = 1.5 # R-CKL54
+#cfl = 0.9 # R-RK44
+#cfl = 1.1 # R-TS64
+#cfl = 1.5 # R-CKL54
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -123,9 +125,9 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition = true)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback, 
+                        #analysis_callback, 
                         alive_callback,
-                        #save_solution,
+                        save_solution,
                         stepsize_callback,
                         amr_callback)
 
@@ -171,7 +173,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; r
 #ode_alg = Trixi.TS64()
 
 #ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
-ode_alg = Trixi.CKL54()
+#ode_alg = Trixi.CKL54()
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);

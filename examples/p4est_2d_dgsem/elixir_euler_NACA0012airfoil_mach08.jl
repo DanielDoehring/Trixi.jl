@@ -107,8 +107,8 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        analysis_callback,
-                        #save_solution,
+                        #analysis_callback,
+                        save_solution,
                         #save_restart,
                         stepsize_callback)
 
