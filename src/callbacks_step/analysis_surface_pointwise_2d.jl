@@ -57,7 +57,7 @@ end
 
 Compute the surface pressure coefficient
 ```math
-C_p \\coloneqq \\frac{p - p_{p_\\infty}}
+C_p \\coloneqq \\frac{p - p_{\\infty}}
                      {0.5 \\rho_{\\infty} U_{\\infty}^2 L_{\\infty}}
 ```
 based on the pressure distribution along a boundary.
