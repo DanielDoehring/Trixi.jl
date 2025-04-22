@@ -58,7 +58,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 restart_file = "restart_ref2_t100.h5"
 restart_filename = joinpath("/home/daniel/git/Paper_PERRK/Data/NACA0012/", restart_file)
 
-tspan = (load_time(restart_filename), 200.0) # 200
+tspan = (load_time(restart_filename), 200.0)
 ode = semidiscretize(semi, tspan, restart_filename)
 
 # Callbacks
@@ -100,11 +100,11 @@ alive_callback = AliveCallback(alive_interval = 1000)
 cfl = 2.8 # Standard PERK4 Multi
 cfl = 2.7 # Relaxed PERK4 Multi
 
-#cfl = 2.7 # Relaxed PERK4 Standalone
+cfl = 2.7 # Relaxed PERK4 Standalone
 
-#cfl = 0.9 # R-RK44
-#cfl = 1.1 # R-TS64
-#cfl = 1.5 # R-CKL54
+cfl = 0.9 # R-RK44
+cfl = 1.1 # R-TS64
+cfl = 1.5 # R-CKL54
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -160,12 +160,18 @@ relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 10, gamma_m
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
 ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+
 #ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRK4(Stages_p4[1], path)
 
 #ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RK44()
+
 #ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.TS64()
+
 #ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.CKL54()
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
-

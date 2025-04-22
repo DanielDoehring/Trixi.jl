@@ -435,6 +435,7 @@ function prolong2mortars!(cache, u,
             j_large += j_large_step
         end
 
+        # NOTE: Sometimes there are strange allocations here
         # Interpolate large element face data from buffer to small face locations
         multiply_dimensionwise!(view(cache.mortars.u, 2, :, 1, :, mortar),
                                 mortar_l2.forward_lower,
