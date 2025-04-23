@@ -169,7 +169,7 @@ cfl(t) = min(7.4, 1.5 + t/t_ramp_up() * 5.9)
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback,
+                        #analysis_callback,
                         alive_callback,
                         stepsize_callback,
                         save_solution
@@ -189,7 +189,7 @@ dtRatios = [0.0571712958370335, # 16
 Stages = [16, 10, 7, 6, 5]
 
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
@@ -200,14 +200,8 @@ sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep = false, callback = callbacks);
 
-#=             
-time_int_tol = 1e-7
-sol = solve(ode,
-            # Moderate number of threads (e.g. 4) advisable to speed things up
-            RDPK3SpFSAL49(thread = Trixi.True());
-            abstol = time_int_tol, reltol = time_int_tol,
-            ode_default_options()..., callback = callbacks);
-=#
-
+#=
 using Plots
 pd = PlotData2D(sol);
+plot(getmesh(pd))
+=#
