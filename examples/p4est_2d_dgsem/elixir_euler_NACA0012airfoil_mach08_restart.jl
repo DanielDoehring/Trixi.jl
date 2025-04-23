@@ -86,7 +86,7 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
                                                                            u_inf(), l_inf))
 
-analysis_interval = 200                                                                           
+analysis_interval = 2000                                                                          
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      analysis_errors = Symbol[],
@@ -125,9 +125,9 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition = true)
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback, 
+                        analysis_callback, 
                         alive_callback,
-                        save_solution,
+                        #save_solution,
                         stepsize_callback,
                         amr_callback)
 
@@ -161,9 +161,9 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NACA0012_Mach08/rusanov
 relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 10, gamma_min = 0.8)
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
-ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
 
-#ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.PairedExplicitRK4(Stages_p4[1], path)
 
 #ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
