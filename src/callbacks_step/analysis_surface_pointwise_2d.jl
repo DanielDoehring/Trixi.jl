@@ -123,6 +123,7 @@ function (surface_friction::SurfaceFrictionCoefficient)(u, normal_direction, x, 
            (0.5 * rhoinf * uinf^2 * linf)
 end
 
+# TODO: 3D version
 # Compute and save to disk a space-dependent `surface_variable`.
 # For the purely hyperbolic, i.e., non-parabolic case, this is for instance 
 # the pressure coefficient `SurfacePressureCoefficient`.
