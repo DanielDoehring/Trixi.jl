@@ -64,7 +64,7 @@ basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 0.5,
                                             alpha_min = 0.001,
-                                            alpha_smooth = false, # true
+                                            alpha_smooth = true, # true
                                             variable = density_pressure)
 
 surface_flux = flux_lax_friedrichs
@@ -81,19 +81,22 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 
 #solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
-mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/m6wing_Trixi_remeshed_bnds.inp"
+base_path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
+#mesh_file = base_path * "m6wing_Trixi_remeshed_bnds.inp"
+mesh_file = base_path * "m6wing_Trixi_remeshed_bnds_comb_NSets.inp"
+
 #mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
 boundary_symbols = [:PhysicalSurface2, # "symm1"
                     :PhysicalSurface4, # "out1"
                     :PhysicalSurface7, # "far1"
-                    :PhysicalSurface8, # "symm2"
+                    #:PhysicalSurface8, # "symm2"
                     :PhysicalSurface12, # "bwing" = bottom wing I guess
                     :PhysicalSurface13, # "far2"
-                    :PhysicalSurface14, # "symm3"
+                    #:PhysicalSurface14, # "symm3"
                     :PhysicalSurface18, # "twing" = top wing I guess
                     :PhysicalSurface19, # "far3"
-                    :PhysicalSurface20, # "symm4"
+                    #:PhysicalSurface20, # "symm4"
                     :PhysicalSurface23, # "out4"
                     :PhysicalSurface25, # "far4"
                     ]
@@ -103,13 +106,13 @@ mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_sy
 boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symmetry
                            :PhysicalSurface4 => bc_farfield, # Farfield: bc_farfield
                            :PhysicalSurface7 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface8 => bc_symmetry, # Symmetry: bc_symmetry
+                           #:PhysicalSurface8 => bc_symmetry, # Symmetry: bc_symmetry
                            :PhysicalSurface12 => boundary_condition_slip_wall, # Wing: bc_slip_wall
                            :PhysicalSurface13 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface14 => bc_symmetry, # Symmetry: bc_symmetry
+                           #:PhysicalSurface14 => bc_symmetry, # Symmetry: bc_symmetry
                            :PhysicalSurface18 => boundary_condition_slip_wall, # Wing: bc_slip_wall
                            :PhysicalSurface19 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface20 => bc_symmetry, # Symmetry: bc_symmetry
+                           #:PhysicalSurface20 => bc_symmetry, # Symmetry: bc_symmetry
                            :PhysicalSurface23 => bc_farfield, # Farfield: bc_farfield
                            :PhysicalSurface25 => bc_farfield, # Farfield: bc_farfield
                           )
@@ -121,12 +124,12 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 #ode = semidiscretize(semi, tspan)
 
 
-restart_file = "restart_000750000.h5"
+restart_file = base_path * "restart_files/restart_t60_damped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("out/", restart_file)
 
-tspan = (load_time(restart_filename), 1.0)
+tspan = (load_time(restart_filename), 6.5)
 #dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -194,13 +197,13 @@ stepsize_callback = StepsizeCallback(cfl = 13.0, interval = 10) # PERK 12 Single
 stepsize_callback = StepsizeCallback(cfl = 9.5, interval = 10) # PERK p2 2-14 Multi AoA 3.06
 
 # k = 1
-stepsize_callback = StepsizeCallback(cfl = 12.0, interval = 10) # PERK p2 2-14 Multi AoA 3.06; probably still not maxed out
+stepsize_callback = StepsizeCallback(cfl = 14.0, interval = 10) # PERK p2 2-14 Multi AoA 3.06; probably still not maxed out
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
                         #save_solution,
-                        save_restart,
+                        #save_restart,
                         stepsize_callback
                         )
 
