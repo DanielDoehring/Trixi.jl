@@ -87,34 +87,18 @@ mesh_file = base_path * "m6wing_Trixi_remeshed_bnds_comb_NSets.inp"
 
 #mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
 
-boundary_symbols = [:PhysicalSurface2, # "symm1"
-                    :PhysicalSurface4, # "out1"
-                    :PhysicalSurface7, # "far1"
-                    #:PhysicalSurface8, # "symm2"
-                    :PhysicalSurface12, # "bwing" = bottom wing I guess
-                    :PhysicalSurface13, # "far2"
-                    #:PhysicalSurface14, # "symm3"
-                    :PhysicalSurface18, # "twing" = top wing I guess
-                    :PhysicalSurface19, # "far3"
-                    #:PhysicalSurface20, # "symm4"
-                    :PhysicalSurface23, # "out4"
-                    :PhysicalSurface25, # "far4"
+boundary_symbols = [:Symmetry,
+                    :FarField,
+                    :BottomWing,
+                    :TopWing
                     ]
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
-boundary_conditions = Dict(:PhysicalSurface2 => bc_symmetry, # Symmetry: bc_symmetry
-                           :PhysicalSurface4 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface7 => bc_farfield, # Farfield: bc_farfield
-                           #:PhysicalSurface8 => bc_symmetry, # Symmetry: bc_symmetry
-                           :PhysicalSurface12 => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                           :PhysicalSurface13 => bc_farfield, # Farfield: bc_farfield
-                           #:PhysicalSurface14 => bc_symmetry, # Symmetry: bc_symmetry
-                           :PhysicalSurface18 => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                           :PhysicalSurface19 => bc_farfield, # Farfield: bc_farfield
-                           #:PhysicalSurface20 => bc_symmetry, # Symmetry: bc_symmetry
-                           :PhysicalSurface23 => bc_farfield, # Farfield: bc_farfield
-                           :PhysicalSurface25 => bc_farfield, # Farfield: bc_farfield
+boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
+                           :FarField => bc_farfield, # Farfield: bc_farfield
+                           :BottomWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                           :TopWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
                           )
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
@@ -139,7 +123,7 @@ ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
 
-force_boundary_names = (:PhysicalSurface12, :PhysicalSurface18)
+force_boundary_names = (:BottomWing, :TopWing)
 
 aoa() = deg2rad(3.06)
 #aoa() = deg2rad(6.06)
@@ -165,11 +149,12 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
                                                                    u_inf(equations), a_inf()))
 
-analysis_interval = 40_000
+analysis_interval = 10
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     #analysis_integrals = (lift_coefficient,),
-                                     analysis_integrals = ())
+                                     analysis_integrals = (lift_coefficient,),
+                                     #analysis_integrals = ()
+                                     )
 
 alive_callback = AliveCallback(alive_interval = 2000)
 
