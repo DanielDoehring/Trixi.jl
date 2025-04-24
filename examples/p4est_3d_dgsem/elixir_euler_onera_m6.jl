@@ -76,6 +76,9 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
 
+# Flux Differencing is required, shock capturing maybe not                                                 
+#volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
+
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
@@ -111,7 +114,6 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 restart_file = base_path * "restart_files/restart_t60_damped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
-#restart_filename = joinpath("out/", restart_file)
 
 tspan = (load_time(restart_filename), 6.5)
 #dt = load_dt(restart_filename)
@@ -212,8 +214,8 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309106167859536
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
-#base_path = "/storage/home/daniel/OneraM6/LLF_only/"
-base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
+base_path = "/storage/home/daniel/OneraM6/LLF_only/"
+#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/LLF_only/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
 #ode_alg = Trixi.PairedExplicitRK3(12, base_path)
