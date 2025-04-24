@@ -18,11 +18,6 @@ equations = CompressibleEulerEquations3D(1.4)
     # AoA = 3.06
     v1 = 0.8388023121403883
     v2 = 0.0448406193973588
-
-    # AoA = 6.06
-    #v1 = 0.8353059860291301
-    #v2 = 0.0886786879915508
-
     v3 = 0.0
 
     p_freestream = 1.0
@@ -76,25 +71,22 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
 
-# Flux Differencing is required, shock capturing maybe not                                                 
+# Flux Differencing is required, shock capturing not (at least not for simply running the code)                                                
 #volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-#solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
-
 base_path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
-#mesh_file = base_path * "m6wing_Trixi_remeshed_bnds.inp"
-mesh_file = base_path * "m6wing_Trixi_remeshed_bnds_comb_NSets.inp"
+base_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
 
-#mesh_file = "/storage/home/daniel/PERRK/Data/OneraM6/m6wing_Trixi_remeshed_bnds.inp"
+#mesh_file = base_path * "m6wing_Trixi_remeshed_bnds.inp"
+mesh_file = base_path * "m6wing_sanitized.inp"
 
 boundary_symbols = [:Symmetry,
                     :FarField,
                     :BottomWing,
-                    :TopWing
-                    ]
+                    :TopWing]
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
@@ -107,11 +99,11 @@ boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-#tspan = (0.0, 1.0)
+#tspan = (0.0, 6.0)
 #ode = semidiscretize(semi, tspan)
 
-
-restart_file = base_path * "restart_files/restart_t60_damped.h5"
+restart_file = "restart_t60_damped.h5"
+#restart_file = base_path * "restart_files/restart_t60_damped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 
@@ -128,7 +120,6 @@ summary_callback = SummaryCallback()
 force_boundary_names = (:BottomWing, :TopWing)
 
 aoa() = deg2rad(3.06)
-#aoa() = deg2rad(6.06)
 
 rho_inf() = 1.4
 u_inf(equations) = 0.84
@@ -151,7 +142,7 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
                                                                    u_inf(equations), a_inf()))
 
-analysis_interval = 10
+analysis_interval = 25_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
@@ -179,7 +170,6 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 stepsize_callback = StepsizeCallback(cfl = 13.0, interval = 10) # PERK 12 Single (Not maxed out yet)
 
 #stepsize_callback = StepsizeCallback(cfl = 9.0, interval = 10) # PERK p3 3-15 Multi
-#stepsize_callback = StepsizeCallback(cfl = 9.5, interval = 10) # PERK p2 2-14 Multi AoA 6.06
 
 stepsize_callback = StepsizeCallback(cfl = 9.5, interval = 10) # PERK p2 2-14 Multi AoA 3.06
 
