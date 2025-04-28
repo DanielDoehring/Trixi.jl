@@ -175,7 +175,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                          n_levels, n_dims, mesh, dg, cache, alg.PERK2Multi)
 
     for i in 1:n_levels
-        println("#Number Elements integrated with level $i: ",
+        println("Number Elements integrated with level $i: ",
                 length(level_info_elements[i]))
     end
 

@@ -285,7 +285,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
     end
 
     for i in 1:n_levels
-        println("#Number Elements integrated with level $i: ",
+        println("Number Elements integrated with level $i: ",
                 length(level_info_elements[i]))
     end
 
