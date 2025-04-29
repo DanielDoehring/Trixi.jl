@@ -5,26 +5,20 @@
 @muladd begin
 #! format: noindent
 
-struct FlowStateDirectional3D{RealT <: Real}
-    psi::Tuple{RealT, RealT, RealT} # Unit vector normal or parallel to freestream
-    rhoinf::RealT
-    uinf::RealT
-    linf::RealT
-end
-
-struct LiftCoefficientPressure3D{RealT <: Real}
-    flow_state::FlowStateDirectional3D{RealT}
-end
-
-"""
+@doc raw"""
     LiftCoefficientPressure3D(aoa, rhoinf, uinf, linf)
 
 Compute the lift coefficient
 ```math
-C_{L,p} \\coloneqq \\frac{\\oint_{\\partial \\Omega} p \\boldsymbol n \\cdot \\psi_L \\, \\mathrm{d} S}
-                        {0.5 \\rho_{\\infty} U_{\\infty}^2 L_{\\infty}}
+C_{L,p} \coloneqq \frac{\oint_{\partial \Omega} p \boldsymbol n \cdot \psi_L \, \mathrm{d} S}
+                        {0.5 \rho_{\infty} U_{\infty}^2 L_{\infty}}
 ```
 based on the pressure distribution along a boundary.
+In 3D, the freestream-normal unit vector ``\psi_L`` is given by
+```math
+\psi_L \coloneqq \begin{pmatrix} -\sin(\alpha) \\ \cos(\alpha) \\ 0 \end{pmatrix}
+```
+where ``\alpha`` is the angle of attack.
 Supposed to be used in conjunction with [`AnalysisSurfaceIntegral`](@ref)
 which stores the boundary information and semidiscretization.
 
@@ -35,22 +29,12 @@ which stores the boundary information and semidiscretization.
 """
 function LiftCoefficientPressure3D(aoa, rhoinf, uinf, ainf)
     # psi_lift is the normal unit vector to the freestream direction.
-    # Note: The choice of the normal vector psi_lift = (-sin(aoa), cos(aoa))
+    # Note: The choice of the normal vector psi_lift = (-sin(aoa), cos(aoa), 0)
     # leads to positive lift coefficients for positive angles of attack for airfoils.
-    # One could also use psi_lift = (sin(aoa), -cos(aoa)) which results in the same
+    # One could also use psi_lift = (sin(aoa), -cos(aoa), 0) which results in the same
     # value, but with the opposite sign.
     psi_lift = (-sin(aoa), cos(aoa), zero(aoa))
-    return LiftCoefficientPressure3D(FlowStateDirectional3D(psi_lift, rhoinf, uinf,
-                                                            ainf))
-end
-
-function (lift_coefficient::LiftCoefficientPressure3D)(u, normal_direction, x, t,
-                                                       equations)
-    p = pressure(u, equations)
-    @unpack psi, rhoinf, uinf, linf = lift_coefficient.flow_state
-    # Normalize as `normal_direction` is not necessarily a unit vector
-    n = dot(normal_direction, psi) / norm(normal_direction)
-    return p * n / (0.5 * rhoinf * uinf^2 * linf)
+    return LiftCoefficientPressure(FlowStateDirectional(psi_lift, rhoinf, uinf, ainf))
 end
 
 function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
@@ -112,12 +96,5 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
         end
     end
     return surface_integral
-end
-
-function pretty_form_ascii(::AnalysisSurfaceIntegral{<:LiftCoefficientPressure3D{<:Any}})
-    "CL_p"
-end
-function pretty_form_utf(::AnalysisSurfaceIntegral{<:LiftCoefficientPressure3D{<:Any}})
-    "CL_p"
 end
 end # muladd

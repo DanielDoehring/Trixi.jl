@@ -6,6 +6,21 @@ used in the Julia ecosystem. Notable changes will be documented in this file
 for human readability.
 
 
+## Changes when updating to v0.12 from v0.11.x
+
+#### Added
+
+#### Changed
+
+- The (2D) aerodynamic coefficients 
+  `DragCoefficientPressure, LiftCoefficientPressure, DragCoefficientShearStress, LiftCoefficientShearStress` have been relabeled to 
+  `DragCoefficientPressure2D, LiftCoefficientPressure2D, DragCoefficientShearStress2D, LiftCoefficientShearStress2D`. ([#2375])
+
+#### Deprecated
+
+#### Removed
+
+
 ## Changes in the v0.11 lifecycle
 
 #### Added
