@@ -6,7 +6,7 @@
 #! format: noindent
 
 @doc raw"""
-    LiftCoefficientPressure2D(aoa, rho_inf, u_inf, linf)
+    LiftCoefficientPressure2D(aoa, rho_inf, u_inf, l_inf)
 
 Compute the lift coefficient
 ```math
@@ -25,20 +25,20 @@ which stores the boundary information and semidiscretization.
 - `aoa::Real`: Angle of attack in radians (for airfoils etc.)
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
+- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function LiftCoefficientPressure2D(aoa, rho_inf, u_inf, linf)
+function LiftCoefficientPressure2D(aoa, rho_inf, u_inf, l_inf)
     # psi_lift is the normal unit vector to the freestream direction.
     # Note: The choice of the normal vector psi_lift = (-sin(aoa), cos(aoa))
     # leads to positive lift coefficients for positive angles of attack for airfoils.
     # One could also use psi_lift = (sin(aoa), -cos(aoa)) which results in the same
     # value, but with the opposite sign.
     psi_lift = (-sin(aoa), cos(aoa))
-    return LiftCoefficientPressure(ForceState(psi_lift, rho_inf, u_inf, linf))
+    return LiftCoefficientPressure(ForceState(psi_lift, rho_inf, u_inf, l_inf))
 end
 
 @doc raw"""
-    DragCoefficientPressure2D(aoa, rho_inf, u_inf, linf)
+    DragCoefficientPressure2D(aoa, rho_inf, u_inf, l_inf)
 
 Compute the drag coefficient
 ```math
@@ -58,16 +58,16 @@ which stores the boundary information and semidiscretization.
 - `aoa::Real`: Angle of attack in radians (for airfoils etc.)
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
+- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function DragCoefficientPressure2D(aoa, rho_inf, u_inf, linf)
+function DragCoefficientPressure2D(aoa, rho_inf, u_inf, l_inf)
     # `psi_drag` is the unit vector tangent to the freestream direction
     psi_drag = (cos(aoa), sin(aoa))
-    return DragCoefficientPressure(ForceState(psi_drag, rho_inf, u_inf, linf))
+    return DragCoefficientPressure(ForceState(psi_drag, rho_inf, u_inf, l_inf))
 end
 
 @doc raw"""
-    LiftCoefficientShearStress2D(aoa, rho_inf, u_inf, linf)
+    LiftCoefficientShearStress2D(aoa, rho_inf, u_inf, l_inf)
 
 Compute the lift coefficient
 ```math
@@ -86,20 +86,20 @@ which stores the boundary information and semidiscretization.
 - `aoa::Real`: Angle of attack in radians (for airfoils etc.)
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
+- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function LiftCoefficientShearStress2D(aoa, rho_inf, u_inf, linf)
+function LiftCoefficientShearStress2D(aoa, rho_inf, u_inf, l_inf)
     # psi_lift is the normal unit vector to the freestream direction.
     # Note: The choice of the normal vector psi_lift = (-sin(aoa), cos(aoa))
     # leads to negative lift coefficients for airfoils.
     # One could also use psi_lift = (sin(aoa), -cos(aoa)) which results in the same
     # value, but with the opposite sign.
     psi_lift = (-sin(aoa), cos(aoa))
-    return LiftCoefficientShearStress(ForceState(psi_lift, rho_inf, u_inf, linf))
+    return LiftCoefficientShearStress(ForceState(psi_lift, rho_inf, u_inf, l_inf))
 end
 
 @doc raw"""
-    DragCoefficientShearStress2D(aoa, rho_inf, u_inf, linf)
+    DragCoefficientShearStress2D(aoa, rho_inf, u_inf, l_inf)
 
 Compute the drag coefficient
 ```math
@@ -118,12 +118,12 @@ which stores the boundary information and semidiscretization.
 - `aoa::Real`: Angle of attack in radians (for airfoils etc.)
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
+- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function DragCoefficientShearStress2D(aoa, rho_inf, u_inf, linf)
+function DragCoefficientShearStress2D(aoa, rho_inf, u_inf, l_inf)
     # `psi_drag` is the unit vector tangent to the freestream direction
     psi_drag = (cos(aoa), sin(aoa))
-    return DragCoefficientShearStress(ForceState(psi_drag, rho_inf, u_inf, linf))
+    return DragCoefficientShearStress(ForceState(psi_drag, rho_inf, u_inf, l_inf))
 end
 
 # Compute the three components of the 2D symmetric viscous stress tensor
@@ -178,9 +178,9 @@ function (lift_coefficient::LiftCoefficientShearStress{RealT, 2})(u, normal_dire
                                                                                       Real}
     visc_stress_vector = viscous_stress_vector(u, normal_direction, equations_parabolic,
                                                gradients_1, gradients_2)
-    @unpack psi, rho_inf, u_inf, linf = lift_coefficient.force_state
+    @unpack psi, rho_inf, u_inf, l_inf = lift_coefficient.force_state
     return (visc_stress_vector[1] * psi[1] + visc_stress_vector[2] * psi[2]) /
-           (0.5 * rho_inf * u_inf^2 * linf)
+           (0.5 * rho_inf * u_inf^2 * l_inf)
 end
 
 function (drag_coefficient::DragCoefficientShearStress{RealT, 2})(u, normal_direction,
@@ -191,9 +191,9 @@ function (drag_coefficient::DragCoefficientShearStress{RealT, 2})(u, normal_dire
                                                                                       Real}
     visc_stress_vector = viscous_stress_vector(u, normal_direction, equations_parabolic,
                                                gradients_1, gradients_2)
-    @unpack psi, rho_inf, u_inf, linf = drag_coefficient.force_state
+    @unpack psi, rho_inf, u_inf, l_inf = drag_coefficient.force_state
     return (visc_stress_vector[1] * psi[1] + visc_stress_vector[2] * psi[2]) /
-           (0.5 * rho_inf * u_inf^2 * linf)
+           (0.5 * rho_inf * u_inf^2 * l_inf)
 end
 
 function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,

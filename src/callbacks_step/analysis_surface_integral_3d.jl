@@ -6,7 +6,7 @@
 #! format: noindent
 
 @doc raw"""
-    LiftCoefficientPressure3D(aoa, rho_inf, u_inf, linf)
+    LiftCoefficientPressure3D(aoa, rho_inf, u_inf, a_inf)
 
 Compute the lift coefficient
 ```math

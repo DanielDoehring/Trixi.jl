@@ -40,7 +40,7 @@ end
 struct FlowState{RealT <: Real}
     rho_inf::RealT
     u_inf::RealT
-    linf::RealT
+    l_inf::RealT
 end
 
 struct SurfacePressureCoefficient{RealT <: Real}
@@ -53,7 +53,7 @@ struct SurfaceFrictionCoefficient{RealT <: Real} <: VariableViscous
 end
 
 """
-    SurfacePressureCoefficient(pinf, rho_inf, u_inf, linf)
+    SurfacePressureCoefficient(pinf, rho_inf, u_inf, l_inf)
 
 Compute the surface pressure coefficient
 ```math
@@ -67,14 +67,14 @@ which stores the boundary information and semidiscretization.
 - `pinf::Real`: Free-stream pressure
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
+- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function SurfacePressureCoefficient(pinf, rho_inf, u_inf, linf)
-    return SurfacePressureCoefficient(pinf, FlowState(rho_inf, u_inf, linf))
+function SurfacePressureCoefficient(pinf, rho_inf, u_inf, l_inf)
+    return SurfacePressureCoefficient(pinf, FlowState(rho_inf, u_inf, l_inf))
 end
 
 """
-SurfaceFrictionCoefficient(rho_inf, u_inf, linf)
+SurfaceFrictionCoefficient(rho_inf, u_inf, l_inf)
 
 Compute the surface skin friction coefficient
 ```math
@@ -87,10 +87,10 @@ which stores the boundary information and semidiscretization.
 
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
+- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function SurfaceFrictionCoefficient(rho_inf, u_inf, linf)
-    return SurfaceFrictionCoefficient(FlowState(rho_inf, u_inf, linf))
+function SurfaceFrictionCoefficient(rho_inf, u_inf, l_inf)
+    return SurfaceFrictionCoefficient(FlowState(rho_inf, u_inf, l_inf))
 end
 
 # Compute local pressure coefficient.
@@ -99,8 +99,8 @@ end
 function (pressure_coefficient::SurfacePressureCoefficient)(u, equations)
     p = pressure(u, equations)
     @unpack pinf = pressure_coefficient
-    @unpack rho_inf, u_inf, linf = pressure_coefficient.flow_state
-    return (p - pinf) / (0.5 * rho_inf * u_inf^2 * linf)
+    @unpack rho_inf, u_inf, l_inf = pressure_coefficient.flow_state
+    return (p - pinf) / (0.5 * rho_inf * u_inf^2 * l_inf)
 end
 
 # Compute local friction coefficient.
@@ -112,7 +112,7 @@ function (surface_friction::SurfaceFrictionCoefficient)(u, normal_direction, x, 
     viscous_stress_vector_ = viscous_stress_vector(u, normal_direction,
                                                    equations_parabolic,
                                                    gradients_1, gradients_2)
-    @unpack rho_inf, u_inf, linf = surface_friction.flow_state
+    @unpack rho_inf, u_inf, l_inf = surface_friction.flow_state
 
     # Normalize as `normal_direction` is not necessarily a unit vector
     n = normal_direction / norm(normal_direction)
@@ -120,7 +120,7 @@ function (surface_friction::SurfaceFrictionCoefficient)(u, normal_direction, x, 
     t = (-n[2], n[1])
     return (viscous_stress_vector_[1] * t[1] +
             viscous_stress_vector_[2] * t[2]) /
-           (0.5 * rho_inf * u_inf^2 * linf)
+           (0.5 * rho_inf * u_inf^2 * l_inf)
 end
 
 # TODO: 3D version
