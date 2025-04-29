@@ -189,7 +189,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
 mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType,
-                                           Params, Sol, F, Alg,
+                                           Params, Sol, F,
                                            PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSingleIntegrator{4}
     u::uType
@@ -203,7 +203,7 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::Alg # PairedExplicitRK4
+    alg::PairedExplicitRK4
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -213,7 +213,7 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType,
 end
 
 mutable struct PairedExplicitRK4EulerAcousticIntegrator{RealT <: Real, uType,
-                                                        Params, Sol, F, Alg,
+                                                        Params, Sol, F,
                                                         PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKEulerAcousticSingleIntegrator{4}
     u::uType
@@ -227,7 +227,7 @@ mutable struct PairedExplicitRK4EulerAcousticIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::Alg # PairedExplicitRK4
+    alg::PairedExplicitRK4
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

@@ -192,7 +192,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 mutable struct PairedExplicitRK2Integrator{RealT <: Real, uType,
-                                           Params, Sol, F, Alg,
+                                           Params, Sol, F,
                                            PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSingleIntegrator{2}
     u::uType
@@ -206,7 +206,7 @@ mutable struct PairedExplicitRK2Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::Alg # PairedExplicitRK2
+    alg::PairedExplicitRK2
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

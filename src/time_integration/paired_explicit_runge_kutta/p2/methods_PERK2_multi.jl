@@ -112,7 +112,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType,
-                                                Params, Sol, F, Alg,
+                                                Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiIntegrator{2}
     u::uType
@@ -126,7 +126,7 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRK2Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -154,7 +154,7 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType,
 end
 
 mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType,
-                                                         Params, Sol, F, Alg,
+                                                         Params, Sol, F,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{2}
     u::uType
@@ -168,7 +168,7 @@ mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRK2Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

@@ -28,7 +28,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType,
-                                                          Params, Sol, F, Alg,
+                                                          Params, Sol, F,
                                                           PairedExplicitRKOptions,
                                                           RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKMultiIntegrator{4}
@@ -43,7 +43,7 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRelaxationRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -77,7 +77,7 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType,
 end
 
 mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real, uType,
-                                                                   Params, Sol, F, Alg,
+                                                                   Params, Sol, F,
                                                                    PairedExplicitRKOptions,
                                                                    RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{4}
@@ -92,7 +92,7 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRelaxationRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

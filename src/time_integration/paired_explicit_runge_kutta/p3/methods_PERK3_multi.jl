@@ -111,7 +111,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType,
-                                                Params, Sol, F, Alg,
+                                                Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiIntegrator{3}
     u::uType
@@ -125,7 +125,7 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRK3Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -154,7 +154,7 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType,
 end
 
 mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType,
-                                                         Params, Sol, F, Alg,
+                                                         Params, Sol, F,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{3}
     u::uType
@@ -168,7 +168,7 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRK3Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -365,6 +365,111 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
 
     return integrator
 end
+
+#=
+@inline function PERK_k2!(integrator::PairedExplicitRK3MultiIntegrator,
+                          p, alg)
+    @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              alg.c[2] * integrator.dt * integrator.k1[i]
+    end
+
+    # k2: Only evaluated at finest level (1)
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[2] * integrator.dt,
+                 integrator, 1)
+end
+
+@inline function PERKMulti_intermediate_stage!(integrator::PairedExplicitRK3MultiIntegrator,
+                                               alg, stage)
+    if alg.num_methods == integrator.n_levels
+        ### Simplified implementation: Own method for each level ###
+
+        for level in 1:(integrator.n_levels)
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      integrator.dt *
+                                      alg.a_matrices[level, 1, stage - 2] *
+                                      integrator.k1[i]
+            end
+        end
+        for level in 1:alg.max_eval_levels[stage]
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] += integrator.dt *
+                                       alg.a_matrices[level, 2, stage - 2] *
+                                       integrator.du[i]
+            end
+        end
+    else
+        ### General implementation: Not own method for each grid level ###
+
+        # Loop over different methods with own associated level
+        for level in 1:min(alg.num_methods, integrator.n_levels)
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      integrator.dt *
+                                      alg.a_matrices[level, 1, stage - 2] *
+                                      integrator.k1[i]
+            end
+        end
+        for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] += integrator.dt *
+                                       alg.a_matrices[level, 2, stage - 2] *
+                                       integrator.du[i]
+            end
+        end
+
+        # "Remainder": Non-efficiently integrated
+        for level in (alg.num_methods + 1):(integrator.n_levels)
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      integrator.dt *
+                                      alg.a_matrices[alg.num_methods, 1, stage - 2] *
+                                      integrator.k1[i]
+            end
+        end
+        if alg.max_eval_levels[stage] == alg.num_methods
+            for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
+                @threaded for i in integrator.level_u_indices_elements[level]
+                    integrator.u_tmp[i] += integrator.dt *
+                                           alg.a_matrices[alg.num_methods, 2,
+                                                          stage - 2] *
+                                           integrator.du[i]
+                end
+            end
+        end
+    end
+
+    # For statically non-uniform meshes/characteristic speeds
+    #integrator.coarsest_lvl = alg.max_active_levels[stage]
+
+    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+    integrator.coarsest_lvl = min(alg.max_active_levels[stage],
+                                  integrator.n_levels)
+end
+
+@inline function PERK_ki!(integrator::PairedExplicitRK3MultiIntegrator,
+                          p, alg, stage)
+    PERKMulti_intermediate_stage!(integrator, alg, stage)
+
+    # Check if there are fewer integrators than grid levels (non-optimal method)
+    if integrator.coarsest_lvl == alg.num_methods
+        # NOTE: This is supposedly more efficient than setting
+        #integrator.coarsest_lvl = integrator.n_levels
+        # and then using the level-dependent version
+
+        integrator.f(integrator.du, integrator.u_tmp, p,
+                     integrator.t + alg.c[stage] * integrator.dt,
+                     integrator)
+    else
+        integrator.f(integrator.du, integrator.u_tmp, p,
+                     integrator.t + alg.c[stage] * integrator.dt,
+                     integrator,
+                     integrator.coarsest_lvl)
+    end
+end
+=#
 
 function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator{3},
                       new_size)

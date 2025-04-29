@@ -61,7 +61,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType,
-                                                     Params, Sol, F, Alg,
+                                                     Params, Sol, F,
                                                      PairedExplicitRKOptions,
                                                      RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKSingleIntegrator{2}
@@ -76,7 +76,7 @@ mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRelaxationRK2
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

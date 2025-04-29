@@ -114,7 +114,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType,
-                                                Params, Sol, F, Alg,
+                                                Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiIntegrator{4}
     u::uType
@@ -128,7 +128,7 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -156,7 +156,7 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType,
 end
 
 mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType,
-                                                         Params, Sol, F, Alg,
+                                                         Params, Sol, F,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{4}
     u::uType
@@ -170,7 +170,7 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -203,7 +203,7 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType,
 end
 
 mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real, uType,
-                                                             Params, Sol, F, Alg,
+                                                             Params, Sol, F,
                                                              PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKEulerAcousticMultiIntegrator{4}
     u::uType
@@ -217,7 +217,7 @@ mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real, uTyp
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::Alg # This is our own class written above; Abbreviation for ALGorithm
+    alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
