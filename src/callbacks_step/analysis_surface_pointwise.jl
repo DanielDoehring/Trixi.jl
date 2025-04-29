@@ -33,7 +33,7 @@ struct AnalysisSurfacePointwise{Variable, NBoundaries}
     function AnalysisSurfacePointwise(boundary_symbols::NTuple{NBoundaries, Symbol},
                                       variable,
                                       output_directory = "out") where {NBoundaries}
-        return new{typeof(variable), NBoundaries}(boundary_symbols, variable,
+        return new{typeof(variable), NBoundaries}(variable, boundary_symbols,
                                                   output_directory)
     end
 end
