@@ -9,7 +9,7 @@
 # pointwise surface forces.
 
 """
-    AnalysisSurfacePointwise{NBoundaries, Variable}(boundary_symbol_or_boundary_symbols,
+    AnalysisSurfacePointwise{Variable, NBoundaries}(boundary_symbol_or_boundary_symbols,
                                                     variable, output_directory = "out")
 
 This struct is used to compute pointwise surface values of a quantity of interest `variable` alongside
@@ -25,15 +25,15 @@ A single boundary name can also be supplied, e.g. `boundary_symbols = (:AirfoilT
 - `variable::Variable`: Quantity of interest, like lift or drag
 - `output_directory = "out"`: Directory where the pointwise value files are stored.
 """
-struct AnalysisSurfacePointwise{NBoundaries, Variable}
-    boundary_symbols::NTuple{NBoundaries, Symbol} # Name(s) of the boundary/boundaries
+struct AnalysisSurfacePointwise{Variable, NBoundaries}
     variable::Variable # Quantity of interest, like lift or drag
+    boundary_symbols::NTuple{NBoundaries, Symbol} # Name(s) of the boundary/boundaries
     output_directory::String
 
     function AnalysisSurfacePointwise(boundary_symbols::NTuple{NBoundaries, Symbol},
                                       variable,
                                       output_directory = "out") where {NBoundaries}
-        return new{NBoundaries, typeof(variable)}(boundary_symbols, variable,
+        return new{typeof(variable), NBoundaries}(boundary_symbols, variable,
                                                   output_directory)
     end
 end

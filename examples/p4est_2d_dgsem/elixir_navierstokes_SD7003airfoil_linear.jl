@@ -88,8 +88,8 @@ semi = SemidiscretizationHyperbolic(mesh, equations,
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
-#tspan = (0.0, 0.5) # For testing of MPI+p4est+PERK in 2D (hyperbolic only)
+#tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
+tspan = (0.0, 0.5) # For testing of MPI+p4est+PERK in 2D (hyperbolic only)
 
 #ode = semidiscretize(semi, tspan)
 ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
@@ -115,17 +115,17 @@ f_U_inf() = U_inf
 f_linf() = airfoil_cord_length
 
 drag_coefficient = AnalysisSurfaceIntegral((:Airfoil,),
-                                           DragCoefficientPressure(f_aoa(), f_rho_inf(),
+                                           DragCoefficientPressure2D(f_aoa(), f_rho_inf(),
                                                                    f_U_inf(), f_linf()))
 
 drag_coefficient_shear_force = AnalysisSurfaceIntegral((:Airfoil,),
-                                                       DragCoefficientShearStress(f_aoa(),
+                                                       DragCoefficientShearStress2D(f_aoa(),
                                                                                   f_rho_inf(),
                                                                                   f_U_inf(),
                                                                                   f_linf()))
 
 lift_coefficient = AnalysisSurfaceIntegral((:Airfoil,),
-                                           LiftCoefficientPressure(f_aoa(), f_rho_inf(),
+                                           LiftCoefficientPressure2D(f_aoa(), f_rho_inf(),
                                                                    f_U_inf(), f_linf()))
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
