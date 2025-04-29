@@ -53,7 +53,7 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
     return flux
 end
 
-polydeg = 1
+polydeg = 2
 basis = LobattoLegendreBasis(polydeg)
 
 shock_indicator = IndicatorHennemannGassner(equations, basis,
@@ -162,12 +162,11 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
 ### LLF-FD-Ranocha optimized ###
+cfl_interval = 2
 
 ## k = 1 ##
-base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k1/"
+base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k1/p2/"
 
-cfl_interval = 2
-# With shock-capturing
 stepsize_callback = StepsizeCallback(cfl = 39.9, interval = cfl_interval) # PERRK p2 16 standalone
 
 dtRatios_complete_p2 = [ 
@@ -189,12 +188,35 @@ dtRatios_complete_p2 = [
                       ] ./ 0.753155136853456
 Stages_complete_p2 = reverse(collect(range(2, 16)))
 
-# With shock-capturing
-#stepsize_callback = StepsizeCallback(cfl = 18.3, interval = cfl_interval) # PERK p2 2-16
+stepsize_callback = StepsizeCallback(cfl = 18.3, interval = cfl_interval) # PERK p2 2-16
 #stepsize_callback = StepsizeCallback(cfl = 18.5, interval = cfl_interval) # PERRK p2 2-16
 
 ## k = 2 ##
-base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k1/"
+base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
+
+stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PERRK p3 15 standalone
+
+dtRatios_complete_p3 = [ 
+    0.309904923439026,
+    0.277295976877213,
+    0.250083755254746,
+    0.228134118318558,
+    0.20889208316803,
+    0.185411275029182,
+    0.160719511508942,
+    0.138943578004837,
+    0.111497408151627,
+    0.0973129367828369,
+    0.0799268364906311,
+    0.0501513481140137,
+    0.0280734300613403
+                      ] ./ 0.309904923439026
+Stages_complete_p3 = reverse(collect(range(3, 15)))
+
+#stepsize_callback = StepsizeCallback(cfl = 8.3, interval = cfl_interval) # PERK p3 3-15
+stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK p3 3-15
+
+#stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # CKL43 (not yet maxed out for relaxation)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
@@ -207,18 +229,31 @@ callbacks = CallbackSet(summary_callback,
 # Run the simulation
 ###############################################################################
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, base_path * "p2/", dtRatios_complete_p2)
-#ode_alg = Trixi.PairedExplicitRK2(16, base_path * "p2/")
+# TODO: Try also standard Newton
+bisection = Trixi.RelaxationSolverBisection(max_iterations = 5)
+newton = Trixi.RelaxationSolverNewton()
 
+## k = 1, p = 2 ##
+#=
+ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2)
+#ode_alg = Trixi.PairedExplicitRK2(16, base_path)
 
-relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 5)
+ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2;
+                                                 relaxation_solver = bisection)
 
-ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages_complete_p2, base_path * "p2/", dtRatios_complete_p2;
-                                                 relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path; 
+                                            relaxation_solver = bisection)
+=#
+## k = 2, p = 3 ##
 
-ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path * "p2/"; 
-                                            relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
+#ode_alg = Trixi.PairedExplicitRK3(15, base_path)
 
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
+                                                 relaxation_solver = newton)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
+
+#ode_alg = Trixi.CKL43()
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
