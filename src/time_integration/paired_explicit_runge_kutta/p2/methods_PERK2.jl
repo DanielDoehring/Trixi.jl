@@ -277,10 +277,9 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{2})
         PERK_k2!(integrator, prob.p, alg)
 
         # Higher stages
-        for stage in 3:(alg.num_stages - 1)
+        for stage in 3:(alg.num_stages)
             PERK_ki!(integrator, prob.p, alg, stage)
         end
-        PERK_kS!(integrator, prob.p, alg)
 
         @threaded for i in eachindex(integrator.u)
             #=

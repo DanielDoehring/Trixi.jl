@@ -1033,7 +1033,6 @@ function timestep_gravity_PERK2!(cache, u_euler, tau, dtau,
             @views @. du_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
         end
     end
-    # TODO: Separate version with `kS!`?
 
     @threaded for i in eachindex(u_ode)
         u_ode[i] += dtau * (alg.b1 * k1[i] + alg.bS * du_ode[i])
@@ -1109,7 +1108,6 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
                  n_levels,
                  n_elements, grav_scale, rho0, u_euler)
     end
-    # TODO: Separate version with `kS!`?
 
     # u_{n+1} = u_n + b_S * k_S = u_n + 1 * k_S
     @threaded for i in eachindex(u_ode)
