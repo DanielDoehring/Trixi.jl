@@ -47,8 +47,8 @@ end
 
 struct ForceState{RealT <: Real, NDIMS}
     psi::NTuple{NDIMS, RealT} # Unit vector normal or parallel to freestream
-    rhoinf::RealT
-    uinf::RealT
+    rho_inf::RealT
+    u_inf::RealT
     linf::RealT
 end
 
@@ -75,19 +75,19 @@ end
 function (lift_coefficient::LiftCoefficientPressure)(u, normal_direction, x, t,
                                                      equations)
     p = pressure(u, equations)
-    @unpack psi, rhoinf, uinf, linf = lift_coefficient.force_state
+    @unpack psi, rho_inf, u_inf, linf = lift_coefficient.force_state
     # Normalize as `normal_direction` is not necessarily a unit vector
     n = dot(normal_direction, psi) / norm(normal_direction)
-    return p * n / (0.5 * rhoinf * uinf^2 * linf)
+    return p * n / (0.5 * rho_inf * u_inf^2 * linf)
 end
 
 function (drag_coefficient::DragCoefficientPressure)(u, normal_direction, x, t,
                                                      equations)
     p = pressure(u, equations)
-    @unpack psi, rhoinf, uinf, linf = drag_coefficient.force_state
+    @unpack psi, rho_inf, u_inf, linf = drag_coefficient.force_state
     # Normalize as `normal_direction` is not necessarily a unit vector
     n = dot(normal_direction, psi) / norm(normal_direction)
-    return p * n / (0.5 * rhoinf * uinf^2 * linf)
+    return p * n / (0.5 * rho_inf * u_inf^2 * linf)
 end
 
 function pretty_form_ascii(::AnalysisSurfaceIntegral{<:LiftCoefficientPressure{<:Any,
@@ -127,4 +127,5 @@ function pretty_form_utf(::AnalysisSurfaceIntegral{<:DragCoefficientShearStress{
 end
 
 include("analysis_surface_integral_2d.jl")
+include("analysis_surface_integral_3d.jl")
 end # muladd

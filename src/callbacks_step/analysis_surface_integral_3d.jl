@@ -6,7 +6,7 @@
 #! format: noindent
 
 @doc raw"""
-    LiftCoefficientPressure3D(aoa, rhoinf, uinf, linf)
+    LiftCoefficientPressure3D(aoa, rho_inf, u_inf, linf)
 
 Compute the lift coefficient
 ```math
@@ -23,18 +23,18 @@ Supposed to be used in conjunction with [`AnalysisSurfaceIntegral`](@ref)
 which stores the boundary information and semidiscretization.
 
 - `aoa::Real`: Angle of attack in radians (for airfoils etc.)
-- `rhoinf::Real`: Free-stream density
-- `uinf::Real`: Free-stream velocity
-- `ainf::Real`: Reference area of geometry
+- `rho_inf::Real`: Free-stream density
+- `u_inf::Real`: Free-stream velocity
+- `a_inf::Real`: Reference area of geometry
 """
-function LiftCoefficientPressure3D(aoa, rhoinf, uinf, ainf)
+function LiftCoefficientPressure3D(aoa, rho_inf, u_inf, a_inf)
     # psi_lift is the normal unit vector to the freestream direction.
     # Note: The choice of the normal vector psi_lift = (-sin(aoa), cos(aoa), 0)
     # leads to positive lift coefficients for positive angles of attack for airfoils.
     # One could also use psi_lift = (sin(aoa), -cos(aoa), 0) which results in the same
     # value, but with the opposite sign.
     psi_lift = (-sin(aoa), cos(aoa), zero(aoa))
-    return LiftCoefficientPressure(FlowStateDirectional(psi_lift, rhoinf, uinf, ainf))
+    return LiftCoefficientPressure(ForceState(psi_lift, rho_inf, u_inf, a_inf))
 end
 
 function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
@@ -79,8 +79,7 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
                                     i_node, j_node, k_node, element)
 
                 # L2 norm of normal direction (contravariant_vector) is the surface element
-                dS = weights[node_index1] * weights[node_index2] *
-                     norm(normal_direction)
+                dS = weights[node_index1] * weights[node_index2] * norm(normal_direction)
 
                 # Integral over entire boundary surface. Note, it is assumed that the
                 # `normal_direction` is normalized to be a normal vector within the

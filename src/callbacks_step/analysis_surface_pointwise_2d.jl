@@ -38,8 +38,8 @@ struct AnalysisSurfacePointwise{Variable, NBoundaries}
 end
 
 struct FlowState{RealT <: Real}
-    rhoinf::RealT
-    uinf::RealT
+    rho_inf::RealT
+    u_inf::RealT
     linf::RealT
 end
 
@@ -53,7 +53,7 @@ struct SurfaceFrictionCoefficient{RealT <: Real} <: VariableViscous
 end
 
 """
-    SurfacePressureCoefficient(pinf, rhoinf, uinf, linf)
+    SurfacePressureCoefficient(pinf, rho_inf, u_inf, linf)
 
 Compute the surface pressure coefficient
 ```math
@@ -65,16 +65,16 @@ Supposed to be used in conjunction with [`AnalysisSurfacePointwise`](@ref)
 which stores the boundary information and semidiscretization.
 
 - `pinf::Real`: Free-stream pressure
-- `rhoinf::Real`: Free-stream density
-- `uinf::Real`: Free-stream velocity
+- `rho_inf::Real`: Free-stream density
+- `u_inf::Real`: Free-stream velocity
 - `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function SurfacePressureCoefficient(pinf, rhoinf, uinf, linf)
-    return SurfacePressureCoefficient(pinf, FlowState(rhoinf, uinf, linf))
+function SurfacePressureCoefficient(pinf, rho_inf, u_inf, linf)
+    return SurfacePressureCoefficient(pinf, FlowState(rho_inf, u_inf, linf))
 end
 
 """
-SurfaceFrictionCoefficient(rhoinf, uinf, linf)
+SurfaceFrictionCoefficient(rho_inf, u_inf, linf)
 
 Compute the surface skin friction coefficient
 ```math
@@ -85,12 +85,12 @@ based on the wall shear stress vector ``\\tau_w`` along a boundary.
 Supposed to be used in conjunction with [`AnalysisSurfacePointwise`](@ref)
 which stores the boundary information and semidiscretization.
 
-- `rhoinf::Real`: Free-stream density
-- `uinf::Real`: Free-stream velocity
+- `rho_inf::Real`: Free-stream density
+- `u_inf::Real`: Free-stream velocity
 - `linf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function SurfaceFrictionCoefficient(rhoinf, uinf, linf)
-    return SurfaceFrictionCoefficient(FlowState(rhoinf, uinf, linf))
+function SurfaceFrictionCoefficient(rho_inf, u_inf, linf)
+    return SurfaceFrictionCoefficient(FlowState(rho_inf, u_inf, linf))
 end
 
 # Compute local pressure coefficient.
@@ -99,8 +99,8 @@ end
 function (pressure_coefficient::SurfacePressureCoefficient)(u, equations)
     p = pressure(u, equations)
     @unpack pinf = pressure_coefficient
-    @unpack rhoinf, uinf, linf = pressure_coefficient.flow_state
-    return (p - pinf) / (0.5 * rhoinf * uinf^2 * linf)
+    @unpack rho_inf, u_inf, linf = pressure_coefficient.flow_state
+    return (p - pinf) / (0.5 * rho_inf * u_inf^2 * linf)
 end
 
 # Compute local friction coefficient.
@@ -112,7 +112,7 @@ function (surface_friction::SurfaceFrictionCoefficient)(u, normal_direction, x, 
     viscous_stress_vector_ = viscous_stress_vector(u, normal_direction,
                                                    equations_parabolic,
                                                    gradients_1, gradients_2)
-    @unpack rhoinf, uinf, linf = surface_friction.flow_state
+    @unpack rho_inf, u_inf, linf = surface_friction.flow_state
 
     # Normalize as `normal_direction` is not necessarily a unit vector
     n = normal_direction / norm(normal_direction)
@@ -120,7 +120,7 @@ function (surface_friction::SurfaceFrictionCoefficient)(u, normal_direction, x, 
     t = (-n[2], n[1])
     return (viscous_stress_vector_[1] * t[1] +
             viscous_stress_vector_[2] * t[2]) /
-           (0.5 * rhoinf * uinf^2 * linf)
+           (0.5 * rho_inf * u_inf^2 * linf)
 end
 
 # TODO: 3D version

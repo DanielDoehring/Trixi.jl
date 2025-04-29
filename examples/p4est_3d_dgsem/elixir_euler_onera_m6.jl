@@ -229,9 +229,7 @@ callbacks = CallbackSet(summary_callback,
 # Run the simulation
 ###############################################################################
 
-# TODO: Try also standard Newton
 bisection = Trixi.RelaxationSolverBisection(max_iterations = 5)
-newton = Trixi.RelaxationSolverNewton()
 
 ## k = 1, p = 2 ##
 #=
@@ -250,7 +248,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path;
 #ode_alg = Trixi.PairedExplicitRK3(15, base_path)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
-                                                 relaxation_solver = newton)
+                                                 relaxation_solver = bisection)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
 
 #ode_alg = Trixi.CKL43()
