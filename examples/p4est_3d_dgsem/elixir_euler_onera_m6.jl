@@ -78,7 +78,6 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 base_path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
 base_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
 
-#mesh_file = base_path * "m6wing_Trixi_remeshed_bnds.inp"
 mesh_file = base_path * "m6wing_sanitized.inp"
 
 boundary_symbols = [:Symmetry,
@@ -105,7 +104,7 @@ restart_file = "restart_t60_damped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 
-tspan = (load_time(restart_filename), 6.001) # 6.01
+tspan = (load_time(restart_filename), 6.001) # 6.001
 #dt = load_dt(restart_filename)
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -192,6 +191,7 @@ stepsize_callback = StepsizeCallback(cfl = 18.3, interval = cfl_interval) # PERK
 #stepsize_callback = StepsizeCallback(cfl = 18.5, interval = cfl_interval) # PERRK p2 2-16
 
 ## k = 2 ##
+
 base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
 
 stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PERRK p3 15 standalone
@@ -213,7 +213,7 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309904923439026
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
-#stepsize_callback = StepsizeCallback(cfl = 8.3, interval = cfl_interval) # PERK p3 3-15
+stepsize_callback = StepsizeCallback(cfl = 8.3, interval = cfl_interval) # PERK p3 3-15
 stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK p3 3-15
 
 #stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # CKL43 (not yet maxed out for relaxation)
@@ -232,8 +232,9 @@ callbacks = CallbackSet(summary_callback,
 bisection = Trixi.RelaxationSolverBisection(max_iterations = 5)
 
 ## k = 1, p = 2 ##
+
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2)
 #=
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2)
 #ode_alg = Trixi.PairedExplicitRK2(16, base_path)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2;
@@ -249,6 +250,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path;
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
                                                  relaxation_solver = bisection)
+
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
 
 #ode_alg = Trixi.CKL43()
