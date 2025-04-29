@@ -772,9 +772,7 @@ end # @muladd
 include("analysis_dg1d.jl")
 include("analysis_dg2d.jl")
 include("analysis_surface_integral.jl")
-# TODO: refactor into dim-indep.
-include("analysis_surface_pointwise_2d.jl")
-
+include("analysis_surface_pointwise.jl")
 include("analysis_dg2d_parallel.jl")
 include("analysis_dg3d.jl")
 include("analysis_dg3d_parallel.jl")
@@ -815,6 +813,7 @@ function analyze(quantity::AnalysisSurfacePointwise{Variable},
                  semi::AbstractSemidiscretization,
                  iter) where {Variable}
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
+    # Call the `Variable`-specific `analyze` function
     analyze(quantity, du, u, t, mesh, equations, solver, cache, semi, iter)
 end
 # Special analyze for `SemidiscretizationHyperbolicParabolic` such that
@@ -831,6 +830,7 @@ function analyze(quantity::AnalysisSurfacePointwise{Variable},
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
     equations_parabolic = semi.equations_parabolic
     cache_parabolic = semi.cache_parabolic
+    # Call the `Variable`-specific `analyze` function
     analyze(quantity, du, u, t, mesh, equations, equations_parabolic, solver, cache, semi,
             cache_parabolic, iter)
 end

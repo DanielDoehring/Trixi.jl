@@ -284,10 +284,9 @@ export SummaryCallback, SteadyStateCallback, AnalysisCallback, AliveCallback,
        GlmSpeedCallback, LBMCollisionCallback, EulerAcousticsCouplingCallback,
        TrivialCallback, AnalysisCallbackCoupled,
        AnalysisSurfacePointwise, AnalysisSurfaceIntegral,
-       DragCoefficientPressure2D, 
+       DragCoefficientPressure2D,
        LiftCoefficientPressure2D, LiftCoefficientPressure3D,
        DragCoefficientShearStress2D, LiftCoefficientShearStress2D,
-       # TODO: Turn below to 2D!
        SurfacePressureCoefficient, SurfaceFrictionCoefficient
 
 export load_mesh, load_time, load_timestep, load_timestep!, load_dt,

@@ -79,7 +79,8 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
                                     i_node, j_node, k_node, element)
 
                 # L2 norm of normal direction (contravariant_vector) is the surface element
-                dS = weights[node_index1] * weights[node_index2] * norm(normal_direction)
+                dS = weights[node_index1] * weights[node_index2] *
+                     norm(normal_direction)
 
                 # Integral over entire boundary surface. Note, it is assumed that the
                 # `normal_direction` is normalized to be a normal vector within the

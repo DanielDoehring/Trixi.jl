@@ -75,11 +75,11 @@ l_inf = 1.0 # Length of airfoil
 force_boundary_names = (:Airfoil,)
 u_inf() = mach_inf()
 drag_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           DragCoefficientPressure(aoa(), rho_inf(),
+                                           DragCoefficientPressure2D(aoa(), rho_inf(),
                                                                    u_inf(), l_inf))
 
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           LiftCoefficientPressure(aoa(), rho_inf(),
+                                           LiftCoefficientPressure2D(aoa(), rho_inf(),
                                                                    u_inf(), l_inf))
 
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
@@ -93,7 +93,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_integrals = (drag_coefficient,
                                                            lift_coefficient),
-                                     #analysis_pointwise = (pressure_coefficient,)
+                                     analysis_pointwise = (pressure_coefficient,)
                                     )
 
 alive_callback = AliveCallback(alive_interval = 1000)
