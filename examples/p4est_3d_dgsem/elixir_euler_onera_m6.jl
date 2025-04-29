@@ -137,8 +137,8 @@ A = height * (0.5 * (g_I + g_III) + g_II)
 
 a_inf() = 0.7534504665983046
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           Trixi.LiftCoefficientPressure3D(aoa(), rho_inf(),
-                                                                   u_inf(equations), a_inf()))
+                                           LiftCoefficientPressure3D(aoa(), rho_inf(),
+                                                                     u_inf(equations), a_inf()))
 
 analysis_interval = 25_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
