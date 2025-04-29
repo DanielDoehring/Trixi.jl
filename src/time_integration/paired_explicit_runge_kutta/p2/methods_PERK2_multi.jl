@@ -119,7 +119,7 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
@@ -161,7 +161,7 @@ mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)

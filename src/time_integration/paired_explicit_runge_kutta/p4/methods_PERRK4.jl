@@ -37,7 +37,7 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT
     dt::RealT # current time step
     dtcache::RealT # manually set time step
     iter::Int # current number of time steps (iteration)

@@ -289,7 +289,7 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
             # and that we construct 'K_S' "in-place" from 'integrator.du'
             integrator.u[i] += integrator.dt *
                                (integrator.k1[i] + integrator.kS1[i] +
-                                4.0 * integrator.du[i]) / 6.0
+                                4 * integrator.du[i]) / 6
         end
     end
 

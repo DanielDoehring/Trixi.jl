@@ -121,7 +121,7 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
@@ -163,7 +163,7 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType,
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
@@ -210,7 +210,7 @@ mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real, uTyp
     du::uType
     u_tmp::uType
     t::RealT
-    tdir::Real
+    tdir::RealT
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
