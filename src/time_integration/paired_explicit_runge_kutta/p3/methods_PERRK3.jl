@@ -176,7 +176,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
             integrator.kS1[i] = integrator.du[i] # Faster than broadcasted version (with .=)
         end
 
-        PERK_ki!(integrator, prob.p, alg, alg.num_stages)
+        PERK_kS!(integrator, prob.p, alg)
 
         # Entropy change due to last (i = S) stage
         dS += 2 / 3 * integrator.dt * # b_{S} = 2/3

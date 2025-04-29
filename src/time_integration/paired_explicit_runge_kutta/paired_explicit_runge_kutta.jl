@@ -206,6 +206,21 @@ end
                  integrator.t + alg.c[stage] * integrator.dt)
 end
 
+@inline function PERK_kS!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
+                                            AbstractPairedExplicitRelaxationRKSingleIntegrator},
+                          p, alg)
+    # Construct current state
+    @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              integrator.dt *
+                              (alg.a_matrix[1, alg.num_stages - 2] * integrator.k1[i] +
+                               alg.a_matrix[2, alg.num_stages - 2] * integrator.du[i])
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.num_stages] * integrator.dt)
+end
+
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                             AbstractPairedExplicitRelaxationRKMultiIntegrator},
                           p, alg)
@@ -223,7 +238,7 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                                                  AbstractPairedExplicitRelaxationRKMultiIntegrator},
                                                alg, stage)
-    if alg.num_methods == integrator.n_levels
+    #if alg.num_methods == integrator.n_levels
         ### Simplified implementation: Own method for each level ###
 
         for level in 1:(integrator.n_levels)
@@ -241,6 +256,7 @@ end
                                        integrator.du[i]
             end
         end
+    #=
     else
         ### General implementation: Not own method for each grid level ###
 
@@ -281,6 +297,7 @@ end
             end
         end
     end
+    =#
 
     # For statically non-uniform meshes/characteristic speeds
     #integrator.coarsest_lvl = alg.max_active_levels[stage]
@@ -293,6 +310,7 @@ end
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                             AbstractPairedExplicitRelaxationRKMultiIntegrator},
                           p, alg, stage)
+    #@trixi_timeit timer() "IntermediateStage" PERKMulti_intermediate_stage!(integrator, alg, stage)
     PERKMulti_intermediate_stage!(integrator, alg, stage)
 
     # Check if there are fewer integrators than grid levels (non-optimal method)
@@ -310,6 +328,17 @@ end
                      integrator,
                      integrator.coarsest_lvl)
     end
+end
+
+@inline function PERK_kS!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
+                                            AbstractPairedExplicitRelaxationRKMultiIntegrator},
+                          p, alg)
+    #@trixi_timeit timer() "IntermediateStage" PERKMulti_intermediate_stage!(integrator, alg, alg.num_stages)
+    PERKMulti_intermediate_stage!(integrator, alg, alg.num_stages)
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[alg.num_stages] * integrator.dt,
+                 integrator)
 end
 
 # used for AMR (Adaptive Mesh Refinement)
