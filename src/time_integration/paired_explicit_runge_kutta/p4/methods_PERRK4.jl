@@ -44,7 +44,7 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::PairedExplicitRelaxationRK4
+    alg::PairedExplicitRK4
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

@@ -43,7 +43,7 @@ mutable struct PairedExplicitRelaxationRK3MultiIntegrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::PairedExplicitRelaxationRK3Multi
+    alg::PairedExplicitRK3Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -91,7 +91,7 @@ mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::PairedExplicitRelaxationRK3Multi
+    alg::PairedExplicitRK3Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

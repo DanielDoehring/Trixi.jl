@@ -76,7 +76,7 @@ mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::PairedExplicitRelaxationRK2
+    alg::PairedExplicitRK2
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
