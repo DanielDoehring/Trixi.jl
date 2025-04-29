@@ -41,7 +41,7 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
     @unpack boundary_symbol_indices = semi.boundary_conditions
     indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
 
-    dim = ndims(mesh)
+    dim = 2
     n_nodes = nnodes(dg)
     n_elements = length(indices)
 
@@ -61,11 +61,11 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
         i_node = i_node_start
         j_node = j_node_start
         for node_index in index_range
-            u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg, node_index,
-                                         boundary)
+            u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg,
+                                         node_index, boundary)
 
-            x = get_node_coords(node_coordinates, equations, dg, i_node, j_node,
-                                element)
+            x = get_node_coords(node_coordinates, equations, dg,
+                                i_node, j_node, element)
             value = variable(u_node, equations)
 
             coordinates[global_node_counter, 1] = x[1]
@@ -101,7 +101,7 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
     @unpack boundary_symbol_indices = semi.boundary_conditions
     indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
 
-    dim = ndims(mesh)
+    dim = 2
     n_nodes = nnodes(dg)
     n_elements = length(indices)
 
@@ -127,11 +127,11 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
         i_node = i_node_start
         j_node = j_node_start
         for node_index in index_range
-            u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg, node_index,
-                                         boundary)
+            u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg,
+                                         node_index, boundary)
 
-            x = get_node_coords(node_coordinates, equations, dg, i_node, j_node,
-                                element)
+            x = get_node_coords(node_coordinates, equations, dg,
+                                i_node, j_node, element)
 
             gradients_1 = get_node_vars(gradients_x, equations_parabolic, dg,
                                         i_node, j_node, element)

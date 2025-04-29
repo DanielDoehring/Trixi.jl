@@ -245,8 +245,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                 -1, n_levels,
                                                                 gamma,
                                                                 alg.relaxation_solver)
-                                                                # For AMR: Counting RHS evals 
-                                                                # 0)
+        # For AMR: Counting RHS evals 
+        # 0)
     end
 
     # initialize callbacks
