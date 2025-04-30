@@ -71,7 +71,7 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 
 # NOTE: Flux Differencing is required, shock capturing not (at least not for simply running the code)
 # IDEA: Compare results of FD only and ER/standard ? maybe oscillations for standard and none for ER
-volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
+#volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
@@ -221,7 +221,7 @@ stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK
 #stepsize_callback = StepsizeCallback(cfl = 2.3, interval = cfl_interval) # RK33
 
 # without SC #
-stepsize_callback = StepsizeCallback(cfl = 9.8, interval = cfl_interval) # PERK p3 3-15
+#stepsize_callback = StepsizeCallback(cfl = 9.8, interval = cfl_interval) # PERK p3 3-15
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
