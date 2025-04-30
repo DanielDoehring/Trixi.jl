@@ -82,8 +82,8 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
 
         # Compute the contravariant flux by taking the scalar product of the
         # first contravariant vector Ja^1 and the flux vector
-        Ja11, Ja12, Ja13 = get_contravariant_vector(1, contravariant_vectors, i, j, k,
-                                                    element)
+        Ja11, Ja12, Ja13 = get_contravariant_vector(1, contravariant_vectors,
+                                                    i, j, k, element)
         contravariant_flux1 = Ja11 * flux1 + Ja12 * flux2 + Ja13 * flux3
         for ii in eachnode(dg)
             multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
@@ -93,8 +93,8 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
 
         # Compute the contravariant flux by taking the scalar product of the
         # second contravariant vector Ja^2 and the flux vector
-        Ja21, Ja22, Ja23 = get_contravariant_vector(2, contravariant_vectors, i, j, k,
-                                                    element)
+        Ja21, Ja22, Ja23 = get_contravariant_vector(2, contravariant_vectors,
+                                                    i, j, k, element)
         contravariant_flux2 = Ja21 * flux1 + Ja22 * flux2 + Ja23 * flux3
         for jj in eachnode(dg)
             multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
@@ -714,7 +714,9 @@ function calc_boundary_flux!(cache, u, t, boundary_conditions::NamedTuple,
         for k in eachnode(dg), j in eachnode(dg)
             calc_boundary_flux_by_direction!(surface_flux_values, u, t, 1,
                                              boundary_conditions[direction],
-                                             mesh, equations, surface_integral, dg,
+                                             mesh,
+                                             have_nonconservative_terms(equations),
+                                             equations, surface_integral, dg,
                                              cache,
                                              direction, (1, j, k), (j, k), element)
         end
@@ -726,7 +728,9 @@ function calc_boundary_flux!(cache, u, t, boundary_conditions::NamedTuple,
         for k in eachnode(dg), j in eachnode(dg)
             calc_boundary_flux_by_direction!(surface_flux_values, u, t, 1,
                                              boundary_conditions[direction],
-                                             mesh, equations, surface_integral, dg,
+                                             mesh,
+                                             have_nonconservative_terms(equations),
+                                             equations, surface_integral, dg,
                                              cache,
                                              direction, (nnodes(dg), j, k), (j, k),
                                              element)
@@ -741,7 +745,9 @@ function calc_boundary_flux!(cache, u, t, boundary_conditions::NamedTuple,
         for k in eachnode(dg), i in eachnode(dg)
             calc_boundary_flux_by_direction!(surface_flux_values, u, t, 2,
                                              boundary_conditions[direction],
-                                             mesh, equations, surface_integral, dg,
+                                             mesh,
+                                             have_nonconservative_terms(equations),
+                                             equations, surface_integral, dg,
                                              cache,
                                              direction, (i, 1, k), (i, k), element)
         end
@@ -753,7 +759,9 @@ function calc_boundary_flux!(cache, u, t, boundary_conditions::NamedTuple,
         for k in eachnode(dg), i in eachnode(dg)
             calc_boundary_flux_by_direction!(surface_flux_values, u, t, 2,
                                              boundary_conditions[direction],
-                                             mesh, equations, surface_integral, dg,
+                                             mesh,
+                                             have_nonconservative_terms(equations),
+                                             equations, surface_integral, dg,
                                              cache,
                                              direction, (i, nnodes(dg), k), (i, k),
                                              element)
@@ -768,7 +776,9 @@ function calc_boundary_flux!(cache, u, t, boundary_conditions::NamedTuple,
         for j in eachnode(dg), i in eachnode(dg)
             calc_boundary_flux_by_direction!(surface_flux_values, u, t, 3,
                                              boundary_conditions[direction],
-                                             mesh, equations, surface_integral, dg,
+                                             mesh,
+                                             have_nonconservative_terms(equations),
+                                             equations, surface_integral, dg,
                                              cache,
                                              direction, (i, j, 1), (i, j), element)
         end
@@ -780,7 +790,9 @@ function calc_boundary_flux!(cache, u, t, boundary_conditions::NamedTuple,
         for j in eachnode(dg), i in eachnode(dg)
             calc_boundary_flux_by_direction!(surface_flux_values, u, t, 3,
                                              boundary_conditions[direction],
-                                             mesh, equations, surface_integral, dg,
+                                             mesh,
+                                             have_nonconservative_terms(equations),
+                                             equations, surface_integral, dg,
                                              cache,
                                              direction, (i, j, nnodes(dg)), (i, j),
                                              element)
