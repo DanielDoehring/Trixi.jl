@@ -53,6 +53,7 @@ struct SurfaceFrictionCoefficient{RealT <: Real} <: VariableViscous
     flow_state::FlowState{RealT}
 end
 
+# TODO: Revisit `l_inf` (for 3D)
 """
     SurfacePressureCoefficient(p_inf, rho_inf, u_inf, l_inf)
 
@@ -146,5 +147,5 @@ function pretty_form_utf(::AnalysisSurfacePointwise{<:SurfaceFrictionCoefficient
 end
 
 include("analysis_surface_pointwise_2d.jl")
-# TODO: 3D version
+include("analysis_surface_pointwise_3d.jl")
 end # muladd

@@ -19,19 +19,20 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
 
     @unpack variable, boundary_symbols = surface_variable
     @unpack boundary_symbol_indices = semi.boundary_conditions
-    indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
+    boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
 
-    dim = 3
+    dim = 3 # Follows from mesh dispatch 
     n_nodes = nnodes(dg)
-    n_elements = length(indices)
+    n_boundary_elements = length(boundary_indices)
 
-    coordinates = Matrix{real(dg)}(undef, n_elements * n_nodes, dim) # physical coordinates of indices
-    values = Vector{real(dg)}(undef, n_elements * n_nodes) # variable values at indices
+    # Physical coordinates of boundary indices. In 3D, the boundaries are surfaces => multiply with number of nodes^2
+    coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes * n_nodes, dim)
+    # Variable values at boundary indices. In 2D, the boundaries are lines => multiply with number of nodes^2
+    values = Vector{real(dg)}(undef, n_boundary_elements * n_nodes * n_nodes)
 
     index_range = eachnode(dg)
-
     global_node_counter = 1 # Keeps track of solution point number on the surface
-    for boundary in indices
+    for boundary in boundary_indices
         element = boundaries.neighbor_ids[boundary]
         node_indices = boundaries.node_indices[boundary]
 

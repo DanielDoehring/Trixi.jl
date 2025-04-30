@@ -39,19 +39,20 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
 
     @unpack variable, boundary_symbols = surface_variable
     @unpack boundary_symbol_indices = semi.boundary_conditions
-    indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
+    boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
 
-    dim = 2
+    dim = 2 # Follows from mesh dispatch 
     n_nodes = nnodes(dg)
-    n_elements = length(indices)
+    n_boundary_elements = length(boundary_indices)
 
-    coordinates = Matrix{real(dg)}(undef, n_elements * n_nodes, dim) # physical coordinates of indices
-    values = Vector{real(dg)}(undef, n_elements * n_nodes) # variable values at indices
+    # Physical coordinates of boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes, dim)
+    # Variable values at boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    values = Vector{real(dg)}(undef, n_boundary_elements * n_nodes)
 
     index_range = eachnode(dg)
-
     global_node_counter = 1 # Keeps track of solution point number on the surface
-    for boundary in indices
+    for boundary in boundary_indices
         element = boundaries.neighbor_ids[boundary]
         node_indices = boundaries.node_indices[boundary]
 
@@ -99,14 +100,16 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
 
     @unpack variable, boundary_symbols = surface_variable
     @unpack boundary_symbol_indices = semi.boundary_conditions
-    indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
+    boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
 
-    dim = 2
+    dim = 2 # Follows from mesh dispatch 
     n_nodes = nnodes(dg)
-    n_elements = length(indices)
+    n_boundary_elements = length(boundary_indices)
 
-    coordinates = Matrix{real(dg)}(undef, n_elements * n_nodes, dim) # physical coordinates of indices
-    values = Vector{real(dg)}(undef, n_elements * n_nodes) # variable values at indices
+    # Physical coordinates of boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes, dim)
+    # Variable values at boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    values = Vector{real(dg)}(undef, n_boundary_elements * n_nodes)
 
     # Additions for parabolic
     @unpack viscous_container = cache_parabolic
@@ -116,7 +119,7 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
 
     index_range = eachnode(dg)
     global_node_counter = 1 # Keeps track of solution point number on the surface
-    for boundary in indices
+    for boundary in boundary_indices
         element = boundaries.neighbor_ids[boundary]
         node_indices = boundaries.node_indices[boundary]
         direction = indices2direction(node_indices)

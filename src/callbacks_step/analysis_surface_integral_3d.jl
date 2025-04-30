@@ -46,11 +46,11 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
 
     @unpack variable, boundary_symbols = surface_variable
     @unpack boundary_symbol_indices = semi.boundary_conditions
-    indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
+    boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
 
     surface_integral = zero(eltype(u))
     index_range = eachnode(dg)
-    for boundary in indices
+    for boundary in boundary_indices
         element = boundaries.neighbor_ids[boundary]
         node_indices = boundaries.node_indices[boundary]
         direction = indices2direction(node_indices)
