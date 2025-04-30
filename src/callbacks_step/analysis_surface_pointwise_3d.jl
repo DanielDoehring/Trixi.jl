@@ -26,9 +26,9 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
     n_boundary_elements = length(boundary_indices)
 
     # Physical coordinates of boundary indices. In 3D, the boundaries are surfaces => multiply with number of nodes^2
-    coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes * n_nodes, dim)
+    coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes^2, dim)
     # Variable values at boundary indices. In 2D, the boundaries are lines => multiply with number of nodes^2
-    values = Vector{real(dg)}(undef, n_boundary_elements * n_nodes * n_nodes)
+    values = Vector{real(dg)}(undef, n_boundary_elements * n_nodes^2)
 
     index_range = eachnode(dg)
     global_node_counter = 1 # Keeps track of solution point number on the surface

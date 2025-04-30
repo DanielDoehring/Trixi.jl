@@ -70,7 +70,6 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_fv = surface_flux)
 
 # NOTE: Flux Differencing is required, shock capturing not (at least not for simply running the code)
-# IDEA: Compare results of FD only and ER/standard ? maybe oscillations for standard and none for ER
 #volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
@@ -100,13 +99,14 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 #tspan = (0.0, 6.0)
 #ode = semidiscretize(semi, tspan)
 
+#restart_file = "restart_t57_undamped.h5"
 restart_file = "restart_t60_damped.h5"
 #restart_file = base_path * "restart_files/restart_t60_damped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 
 tspan = (load_time(restart_filename), 6.001) # 6.001
-#dt = load_dt(restart_filename)
+
 ode = semidiscretize(semi, tspan, restart_filename)
 
 
@@ -123,28 +123,32 @@ rho_inf() = 1.4
 u_inf(equations) = 0.84
 # Area calculated from information given at https://www.grc.nasa.gov/www/wind/valid/m6wing/m6wing.html
 
-height = 1.1963
-#height = 1.0 # If normalized to one
+#height = 1.1963
+height = 1.0 # Mesh we use normalizes wing height to one
 
 g_I = tan(deg2rad(30)) * height
 
-base = 0.8059
-#base = 0.8059 / 1.1963 # For neight normalization to one
+#base = 0.8059
+base = 0.8059 / 1.1963 # Mesh we use normalizes wing height to one
 
 g_II = base - g_I
 g_III = tan(deg2rad(15.8)) * height
 A = height * (0.5 * (g_I + g_III) + g_II)
 
-a_inf() = 0.7534504665983046
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            LiftCoefficientPressure3D(aoa(), rho_inf(),
-                                                                     u_inf(equations), a_inf()))
+                                                                     u_inf(equations), A))
 
-analysis_interval = 25_000
+p_inf() = 1.0
+pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
+                                                SurfacePressureCoefficient(p_inf(), rho_inf(),
+                                                                        u_inf(equations), A))
+
+analysis_interval = 200
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
-                                     #analysis_integrals = ()
+                                     #analysis_pointwise = (pressure_coefficient,)
                                      )
 
 alive_callback = AliveCallback(alive_interval = 200)
@@ -220,9 +224,6 @@ stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK
 #stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # CKL43
 #stepsize_callback = StepsizeCallback(cfl = 2.3, interval = cfl_interval) # RK33
 
-# without SC #
-#stepsize_callback = StepsizeCallback(cfl = 9.8, interval = cfl_interval) # PERK p3 3-15
-
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
@@ -253,10 +254,10 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path;
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, base_path)
 
-#=
+
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
                                                  relaxation_solver = bisection)
-=#
+
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
 
