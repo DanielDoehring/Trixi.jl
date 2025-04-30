@@ -69,8 +69,9 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
 
-# Flux Differencing is required, shock capturing not (at least not for simply running the code)
-#volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
+# NOTE: Flux Differencing is required, shock capturing not (at least not for simply running the code)
+# IDEA: Compare results of FD only and ER/standard ? maybe oscillations for standard and none for ER
+volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
@@ -216,12 +217,16 @@ Stages_complete_p3 = reverse(collect(range(3, 15)))
 stepsize_callback = StepsizeCallback(cfl = 8.3, interval = cfl_interval) # PERK p3 3-15
 stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK p3 3-15
 
-#stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # CKL43 (not yet maxed out for relaxation)
+#stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # CKL43
+#stepsize_callback = StepsizeCallback(cfl = 2.3, interval = cfl_interval) # RK33
+
+# without SC #
+stepsize_callback = StepsizeCallback(cfl = 9.8, interval = cfl_interval) # PERK p3 3-15
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        #save_solution,
+                        save_solution,
                         #save_restart,
                         stepsize_callback
                         )
@@ -245,15 +250,18 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path;
 =#
 ## k = 2, p = 3 ##
 
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, base_path)
 
+#=
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
                                                  relaxation_solver = bisection)
+=#
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
 
-#ode_alg = Trixi.CKL43()
+#ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = bisection)
+#ode_alg = Trixi.RelaxationRK33(; relaxation_solver = bisection)
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
