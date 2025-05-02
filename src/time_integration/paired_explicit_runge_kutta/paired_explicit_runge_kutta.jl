@@ -237,10 +237,19 @@ end
                                       integrator.k1[i]
             end
         end
+
+        for level in 1:alg.max_add_levels[stage]
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] += integrator.dt *
+                                       alg.a_matrices[level, 2, stage - 2] *
+                                       integrator.du[i]
+            end
+        end
         =#
         
         #=
         # "u to indices" style
+        # NOTE: Could combine this with the "indices to u" style
         @threaded for i in eachindex(integrator.u)
             integrator.u_tmp[i] = integrator.u[i] +
                                   integrator.dt *
@@ -248,8 +257,16 @@ end
                                                  stage - 2] *
                                   integrator.k1[i]
         end
+
+        @threaded for i in integrator.level_u_indices_elements_acc[alg.max_add_levels[stage]]
+            integrator.u_tmp[i] += integrator.dt *
+                                   alg.a_matrices[integrator.u_to_level[i], 2,
+                                                  stage - 2] *
+                                   integrator.du[i]
+        end
         =#
 
+        
         # "PERK4" style
         for level in 1:alg.max_add_levels[stage]
             @threaded for i in integrator.level_u_indices_elements[level]
@@ -261,29 +278,7 @@ end
                                        integrator.du[i])
             end
         end
-        
-        #=
-        # "indices to u" style
-        for level in 1:alg.max_add_levels[stage]
-            @threaded for i in integrator.level_u_indices_elements[level]
-                integrator.u_tmp[i] += integrator.dt *
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i]
-            end
-        end
-        =#
 
-        #=
-        # "u to indices" style
-        @threaded for i in integrator.level_u_indices_elements_acc[alg.max_add_levels[stage]]
-            integrator.u_tmp[i] += integrator.dt *
-                                   alg.a_matrices[integrator.u_to_level[i], 2,
-                                                  stage - 2] *
-                                   integrator.du[i]
-        end
-        =#
-
-        # "PERK4" style
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
@@ -292,6 +287,7 @@ end
                                       integrator.k1[i]
             end
         end
+        
     else
         ### General implementation: Not own method for each grid level ###
 

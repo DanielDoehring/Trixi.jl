@@ -75,8 +75,8 @@ volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-mesh_path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
-#mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
+#mesh_path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
+mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
 
 mesh_file = mesh_path * "m6wing_sanitized.inp"
 
@@ -103,10 +103,10 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 restart_file = "restart_t60_damped.h5"
 restart_file = "restart_t605_undamped.h5"
 
-#restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
-restart_filename = joinpath("/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
+restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
+#restart_filename = joinpath("/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.04905) # 6.05
+tspan = (load_time(restart_filename), 6.0491) # 6.05
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -198,7 +198,7 @@ stepsize_callback = StepsizeCallback(cfl = 18.3, interval = cfl_interval) # PERK
 ## k = 2 ##
 
 base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
-base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
+#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
 
 stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PERRK p3 15 standalone
 
