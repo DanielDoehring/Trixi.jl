@@ -439,62 +439,63 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator{4},
                                                                  AbstractPairedExplicitRelaxationRKMultiIntegrator{4}},
                                                alg, stage)
-    #=
-    ### General implementation: Not own method for each grid level ###
-    # Loop over different methods with own associated level
-    for level in 1:min(alg.num_methods, integrator.n_levels)
-        @threaded for i in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  integrator.dt *
-                                  alg.a_matrices[level, 1, stage - 2] *
-                                  integrator.k1[i]
-        end
-    end
-    for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
-        @threaded for i in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[i] += integrator.dt *
-                                   alg.a_matrices[level, 2, stage - 2] *
-                                   integrator.du[i]
-        end
-    end
+    if alg.num_methods == integrator.n_levels
+        ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
 
-    # "Remainder": Non-efficiently integrated
-    for level in (alg.num_methods + 1):(integrator.n_levels)
-        @threaded for i in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  integrator.dt *
-                                  alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                  integrator.k1[i]
+        for level in 1:alg.max_add_levels[stage]
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      integrator.dt *
+                                      (alg.a_matrices[level, 1, stage - 2] *
+                                       integrator.k1[i] +
+                                       alg.a_matrices[level, 2, stage - 2] *
+                                       integrator.du[i])
+            end
         end
-    end
-    if alg.max_add_levels[stage] == alg.num_methods
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      integrator.dt * integrator.k1[i] # * A[stage, 1, level] = c[level] = 1
+            end
+        end
+    else
+        ### General implementation: Not own method for each grid level ###
+
+        # Loop over different methods with own associated level
+        for level in 1:min(alg.num_methods, integrator.n_levels)
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      integrator.dt *
+                                      alg.a_matrices[level, 1, stage - 2] *
+                                      integrator.k1[i]
+            end
+        end
+        for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
+            @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] += integrator.dt *
-                                       alg.a_matrices[alg.num_methods, 2,
-                                                      stage - 2] *
+                                       alg.a_matrices[level, 2, stage - 2] *
                                        integrator.du[i]
             end
         end
-    end
-    =#
 
-    # TODO: Find a way to handle this automatically via an if-clause
-    ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
-    for level in 1:alg.max_add_levels[stage]
-        @threaded for i in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  integrator.dt *
-                                  (alg.a_matrices[level, 1, stage - 2] *
-                                   integrator.k1[i] +
-                                   alg.a_matrices[level, 2, stage - 2] *
-                                   integrator.du[i])
+        # "Remainder": Non-efficiently integrated
+        for level in (alg.num_methods + 1):(integrator.n_levels)
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      integrator.dt *
+                                      alg.a_matrices[alg.num_methods, 1, stage - 2] *
+                                      integrator.k1[i]
+            end
         end
-    end
-    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
-        @threaded for i in integrator.level_u_indices_elements[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  integrator.dt * integrator.k1[i] # * A[stage, 1, level] = c[level] = 1
+        if alg.max_add_levels[stage] == alg.num_methods
+            for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+                @threaded for i in integrator.level_u_indices_elements[level]
+                    integrator.u_tmp[i] += integrator.dt *
+                                           alg.a_matrices[alg.num_methods, 2,
+                                                          stage - 2] *
+                                           integrator.du[i]
+                end
+            end
         end
     end
 
