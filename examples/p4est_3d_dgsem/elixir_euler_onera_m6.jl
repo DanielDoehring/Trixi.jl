@@ -107,7 +107,7 @@ restart_file = "restart_t605_undamped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 
-tspan = (load_time(restart_filename), 6.05)
+tspan = (load_time(restart_filename), 6.0491) # 6.05
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -167,7 +167,6 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
-### LLF-FD-Ranocha optimized ###
 cfl_interval = 2
 
 ## k = 1 ##
@@ -220,16 +219,20 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309904923439026
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
-## Shock-Capturing ##
+## Shock-Capturing, 6 -> 6.001 ##
 
 stepsize_callback = StepsizeCallback(cfl = 8.3, interval = cfl_interval) # PERK p3 3-15
 #stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK p3 3-15
 
-#stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # CKL43
-#stepsize_callback = StepsizeCallback(cfl = 2.3, interval = cfl_interval) # RK33
+#stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # R-CKL43
+#stepsize_callback = StepsizeCallback(cfl = 2.3, interval = cfl_interval) # R-RK33
 
-## Only Flux-Differencing ##
-stepsize_callback = StepsizeCallback(cfl = 9.9, interval = cfl_interval) # PERK p3 3-15
+## Only Flux-Differencing 6.049 - > 6.05 ##
+stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PERK p3 3-15
+
+#stepsize_callback = StepsizeCallback(cfl = 10.7, interval = cfl_interval) # PERK p3 15
+
+#stepsize_callback = StepsizeCallback(cfl = 2.8, interval = cfl_interval) # RK33
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
@@ -269,7 +272,9 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, 
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
 
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = bisection)
+
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = bisection)
+#ode_alg = Trixi.RK33()
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
