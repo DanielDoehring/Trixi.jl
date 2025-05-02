@@ -70,7 +70,7 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_fv = surface_flux)
 
 # NOTE: Flux Differencing is required, shock capturing not (at least not for simply running the code)
-#volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
+volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
@@ -101,11 +101,13 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 
 #restart_file = "restart_t57_undamped.h5"
 restart_file = "restart_t60_damped.h5"
+restart_file = "restart_t605_undamped.h5"
+
 #restart_file = base_path * "restart_files/restart_t60_damped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 
-tspan = (load_time(restart_filename), 6.001) # 6.001
+tspan = (load_time(restart_filename), 6.05)
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -144,7 +146,7 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
                                                                         u_inf(equations), A))
 
-analysis_interval = 200
+analysis_interval = 10_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
@@ -218,16 +220,21 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309904923439026
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
+## Shock-Capturing ##
+
 stepsize_callback = StepsizeCallback(cfl = 8.3, interval = cfl_interval) # PERK p3 3-15
-stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK p3 3-15
+#stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK p3 3-15
 
 #stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # CKL43
 #stepsize_callback = StepsizeCallback(cfl = 2.3, interval = cfl_interval) # RK33
 
+## Only Flux-Differencing ##
+stepsize_callback = StepsizeCallback(cfl = 9.9, interval = cfl_interval) # PERK p3 3-15
+
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        save_solution,
+                        #save_solution,
                         #save_restart,
                         stepsize_callback
                         )
@@ -254,10 +261,10 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path;
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, base_path)
 
-
+#=
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
                                                  relaxation_solver = bisection)
-
+=#
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
 
