@@ -223,7 +223,7 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                                                  AbstractPairedExplicitRelaxationRKMultiIntegrator},
                                                alg, stage)
-    # NOTE: Here some allocations are observed                                               
+    # NOTE: Here some allocations are observed (due to the `@threaded` macro)                                               
     if alg.num_methods == integrator.n_levels
         ### Simplified implementation: Own method for each level ###
 
@@ -235,7 +235,7 @@ end
                                       integrator.k1[i]
             end
         end
-        for level in 1:alg.max_eval_levels[stage]
+        for level in 1:alg.max_add_levels[stage]
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] += integrator.dt *
                                        alg.a_matrices[level, 2, stage - 2] *
@@ -254,7 +254,7 @@ end
                                       integrator.k1[i]
             end
         end
-        for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
+        for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] += integrator.dt *
                                        alg.a_matrices[level, 2, stage - 2] *
@@ -271,8 +271,8 @@ end
                                       integrator.k1[i]
             end
         end
-        if alg.max_eval_levels[stage] == alg.num_methods
-            for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
+        if alg.max_add_levels[stage] == alg.num_methods
+            for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
                 @threaded for i in integrator.level_u_indices_elements[level]
                     integrator.u_tmp[i] += integrator.dt *
                                            alg.a_matrices[alg.num_methods, 2,

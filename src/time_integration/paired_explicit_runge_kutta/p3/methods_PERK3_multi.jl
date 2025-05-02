@@ -28,11 +28,11 @@ function compute_PairedExplicitRK3Multi_butcher_tableau(stages::Vector{Int64},
     active_levels[1] = 1:num_methods
 
     # Datastructure indicating at which stage which level contributes to state
-    eval_levels = [Vector{Int64}() for _ in 1:num_stages]
-    # k1 is evaluated at all levels
-    eval_levels[1] = 1:num_methods
+    add_levels = [Vector{Int64}() for _ in 1:num_stages]
+    # k1 is used/added at all levels
+    add_levels[1] = 1:num_methods
     # Second stage: Only finest method
-    eval_levels[2] = [1]
+    add_levels[2] = [1]
 
     for level in eachindex(stages)
         num_stage_evals = stages[level]
@@ -57,15 +57,15 @@ function compute_PairedExplicitRK3Multi_butcher_tableau(stages::Vector{Int64},
             push!(active_levels[stage], level)
         end
 
-        # Add eval levels to stages
+        # Push contributing (added) levels to stages
         for stage in num_stages:-1:(num_stages - num_a_coeffs + 1)
-            push!(eval_levels[stage], level)
+            push!(add_levels[stage], level)
         end
     end
     max_active_levels = maximum.(active_levels)
-    max_eval_levels = maximum.(eval_levels)
+    max_add_levels = maximum.(add_levels)
 
-    return a_matrices, c, active_levels, max_active_levels, max_eval_levels
+    return a_matrices, c, active_levels, max_active_levels, max_add_levels
 end
 
 struct PairedExplicitRK3Multi <:
@@ -82,7 +82,7 @@ struct PairedExplicitRK3Multi <:
 
     active_levels::Vector{Vector{Int64}}
     max_active_levels::Vector{Int64}
-    max_eval_levels::Vector{Int64}
+    max_add_levels::Vector{Int64}
 end
 
 # Constructor for previously computed A Coeffs
@@ -95,15 +95,15 @@ function PairedExplicitRK3Multi(stages::Vector{Int64},
     a_matrices, c,
     active_levels,
     max_active_levels,
-    max_eval_levels = compute_PairedExplicitRK3Multi_butcher_tableau(stages,
-                                                                     num_stages,
-                                                                     base_path_a_coeffs,
-                                                                     cS2)
+    max_add_levels = compute_PairedExplicitRK3Multi_butcher_tableau(stages,
+                                                                    num_stages,
+                                                                    base_path_a_coeffs,
+                                                                    cS2)
 
     return PairedExplicitRK3Multi(minimum(stages), length(stages), num_stages, stages,
                                   dt_ratios,
                                   a_matrices, c, active_levels,
-                                  max_active_levels, max_eval_levels)
+                                  max_active_levels, max_add_levels)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77

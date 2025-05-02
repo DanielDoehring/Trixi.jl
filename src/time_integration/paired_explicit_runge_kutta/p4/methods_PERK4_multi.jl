@@ -26,11 +26,11 @@ function compute_PairedExplicitRK4Multi_butcher_tableau(stages::Vector{Int64},
     active_levels[1] = 1:num_methods
 
     # Datastructure indicating at which stage which level contributes to state
-    eval_levels = [Vector{Int64}() for _ in 1:num_stages]
-    # k1 is evaluated at all levels
-    eval_levels[1] = 1:num_methods
+    add_levels = [Vector{Int64}() for _ in 1:num_stages]
+    # k1 is used/added at all levels
+    add_levels[1] = 1:num_methods
     # Second stage: Only finest method
-    eval_levels[2] = [1]
+    add_levels[2] = [1]
 
     for level in eachindex(stages)
         num_stage_evals = stages[level]
@@ -56,19 +56,19 @@ function compute_PairedExplicitRK4Multi_butcher_tableau(stages::Vector{Int64},
             push!(active_levels[stage], level)
         end
 
-        # Add eval levels to stages
+        # Push contributing (added) levels to stages
         for stage in num_stages:-1:(num_stages - (3 + num_a_coeffs) - 1)
-            push!(eval_levels[stage], level)
+            push!(add_levels[stage], level)
         end
     end
     # Shared matrix
     a_matrix_constant = PERK4_a_matrix_constant(cS3)
 
     max_active_levels = maximum.(active_levels)
-    max_eval_levels = maximum.(eval_levels)
+    max_add_levels = maximum.(add_levels)
 
     return a_matrices, a_matrix_constant, c, active_levels, max_active_levels,
-           max_eval_levels
+           max_add_levels
 end
 
 struct PairedExplicitRK4Multi <:
@@ -86,7 +86,7 @@ struct PairedExplicitRK4Multi <:
 
     active_levels::Vector{Vector{Int64}}
     max_active_levels::Vector{Int64}
-    max_eval_levels::Vector{Int64}
+    max_add_levels::Vector{Int64}
 end
 
 function PairedExplicitRK4Multi(stages::Vector{Int64},
@@ -99,14 +99,14 @@ function PairedExplicitRK4Multi(stages::Vector{Int64},
     a_matrix_constant, c,
     active_levels,
     max_active_levels,
-    max_eval_levels = compute_PairedExplicitRK4Multi_butcher_tableau(stages, num_stages,
-                                                                     base_path_a_coeffs,
-                                                                     cS3)
+    max_add_levels = compute_PairedExplicitRK4Multi_butcher_tableau(stages, num_stages,
+                                                                    base_path_a_coeffs,
+                                                                    cS3)
 
     return PairedExplicitRK4Multi(minimum(stages), length(stages), num_stages, stages,
                                   dt_ratios,
                                   a_matrices, a_matrix_constant, c, active_levels,
-                                  max_active_levels, max_eval_levels)
+                                  max_active_levels, max_add_levels)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -450,7 +450,7 @@ end
                                   integrator.k1[i]
         end
     end
-    for level in 1:min(alg.max_eval_levels[stage], integrator.n_levels)
+    for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] += integrator.dt *
                                    alg.a_matrices[level, 2, stage - 2] *
@@ -467,8 +467,8 @@ end
                                   integrator.k1[i]
         end
     end
-    if alg.max_eval_levels[stage] == alg.num_methods
-        for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
+    if alg.max_add_levels[stage] == alg.num_methods
+        for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] += integrator.dt *
                                        alg.a_matrices[alg.num_methods, 2,
@@ -481,7 +481,7 @@ end
 
     # TODO: Find a way to handle this automatically via an if-clause
     ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
-    for level in 1:alg.max_eval_levels[stage]
+    for level in 1:alg.max_add_levels[stage]
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
                                   integrator.dt *
@@ -491,7 +491,7 @@ end
                                    integrator.du[i])
         end
     end
-    for level in (alg.max_eval_levels[stage] + 1):(integrator.n_levels)
+    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
                                   integrator.dt * integrator.k1[i] # * A[stage, 1, level] = c[level] = 1

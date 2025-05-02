@@ -876,7 +876,7 @@ end
                        dtau * alg.a_matrices[level, 1, stage - 2] * k1[i]
         end
     end
-    for level in 1:min(alg.max_eval_levels[stage], n_levels)
+    for level in 1:min(alg.max_add_levels[stage], n_levels)
         @threaded for i in level_u_indices_elements[level]
             u_tmp[i] += dtau * alg.a_matrices[level, 2, stage - 2] * du[i]
         end
@@ -889,8 +889,8 @@ end
                        dtau * alg.a_matrices[alg.num_methods, 1, stage - 2] * k1[i]
         end
     end
-    if alg.max_eval_levels[stage] == alg.num_methods
-        for level in (alg.max_eval_levels[stage] + 1):n_levels
+    if alg.max_add_levels[stage] == alg.num_methods
+        for level in (alg.max_add_levels[stage] + 1):n_levels
             @threaded for i in level_u_indices_elements[level]
                 u_tmp[i] += dtau * alg.a_matrices[alg.num_methods, 2, stage - 2] * du[i]
             end
@@ -904,7 +904,7 @@ end
             u_tmp[i] = u[i] + dtau * alg.a_matrices[level, 1, stage - 2] * k1[i]
         end
     end
-    for level in 1:alg.max_eval_levels[stage]
+    for level in 1:alg.max_add_levels[stage]
         @threaded for i in level_u_indices_elements[level]
             u_tmp[i] += dtau * alg.a_matrices[level, 2, stage - 2] * du[i]
         end
