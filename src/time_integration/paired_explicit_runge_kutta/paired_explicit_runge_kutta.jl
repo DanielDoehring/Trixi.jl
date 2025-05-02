@@ -223,10 +223,14 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                                                  AbstractPairedExplicitRelaxationRKMultiIntegrator},
                                                alg, stage)
-    # NOTE: Here some allocations are observed (due to the `@threaded` macro)                                               
+    # NOTE: Here some allocations are observed (due to the `@threaded` macro)
+
+    # IDEA: Could thread-parallelize over all indices on the coarsest level, 
+    # and then use an additional datastructure to map from u index back to method/level index
     if alg.num_methods == integrator.n_levels
         ### Simplified implementation: Own method for each level ###
 
+        #=
         for level in 1:(integrator.n_levels)
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
@@ -235,6 +239,16 @@ end
                                       integrator.k1[i]
             end
         end
+        =#
+        @threaded for i in eachindex(integrator.u)
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  integrator.dt *
+                                  alg.a_matrices[integrator.u_to_level[i], 1,
+                                                 stage - 2] *
+                                  integrator.k1[i]
+        end
+
+        # TODO: Do some proper benchmarking
         for level in 1:alg.max_add_levels[stage]
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] += integrator.dt *
@@ -242,6 +256,13 @@ end
                                        integrator.du[i]
             end
         end
+        #=
+        @threaded for i in integrator.level_u_indices_elements_acc[alg.max_add_levels[stage]]
+            integrator.u_tmp[i] += integrator.dt *
+                                   alg.a_matrices[integrator.u_to_level[i], 2, stage - 2] *
+                                   integrator.du[i]
+        end
+        =#
     else
         ### General implementation: Not own method for each grid level ###
 

@@ -925,8 +925,7 @@ function get_hmin_per_element(mesh::P4estMesh{3}, elements,
     return hmin_per_element, h_min, h_max
 end
 
-# TODO: T8Code extensions
-
+# Partitioning function for approach: Each level stores its indices
 @inline function partition_u!(level_u_indices_elements, level_info_elements,
                               n_levels, u_ode, mesh, equations, dg, cache)
     u = wrap_array(u_ode, mesh, equations, dg, cache)
@@ -936,6 +935,24 @@ end
                                                                     level_info_elements[level]]))
         append!(level_u_indices_elements[level], indices)
         sort!(level_u_indices_elements[level])
+    end
+
+    return nothing
+end
+
+# Partitioning function for approach: Each index stores its level
+@inline function partition_u!(level_u_indices_elements, level_info_elements,
+                              u_to_level,
+                              n_levels, u_ode, mesh, equations, dg, cache)
+    u = wrap_array(u_ode, mesh, equations, dg, cache)
+
+    for level in 1:n_levels
+        @views indices = collect(Iterators.flatten(LinearIndices(u)[..,
+                                                                    level_info_elements[level]]))
+        append!(level_u_indices_elements[level], indices)
+        sort!(level_u_indices_elements[level])
+
+        @views u_to_level[indices] .= level
     end
 
     return nothing
