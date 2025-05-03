@@ -171,15 +171,17 @@ function relaxation_solver!(integrator,
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                             gamma_max * dir_wrap[.., element]
     end
-    r_max = entropy_difference(gamma_max, S_old, dS, u_tmp_wrap,
-                               mesh, equations, dg, cache)
+    @trixi_timeit timer() "Δη" r_max=entropy_difference(gamma_max, S_old, dS,
+                                                        u_tmp_wrap, mesh,
+                                                        equations, dg, cache)
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                             gamma_min * dir_wrap[.., element]
     end
-    r_min = entropy_difference(gamma_min, S_old, dS, u_tmp_wrap,
-                               mesh, equations, dg, cache)
+    @trixi_timeit timer() "Δη" r_min=entropy_difference(gamma_min, S_old, dS,
+                                                        u_tmp_wrap, mesh,
+                                                        equations, dg, cache)
 
     # Check if there exists a root for `r` in the interval [gamma_min, gamma_max]
     if r_max > 0 && r_min < 0
@@ -192,8 +194,10 @@ function relaxation_solver!(integrator,
                                                     integrator.gamma *
                                                     dir_wrap[.., element]
             end
-            r_gamma = entropy_difference(integrator.gamma, S_old, dS, u_tmp_wrap,
-                                         mesh, equations, dg, cache)
+            @trixi_timeit timer() "Δη" r_gamma=entropy_difference(integrator.gamma,
+                                                                  S_old, dS,
+                                                                  u_tmp_wrap, mesh,
+                                                                  equations, dg, cache)
 
             if r_gamma < 0
                 gamma_min = integrator.gamma
@@ -226,15 +230,17 @@ function relaxation_solver!(integrator,
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                             gamma_1 * dir_wrap[.., element]
     end
-    r_1 = entropy_difference(gamma_1, S_old, dS, u_tmp_wrap,
-                             mesh, equations, dg, cache)
+    @trixi_timeit timer() "Δη" r_1=entropy_difference(gamma_1, S_old, dS,
+                                                      u_tmp_wrap, mesh,
+                                                      equations, dg, cache)
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                             gamma_0 * dir_wrap[.., element]
     end
-    r_0 = entropy_difference(gamma_0, S_old, dS, u_tmp_wrap,
-                             mesh, equations, dg, cache)
+    @trixi_timeit timer() "Δη" r_0=entropy_difference(gamma_0, S_old, dS,
+                                                      u_tmp_wrap, mesh,
+                                                      equations, dg, cache)
 
     # Check if there exists a root for `r` in the interval [gamma_0, gamma_1] = [gamma_min, gamma_max]
     if r_1 > 0 && r_0 < 0
@@ -252,8 +258,9 @@ function relaxation_solver!(integrator,
                                                     gamma_1 * dir_wrap[.., element]
             end
             r_0 = r_1
-            r_1 = entropy_difference(gamma_1, S_old, dS, u_tmp_wrap,
-                                     mesh, equations, dg, cache)
+            @trixi_timeit timer() "Δη" r_1=entropy_difference(gamma_1, S_old, dS,
+                                                              u_tmp_wrap, mesh,
+                                                              equations, dg, cache)
 
             gamma_0 = gamma_1 - r_1 * (gamma_1 - gamma_0) / (r_1 - r_0)
             # Switch order of 0, 1:
@@ -295,8 +302,10 @@ function relaxation_solver!(integrator,
                                                 integrator.gamma *
                                                 dir_wrap[.., element]
         end
-        r_gamma = entropy_difference(integrator.gamma, S_old, dS, u_tmp_wrap,
-                                     mesh, equations, dg, cache)
+        @trixi_timeit timer() "Δη" r_gamma=entropy_difference(integrator.gamma,
+                                                              S_old, dS,
+                                                              u_tmp_wrap, mesh,
+                                                              equations, dg, cache)
         dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
 
         integrator.gamma -= step_scaling * r_gamma / dr
