@@ -42,8 +42,7 @@ end
 
 @inline function int_w_dot_stage(stage, u_i,
                                  mesh::Union{TreeMesh{3}, StructuredMesh{3},
-                                             P4estMesh{3},
-                                             T8codeMesh{3}},
+                                             P4estMesh{3}, T8codeMesh{3}},
                                  equations, dg::DG, cache)
     @trixi_timeit timer() "Integrate w ⋅ k" begin
         # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
