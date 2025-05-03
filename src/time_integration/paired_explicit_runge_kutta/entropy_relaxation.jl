@@ -8,14 +8,14 @@
 # NOTE: This could actually live in a more general location,
 # as it is not PERK-specific.
 
-@inline function int_w_dot_stage(stage, u_i,
+@inline function int_w_dot_stage(stage, u_stage,
                                  mesh::Union{TreeMesh{1}, StructuredMesh{1}},
                                  equations, dg::DG, cache)
     @trixi_timeit timer() "Integrate w ⋅ k" begin
         # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
-        integrate_via_indices(u_i, mesh, equations, dg, cache,
-                              stage) do u_i, i, element, equations, dg, stage
-            u_local = get_node_vars(u_i, equations, dg, i, element)
+        integrate_via_indices(u_stage, mesh, equations, dg, cache,
+                              stage) do u_stage, i, element, equations, dg, stage
+            u_local = get_node_vars(u_stage, equations, dg, i, element)
             w_node = cons2entropy(u_local, equations)
             stage_node = get_node_vars(stage, equations, dg, i, element)
             dot(w_node, stage_node)
@@ -23,16 +23,16 @@
     end
 end
 
-@inline function int_w_dot_stage(stage, u_i,
+@inline function int_w_dot_stage(stage, u_stage,
                                  mesh::Union{TreeMesh{2}, StructuredMesh{2},
                                              UnstructuredMesh2D, P4estMesh{2},
                                              T8codeMesh{2}},
                                  equations, dg::DG, cache)
     @trixi_timeit timer() "Integrate w ⋅ k" begin
         # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
-        integrate_via_indices(u_i, mesh, equations, dg, cache,
-                              stage) do u_i, i, j, element, equations, dg, stage
-            u_local = get_node_vars(u_i, equations, dg, i, j, element)
+        integrate_via_indices(u_stage, mesh, equations, dg, cache,
+                              stage) do u_stage, i, j, element, equations, dg, stage
+            u_local = get_node_vars(u_stage, equations, dg, i, j, element)
             w_node = cons2entropy(u_local, equations)
             stage_node = get_node_vars(stage, equations, dg, i, j, element)
             dot(w_node, stage_node)
@@ -40,15 +40,15 @@ end
     end
 end
 
-@inline function int_w_dot_stage(stage, u_i,
+@inline function int_w_dot_stage(stage, u_stage,
                                  mesh::Union{TreeMesh{3}, StructuredMesh{3},
                                              P4estMesh{3}, T8codeMesh{3}},
                                  equations, dg::DG, cache)
     @trixi_timeit timer() "Integrate w ⋅ k" begin
         # Calculate ∫(∂S/∂u ⋅ k)dΩ = ∫(w ⋅ k)dΩ
-        integrate_via_indices(u_i, mesh, equations, dg, cache,
-                              stage) do u_i, i, j, k, element, equations, dg, stage
-            u_local = get_node_vars(u_i, equations, dg, i, j, k, element)
+        integrate_via_indices(u_stage, mesh, equations, dg, cache,
+                              stage) do u_stage, i, j, k, element, equations, dg, stage
+            u_local = get_node_vars(u_stage, equations, dg, i, j, k, element)
             w_node = cons2entropy(u_local, equations)
             stage_node = get_node_vars(stage, equations, dg, i, j, k, element)
             dot(w_node, stage_node)
@@ -64,6 +64,7 @@ end
 
 abstract type RelaxationSolver end
 
+# TODO: Field dS_accept which is checked whether relaxation should be performed at all
 struct RelaxationSolverBisection{RealT <: Real} <: RelaxationSolver
     gamma_min::RealT    # Lower bound of the initial bracketing interval
     gamma_max::RealT    # Upper bound of the initial bracketing interval
@@ -72,8 +73,7 @@ struct RelaxationSolverBisection{RealT <: Real} <: RelaxationSolver
 end
 
 function RelaxationSolverBisection(; gamma_min = 0.1, gamma_max = 1.2,
-                                   gamma_tol = 1e-14,
-                                   max_iterations = 25)
+                                   gamma_tol = 1e-14, max_iterations = 25)
     return RelaxationSolverBisection(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
@@ -85,8 +85,7 @@ struct RelaxationSolverSecant{RealT <: Real} <: RelaxationSolver
 end
 
 function RelaxationSolverSecant(; gamma_min = 0.1, gamma_max = 1.2,
-                                gamma_tol = 1e-14,
-                                max_iterations = 15)
+                                gamma_tol = 1e-14, max_iterations = 15)
     return RelaxationSolverSecant(gamma_min, gamma_max, gamma_tol, max_iterations)
 end
 
@@ -127,15 +126,15 @@ end
 struct RelaxationSolverNewton{RealT <: Real} <: RelaxationSolver
     step_scaling::RealT # Scaling factor for the Newton step
     root_tol::RealT     # Function-tolerance for the "relaxation equation" 
-    max_iterations::Int # Maximum number of Newton iterations
     # Minimum relaxation parameter. If the Newton iteration computes a value smaller than this, 
     # the relaxation parameter is set to 1.
     gamma_min::RealT
+    max_iterations::Int # Maximum number of Newton iterations
 end
 
 function RelaxationSolverNewton(; step_scaling = 1.0, root_tol = 1e-14,
-                                max_iterations = 5, gamma_min = 1e-13)
-    return RelaxationSolverNewton(step_scaling, root_tol, max_iterations, gamma_min)
+                                gamma_min = 1e-13, max_iterations = 5)
+    return RelaxationSolverNewton(step_scaling, root_tol, gamma_min, max_iterations)
 end
 
 function Base.show(io::IO, relaxation_solver::RelaxationSolverNewton)
