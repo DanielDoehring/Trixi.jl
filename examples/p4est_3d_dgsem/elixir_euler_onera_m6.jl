@@ -219,14 +219,6 @@ dtRatios_complete_p3 = [
                       ] ./ 0.309904923439026
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
-## Shock-Capturing, 6 -> 6.001 ##
-
-stepsize_callback = StepsizeCallback(cfl = 8.3, interval = cfl_interval) # PERK p3 3-15
-#stepsize_callback = StepsizeCallback(cfl = 8.4, interval = cfl_interval) # PERRK p3 3-15
-
-#stepsize_callback = StepsizeCallback(cfl = 2.5, interval = cfl_interval) # R-CKL43
-#stepsize_callback = StepsizeCallback(cfl = 2.3, interval = cfl_interval) # R-RK33
-
 ## 6.049 -> 6.05 ##
 
 # Only Flux-Differencing #
@@ -253,21 +245,16 @@ callbacks = CallbackSet(summary_callback,
 # Run the simulation
 ###############################################################################
 
-bisection = Trixi.RelaxationSolverBisection(max_iterations = 5, gamma_min = 0.95, gamma_max = 1.1)
-secant = Trixi.RelaxationSolverSecant(max_iterations = 5, gamma_min = 0.95, gamma_max = 1.1)
+bisection = Trixi.RelaxationSolverBisection(max_iterations = 5, gamma_min = 0.95, gamma_max = 1.1,
+                                            root_tol = 1e-12)
+
+newton = Trixi.RelaxationSolverNewton(root_tol = 1e-12)
 
 ## k = 1, p = 2 ##
 
 #ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2)
-#=
 #ode_alg = Trixi.PairedExplicitRK2(16, base_path)
 
-ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2;
-                                                 relaxation_solver = bisection)
-
-ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path; 
-                                            relaxation_solver = bisection)
-=#
 ## k = 2, p = 3 ##
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
@@ -275,7 +262,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK2(16, base_path;
 
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
-                                                 relaxation_solver = bisection)
+                                                 relaxation_solver = newton)
 
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = bisection)                                                 
