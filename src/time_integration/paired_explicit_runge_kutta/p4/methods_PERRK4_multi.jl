@@ -92,7 +92,7 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F
-    alg::PairedExplicitRelaxationRK4Multi
+    alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
