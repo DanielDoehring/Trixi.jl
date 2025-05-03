@@ -204,7 +204,7 @@ function relaxation_solver!(integrator,
             end
             iterations += 1
         end
-    else
+    else # No proper bracketing interval found
         integrator.gamma = 1
         # CARE: This is an experimental strategy: 
         # Set gamma to smallest value s.t. convergence is still assured
@@ -273,7 +273,7 @@ function relaxation_solver!(integrator,
                 integrator.gamma = 1
             end
         end
-    else
+    else # No proper bracketing interval found
         integrator.gamma = 1
         # CARE: This is an experimental strategy: 
         # Set gamma to smallest value s.t. convergence is still assured
