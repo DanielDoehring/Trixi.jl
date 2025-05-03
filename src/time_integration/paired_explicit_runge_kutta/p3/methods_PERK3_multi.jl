@@ -151,9 +151,6 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType,
 
     coarsest_lvl::Int64
     n_levels::Int64
-
-    u_to_level::Vector{Int64}
-    level_u_indices_elements_acc::Vector{Vector{Int64}}
 end
 
 mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType,
@@ -297,24 +294,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     end
 
     # Set (initial) distribution of DG nodal values
-    #=
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partition_u!(level_u_indices_elements, level_info_elements, 
+    partition_u!(level_u_indices_elements, level_info_elements,
                  n_levels, u0, mesh, equations, dg, cache)
-    =#
-
-    level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    u_to_level = zeros(Int64, length(u0))
-    partition_u!(level_u_indices_elements, level_info_elements, u_to_level,
-                 n_levels, u0, mesh, equations, dg, cache)
-
-    level_u_indices_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
-    for level in 1:n_levels
-        for l in 1:level
-            append!(level_u_indices_elements_acc[level], level_u_indices_elements[l])
-        end
-        sort!(level_u_indices_elements_acc[level])
-    end
 
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
@@ -364,9 +346,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                                                       level_info_mortars_acc,
                                                       level_info_mpi_mortars_acc,
                                                       level_u_indices_elements,
-                                                      -1, n_levels,
-                                                      u_to_level,
-                                                      level_u_indices_elements_acc)
+                                                      -1, n_levels)
 
         if :semi_gravity in fieldnames(typeof(semi))
             partition_u_gravity!(integrator)
