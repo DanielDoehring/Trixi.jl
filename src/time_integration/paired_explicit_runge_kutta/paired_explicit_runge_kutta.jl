@@ -246,9 +246,12 @@ end
             end
         end
         =#
-        
+
         #=
         # "u to indices" style
+        # See e.g. commit
+        # https://github.com/DanielDoehring/Trixi.jl/commit/c775e5f45899cb75c742936c059629178ec766cb
+        #  for reconstruction
         # NOTE: Could combine this with the "indices to u" style
         @threaded for i in eachindex(integrator.u)
             integrator.u_tmp[i] = integrator.u[i] +
@@ -266,7 +269,6 @@ end
         end
         =#
 
-        
         # "PERK4" style
         for level in 1:alg.max_add_levels[stage]
             @threaded for i in integrator.level_u_indices_elements[level]
@@ -282,12 +284,12 @@ end
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt * 
+                                      integrator.dt *
                                       alg.a_matrices[level, 1, stage - 2] *
                                       integrator.k1[i]
             end
         end
-        
+
     else
         ### General implementation: Not own method for each grid level ###
 
