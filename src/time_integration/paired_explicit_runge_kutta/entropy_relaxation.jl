@@ -64,37 +64,39 @@ end
 
 abstract type RelaxationSolver end
 
-# TODO: Unify order of parameters: Shared first (num_iterations, root_tol)
 struct RelaxationSolverBisection{RealT <: Real} <: RelaxationSolver
+    # General parameters
+    max_iterations::Int # Maximum number of bisection iterations
+    root_tol::RealT     # Function-tolerance for the relaxation equation
+    gamma_tol::RealT    # Absolute tolerance for the bracketing interval length
+    # Method-specific parameters
     gamma_min::RealT    # Lower bound of the initial bracketing interval
     gamma_max::RealT    # Upper bound of the initial bracketing interval
-    gamma_tol::RealT    # Absolute tolerance for the bracketing interval length
-    max_iterations::Int # Maximum number of bisection iterations
-    root_tol::RealT     # Function-tolerance for the "relaxation equation" 
 end
 
-function RelaxationSolverBisection(; gamma_min = 0.1, gamma_max = 1.2,
-                                   gamma_tol = 1e-14, max_iterations = 25,
-                                   root_tol = 1e-14)
-    return RelaxationSolverBisection(gamma_min, gamma_max, gamma_tol, max_iterations,
-                                     root_tol)
+function RelaxationSolverBisection(; max_iterations = 25,
+                                   root_tol = 1e-15, gamma_tol = 1e-13,
+                                   gamma_min = 0.1, gamma_max = 1.2)
+    return RelaxationSolverBisection(max_iterations, root_tol, gamma_tol,
+                                     gamma_min, gamma_max)
 end
 
 struct RelaxationSolverSecant{RealT <: Real} <: RelaxationSolver
-    gamma_min::RealT    # Lower bound of the initial bracketing interval
-    gamma_max::RealT    # Upper bound of the initial bracketing interval
-    gamma_tol::RealT    # Absolute tolerance for the bracketing interval length
+    # General parameters
     max_iterations::Int # Maximum number of bisection iterations
-    root_tol::RealT     # Function-tolerance for the "relaxation equation" 
+    root_tol::RealT     # Function-tolerance for the relaxation equation
+    gamma_tol::RealT    # Absolute tolerance for the bracketing interval length
+    # Method-specific parameters
+    gamma_min::RealT    # Lower bound of the initial bracketing interval
+    gamma_max::RealT    # Upper bound of the initial bracketing interval 
 end
 
-function RelaxationSolverSecant(; gamma_min = 0.1, gamma_max = 1.2,
-                                gamma_tol = 1e-14, max_iterations = 15,
-                                root_tol = 1e-14)
-    return RelaxationSolverSecant(gamma_min, gamma_max, gamma_tol, max_iterations,
-                                  root_tol)
+function RelaxationSolverSecant(; max_iterations = 15,
+                                root_tol = 1e-15, gamma_tol = 1e-13,
+                                gamma_min = 0.1, gamma_max = 1.2)
+    return RelaxationSolverSecant(max_iterations, root_tol, gamma_tol,
+                                  gamma_min, gamma_max)
 end
-
 function Base.show(io::IO,
                    relaxation_solver::Union{RelaxationSolverBisection,
                                             RelaxationSolverSecant})
@@ -103,11 +105,11 @@ function Base.show(io::IO,
     elseif typeof(relaxation_solver) <: RelaxationSolverSecant
         solver_type = "RelaxationSolverSecant"
     end
-    print(io, "$solver_type(gamma_min=", relaxation_solver.gamma_min,
-          ", gamma_max=", relaxation_solver.gamma_max,
+    print(io, "$solver_type(max_iterations=", relaxation_solver.max_iterations,
+          ", root_tol=", relaxation_solver.root_tol,
           ", gamma_tol=", relaxation_solver.gamma_tol,
-          ", max_iterations=", relaxation_solver.max_iterations,
-          ", root_tol=", relaxation_solver.root_tol, ")")
+          ", gamma_min=", relaxation_solver.gamma_min,
+          ", gamma_max=", relaxation_solver.gamma_max, ")")
 end
 function Base.show(io::IO, ::MIME"text/plain",
                    relaxation_solver::Union{RelaxationSolverBisection,
@@ -116,11 +118,11 @@ function Base.show(io::IO, ::MIME"text/plain",
         show(io, relaxation_solver)
     else
         setup = [
-            "gamma_min" => relaxation_solver.gamma_min,
-            "gamma_max" => relaxation_solver.gamma_max,
-            "gamma_tol" => relaxation_solver.gamma_tol,
             "max_iterations" => relaxation_solver.max_iterations,
-            "root_tol" => relaxation_solver.root_tol
+            "root_tol" => relaxation_solver.root_tol,
+            "gamma_tol" => relaxation_solver.gamma_tol,
+            "gamma_min" => relaxation_solver.gamma_min,
+            "gamma_max" => relaxation_solver.gamma_max
         ]
         if typeof(relaxation_solver) <: RelaxationSolverBisection
             solver_type = "RelaxationSolverBisection"
@@ -131,37 +133,45 @@ function Base.show(io::IO, ::MIME"text/plain",
     end
 end
 
-# TODO: gamma_tol for stepsize?
 struct RelaxationSolverNewton{RealT <: Real} <: RelaxationSolver
-    step_scaling::RealT # Scaling factor for the Newton step
-    root_tol::RealT     # Function-tolerance for the "relaxation equation" 
+    # General parameters
+    max_iterations::Int # Maximum number of Newton iterations
+    root_tol::RealT     # Function-tolerance for the relaxation equation
+    gamma_tol::RealT    # Absolute tolerance for the Newton update step size
+    # Method-specific parameters
     # Minimum relaxation parameter. If the Newton iteration computes a value smaller than this, 
     # the relaxation parameter is set to 1.
     gamma_min::RealT
-    max_iterations::Int # Maximum number of Newton iterations
+    step_scaling::RealT # Scaling factor for the Newton step
+end
+function RelaxationSolverNewton(; max_iterations = 5,
+                                root_tol = 1e-15, gamma_tol = 1e-13,
+                                gamma_min = 1e-13, step_scaling = 1.0)
+    return RelaxationSolverNewton(max_iterations, root_tol, gamma_tol,
+                                  gamma_min, step_scaling)
 end
 
-function RelaxationSolverNewton(; step_scaling = 1.0, root_tol = 1e-14,
-                                gamma_min = 1e-13, max_iterations = 5)
-    return RelaxationSolverNewton(step_scaling, root_tol, gamma_min, max_iterations)
-end
-
-function Base.show(io::IO, relaxation_solver::RelaxationSolverNewton)
-    print(io, "RelaxationSolverNewton(step_scaling=", relaxation_solver.step_scaling,
+function Base.show(io::IO,
+                   relaxation_solver::RelaxationSolverNewton)
+    print(io, "RelaxationSolverNewton(max_iterations=",
+          relaxation_solver.max_iterations,
           ", root_tol=", relaxation_solver.root_tol,
-          ", max_iterations=", relaxation_solver.max_iterations,
-          ", gamma_min=", relaxation_solver.gamma_min, ")")
+          ", gamma_tol=", relaxation_solver.gamma_tol,
+          ", gamma_min=", relaxation_solver.gamma_min,
+          ", step_scaling=", relaxation_solver.step_scaling, ")")
 end
+
 function Base.show(io::IO, ::MIME"text/plain",
                    relaxation_solver::RelaxationSolverNewton)
     if get(io, :compact, false)
         show(io, relaxation_solver)
     else
         setup = [
-            "step_scaling" => relaxation_solver.step_scaling,
-            "root_tol" => relaxation_solver.root_tol,
             "max_iterations" => relaxation_solver.max_iterations,
-            "gamma_min" => relaxation_solver.gamma_min
+            "root_tol" => relaxation_solver.root_tol,
+            "gamma_tol" => relaxation_solver.gamma_tol,
+            "gamma_min" => relaxation_solver.gamma_min,
+            "step_scaling" => relaxation_solver.step_scaling
         ]
         summary_box(io, "RelaxationSolverNewton", setup)
     end
@@ -186,7 +196,7 @@ function relaxation_solver!(integrator,
         return nothing
     end
 
-    @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
+    @unpack max_iterations, gamma_tol, gamma_min, gamma_max = relaxation_solver
 
     @threaded for element in eachelement(dg, cache)
         @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
@@ -256,7 +266,7 @@ function relaxation_solver!(integrator,
         return nothing
     end
 
-    @unpack gamma_min, gamma_max, gamma_tol, max_iterations = relaxation_solver
+    @unpack max_iterations, gamma_tol, gamma_min, gamma_max = relaxation_solver
 
     # Naming aliases to avoid confusion
     gamma_0, gamma_1 = gamma_min, gamma_max
@@ -333,7 +343,7 @@ function relaxation_solver!(integrator,
                             S_old, dS,
                             mesh, equations, dg::DG, cache,
                             relaxation_solver::RelaxationSolverNewton)
-    @unpack step_scaling, root_tol, max_iterations, gamma_min = relaxation_solver
+    @unpack max_iterations, root_tol, gamma_tol, gamma_min, step_scaling = relaxation_solver
 
     r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
     iterations = 0
@@ -347,8 +357,15 @@ function relaxation_solver!(integrator,
                                                               S_old, dS,
                                                               u_tmp_wrap, mesh,
                                                               equations, dg, cache)
-        # TODO: Break here if r_gamma < = root_tol ?
+
+        if abs(r_gamma) <= root_tol
+            break
+        end
+
         dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
+        if abs(dr) <= gamma_tol
+            break
+        end
 
         integrator.gamma -= step_scaling * r_gamma / dr
         iterations += 1
