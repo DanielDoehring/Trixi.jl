@@ -268,6 +268,12 @@ function relaxation_solver!(integrator,
 
             iterations += 1
             integrator.gamma = gamma_1 # Write result back to integrator
+
+            # Catch failure
+            if integrator.gamma < gamma_min
+                break
+                integrator.gamma = 1
+            end
         end
     else
         integrator.gamma = 1
