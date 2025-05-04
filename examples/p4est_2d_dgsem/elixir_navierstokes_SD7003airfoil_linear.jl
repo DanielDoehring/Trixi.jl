@@ -78,18 +78,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
-# For testing of MPI+p4est+PERK in 2D (hyperbolic only)
-#=
-semi = SemidiscretizationHyperbolic(mesh, equations,
-                                    initial_condition, solver;
-                                    boundary_conditions = boundary_conditions)
-=#
-
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-#tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
-tspan = (0.0, 0.5) # For testing of MPI+p4est+PERK in 2D (hyperbolic only)
+tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 
 #ode = semidiscretize(semi, tspan)
 ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
@@ -106,8 +98,8 @@ ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 summary_callback = SummaryCallback()
 
 # Choose analysis interval such that roughly every dt_c = 0.005 a record is taken
-analysis_interval = 25 # PERK4_Multi, PERKSingle
-#analysis_interval = 10_000 # For testing of MPI+p4est+PERK in 2D (hyperbolic only)
+analysis_interval = 25 # Matches for PERK 4 schemes
+analysis_interval = 1_000_000 # Only at end
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
@@ -136,10 +128,10 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_coefficient_shear_force,
                                                            lift_coefficient))
 
-cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
+#cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
 #cfl = 6.5 # PERK 4 Single 12
 
-#cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
+cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
 #cfl = 7.6 # Single PERK 14
 
 #cfl = 1.9 # R-RK44
@@ -155,15 +147,15 @@ save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      solution_variables = cons2prim,
                                      output_directory = "out")
 
-alive_callback = AliveCallback(alive_interval = 200)
+alive_callback = AliveCallback(alive_interval = 400)
 
 save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
                                    save_final_restart = true)
 
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        save_solution, # For plotting during measurement run
-                        #save_restart, # For restart with measurements
+                        #save_solution, # For plotting during measurement run
+                        save_restart, # For restart with measurements
                         analysis_callback,
                         summary_callback);
 
@@ -184,14 +176,14 @@ relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 #ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
 
-# For measurement run
+# For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
 sol = Trixi.solve(ode, ode_algorithm,
