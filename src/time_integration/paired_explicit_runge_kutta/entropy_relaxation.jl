@@ -363,11 +363,13 @@ function relaxation_solver!(integrator,
         end
 
         dr = int_w_dot_stage(dir_wrap, u_tmp_wrap, mesh, equations, dg, cache) - dS
-        if abs(dr) <= gamma_tol
+
+        step = step_scaling * r_gamma / dr
+        if abs(step) <= gamma_tol
             break
         end
 
-        integrator.gamma -= step_scaling * r_gamma / dr
+        integrator.gamma -= step
         iterations += 1
     end
 

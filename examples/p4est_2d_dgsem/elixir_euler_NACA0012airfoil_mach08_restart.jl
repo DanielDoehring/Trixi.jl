@@ -86,7 +86,7 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
                                                                            u_inf(), l_inf))
 
-analysis_interval = 2000                                                                          
+analysis_interval = 500_000 # Only at the end                                                                         
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      analysis_errors = Symbol[],
@@ -99,13 +99,10 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 alive_callback = AliveCallback(alive_interval = 1000)
 
 
-cfl = 2.8 # Standard PERK4 Multi
-cfl = 2.7 # Relaxed PERK4 Multi
-
-cfl = 2.7 # Relaxed PERK4 Standalone
+cfl = 2.8 # Standard PE(R)RK4 Multi/Standalone
 
 #cfl = 0.9 # R-RK44
-#cfl = 1.1 # R-TS64
+cfl = 1.1 # R-TS64
 #cfl = 1.5 # R-CKL54
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -117,7 +114,7 @@ amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       max_level = 3, max_threshold = 0.1)  # 3
 
 amr_ref_interval = 200
-cfl_ref = 2.7
+cfl_ref = 2.8
 amr_interval = Int(ceil(amr_ref_interval * cfl_ref/cfl))
 
 amr_callback = AMRCallback(semi, amr_controller,
@@ -127,7 +124,7 @@ amr_callback = AMRCallback(semi, amr_controller,
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, 
                         alive_callback,
-                        #save_solution,
+                        save_solution,
                         stepsize_callback,
                         amr_callback)
 
@@ -157,19 +154,20 @@ Stages_p4 = [14, 12, 10, 8, 7, 6, 5]
 
 path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NACA0012_Mach08/rusanov_chandrashekar/"
 
-# TODO: Re-run with new relaxation solver or set root_tol` low enough
-relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 10, gamma_min = 0.8)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
 #ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.PairedExplicitRK4(Stages_p4[1], path)
+
+# NOTE: For some reason `prolong2mortars` massive allocates if the multirate version is not executed before
 
 #ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.RK44()
 
-#ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.TS64()
 
 #ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
