@@ -383,16 +383,7 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
                                                                      integrator.relaxation_solver)
 
         integrator.iter += 1
-        # Check if due to entropy relaxation the final step is not reached
-        if integrator.finalstep == true && integrator.gamma != 1
-            # If we would go beyond the final time, clip gamma at 1.0
-            if integrator.gamma > 1.0
-                integrator.gamma = 1.0
-            else # If we are below the final time, reset finalstep flag
-                integrator.finalstep = false
-            end
-        end
-        integrator.t += integrator.gamma * integrator.dt
+        update_t_relaxation!(integrator)
 
         # Do relaxed update
         @threaded for i in eachindex(integrator.u)

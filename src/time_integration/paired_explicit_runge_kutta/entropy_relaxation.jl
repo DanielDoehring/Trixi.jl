@@ -384,4 +384,19 @@ function relaxation_solver!(integrator,
 
     return nothing
 end
+
+@inline function update_t_relaxation!(integrator)
+    # Check if due to entropy relaxation the final step is not reached
+    if integrator.finalstep == true && integrator.gamma != 1
+        # If we would go beyond the final time, clip gamma at 1.0
+        #if integrator.gamma > 1.0
+        integrator.gamma = 1.0
+        #else # If we are below the final time, reset finalstep flag
+        #    integrator.finalstep = false
+        #end
+    end
+    integrator.t += integrator.gamma * integrator.dt
+
+    return nothing
+end
 end # @muladd
