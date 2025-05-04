@@ -345,9 +345,8 @@ function relaxation_solver!(integrator,
                             relaxation_solver::RelaxationSolverNewton)
     @unpack max_iterations, root_tol, gamma_tol, gamma_min, step_scaling = relaxation_solver
 
-    r_gamma = floatmax(typeof(integrator.gamma)) # Initialize with large value
     iterations = 0
-    while abs(r_gamma) > root_tol && iterations < max_iterations
+    while iterations < max_iterations
         @threaded for element in eachelement(dg, cache)
             @views @. u_tmp_wrap[.., element] = u_wrap[.., element] +
                                                 integrator.gamma *
