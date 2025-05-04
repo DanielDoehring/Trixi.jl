@@ -157,7 +157,7 @@ Stages_p4 = [14, 12, 10, 8, 7, 6, 5]
 
 path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NACA0012_Mach08/rusanov_chandrashekar/"
 
-# NOTE: Use case for relaxation: Better accuracy of the lift/drag coefficients?
+# TODO: Re-run with new relaxation solver or set root_tol` low enough
 relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 10, gamma_min = 0.8)
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
