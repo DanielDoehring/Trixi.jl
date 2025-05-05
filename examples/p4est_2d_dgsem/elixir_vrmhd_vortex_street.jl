@@ -184,8 +184,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Setup an ODE problem
 
 tspan = (0.0, 120.0)
-#ode = semidiscretize(semi, tspan)
-ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multirate
+ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multirate
 
 # For finding final CFL
 #=
@@ -214,27 +214,27 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
 cfl_0() = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
 cfl_0() = 1.4 # PE (Relaxation) RK 4 13 (Standalone)
 
-#cfl_0() = 1.3 # R-RK44
-#cfl_0() = 1.3 # R-TS64
-#cfl_0() = 2.2 # R-CKL54
+cfl_0() = 1.3 # R-RK44
+cfl_0() = 1.3 # R-TS64
+cfl_0() = 2.2 # R-CKL54
 
 ### Restared CFL ###
 
 cfl_max() = 6.5 # PER(R)K4 13, 8, 6, 5
-#cfl_max() = 7.3 # Standalone PERRK4 13
+cfl_max() = 7.3 # Standalone PERRK4 13
 
-#cfl_max() = 1.5 # R-RK44
-#cfl_max() = 2.1 # R-TS64
-#cfl_max() = 2.7 # R-CKL54
+cfl_max() = 1.5 # R-RK44
+cfl_max() = 2.1 # R-TS64
+cfl_max() = 2.7 # R-CKL54
 
 ### Ramp-Up CFL ###
 t_ramp_up() = 4.40 # PER(R)K4 4 13, 8, 6, 5 
 
-#t_ramp_up() = 5.00 # PE Relaxation RK 4 13
+t_ramp_up() = 5.00 # Standalone PERRK4 13
 
-#t_ramp_up() = 0.75 # R-RK44
-#t_ramp_up() = 2.40 # R-TS64
-#t_ramp_up() = 1.10 # R-CKL54
+t_ramp_up() = 0.75 # R-RK44
+t_ramp_up() = 2.40 # R-TS64
+t_ramp_up() = 1.10 # R-CKL54
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -247,7 +247,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 
 # Combine all the callbacks into a description.
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         alive_callback,
                         glm_speed_callback,
                         stepsize_callback,
@@ -259,7 +259,7 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 base_path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 4, root_tol = 1e-13, gamma_tol = 1e-12)
 
 
 # p = 4
@@ -274,13 +274,13 @@ Stages = [13, 8, 6, 5]
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
 
 #ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
