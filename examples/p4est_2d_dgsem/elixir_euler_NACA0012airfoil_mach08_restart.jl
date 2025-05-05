@@ -102,7 +102,7 @@ alive_callback = AliveCallback(alive_interval = 1000)
 cfl = 2.8 # Standard PE(R)RK4 Multi/Standalone
 
 #cfl = 0.9 # R-RK44
-cfl = 1.1 # R-TS64
+#cfl = 1.1 # R-TS64
 #cfl = 1.5 # R-CKL54
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -157,7 +157,7 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NACA0012_Mach08/rusanov
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.PairedExplicitRK4(Stages_p4[1], path)
@@ -167,7 +167,7 @@ relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 
 #ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.RK44()
 
-ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.TS64()
 
 #ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
