@@ -223,9 +223,6 @@ end
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                                                  AbstractPairedExplicitRelaxationRKMultiIntegrator},
                                                alg, stage)
-    # NOTE: Here some allocations are observed (due to the `@threaded` macro)
-    # However, these do not increase if more threads are used!
-
     if alg.num_methods == integrator.n_levels
         ### Simplified implementation: Own method for each level ###
 
