@@ -933,7 +933,7 @@ end
     for level in 1:n_levels
         @views indices = collect(Iterators.flatten(LinearIndices(u)[..,
                                                                     level_info_elements[level]]))
-        append!(level_u_indices_elements[level], indices)
+        level_u_indices_elements[level] = indices
         sort!(level_u_indices_elements[level])
     end
 
@@ -949,7 +949,7 @@ end
     for level in 1:n_levels
         @views indices = collect(Iterators.flatten(LinearIndices(u)[..,
                                                                     level_info_elements[level]]))
-        append!(level_u_indices_elements[level], indices)
+        level_u_indices_elements[level] = indices
         sort!(level_u_indices_elements[level])
 
         @views u_to_level[indices] .= level
