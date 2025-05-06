@@ -141,6 +141,7 @@ include("time_integration/time_integration.jl")
 include("callbacks_step/callbacks_step.jl")
 include("callbacks_stage/callbacks_stage.jl")
 include("semidiscretization/semidiscretization_euler_gravity.jl")
+include("semidiscretization/semidiscretization_euler_electric.jl")
 
 # Special elixirs such as `convergence_test`
 include("auxiliary/special_elixirs.jl")

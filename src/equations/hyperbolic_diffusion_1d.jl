@@ -153,6 +153,22 @@ function initial_condition_eoc_test_coupled_euler_gravity(x, t,
     return SVector(phi, q1)
 end
 
+#### DRAFT!! ####
+function initial_condition_perturbation_test_coupled_euler_electric(x, t, equations::HyperbolicDiffusionEquations1D)
+    #TODO: Looks strange. Need to come back and recheck
+    phi = 0 # Since n_i = n_e = -> n_i - n_e = 0
+    q1 = 0 # Since E = -∂_x(ϕ) = 0
+    return SVector(phi, q1)
+end
+
+#### DRAFT!! ####
+function initial_condition_plasma(x, t, equations::HyperbolicDiffusionEquations1D)
+    # Plasma is injected into a vacuum. As far as I understand, everything should be 0 here?
+    phi = 0
+    q1 = 0
+    return SVector(phi, q1)
+end
+
 # Calculate 1D flux in for a single point
 @inline function flux(u, orientation::Integer,
                       equations::HyperbolicDiffusionEquations1D)
