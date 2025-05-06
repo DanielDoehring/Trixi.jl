@@ -156,8 +156,8 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
 
         k1_wrap = wrap_array(integrator.k1, prob.p)
         # Entropy change due to first stage
-        dS = 1 / 6 * integrator.dt * # b1 = 1/6
-             int_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache)
+        dS = integrator.dt *
+             int_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache) / 6 # 1/6
 
         PERK_k2!(integrator, prob.p, alg)
 
@@ -168,8 +168,8 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
         du_wrap = wrap_array(integrator.du, prob.p)
         u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
         # Entropy change due to S-1 stage
-        dS += 1 / 6 * integrator.dt * # b_{S-1} = 1/6
-              int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+        dS += integrator.dt *
+              int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache) / 6 # b_{S-1} = 1/6
 
         # We need to store `du` of the S-1 stage in `kS1` for the final update:
         @threaded for i in eachindex(integrator.u)
