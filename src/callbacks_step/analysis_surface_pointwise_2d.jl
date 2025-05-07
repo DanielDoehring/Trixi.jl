@@ -45,9 +45,14 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
     n_nodes = nnodes(dg)
     n_boundary_elements = length(boundary_indices)
 
-    # Physical coordinates of boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    # Store element indices of nodes for convenient postprocessing
+    # In 2D, the boundaries are lines => multiply with number of nodes
+    element_indices = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    # Store unqiue node counter to distinguish nodes at the same spatial position
+    node_counter = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    # Physical coordinates of boundary indices
     coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes, dim)
-    # Variable values at boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    # Variable values at boundary indices
     values = Vector{real(dg)}(undef, n_boundary_elements * n_nodes)
 
     index_range = eachnode(dg)
@@ -69,6 +74,8 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
                                 i_node, j_node, element)
             value = variable(u_node, equations)
 
+            element_indices[global_node_counter] = element
+            node_counter[global_node_counter] = global_node_counter
             coordinates[global_node_counter, 1] = x[1]
             coordinates[global_node_counter, 2] = x[2]
             values[global_node_counter] = value
@@ -81,7 +88,8 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
 
     # Save to disk
     save_pointwise_file(surface_variable.output_directory, varname(variable),
-                        coordinates, values, t, iter)
+                        element_indices, node_counter, coordinates, values,
+                        t, iter)
 end
 
 # Compute and save to disk a space-dependent `surface_variable`.
@@ -106,9 +114,14 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
     n_nodes = nnodes(dg)
     n_boundary_elements = length(boundary_indices)
 
-    # Physical coordinates of boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    # Store element indices of nodes for convenient postprocessing
+    # In 2D, the boundaries are lines => multiply with number of nodes
+    element_indices = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    # Store unqiue node counter to distinguish nodes at the same spatial position
+    node_counter = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    # Physical coordinates of boundary indices
     coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes, dim)
-    # Variable values at boundary indices. In 2D, the boundaries are lines => multiply with number of nodes
+    # Variable values at boundary indices
     values = Vector{real(dg)}(undef, n_boundary_elements * n_nodes)
 
     # Additions for parabolic
@@ -150,6 +163,8 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
             value = variable(u_node, normal_direction, x, t, equations_parabolic,
                              gradients_1, gradients_2)
 
+            element_indices[global_node_counter] = element
+            node_counter[global_node_counter] = global_node_counter
             coordinates[global_node_counter, 1] = x[1]
             coordinates[global_node_counter, 2] = x[2]
             values[global_node_counter] = value
@@ -162,6 +177,7 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
 
     # Save to disk
     save_pointwise_file(surface_variable.output_directory, varname(variable),
-                        coordinates, values, t, iter)
+                        element_indices, node_counter, coordinates, values,
+                        t, iter)
 end
 end # muladd

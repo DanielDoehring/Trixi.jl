@@ -115,7 +115,9 @@ varname(friction_coefficient::SurfaceFrictionCoefficient) = "CF_x"
 # The file is written to the `output_directory` with name `varname` in HDF5 (.h5) format.
 # The latter two are retrieved from the `surface_variable`,
 # an instantiation of `AnalysisSurfacePointwise`.
-function save_pointwise_file(output_directory, varname, coordinates, values, t, iter)
+function save_pointwise_file(output_directory, varname,
+                             element_indices, node_counter, coordinates, values,
+                             t, iter)
     n_points = length(values)
 
     filename = joinpath(output_directory, varname) * @sprintf("_%06d.h5", iter)
@@ -127,6 +129,8 @@ function save_pointwise_file(output_directory, varname, coordinates, values, t, 
 
         file["time"] = t
         file["timestep"] = iter
+        file["element_indices"] = element_indices
+        file["node_counter"] = node_counter
         file["point_coordinates"] = coordinates
         file["point_data"] = values
     end
