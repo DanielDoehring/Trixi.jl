@@ -294,7 +294,7 @@ Details about the 1D pressure Riemann solution can be found in Section 6.3.3 of 
   3rd edition
   [DOI: 10.1007/b79761](https://doi.org/10.1007/b79761)
 
-Should be used together with [`UnstructuredMesh2D`](@ref).
+Should be used together with [`UnstructuredMesh2D`](@ref) or [`P4estMesh`](@ref).
 """
 @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
                                               x, t,
@@ -384,14 +384,28 @@ Should be used together with [`StructuredMesh`](@ref).
     return boundary_flux
 end
 
+# Computes the mirror velocity across a symmetry plane which enforces
+# a tangential velocity that is aligned with the symmetry plane, i.e.,
+# which is normal to the `normal_direction`.
+@inline function velocity_symmetry_plane(normal_direction::AbstractVector, v1, v2)
+    norm_ = norm(normal_direction)
+    normal = normal_direction / norm_
+
+    v1_mirror = v1 - 2 * v_normal * normal[1]
+    v2_mirror = v2 - 2 * v_normal * normal[2]
+
+    return v1_mirror, v2_mirror
+end
+
 @doc raw"""
     boundary_condition_symmetry_plane(u_inner, normal_direction, x, t, surface_flux_function,
                                       equations::CompressibleEulerEquations2D)
 
 Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
-allows only for tangential velocity.
-The density and pressure are simply copied from the inner fluid cell to the outer cell
-The boundary velocity is always set
+allows only for non-zero tangential velocity.
+The density and pressure are simply copied from the inner fluid cell to the outer ghost cell.
+Any boundary on which this condition is applied thus acts as a symmetry plane for the flow.
+The boundary velocity is set as
 ```math
     \boldsymbol{v}_{\mathrm{Bnd}} = \boldsymbol{v}_{\mathrm{Fluid}} - 2 v_n \boldsymbol{n}_{\mathrm{Fluid}}
 ```
@@ -399,27 +413,29 @@ where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., in
 ```math
     v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
 ```
+
+Should be used together with [`UnstructuredMesh2D`](@ref) or [`P4estMesh`](@ref).
 """
-@inline function boundary_condition_symmetry_plane(u_inner, normal_direction::AbstractVector, x, t,
+@inline function boundary_condition_symmetry_plane(u_inner,
+                                                   normal_direction::AbstractVector, x,
+                                                   t,
                                                    surface_flux_function,
                                                    equations::CompressibleEulerEquations2D)
-    norm_ = norm(normal_direction)
-    normal = normal_direction / norm_
-
     # compute the primitive variables
     rho, v1, v2, p = cons2prim(u_inner, equations)
 
-    v_normal = normal[1] * v1 + normal[2] * v2
+    v1_mirror, v2_mirror = velocity_tangential_mirror(normal_direction, v1, v2)
 
     u_mirror = prim2cons(SVector(rho,
-            v1 - 2 * v_normal * normal[1],
-            v2 - 2 * v_normal * normal[2],
-            p), equations)
+                                 v1_mirror,
+                                 v2_mirror,
+                                 p), equations)
 
     flux = surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
 
     return flux
 end
+# TODO: Other mesh types
 
 # Calculate 2D flux for a single point
 @inline function flux(u, orientation::Integer, equations::CompressibleEulerEquations2D)

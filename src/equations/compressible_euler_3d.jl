@@ -386,6 +386,62 @@ Should be used together with [`StructuredMesh`](@ref).
     return boundary_flux
 end
 
+# Computes the mirror velocity across a symmetry plane which enforces
+# a tangential velocity that is aligned with the symmetry plane, i.e.,
+# which is normal to the `normal_direction`.
+@inline function velocity_symmetry_plane(normal_direction::AbstractVector, v1, v2, v3)
+    norm_ = norm(normal_direction)
+    normal = normal_direction / norm_
+
+    v1_mirror = v1 - 2 * v_normal * normal[1]
+    v2_mirror = v2 - 2 * v_normal * normal[2]
+    v3_mirror = v3 - 2 * v_normal * normal[3]
+
+    return v1_mirror, v2_mirror, v3_mirror
+end
+
+@doc raw"""
+    boundary_condition_symmetry_plane(u_inner, normal_direction, x, t, surface_flux_function,
+                                      equations::CompressibleEulerEquations3D)
+
+Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
+allows only for non-zero tangential velocity.
+The density and pressure are simply copied from the inner fluid cell to the outer ghost cell.
+Any boundary on which this condition is applied thus acts as a symmetry plane for the flow.
+The boundary velocity is set as
+```math
+    \boldsymbol{v}_{\mathrm{Bnd}} = \boldsymbol{v}_{\mathrm{Fluid}} - 2 v_n \boldsymbol{n}_{\mathrm{Fluid}}
+```
+where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., into the boundary pointing) normal unit vector and
+```math
+    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
+```
+
+Should be used together with [`P4estMesh`](@ref).
+"""
+@inline function boundary_condition_symmetry_plane(u_inner,
+                                                   normal_direction::AbstractVector, x,
+                                                   t,
+                                                   surface_flux_function,
+                                                   equations::CompressibleEulerEquations3D)
+    # compute the primitive variables
+    rho, v1, v2, v3, p = cons2prim(u_inner, equations)
+
+    v1_mirror, v2_mirror, v3_mirror = velocity_symmetry_plane(normal_direction,
+                                                              v1, v2, v3)
+
+    u_mirror = prim2cons(SVector(rho,
+                                 v1_mirror,
+                                 v2_mirror,
+                                 v3_mirror,
+                                 p), equations)
+
+    flux = surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
+
+    return flux
+end
+# TODO: Other mesh types
+
 # Calculate 1D flux for a single point
 @inline function flux(u, orientation::Integer, equations::CompressibleEulerEquations3D)
     rho, rho_v1, rho_v2, rho_v3, rho_e = u

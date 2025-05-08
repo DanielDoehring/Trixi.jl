@@ -25,12 +25,15 @@ struct NoSlip{F}
 end
 
 @doc raw"""
-    struct SymmetricVelocity
+    struct SymmetryPlane
 
-Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary.
-The density is simply copied from the inner cell to the outer cell.
+Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
+allows only for non-zero tangential velocity.
+The density is simply copied from the inner fluid cell to the outer ghost cell.
 When combined with the heat boundary condition [`Adiabatic`](@ref), this creates a truly symmetric boundary condition.
-In contrast to the [`NoSlip`](@ref) boundary condition, `SymmetricVelocity` does not require supplied function.
+Any boundary on which this condition is applied thus acts as a symmetry plane for the flow.
+
+In contrast to the [`NoSlip`](@ref) boundary condition, `SymmetryPlane` does not require supplied function.
 Instead, the boundary velocity is always set to
 ```math
     \boldsymbol{v}_{\mathrm{Bnd}} = \boldsymbol{v}_{\mathrm{Fluid}} - 2 v_n \boldsymbol{n}_{\mathrm{Fluid}}
@@ -39,10 +42,11 @@ where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., in
 ```math
     v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
 ```
-# TODO: Link to Euler BC "symmetry_wall" or something along those lines
+The (purely) hyperbolic equivalent boundary condition is [`boundary_condition_symmetry_plane`](@ref).
+
 Note that in 1D this degenerates to the [`NoSlip`](@ref) boundary condition which must be used instead.
 """
-struct SymmetricVelocity end
+struct SymmetryPlane end
 
 """
     struct Isothermal

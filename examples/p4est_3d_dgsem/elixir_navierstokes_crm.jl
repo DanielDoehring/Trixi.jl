@@ -77,31 +77,7 @@ boundary_symbols = [:FUSELAGE,
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
-# Ensure that rho and p are the same across symmetry line and allow only tangential velocity
-# TODO: Set up own function for this
-@inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
-                             surface_flux_function,
-                             equations::CompressibleEulerEquations3D)
-    norm_ = norm(normal_direction)
-    normal = normal_direction / norm_
-
-    # compute the primitive variables
-    rho, v1, v2, v3, p = cons2prim(u_inner, equations)
-
-    v_normal = normal[1] * v1 + normal[2] * v2 + normal[3] * v3
-
-    u_mirror = prim2cons(SVector(rho,
-                                 v1 - 2 * v_normal * normal[1],
-                                 v2 - 2 * v_normal * normal[2],
-                                 v3 - 2 * v_normal * normal[3],
-                                 p), equations)
-
-    flux = surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
-
-    return flux
-end
-
-boundary_conditions_hyp = Dict(:SYMMETRY => bc_symmetry, # Symmetry: bc_symmetry
+boundary_conditions_hyp = Dict(:SYMMETRY => boundary_condition_symmetry_plane, # Symmetry: bc_symmetry
                                :FARFIELD => bc_farfield, # Farfield: bc_farfield
                                :WING => boundary_condition_slip_wall, # Wing: bc_slip_wall
                                :FUSELAGE => boundary_condition_slip_wall, # Fuselage: bc_slip_wall
@@ -113,7 +89,7 @@ velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
 bc_body = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
 
-symmetry_bc_para = SymmetricVelocity()
+symmetry_bc_para = SymmetryPlane()
 bc_symmetry_plane = BoundaryConditionNavierStokesWall(symmetry_bc_para, heat_bc)
 
 boundary_conditions_para = Dict(:SYMMETRY => bc_symmetry_plane, # Symmetry
