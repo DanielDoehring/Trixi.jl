@@ -397,7 +397,7 @@ end
     return flux_inner
 end
 
-@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:Symmetric,
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:SymmetricVelocity,
                                                                         <:Adiabatic})(flux_inner,
                                                                                       u_inner,
                                                                                       normal::AbstractVector,
@@ -405,13 +405,23 @@ end
                                                                                       t,
                                                                                       operator_type::Gradient,
                                                                                       equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
-    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
-                                                                                        t,
-                                                                                        equations)
-    return SVector(u_inner[1], v1, v2, v3, u_inner[5])
+    norm_ = norm(normal)
+    unit_normal = normal / norm_
+
+    v1 = u_inner[2]
+    v2 = u_inner[3]
+    v3 = u_inner[4]
+
+    v_normal = unit_normal[1] * v1 + unit_normal[2] * v2 + unit_normal[3] * v3
+
+    v_mirror_1 = v1 - 2 * v_normal * unit_normal[1]
+    v_mirror_2 = v2 - 2 * v_normal * unit_normal[2]
+    v_mirror_3 = v3 - 2 * v_normal * unit_normal[3]
+
+    return SVector(u_inner[1], v_mirror_1, v_mirror_2, v_mirror_3, u_inner[5])
 end
 
-@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:Symmetric,
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:SymmetricVelocity,
                                                                         <:Adiabatic})(flux_inner,
                                                                                       u_inner,
                                                                                       normal::AbstractVector,
@@ -422,11 +432,21 @@ end
     normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x,
                                                                                                            t,
                                                                                                            equations)
-    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
-                                                                                        t,
-                                                                                        equations)
+    norm_ = norm(normal)
+    unit_normal = normal / norm_
+
+    v1 = u_inner[2]
+    v2 = u_inner[3]
+    v3 = u_inner[4]
+
+    v_normal = unit_normal[1] * v1 + unit_normal[2] * v2 + unit_normal[3] * v3
+
+    v_mirror_1 = v1 - 2 * v_normal * unit_normal[1]
+    v_mirror_2 = v2 - 2 * v_normal * unit_normal[2]
+    v_mirror_3 = v3 - 2 * v_normal * unit_normal[3]
+
     _, tau_1n, tau_2n, tau_3n, _ = flux_inner # extract fluxes for 2nd, 3rd, and 4th equations
-    normal_energy_flux = v1 * tau_1n + v2 * tau_2n + v3 * tau_3n + normal_heat_flux
+    normal_energy_flux = v_mirror_1 * tau_1n + v_mirror_2 * tau_2n + v_mirror_3 * tau_3n + normal_heat_flux
     return SVector(flux_inner[1], flux_inner[2], flux_inner[3], flux_inner[4],
                    normal_energy_flux)
 end

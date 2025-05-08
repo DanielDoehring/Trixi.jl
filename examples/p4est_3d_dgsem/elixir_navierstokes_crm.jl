@@ -77,8 +77,8 @@ boundary_symbols = [:FUSELAGE,
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
-# Ensure that rho and p are the same across symmetry line and allow only 
-# tangential velocity
+# Ensure that rho and p are the same across symmetry line and allow only tangential velocity
+# TODO: Set up own function for this
 @inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
                              surface_flux_function,
                              equations::CompressibleEulerEquations3D)
@@ -111,32 +111,17 @@ boundary_conditions_hyp = Dict(:SYMMETRY => bc_symmetry, # Symmetry: bc_symmetry
 
 velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
-boundary_condition_body = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
+bc_body = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
 
-# TODO: Get velocity gradients right for symmetry
-@inline function boundary_condition_copy(flux_inner,
-                                         u_inner,
-                                         normal::AbstractVector,
-                                         x, t,
-                                         operator_type::Trixi.Gradient,
-                                         equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
-    return u_inner
-end
-@inline function boundary_condition_copy(flux_inner,
-                                         u_inner,
-                                         normal::AbstractVector,
-                                         x, t,
-                                         operator_type::Trixi.Divergence,
-                                         equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
-    return flux_inner
-end
+symmetry_bc_para = SymmetricVelocity()
+bc_symmetry_plane = BoundaryConditionNavierStokesWall(symmetry_bc_para, heat_bc)
 
-boundary_conditions_para = Dict(:SYMMETRY => boundary_condition_copy, # Symmetry # TODO: Possible?
+boundary_conditions_para = Dict(:SYMMETRY => bc_symmetry_plane, # Symmetry
                                 :FARFIELD => bc_farfield, # Farfield: bc_farfield
-                                :WING => boundary_condition_body, # Wing: boundary_condition_body
-                                :FUSELAGE => boundary_condition_body, # Fuselage: boundary_condition_body
-                                :WING_UP => boundary_condition_body, # Wing: boundary_condition_body
-                                :WING_LO => boundary_condition_body, # Wing: boundary_condition_body
+                                :WING => bc_body, # Wing: bc_body
+                                :FUSELAGE => bc_body, # Fuselage: bc_body
+                                :WING_UP => bc_body, # Wing: bc_body
+                                :WING_LO => bc_body, # Wing: bc_body
                                 :OUTFLOW => bc_farfield)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
@@ -175,11 +160,14 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    output_directory = "out")
 
 # TODO: Likely, CFL ramp-up needed
+#=
 cfl_0() = 0.2
 cfl_max() = 2.0
-t_ramp_up() = 1e-7
+t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+=#
+cfl = 0.2
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -190,8 +178,8 @@ amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       max_level = 2, max_threshold = 0.1)  # 2
 
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 5,
-                           adapt_initial_condition = true)
+                           interval = 10,
+                           adapt_initial_condition = false)
 
 callbacks = CallbackSet(summary_callback,
                         #alive_callback,
@@ -246,7 +234,7 @@ dtRatios_red_p3 = [
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3]
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "p3/", dtRatios_red_p3)
-#ode_alg = Trixi.RK33()
+ode_alg = Trixi.RK33()
 #=
 relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 5)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtRatios_complete;

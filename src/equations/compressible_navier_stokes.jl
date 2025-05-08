@@ -39,6 +39,8 @@ where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., in
 ```math
     v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
 ```
+# TODO: Link to Euler BC "symmetry_wall" or something along those lines
+Note that in 1D this degenerates to the [`NoSlip`](@ref) boundary condition which must be used instead.
 """
 struct SymmetricVelocity end
 

@@ -384,6 +384,43 @@ Should be used together with [`StructuredMesh`](@ref).
     return boundary_flux
 end
 
+@doc raw"""
+    boundary_condition_symmetry_plane(u_inner, normal_direction, x, t, surface_flux_function,
+                                      equations::CompressibleEulerEquations2D)
+
+Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
+allows only for tangential velocity.
+The density and pressure are simply copied from the inner fluid cell to the outer cell
+The boundary velocity is always set
+```math
+    \boldsymbol{v}_{\mathrm{Bnd}} = \boldsymbol{v}_{\mathrm{Fluid}} - 2 v_n \boldsymbol{n}_{\mathrm{Fluid}}
+```
+where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., into the boundary pointing) normal unit vector and
+```math
+    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
+```
+"""
+@inline function boundary_condition_symmetry_plane(u_inner, normal_direction::AbstractVector, x, t,
+                                                   surface_flux_function,
+                                                   equations::CompressibleEulerEquations2D)
+    norm_ = norm(normal_direction)
+    normal = normal_direction / norm_
+
+    # compute the primitive variables
+    rho, v1, v2, p = cons2prim(u_inner, equations)
+
+    v_normal = normal[1] * v1 + normal[2] * v2
+
+    u_mirror = prim2cons(SVector(rho,
+            v1 - 2 * v_normal * normal[1],
+            v2 - 2 * v_normal * normal[2],
+            p), equations)
+
+    flux = surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
+
+    return flux
+end
+
 # Calculate 2D flux for a single point
 @inline function flux(u, orientation::Integer, equations::CompressibleEulerEquations2D)
     rho, rho_v1, rho_v2, rho_e = u
