@@ -391,6 +391,8 @@ end
     norm_ = norm(normal_direction)
     normal = normal_direction / norm_
 
+    v_normal = v1 * normal[1] + v2 * normal[2]
+
     v1_mirror = v1 - 2 * v_normal * normal[1]
     v2_mirror = v2 - 2 * v_normal * normal[2]
 
@@ -431,7 +433,7 @@ Should be used together with [`UnstructuredMesh2D`](@ref) or [`P4estMesh`](@ref)
                                  v2_mirror,
                                  p), equations)
 
-    flux = surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
+    flux = surface_flux_function(u_inner, u_mirror, normal_direction, equations)
 
     return flux
 end

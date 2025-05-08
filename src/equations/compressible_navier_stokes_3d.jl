@@ -405,7 +405,7 @@ end
                                                                                       t,
                                                                                       operator_type::Gradient,
                                                                                       equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
-    v1_mirror, v2_mirror, v3_mirror = velocity_symmetry_plane(normal_direction,
+    v1_mirror, v2_mirror, v3_mirror = velocity_symmetry_plane(normal,
                                                               u_inner[2],
                                                               u_inner[3],
                                                               u_inner[4])
@@ -424,7 +424,7 @@ end
     normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x,
                                                                                                            t,
                                                                                                            equations)
-    v1_mirror, v2_mirror, v3_mirror = velocity_symmetry_plane(normal_direction,
+    v1_mirror, v2_mirror, v3_mirror = velocity_symmetry_plane(normal,
                                                               u_inner[2],
                                                               u_inner[3],
                                                               u_inner[4])
