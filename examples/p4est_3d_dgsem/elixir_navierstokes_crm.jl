@@ -7,6 +7,9 @@ using LinearAlgebra: norm
 gamma = 1.4
 prandtl_number() = 0.72
 
+# Follows problem C3.5 of the 2015 Third International Workshop on High-Order CFD Methods
+# https://www1.grc.nasa.gov/research-and-engineering/hiocfd/
+
 Re = 5 * 10^6
 
 ## Standard units ##
@@ -54,7 +57,7 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_smooth = true, # true
                                             variable = pressure) # density_pressure
 
-surface_flux = flux_hll # flux_lax_friedrichs
+surface_flux = flux_hll
 volume_flux = flux_ranocha
 
 # TODO: Do I need SC ? Or is FD sufficient?
@@ -89,10 +92,9 @@ velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
 bc_body = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
 
-symmetry_bc_para = SymmetryPlane()
-bc_symmetry_plane = BoundaryConditionNavierStokesWall(symmetry_bc_para, heat_bc)
+bc_symmetry_plane_para = BoundaryConditionNavierStokesWall(SymmetryPlane(), heat_bc)
 
-boundary_conditions_para = Dict(:SYMMETRY => bc_symmetry_plane, # Symmetry
+boundary_conditions_para = Dict(:SYMMETRY => bc_symmetry_plane_para, # Symmetry
                                 :FARFIELD => bc_farfield, # Farfield: bc_farfield
                                 :WING => bc_body, # Wing: bc_body
                                 :FUSELAGE => bc_body, # Fuselage: bc_body
@@ -106,8 +108,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                                                     boundary_conditions_para))
 
 tspan = (0.0, 1e-5)
-#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
-ode = semidiscretize(semi, tspan) # Everything else
+ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+#ode = semidiscretize(semi, tspan) # Everything else
 
 # Callbacks
 ###############################################################################
@@ -135,15 +137,13 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory = "out")
 
-# TODO: Likely, CFL ramp-up needed
-#=
-cfl_0() = 0.2
-cfl_max() = 2.0
+cfl_0() = 0.8
+cfl_max() = 1.9
 t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
-=#
-cfl = 0.2
+
+#cfl = 0.8
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -170,7 +170,7 @@ callbacks = CallbackSet(summary_callback,
 
 # TODO: Optimize for HLL?
 #base_path = "/storage/home/daniel/OneraM6/LLF_only/"
-base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/"
+base_path = "/home/daniel/git/Paper_PERRK/Data/CRM/k2/p3/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
 #ode_alg = Trixi.PairedExplicitRK3(12, base_path)
@@ -178,39 +178,38 @@ base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/L
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path * "p3/", dtRatios_complete_p3)
 
 dtRatios_complete_p3 = [ 
-    0.309904923439026,
-    0.277295976877213,
-    0.250083755254746,
-    0.228134118318558,
-    0.20889208316803,
-    0.185411275029182,
-    0.160719511508942,
-    0.138943578004837,
-    0.111497408151627,
-    0.0973129367828369,
-    0.0799268364906311,
-    0.0501513481140137,
-    0.0280734300613403
-                      ] ./ 0.309904923439026
+    0.00106435123831034,
+    0.000983755702972412,
+    0.000857676243782043,
+    0.000776133546233177,
+    0.000684534176141024,
+    0.00062269344329834,
+    0.000545023646652699,
+    0.000463906383514404,
+    0.000371748408675194,
+    0.000311754931509495,
+    0.000263250452280045,
+    0.000177319368720055,
+    0.000112414136528969
+                      ] ./ 0.00106435123831034
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
 dtRatios_red_p3 = [ 
-    0.309904923439026,
-    0.228134118318558,
-    0.20889208316803,
-    0.185411275029182,
-    0.160719511508942,
-    0.138943578004837,
-    0.111497408151627,
-    0.0973129367828369,
-    0.0799268364906311,
-    0.0501513481140137,
-    0.0280734300613403
-                      ] ./ 0.309904923439026
-Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3]
+    0.00106435123831034,
+    0.000776133546233177,
+    0.000684534176141024,
+    0.00062269344329834,
+    0.000545023646652699,
+    0.000463906383514404,
+    0.000371748408675194,
+    0.000263250452280045,
+    0.000177319368720055,
+    0.000112414136528969
+                      ] ./ 0.00106435123831034
+Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "p3/", dtRatios_red_p3)
-ode_alg = Trixi.RK33()
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path, dtRatios_red_p3)
+#ode_alg = Trixi.RK33()
 #=
 relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 5)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtRatios_complete;
