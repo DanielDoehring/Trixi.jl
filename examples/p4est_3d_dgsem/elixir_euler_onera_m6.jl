@@ -28,6 +28,7 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
+#=
 # Ensure that rho and p are the same across symmetry line and allow only 
 # tangential velocity
 @inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
@@ -52,6 +53,7 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
     return flux
 end
+=#
 
 polydeg = 2
 basis = LobattoLegendreBasis(polydeg)
@@ -87,7 +89,7 @@ boundary_symbols = [:Symmetry,
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
-boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
+boundary_conditions = Dict(:Symmetry => boundary_condition_symmetry_plane, # Symmetry: bc_symmetry
                            :FarField => bc_farfield, # Farfield: bc_farfield
                            :BottomWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
                            :TopWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
@@ -96,11 +98,9 @@ boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
-#tspan = (0.0, 6.0)
+#tspan = (0.0, 6.049)
 #ode = semidiscretize(semi, tspan)
 
-#restart_file = "restart_t57_undamped.h5"
-restart_file = "restart_t60_damped.h5"
 restart_file = "restart_t605_undamped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
@@ -166,35 +166,6 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory="/storage/home/daniel/OneraM6/")
 
-cfl_interval = 2
-
-## k = 1 ##
-base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k1/p2/"
-
-stepsize_callback = StepsizeCallback(cfl = 39.9, interval = cfl_interval) # PERRK p2 16 standalone
-
-dtRatios_complete_p2 = [ 
-    0.753155136853456,
-    0.695487338849343,
-    0.641318947672844,
-    0.574993145465851,
-    0.503288297653198,
-    0.442298481464386,
-    0.391183462142944,
-    0.346144811809063,
-    0.293439486026764,
-    0.243663728386164,
-    0.184185989908628,
-    0.15320873260498,
-    0.123865127563477,
-    0.0781898498535156,
-    0.0436210632324219
-                      ] ./ 0.753155136853456
-Stages_complete_p2 = reverse(collect(range(2, 16)))
-
-stepsize_callback = StepsizeCallback(cfl = 18.3, interval = cfl_interval) # PERK p2 2-16
-#stepsize_callback = StepsizeCallback(cfl = 18.5, interval = cfl_interval) # PERRK p2 2-16
-
 ## k = 2 ##
 
 base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
@@ -222,18 +193,17 @@ Stages_complete_p3 = reverse(collect(range(3, 15)))
 ## 6.049 -> 6.05 ##
 
 # Only Flux-Differencing #
+cfl_interval = 2
 
 stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(R)K p3 3-15
-stepsize_callback = StepsizeCallback(cfl = 10.7, interval = cfl_interval) # PER(R)K p3 15
-stepsize_callback = StepsizeCallback(cfl = 2.7, interval = cfl_interval) # (R-)CKL43
+#stepsize_callback = StepsizeCallback(cfl = 10.7, interval = cfl_interval) # PER(R)K p3 15
+#stepsize_callback = StepsizeCallback(cfl = 2.7, interval = cfl_interval) # (R-)CKL43
 #stepsize_callback = StepsizeCallback(cfl = 2.8, interval = cfl_interval) # (R-)RK33
-
-# Try also with SC? #
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        #save_solution,
+                        save_solution,
                         #save_restart,
                         stepsize_callback
                         )
@@ -243,24 +213,17 @@ callbacks = CallbackSet(summary_callback,
 
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 
-## k = 1, p = 2 ##
-
-#ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, base_path, dtRatios_complete_p2)
-#ode_alg = Trixi.PairedExplicitRK2(16, base_path)
-
 ## k = 2, p = 3 ##
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, base_path)
 
-#=
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
                                                  relaxation_solver = newton)
-=#
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = newton)                                                 
 
-ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
+#ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.CKL43()
 
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
