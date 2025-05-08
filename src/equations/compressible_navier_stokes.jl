@@ -24,6 +24,24 @@ struct NoSlip{F}
     boundary_value_function::F # value of the velocity vector on the boundary
 end
 
+@doc raw"""
+    struct SymmetricVelocity
+
+Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary.
+The density is simply copied from the inner cell to the outer cell.
+When combined with the heat boundary condition [`Adiabatic`](@ref), this creates a truly symmetric boundary condition.
+In contrast to the [`NoSlip`](@ref) boundary condition, `SymmetricVelocity` does not require supplied function.
+Instead, the boundary velocity is always set to
+```math
+    \boldsymbol{v}_{\mathrm{Bnd}} = \boldsymbol{v}_{\mathrm{Fluid}} - 2 v_n \boldsymbol{n}_{\mathrm{Fluid}}
+```
+where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., into the boundary pointing) normal unit vector and
+```math
+    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
+```
+"""
+struct SymmetricVelocity end
+
 """
     struct Isothermal
 

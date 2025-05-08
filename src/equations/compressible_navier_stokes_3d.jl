@@ -397,6 +397,40 @@ end
     return flux_inner
 end
 
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:Symmetric,
+                                                                        <:Adiabatic})(flux_inner,
+                                                                                      u_inner,
+                                                                                      normal::AbstractVector,
+                                                                                      x,
+                                                                                      t,
+                                                                                      operator_type::Gradient,
+                                                                                      equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
+    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
+                                                                                        t,
+                                                                                        equations)
+    return SVector(u_inner[1], v1, v2, v3, u_inner[5])
+end
+
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:Symmetric,
+                                                                        <:Adiabatic})(flux_inner,
+                                                                                      u_inner,
+                                                                                      normal::AbstractVector,
+                                                                                      x,
+                                                                                      t,
+                                                                                      operator_type::Divergence,
+                                                                                      equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
+    normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x,
+                                                                                                           t,
+                                                                                                           equations)
+    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
+                                                                                        t,
+                                                                                        equations)
+    _, tau_1n, tau_2n, tau_3n, _ = flux_inner # extract fluxes for 2nd, 3rd, and 4th equations
+    normal_energy_flux = v1 * tau_1n + v2 * tau_2n + v3 * tau_3n + normal_heat_flux
+    return SVector(flux_inner[1], flux_inner[2], flux_inner[3], flux_inner[4],
+                   normal_energy_flux)
+end
+
 # specialized BC impositions for GradientVariablesEntropy.
 
 # This should return a SVector containing the boundary values of entropy variables.

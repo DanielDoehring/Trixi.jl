@@ -113,7 +113,7 @@ velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
 boundary_condition_body = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
 
-# TODO: Proper approach for symmetry BCs?
+# TODO: Get velocity gradients right for symmetry
 @inline function boundary_condition_copy(flux_inner,
                                          u_inner,
                                          normal::AbstractVector,
@@ -144,7 +144,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-tspan = (0.0, 1e-6)
+tspan = (0.0, 1e-5)
 #ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 ode = semidiscretize(semi, tspan) # Everything else
 
@@ -153,11 +153,11 @@ ode = semidiscretize(semi, tspan) # Everything else
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 10
+analysis_interval = 20
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      #analysis_integrals = (lift_coefficient,),
-                                     analysis_integrals = ()
+                                     #analysis_integrals = ()
                                      )
 
 alive_callback = AliveCallback(alive_interval = 1)
@@ -174,8 +174,14 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory = "out")
 
-# TODO: Likely, CFL ramp-up needed                                   
-stepsize_callback = StepsizeCallback(cfl = 0.2, interval = 1)
+# TODO: Likely, CFL ramp-up needed
+cfl_0() = 0.2
+cfl_max() = 2.0
+t_ramp_up() = 1e-7
+
+cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+
+stepsize_callback = StepsizeCallback(cfl = cfl)
 
 amr_indicator = shock_indicator
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
@@ -240,7 +246,7 @@ dtRatios_red_p3 = [
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3]
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "p3/", dtRatios_red_p3)
-ode_alg = Trixi.RK33()
+#ode_alg = Trixi.RK33()
 #=
 relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 5)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtRatios_complete;
