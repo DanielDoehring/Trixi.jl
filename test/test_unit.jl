@@ -712,6 +712,44 @@ end
     end
 end
 
+@timed_testset "boundary_condition_symmetry_plane" begin
+    @testset "TreeMesh2D" begin
+        equations = CompressibleEulerEquations2D(1.4)
+
+        rho = 1.4
+        p = 1.0
+
+        surface_fluxes = (flux_lax_friedrichs, flux_hll, flux_hlle, flux_hllc)
+        for surface_flux in surface_fluxes
+            u_x_only = prim2cons(SVector(rho, 1.0, 0.0, p), equations)
+            orientation = 2 # = y
+            target_flux = SVector(0, 0, 1, 0)
+            for direction in 1:2
+                boundary_flux = boundary_condition_symmetry_plane(u_x_only,
+                                                                  orientation,
+                                                                  direction,
+                                                                  42.0, 42.0,
+                                                                  surface_flux,
+                                                                  equations)
+                @test all(isapprox(boundary_flux, target_flux))
+            end
+
+            u_y_only = prim2cons(SVector(rho, 0.0, 1.0, p), equations)
+            orientation = 1 # = x
+            target_flux = SVector(0, 1, 0, 0)
+            for direction in 1:2
+                boundary_flux = boundary_condition_symmetry_plane(u_y_only,
+                                                                  orientation,
+                                                                  direction,
+                                                                  42.0, 42.0,
+                                                                  surface_flux,
+                                                                  equations)
+                @test all(isapprox(boundary_flux, target_flux))
+            end
+        end
+    end
+end
+
 @timed_testset "StepsizeCallback" begin
     # Ensure a proper error is thrown if used with adaptive time integration schemes
     @test_nowarn_mod trixi_include(@__MODULE__,

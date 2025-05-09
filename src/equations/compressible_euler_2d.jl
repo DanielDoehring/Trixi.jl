@@ -294,7 +294,7 @@ Details about the 1D pressure Riemann solution can be found in Section 6.3.3 of 
   3rd edition
   [DOI: 10.1007/b79761](https://doi.org/10.1007/b79761)
 
-Should be used together with [`UnstructuredMesh2D`](@ref) or [`P4estMesh`](@ref).
+Should be used together with [`UnstructuredMesh2D`](@ref), [`P4estMesh`](@ref) or [`T8CodeMesh`](@ref).
 """
 @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
                                               x, t,
@@ -354,7 +354,7 @@ Should be used together with [`TreeMesh`](@ref).
         normal_direction = SVector(zero(RealT), one(RealT))
     end
 
-    # compute and return the flux using `boundary_condition_slip_wall` routine above
+    # compute and return the flux using `boundary_condition_slip_wall` routine below
     return boundary_condition_slip_wall(u_inner, normal_direction, direction,
                                         x, t, surface_flux_function, equations)
 end
@@ -379,6 +379,118 @@ Should be used together with [`StructuredMesh`](@ref).
         boundary_flux = boundary_condition_slip_wall(u_inner, normal_direction,
                                                      x, t, surface_flux_function,
                                                      equations)
+    end
+
+    return boundary_flux
+end
+
+# Computes the mirror velocity across a symmetry plane which enforces
+# a tangential velocity that is aligned with the symmetry plane, i.e.,
+# which is normal to the `normal_direction`.
+@inline function velocity_symmetry_plane(normal_direction::AbstractVector, v1, v2)
+    norm_ = norm(normal_direction)
+    normal = normal_direction / norm_
+
+    # TODO: Use "rotate_to_x" instead?
+    # Measure orthogonality of velocity to normal
+    v_normal = v1 * normal[1] + v2 * normal[2]
+    # One could check `if isapprox(v_normal, 0)` here and directly return `v1, v2`.
+    # In practical simulations, however, this will most likely seldom occurr and 
+    # any computations saved by this check will most likely be lost due to the `if`-clause.
+
+    v1_outer = v1 - 2 * v_normal * normal[1]
+    v2_outer = v2 - 2 * v_normal * normal[2]
+
+    return v1_outer, v2_outer
+end
+
+@doc raw"""
+    boundary_condition_symmetry_plane(u_inner, normal_direction, x, t, surface_flux_function,
+                                      equations::CompressibleEulerEquations2D)
+
+Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
+allows only the tangential velocity to be non-zero.
+The density and pressure are simply copied from the inner fluid cell to the outer ghost cell.
+This is the conceptual difference to the [`boundary_condition_slip_wall`](@ref) condition, which
+also only permits tangential velocities, but computes an exact solution of pressure Riemann problem.
+
+Any boundary on which this condition is applied thus acts as a symmetry plane for the flow.
+The boundary velocity is set as
+```math
+    \boldsymbol{v}_{\mathrm{Bnd}} = \boldsymbol{v}_{\mathrm{Fluid}} - 2 v_n \boldsymbol{n}_{\mathrm{Fluid}}
+```
+where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., into the boundary pointing) normal unit vector and
+```math
+    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}}
+```
+measures the alignment of the velocity with the domain normal.
+
+Should be used together with [`UnstructuredMesh2D`](@ref), [`P4estMesh`](@ref) or [`T8CodeMesh`](@ref).
+"""
+@inline function boundary_condition_symmetry_plane(u_inner,
+                                                   normal_direction::AbstractVector, x,
+                                                   t,
+                                                   surface_flux_function,
+                                                   equations::CompressibleEulerEquations2D)
+    # compute the primitive variables
+    rho, v1, v2, p = cons2prim(u_inner, equations)
+
+    v1_outer, v2_outer = velocity_symmetry_plane(normal_direction, v1, v2)
+
+    u_outer = prim2cons(SVector(rho,
+                                v1_outer,
+                                v2_outer,
+                                p), equations)
+
+    flux = surface_flux_function(u_inner, u_outer, normal_direction, equations)
+
+    return flux
+end
+
+"""
+    boundary_condition_symmetry_plane(u_inner, orientation, direction, x, t,
+                                 surface_flux_function, equations::CompressibleEulerEquations2D)
+
+Should be used together with [`TreeMesh`](@ref).
+"""
+@inline function boundary_condition_symmetry_plane(u_inner, orientation,
+                                                   direction, x, t,
+                                                   surface_flux_function,
+                                                   equations::CompressibleEulerEquations2D)
+    # get the appropriate normal vector from the orientation
+    RealT = eltype(u_inner)
+    if orientation == 1
+        normal_direction = SVector(one(RealT), zero(RealT))
+    else # orientation == 2
+        normal_direction = SVector(zero(RealT), one(RealT))
+    end
+
+    # compute and return the flux using `boundary_condition_slip_wall` routine below
+    return boundary_condition_symmetry_plane(u_inner, normal_direction, direction,
+                                             x, t, surface_flux_function, equations)
+end
+
+"""
+    boundary_condition_slip_wall(u_inner, normal_direction, direction, x, t,
+                                 surface_flux_function, equations::CompressibleEulerEquations2D)
+
+Should be used together with [`StructuredMesh`](@ref).
+"""
+@inline function boundary_condition_symmetry_plane(u_inner,
+                                                   normal_direction::AbstractVector,
+                                                   direction, x, t,
+                                                   surface_flux_function,
+                                                   equations::CompressibleEulerEquations2D)
+    # flip sign of normal to make it outward pointing, then flip the sign of the normal flux back
+    # to be inward pointing on the -x and -y sides due to the orientation convention used by StructuredMesh
+    if isodd(direction)
+        boundary_flux = -boundary_condition_symmetry_plane(u_inner, -normal_direction,
+                                                           x, t, surface_flux_function,
+                                                           equations)
+    else
+        boundary_flux = boundary_condition_symmetry_plane(u_inner, normal_direction,
+                                                          x, t, surface_flux_function,
+                                                          equations)
     end
 
     return boundary_flux

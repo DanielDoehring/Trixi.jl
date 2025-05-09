@@ -216,6 +216,7 @@ export boundary_condition_do_nothing,
        BoundaryConditionNeumann,
        boundary_condition_noslip_wall,
        boundary_condition_slip_wall,
+       boundary_condition_symmetry_plane,
        boundary_condition_wall,
        BoundaryConditionNavierStokesWall, NoSlip, Adiabatic, Isothermal,
        BoundaryConditionCoupled

@@ -466,6 +466,57 @@ end
     end
 end
 
+@trixi_testset "elixir_euler_symmetry_bnd.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_symmetry_bnd.jl"),
+                        l2=[
+                            2.967913640695959e-15,
+                            5.081794733924337e-16,
+                            6.5411584317203205e-15,
+                            7.433605454413266e-15
+                        ],
+                        linf=[
+                            1.4654943925052066e-14,
+                            3.938454464495361e-15,
+                            2.5757174171303632e-14,
+                            3.4638958368304884e-14
+                        ])
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    let
+        t = sol.t[end]
+        u_ode = sol.u[end]
+        du_ode = similar(u_ode)
+        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    end
+end
+
+@trixi_testset "elixir_euler_symmetry_bnd.jl (flipped BCs)" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_symmetry_bnd.jl"),
+                        # These are the exact same errors as in the previous test
+                        l2=[
+                            2.967913640695959e-15,
+                            5.081794733924337e-16,
+                            6.5411584317203205e-15,
+                            7.433605454413266e-15
+                        ],
+                        linf=[
+                            1.4654943925052066e-14,
+                            3.938454464495361e-15,
+                            2.5757174171303632e-14,
+                            3.4638958368304884e-14
+                        ],
+                        boundary_conditions=Dict(:x_neg => boundary_condition_symmetry_plane,
+                                                 :x_pos => boundary_condition_dirichlet))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    let
+        t = sol.t[end]
+        u_ode = sol.u[end]
+        du_ode = similar(u_ode)
+        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    end
+end
+
 @trixi_testset "elixir_euler_forward_step_amr.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_forward_step_amr.jl"),
                         l2=[

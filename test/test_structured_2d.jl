@@ -505,6 +505,61 @@ end
     end
 end
 
+@trixi_testset "elixir_euler_symmetry_bnd.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_symmetry_bnd.jl"),
+                        l2=[
+                            1.148853986320156e-14,
+                            1.291313371708063e-14,
+                            7.789229261259045e-15,
+                            2.969815062927426e-14
+                        ],
+                        linf=[
+                            1.5587531265737198e-13,
+                            8.837375276016246e-14,
+                            7.926992395823618e-14,
+                            3.894662370385049e-13
+                        ])
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    let
+        t = sol.t[end]
+        u_ode = sol.u[end]
+        du_ode = similar(u_ode)
+        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    end
+end
+
+@trixi_testset "elixir_euler_symmetry_bnd.jl (Slip-Wall BCs)" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_symmetry_bnd.jl"),
+                        # These are the exact same errors as in the previous test
+                        l2=[
+                            1.148853986320156e-14,
+                            1.291313371708063e-14,
+                            7.789229261259045e-15,
+                            2.969815062927426e-14
+                        ],
+                        linf=[
+                            1.5587531265737198e-13,
+                            8.837375276016246e-14,
+                            7.926992395823618e-14,
+                            3.894662370385049e-13
+                        ],
+                        boundary_conditions=(x_neg = boundary_condition_slip_wall,
+                                             x_pos = boundary_condition_slip_wall,
+                                             y_neg = boundary_condition_dirichlet,
+                                             y_pos = boundary_condition_dirichlet))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    let
+        t = sol.t[end]
+        u_ode = sol.u[end]
+        du_ode = similar(u_ode)
+        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    end
+end
+
 @trixi_testset "elixir_euler_source_terms_waving_flag.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_source_terms_waving_flag.jl"),
