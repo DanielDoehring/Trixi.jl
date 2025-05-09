@@ -413,8 +413,9 @@ The boundary velocity is set as
 ```
 where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., into the boundary pointing) normal unit vector and
 ```math
-    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
+    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}}
 ```
+measures the alignment of the velocity with the domain normal.
 
 Should be used together with [`UnstructuredMesh2D`](@ref) or [`P4estMesh`](@ref).
 """
@@ -426,12 +427,12 @@ Should be used together with [`UnstructuredMesh2D`](@ref) or [`P4estMesh`](@ref)
     # compute the primitive variables
     rho, v1, v2, p = cons2prim(u_inner, equations)
 
-    v1_outer, v2_outer = velocity_tangential_outer(normal_direction, v1, v2)
+    v1_outer, v2_outer = velocity_symmetry_plane(normal_direction, v1, v2)
 
     u_outer = prim2cons(SVector(rho,
-                                 v1_outer,
-                                 v2_outer,
-                                 p), equations)
+                                v1_outer,
+                                v2_outer,
+                                p), equations)
 
     flux = surface_flux_function(u_inner, u_outer, normal_direction, equations)
 

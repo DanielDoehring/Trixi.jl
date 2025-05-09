@@ -40,8 +40,9 @@ Instead, the boundary velocity is always set to
 ```
 where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., into the boundary pointing) normal unit vector and
 ```math
-    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}} \: .
+    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}}
 ```
+measures the alignment of the velocity with the domain normal.
 The (purely) hyperbolic equivalent boundary condition is [`boundary_condition_symmetry_plane`](@ref).
 
 Note that in 1D this degenerates to the [`NoSlip`](@ref) boundary condition which must be used instead.

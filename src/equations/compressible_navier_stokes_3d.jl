@@ -406,9 +406,9 @@ end
                                                                                       operator_type::Gradient,
                                                                                       equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
     v1_outer, v2_outer, v3_outer = velocity_symmetry_plane(normal,
-                                                              u_inner[2],
-                                                              u_inner[3],
-                                                              u_inner[4])
+                                                           u_inner[2],
+                                                           u_inner[3],
+                                                           u_inner[4])
 
     return SVector(u_inner[1], v1_outer, v2_outer, v3_outer, u_inner[5])
 end
@@ -425,9 +425,9 @@ end
                                                                                                            t,
                                                                                                            equations)
     v1_outer, v2_outer, v3_outer = velocity_symmetry_plane(normal,
-                                                              u_inner[2],
-                                                              u_inner[3],
-                                                              u_inner[4])
+                                                           u_inner[2],
+                                                           u_inner[3],
+                                                           u_inner[4])
 
     _, tau_1n, tau_2n, tau_3n, _ = flux_inner # extract fluxes for 2nd, 3rd, and 4th equations
     normal_energy_flux = v1_outer * tau_1n + v2_outer * tau_2n + v3_outer * tau_3n +
