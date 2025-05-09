@@ -393,10 +393,10 @@ end
 
     v_normal = v1 * normal[1] + v2 * normal[2]
 
-    v1_mirror = v1 - 2 * v_normal * normal[1]
-    v2_mirror = v2 - 2 * v_normal * normal[2]
+    v1_outer = v1 - 2 * v_normal * normal[1]
+    v2_outer = v2 - 2 * v_normal * normal[2]
 
-    return v1_mirror, v2_mirror
+    return v1_outer, v2_outer
 end
 
 @doc raw"""
@@ -404,7 +404,7 @@ end
                                       equations::CompressibleEulerEquations2D)
 
 Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
-allows only for non-zero tangential velocity.
+allows only the tangential velocity to be non-zero.
 The density and pressure are simply copied from the inner fluid cell to the outer ghost cell.
 Any boundary on which this condition is applied thus acts as a symmetry plane for the flow.
 The boundary velocity is set as
@@ -426,14 +426,14 @@ Should be used together with [`UnstructuredMesh2D`](@ref) or [`P4estMesh`](@ref)
     # compute the primitive variables
     rho, v1, v2, p = cons2prim(u_inner, equations)
 
-    v1_mirror, v2_mirror = velocity_tangential_mirror(normal_direction, v1, v2)
+    v1_outer, v2_outer = velocity_tangential_outer(normal_direction, v1, v2)
 
-    u_mirror = prim2cons(SVector(rho,
-                                 v1_mirror,
-                                 v2_mirror,
+    u_outer = prim2cons(SVector(rho,
+                                 v1_outer,
+                                 v2_outer,
                                  p), equations)
 
-    flux = surface_flux_function(u_inner, u_mirror, normal_direction, equations)
+    flux = surface_flux_function(u_inner, u_outer, normal_direction, equations)
 
     return flux
 end

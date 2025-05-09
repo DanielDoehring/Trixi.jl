@@ -28,7 +28,7 @@ end
     struct SymmetryPlane
 
 Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
-allows only for non-zero tangential velocity.
+allows only the tangential velocity to be non-zero.
 The density is simply copied from the inner fluid cell to the outer ghost cell.
 When combined with the heat boundary condition [`Adiabatic`](@ref), this creates a truly symmetric boundary condition.
 Any boundary on which this condition is applied thus acts as a symmetry plane for the flow.
