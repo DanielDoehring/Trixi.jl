@@ -54,21 +54,22 @@ basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 0.5,
                                             alpha_min = 0.001,
-                                            alpha_smooth = true, # true
-                                            variable = pressure) # density_pressure
+                                            alpha_smooth = true,
+                                            variable = pressure)
 
 surface_flux = flux_hll
 volume_flux = flux_ranocha
 
-# TODO: Do I need SC ? Or is FD sufficient?
 volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
-               volume_integral = volume_integral)
+               volume_integral = volume_integral)              
 
-mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
+#mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
+base_path = "/storage/home/daniel/CRM/"
+mesh_file = base_path * "crm_q3_lin_relabel.inp"
 
 boundary_symbols = [:FUSELAGE,
     :WING,
@@ -107,27 +108,36 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-tspan = (0.0, 1e-5)
-ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+#tspan = (0.0, 1e-2)
+#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan) # Everything else
+
+
+# For PERK Multi coefficient measurements
+restart_file = "restart_66e-4.h5"
+restart_filename = joinpath("out", restart_file)
+
+tspan = (load_time(restart_filename), 1e-2)
+
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+
 
 # Callbacks
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 20
+analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
+                                     analysis_integrals = (),
                                      #analysis_integrals = (lift_coefficient,),
-                                     #analysis_integrals = ()
                                      )
 
-alive_callback = AliveCallback(alive_interval = 1)
+alive_callback = AliveCallback(alive_interval = 500)
 
-save_sol_interval = analysis_interval
-
-save_solution = SaveSolutionCallback(interval = 100_000,
+save_sol_interval = 3000
+save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
@@ -136,41 +146,27 @@ save_solution = SaveSolutionCallback(interval = 100_000,
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory = "out")
-
+#=
 cfl_0() = 0.8
-cfl_max() = 1.9
+cfl_max() = 1.5 # 1.5 crashes after ~8000 steps for relxation methods
 t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+=#
 
-#cfl = 0.8
+cfl = 1.3 # Restarted
 
-stepsize_callback = StepsizeCallback(cfl = cfl)
-
-amr_indicator = shock_indicator
-amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level = 0,
-                                      med_level = 1, med_threshold = 0.05, # 1
-                                      max_level = 2, max_threshold = 0.1)  # 2
-
-amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 10,
-                           adapt_initial_condition = false)
+stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
 callbacks = CallbackSet(summary_callback,
-                        #alive_callback,
-                        analysis_callback,
-                        #amr_callback,
-                        save_solution,
-                        #save_restart,
+                        alive_callback,
+                        #analysis_callback,
+                        #save_solution,
+                        save_restart,
                         stepsize_callback)
 
 # Run the simulation
 ###############################################################################
-
-# TODO: Optimize for HLL?
-#base_path = "/storage/home/daniel/OneraM6/LLF_only/"
-base_path = "/home/daniel/git/Paper_PERRK/Data/CRM/k2/p3/"
 
 #ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
 #ode_alg = Trixi.PairedExplicitRK3(12, base_path)
@@ -208,13 +204,14 @@ dtRatios_red_p3 = [
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path, dtRatios_red_p3)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 #ode_alg = Trixi.RK33()
-#=
-relaxation_solver = Trixi.RelaxationSolverBisection(max_iterations = 5)
-ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete, base_path, dtRatios_complete;
+
+
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = relaxation_solver)
-=#
+
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0,
                   save_everystep = false, callback = callbacks);
