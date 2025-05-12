@@ -70,23 +70,24 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
 base_path = "/storage/home/daniel/CRM/"
-mesh_file = base_path * "crm_q3_lin_relabel.inp"
+#mesh_file = base_path * "crm_q3_lin_relabel.inp"
+mesh_file = base_path * "crm_q3_lin_aircraft_only.inp" # NOTE: Does not seem to have a benefit
 
 boundary_symbols = [:SYMMETRY,
                     :FARFIELD,
-                    :WING,
-                    :FUSELAGE,
-                    :WING_UP, :WING_LO,
+                    #:WING, :FUSELAGE, :WING_UP, :WING_LO,
+                    :AIRCRAFT,
                     :OUTFLOW]
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
 boundary_conditions_hyp = Dict(:SYMMETRY => boundary_condition_symmetry_plane, # Symmetry: bc_symmetry
                                :FARFIELD => bc_farfield, # Farfield: bc_farfield
-                               :WING => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                               :FUSELAGE => boundary_condition_slip_wall, # Fuselage: bc_slip_wall
-                               :WING_UP => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                               :WING_LO => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                               #:WING => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                               #:FUSELAGE => boundary_condition_slip_wall, # Fuselage: bc_slip_wall
+                               #:WING_UP => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                               #:WING_LO => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                               :AIRCRAFT => boundary_condition_slip_wall, # Wing: bc_slip_wall
                                :OUTFLOW => bc_farfield)
 
 velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
@@ -97,22 +98,24 @@ bc_symmetry_plane_para = BoundaryConditionNavierStokesWall(SymmetryPlane(), heat
 
 boundary_conditions_para = Dict(:SYMMETRY => bc_symmetry_plane_para, # Symmetry
                                 :FARFIELD => bc_farfield, # Farfield: bc_farfield
-                                :WING => bc_body, # Wing: bc_body
-                                :FUSELAGE => bc_body, # Fuselage: bc_body
-                                :WING_UP => bc_body, # Wing: bc_body
-                                :WING_LO => bc_body, # Wing: bc_body
+                                #:WING => bc_body, # Wing: bc_body
+                                #:FUSELAGE => bc_body, # Fuselage: bc_body
+                                #:WING_UP => bc_body, # Wing: bc_body
+                                #:WING_LO => bc_body, # Wing: bc_body
+                                :AIRCRAFT => bc_body, # Wing: bc_body
                                 :OUTFLOW => bc_farfield)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
-#=
-tspan = (0.0, 1e-2)
+
+tspan = (0.0, 1e-5)
 ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan) # Everything else
-=#
 
+
+#=
 # For PERK Multi coefficient measurements
 #restart_file = "restart_28e-4.h5"
 restart_file = "restart_66e-4.h5"
@@ -122,7 +125,7 @@ tspan = (load_time(restart_filename), 7.5e-4) # 7.5e-4 for figure, e.g. pressure
 
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan, restart_filename)
-
+=#
 
 # Callbacks
 ###############################################################################
@@ -131,7 +134,13 @@ summary_callback = SummaryCallback()
 
 analysis_interval = 2000
 
-force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
+# TODO: Something wrong here: Paraview crashes upon element retrieval
+#force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
+#force_boundary_names = (:WING, :FUSELAGE)
+#force_boundary_names = (:FUSELAGE,)
+
+force_boundary_names = (:AIRCRAFT,)
+
 A = 191.8 # m^2 = 297360 inch^2
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p(), rho(),
@@ -158,19 +167,19 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    output_directory = "out")
 
 ## k = 2 ##
-#=
+
 cfl_0() = 0.8
 cfl_max() = 1.5 # 1.5 crashes after ~8000 steps for relxation methods
 t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
-=#
+
 
 ### CFL Numbers restarted from 2.8e-4 ###
 
 # IDEA: Use these CFL numbers (with ramp-up) for timings from 0->7.5e-4
 
-cfl = 1.3
+#cfl = 1.3
 
 # CFL numbers for other integrators
 #cfl = 2.2 # PERRK Standalone 15
