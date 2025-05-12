@@ -110,7 +110,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-tspan = (0.0, 1e-5)
+tspan = (0.0, 1e-5) # 1e-5 for debugging only (plot aircraft elements)
 ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan) # Everything else
 
