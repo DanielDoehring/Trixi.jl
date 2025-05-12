@@ -25,6 +25,8 @@ p() = c^2 * rho() / gamma
 
 U() = 0.85 * c
 
+convective_timescale = chord / U() # seconds
+
 mu() = rho() * chord * U()/Re
 
 equations = CompressibleEulerEquations3D(gamma)
@@ -70,13 +72,12 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 base_path = "/storage/home/daniel/CRM/"
 mesh_file = base_path * "crm_q3_lin_relabel.inp"
 
-boundary_symbols = [:FUSELAGE,
-    :WING,
-    :SYMMETRY,
-    :FARFIELD,
-    :WING_UP, :WING_LO,
-    :OUTFLOW
-]
+boundary_symbols = [:SYMMETRY,
+                    :FARFIELD,
+                    :WING,
+                    :FUSELAGE,
+                    :WING_UP, :WING_LO,
+                    :OUTFLOW]
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
@@ -113,14 +114,14 @@ ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 =#
 
 # For PERK Multi coefficient measurements
-restart_file = "restart_28e-4.h5"
-#restart_file = "restart_66e-4.h5"
+#restart_file = "restart_28e-4.h5"
+restart_file = "restart_66e-4.h5"
 restart_filename = joinpath("out", restart_file)
 
-tspan = (load_time(restart_filename), 1e-2)
+tspan = (load_time(restart_filename), 7.5e-4) # 7.5e-4 for figure, e.g. pressure on aircraft
 
-#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
-ode = semidiscretize(semi, tspan, restart_filename)
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
+#ode = semidiscretize(semi, tspan, restart_filename)
 
 
 # Callbacks
@@ -128,14 +129,22 @@ ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100
+analysis_interval = 2000
+
+force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
+A = 191.8 # m^2 = 297360 inch^2
+pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
+                                                SurfacePressureCoefficient(p(), rho(),
+                                                                           U(), A))
+
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
+                                     #analysis_integrals = (lift_coefficient,),
                                      analysis_integrals = (),
-                                     #analysis_integrals = (lift_coefficient,), # NOTE: For visualizing plane (element indices)
+                                     analysis_pointwise = (pressure_coefficient,)
                                      )
 
-alive_callback = AliveCallback(alive_interval = 10)
+alive_callback = AliveCallback(alive_interval = 100)
 
 save_sol_interval = 3000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
@@ -159,19 +168,21 @@ cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 ### CFL Numbers restarted from 2.8e-4 ###
 
+# IDEA: Use these CFL numbers (with ramp-up) for timings from 0->7.5e-4
+
 cfl = 1.3
 
 # CFL numbers for other integrators
-cfl = 2.2 # PERRK Standalone 15
-cfl = 0.5 # R-CKL43
-cfl = 0.4 # R-RK33
+#cfl = 2.2 # PERRK Standalone 15
+#cfl = 0.5 # R-CKL43
+#cfl = 0.4 # R-RK33
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        #save_solution,
+                        save_solution,
                         #save_restart,
                         stepsize_callback)
 
@@ -214,16 +225,16 @@ dtRatios_red_p3 = [
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
 
-ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
-ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
-ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+#ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
+#ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0,
                   save_everystep = false, callback = callbacks);
