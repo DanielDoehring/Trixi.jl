@@ -132,7 +132,7 @@ analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (),
-                                     #analysis_integrals = (lift_coefficient,),
+                                     #analysis_integrals = (lift_coefficient,), # NOTE: For visualizing plane (element indices)
                                      )
 
 alive_callback = AliveCallback(alive_interval = 10)
@@ -157,7 +157,9 @@ t_ramp_up() = 1e-6
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 =#
 
-cfl = 1.3 # Restarted from 2.8e-4
+### CFL Numbers restarted from 2.8e-4 ###
+
+cfl = 1.3
 
 # CFL numbers for other integrators
 cfl = 2.2 # PERRK Standalone 15
@@ -212,18 +214,16 @@ dtRatios_red_p3 = [
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
+
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
-
 ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
-#ode_alg = Trixi.CKL43()
-
 ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
-#ode_alg = Trixi.RK33()
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0,
                   save_everystep = false, callback = callbacks);
