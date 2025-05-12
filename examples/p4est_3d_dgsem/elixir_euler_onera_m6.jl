@@ -171,7 +171,7 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
 #base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
 
-stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PERRK p3 15 standalone
+stepsize_callback = StepsizeCallback(cfl = 10.0, interval = 2) # PERRK p3 15 standalone
 
 dtRatios_complete_p3 = [ 
     0.309904923439026,
@@ -203,7 +203,7 @@ stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        save_solution,
+                        #save_solution,
                         #save_restart,
                         stepsize_callback
                         )
