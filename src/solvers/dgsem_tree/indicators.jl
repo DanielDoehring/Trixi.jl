@@ -301,6 +301,11 @@ function Base.show(io::IO, ::MIME"text/plain", indicator::IndicatorLöhner)
     end
 end
 
+"""
+    IndicatorLoehner
+
+Same as [`IndicatorLöhner`](@ref).
+"""
 const IndicatorLoehner = IndicatorLöhner
 
 # dirty Löhner estimate, direction by direction, assuming constant nodes
