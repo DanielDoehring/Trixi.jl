@@ -288,7 +288,6 @@ end
                                       integrator.k1[i]
             end
         end
-
     else
         ### General implementation: Not own method for each grid level ###
 
