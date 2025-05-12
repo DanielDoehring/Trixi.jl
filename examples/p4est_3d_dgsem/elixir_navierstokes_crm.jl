@@ -1,6 +1,5 @@
 using Trixi
 using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
-using LinearAlgebra: norm
 
 ###############################################################################
 
@@ -107,19 +106,21 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
-
-#tspan = (0.0, 1e-2)
-#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+#=
+tspan = (0.0, 1e-2)
+ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan) # Everything else
-
+=#
 
 # For PERK Multi coefficient measurements
-restart_file = "restart_66e-4.h5"
+restart_file = "restart_28e-4.h5"
+#restart_file = "restart_66e-4.h5"
 restart_filename = joinpath("out", restart_file)
 
 tspan = (load_time(restart_filename), 1e-2)
 
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
+ode = semidiscretize(semi, tspan, restart_filename)
 
 
 # Callbacks
@@ -134,7 +135,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      #analysis_integrals = (lift_coefficient,),
                                      )
 
-alive_callback = AliveCallback(alive_interval = 500)
+alive_callback = AliveCallback(alive_interval = 10)
 
 save_sol_interval = 3000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
@@ -146,6 +147,8 @@ save_solution = SaveSolutionCallback(interval = save_sol_interval,
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory = "out")
+
+## k = 2 ##
 #=
 cfl_0() = 0.8
 cfl_max() = 1.5 # 1.5 crashes after ~8000 steps for relxation methods
@@ -154,15 +157,20 @@ t_ramp_up() = 1e-6
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 =#
 
-cfl = 1.3 # Restarted
+cfl = 1.3 # Restarted from 2.8e-4
+
+# CFL numbers for other integrators
+cfl = 2.2 # PERRK Standalone 15
+cfl = 0.5 # R-CKL43
+cfl = 0.4 # R-RK33
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         #save_solution,
-                        save_restart,
+                        #save_restart,
                         stepsize_callback)
 
 # Run the simulation
@@ -204,14 +212,18 @@ dtRatios_red_p3 = [
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
-#ode_alg = Trixi.RK33()
+newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 
-
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
-                                                 relaxation_solver = relaxation_solver)
+                                                 relaxation_solver = newton)
 
+ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+
+ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
+#ode_alg = Trixi.CKL43()
+
+ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
+#ode_alg = Trixi.RK33()
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0,
                   save_everystep = false, callback = callbacks);
