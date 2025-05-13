@@ -396,6 +396,8 @@ end
     end
     integrator.t += integrator.gamma * integrator.dt
 
+    #println("gamma: ", integrator.gamma)
+
     return nothing
 end
 end # @muladd
