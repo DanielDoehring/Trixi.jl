@@ -1,4 +1,3 @@
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -42,12 +41,12 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      # Note: entropy defaults to mathematical entropy
                                      analysis_integrals = (entropy,),
-                                     analysis_filename = "entropy_standard.dat",
-                                     #analysis_filename = "entropy_ER.dat",
+                                     #analysis_filename = "entropy_standard.dat",
+                                     analysis_filename = "entropy_ER.dat",
                                      save_analysis = true)
 
-cfl = 1.0 # Probably not maxed out
-#cfl = 0.25 # RK4
+cfl = 1.0 # Probably not maxed out (PERRK schemes)
+#cfl = 0.25 # RK4 etc.
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -62,20 +61,19 @@ callbacks = CallbackSet(summary_callback,
 basepath = "/home/daniel/git/Paper_PERRK/Data/WeakBlastWave/"
 dtRatios = [1, 0.5, 0.25]
 
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
-#relaxation_solver = Trixi.RelaxationSolverSecant()
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = eps(Float64), gamma_tol = eps(Float64))
 
 # p = 2
-
+#=
 Stages = [9, 5, 3]
 path = basepath * "p2/"
 
 #ode_alg = Trixi.PairedExplicitRK2(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK2(Stages[1], path, relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+=#
 # p = 3
 #=
 Stages = [13, 7, 4]
@@ -84,21 +82,21 @@ path = basepath * "p3/"
 #ode_alg = Trixi.PairedExplicitRK3(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(Stages[1], path, relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
 # p = 4
-#=
+
 Stages = [18, 10, 6]
 path = basepath * "p4/"
 
 #ode_alg = Trixi.PairedExplicitRK4(Stages[1], path)
 #ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages[1], path, relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+#ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+
 
 # Test comparison algorithms for entropy conservation property
 #ode_alg = Trixi.RK44()

@@ -44,16 +44,17 @@ summary_callback = SummaryCallback()
 analysis_callback = AnalysisCallback(semi, interval = 1,
                                      extra_analysis_errors = (:conservation_error,),
                                      extra_analysis_integrals = (Trixi.entropy_math,),
-                                     #analysis_filename = "entropy_ER.dat",
-                                     analysis_filename = "entropy_standard.dat",
+                                     analysis_filename = "entropy_ER.dat",
+                                     #analysis_filename = "entropy_standard.dat",
                                      save_analysis = true)
 cfl = 3.5 # [16, 8]
 #cfl = 5.5 # [32, 16]
 
+# Employed only for finding the roughly stable timestep
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback
+                        #analysis_callback
                         #stepsize_callback
                         )
 
@@ -71,7 +72,7 @@ relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10, root_tol =
 ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios;
                                                  relaxation_solver = relaxation_solver)
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK2(16, path; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.PairedExplicitRK2(16, path)
