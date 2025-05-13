@@ -156,7 +156,7 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi)
                                       med_level = Refinement + 1, med_threshold = -3.0,
                                       max_level = Refinement + 2, max_threshold = -2.0)
 
-N_Convergence = 0
+N_Convergence = 0 # up to 7 for p2, 3 for p3/p4
 CFL_Convergence = 1.0 / (2^N_Convergence)
 
 amr_callback = AMRCallback(semi, amr_controller,
@@ -175,31 +175,37 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 dtRatios = [1, 0.5, 0.25]
-basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
-#basepath = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
+#basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
+basepath = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
+
+newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = eps(Float64))
 
 # p = 2
-#=
+
 Stages = [12, 6, 3]
 path = basepath * "p2/"
-ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios)
-=#
+#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios,
+                                                       relaxation_solver = newton)
+
 
 # p = 3
 #=
 Stages = [16, 8, 4]
 path = basepath * "p3/"
-ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios,
+                                                       relaxation_solver = newton)
 =#
 
 # p = 4
-
+#=
 Stages = [15, 9, 5]
 path = basepath * "p4/"
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios,
+                                                       relaxation_solver = newton)
+=#
 
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
 

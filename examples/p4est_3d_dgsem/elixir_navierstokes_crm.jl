@@ -13,6 +13,8 @@ Re = 5 * 10^6
 
 ## Standard units ##
 
+# TODO: Better convert units to inches (aircraft is in inches)
+
 chord = 7.005 # meters = 275.80 inches
 
 c = 343 # m/s
@@ -70,24 +72,21 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
 base_path = "/storage/home/daniel/CRM/"
-#mesh_file = base_path * "crm_q3_lin_relabel.inp"
-mesh_file = base_path * "crm_q3_lin_aircraft_only.inp" # NOTE: Does not seem to have a benefit
+mesh_file = base_path * "crm_q3_lin_relabel.inp"
 
 boundary_symbols = [:SYMMETRY,
                     :FARFIELD,
-                    #:WING, :FUSELAGE, :WING_UP, :WING_LO,
-                    :AIRCRAFT,
+                    :WING, :FUSELAGE, :WING_UP, :WING_LO,
                     :OUTFLOW]
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
 boundary_conditions_hyp = Dict(:SYMMETRY => boundary_condition_symmetry_plane, # Symmetry: bc_symmetry
                                :FARFIELD => bc_farfield, # Farfield: bc_farfield
-                               #:WING => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                               #:FUSELAGE => boundary_condition_slip_wall, # Fuselage: bc_slip_wall
-                               #:WING_UP => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                               #:WING_LO => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                               :AIRCRAFT => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                               :WING => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                               :FUSELAGE => boundary_condition_slip_wall, # Fuselage: bc_slip_wall
+                               :WING_UP => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                               :WING_LO => boundary_condition_slip_wall, # Wing: bc_slip_wall
                                :OUTFLOW => bc_farfield)
 
 velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
@@ -98,11 +97,10 @@ bc_symmetry_plane_para = BoundaryConditionNavierStokesWall(SymmetryPlane(), heat
 
 boundary_conditions_para = Dict(:SYMMETRY => bc_symmetry_plane_para, # Symmetry
                                 :FARFIELD => bc_farfield, # Farfield: bc_farfield
-                                #:WING => bc_body, # Wing: bc_body
-                                #:FUSELAGE => bc_body, # Fuselage: bc_body
-                                #:WING_UP => bc_body, # Wing: bc_body
-                                #:WING_LO => bc_body, # Wing: bc_body
-                                :AIRCRAFT => bc_body, # Wing: bc_body
+                                :WING => bc_body, # Wing: bc_body
+                                :FUSELAGE => bc_body, # Fuselage: bc_body
+                                :WING_UP => bc_body, # Wing: bc_body
+                                :WING_LO => bc_body, # Wing: bc_body
                                 :OUTFLOW => bc_farfield)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
@@ -110,9 +108,9 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-tspan = (0.0, 1e-5) # 1e-5 for debugging only (plot aircraft elements)
-ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
-#ode = semidiscretize(semi, tspan) # Everything else
+tspan = (0.0, 7.5e-4) # 1e-5 for debugging only (plot aircraft elements)
+#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+ode = semidiscretize(semi, tspan) # Everything else
 
 
 #=
@@ -132,25 +130,24 @@ ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 2000
+analysis_interval = 100_000
 
-# TODO: Something wrong here: Paraview crashes upon element retrieval
-#force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
-#force_boundary_names = (:WING, :FUSELAGE)
-#force_boundary_names = (:FUSELAGE,)
-
-force_boundary_names = (:AIRCRAFT,)
+force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
 
 A = 191.8 # m^2 = 297360 inch^2
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p(), rho(),
                                                                            U(), A))
+aoa() = 0.0
+lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
+                                           LiftCoefficientPressure3D(aoa(), rho(),
+                                                                     U(), A))
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      #analysis_integrals = (lift_coefficient,),
                                      analysis_integrals = (),
-                                     analysis_pointwise = (pressure_coefficient,)
+                                     #analysis_pointwise = (pressure_coefficient,)
                                      )
 
 alive_callback = AliveCallback(alive_interval = 100)
@@ -169,7 +166,14 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 ## k = 2 ##
 
 cfl_0() = 0.8
-cfl_max() = 1.5 # 1.5 crashes after ~8000 steps for relxation methods
+#cfl_max() = 1.5 # For first run with PERRK
+
+# Copied from below for one run
+#cfl_max() = 1.3 # (Second) run PERRK Multi
+cfl_max() = 2.1 # PERRK Standalone 15
+#cfl_max() = 0.5 # R-CKL43
+#cfl_max() = 0.4 # R-RK33
+
 t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
@@ -179,7 +183,7 @@ cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 # IDEA: Use these CFL numbers (with ramp-up) for timings from 0->7.5e-4
 
-#cfl = 1.3
+#cfl = 1.3 # PERRK Multi
 
 # CFL numbers for other integrators
 #cfl = 2.2 # PERRK Standalone 15
@@ -191,7 +195,7 @@ stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        save_solution,
+                        #save_solution,
                         #save_restart,
                         stepsize_callback)
 
@@ -241,7 +245,7 @@ newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamm
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
 
-#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
