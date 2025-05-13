@@ -1,4 +1,3 @@
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 # Ratio of specific heats
@@ -62,7 +61,7 @@ N_passes = 4
 T_end = EdgeLength() * N_passes
 tspan = (0.0, T_end)
 
-tspan = (0.0, 0.0) # For plotting of IC
+#tspan = (0.0, 0.0) # For plotting of IC
 
 function mapping(xi_, eta_)
     exponent = 1.4
@@ -117,7 +116,7 @@ save_solution = SaveSolutionCallback(interval = 100,
 
 callbacks = CallbackSet(summary_callback,
                         analysis_cb_entropy,
-                        save_solution, # For plotting of IC
+                        #save_solution, # For plotting of IC
                         #analysis_callback,
                         alive_callback)
 
@@ -125,8 +124,8 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/"
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3, root_tol = 1e-14)
-
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3, root_tol = 1e-14, gamma_tol = 1e-15)
+#=
 # p = 2
 path = basepath * "p2/"
 
@@ -143,7 +142,7 @@ dtRatios = [
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios,
                                                        relaxation_solver = relaxation_solver)
-
+=#
 #=
 # p = 3
 path = basepath * "p3/"
@@ -165,7 +164,7 @@ dtRatios = [
 ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
-#=
+
 # p = 4
 path = basepath * "p4/"
 
@@ -181,7 +180,7 @@ dtRatios = [
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 7.25e-3,
