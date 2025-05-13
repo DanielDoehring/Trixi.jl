@@ -156,6 +156,7 @@ boundary_conditions_parabolic = (; x_neg = boundary_condition_parabolic,
 # The LDG scheme can be used by specifying the keyword
 # solver_parabolic = ViscousFormulationLocalDG()
 # in the semidiscretization call below.
+# TODO: Use LDG!
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions,
@@ -191,7 +192,9 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 dtRatios = [1, 0.25]
 basepath = "/home/daniel/git/Paper_PERRK/Data/ViscousShock/"
 
+# TODO: Perform convergence study with different parameter of the relaxation solver!
 relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8,
+                                                    root_tol = eps(Float64),
                                                     gamma_tol = 100 * eps(Float64))
 
 #=
@@ -216,7 +219,7 @@ Stages = [10, 6]
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 
-dtRef = 8.75e-3
+dtRef = 8.75e-3 # TODO: If we switch to LDG this may be increased and convergence rates may be as expected
 max_level = Trixi.maximum_level(mesh.tree)
 dt = dtRef / 4.0^(max_level - 2)
 
