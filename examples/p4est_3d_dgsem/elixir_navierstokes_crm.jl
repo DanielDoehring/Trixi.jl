@@ -10,19 +10,14 @@ prandtl_number() = 0.72
 # https://www1.grc.nasa.gov/research-and-engineering/hiocfd/
 
 Re = 5 * 10^6
+chord = 275.80 # inches = 7.005 m
 
-## Standard units ##
-
-# TODO: Better convert units to inches (aircraft is in inches)
-
-chord = 7.005 # meters = 275.80 inches
-
-c = 343 # m/s
+c = 13504 # inches/s = 343 m/s
 
 #p = 101325 # Pa
 #rho = c^2 / (gamma * p)
 
-rho() = 1.293 # kg/m^3
+rho() = 2.1199e-5 # kg/inches^3 = 1.293 kg/m^3
 p() = c^2 * rho() / gamma
 
 U() = 0.85 * c
@@ -37,6 +32,7 @@ equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
 
 @inline function initial_condition(x, t, equations)
     # set the freestream flow parameters
+    # TODO: Convert to inch-based units
     rho_freestream = 1.293
 
     v1 = 291.55
@@ -134,7 +130,7 @@ analysis_interval = 100_000
 
 force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
 
-A = 191.8 # m^2 = 297360 inch^2
+A = 297360 # inch^2 = 191.8 m^2
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p(), rho(),
                                                                            U(), A))
