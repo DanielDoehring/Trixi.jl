@@ -1,5 +1,3 @@
-
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -36,8 +34,8 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 0.0) # For plotting of IC
-#tspan = (0.0, 1.0)
+#tspan = (0.0, 0.0) # For plotting of IC
+tspan = (0.0, 1.0)
 
 ode = semidiscretize(semi, tspan)
 
@@ -68,10 +66,10 @@ callbacks = CallbackSet(summary_callback,
 basepath = "/home/daniel/git/Paper_PERRK/Data/WeakBlastWave/"
 dtRatios = [1, 0.5, 0.25]
 
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 3)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = eps(Float64), gamma_tol = eps(Float64))
 #relaxation_solver = Trixi.RelaxationSolverSecant()
 
-#=
+
 # p = 2
 Stages = [9, 5, 3]
 path = basepath * "p2/"
@@ -81,10 +79,10 @@ path = basepath * "p2/"
 
 #ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+
 
 # p = 3
-
+#=
 Stages = [13, 7, 4]
 path = basepath * "p3/"
 
@@ -94,7 +92,7 @@ path = basepath * "p3/"
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios,
                                                  relaxation_solver = relaxation_solver)
-
+=#
 # p = 4
 #=
 Stages = [18, 10, 6]
@@ -108,13 +106,13 @@ ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxat
 =#
 
 # Test comparison algorithms for entropy conservation property
-ode_alg = Trixi.RK44()
-ode_alg = Trixi.TS64()
-ode_alg = Trixi.CKL54()
+#ode_alg = Trixi.RK44()
+#ode_alg = Trixi.TS64()
+#ode_alg = Trixi.CKL54()
 
 #ode_alg = Trixi.RelaxationRK44()
 #ode_alg = Trixi.RelaxationTS64()
-ode_alg = Trixi.RelaxationCKL54()
+#ode_alg = Trixi.RelaxationCKL54()
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 42.0,
