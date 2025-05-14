@@ -42,6 +42,7 @@ solver = DGSEM(basis, surface_flux, volume_integral)
 coordinates_min = (-1.0, -1.0)
 coordinates_max = ( 1.0,  1.0)
 Refinement = 7
+# CARE: No inherent multiscale structure! Randomly assign cells!
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level=Refinement,
                 n_cells_max=100_000)
@@ -70,8 +71,9 @@ save_solution = SaveSolutionCallback(interval = 10_000,
                                      solution_variables = cons2prim)
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback,
-                        save_solution)
+                        analysis_callback,
+                        #save_solution
+                        )
 
 ###############################################################################
 # run the simulation
@@ -83,15 +85,15 @@ Stages = reverse(collect(range(5, 16)))
 dt = 1e-3
 dtRatios = [42]
 
-ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path * "p2/", dtRatios)
-ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path * "p3/", dtRatios)
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path * "p4/", dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path * "p2/", dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path * "p3/", dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path * "p4/", dtRatios)
 
-relaxation_solver = Trixi.RelaxationSolverSecant(max_iterations = 10)
+relaxation_solver = Trixi.RelaxationSolverSecant(max_iterations = 10, root_tol = 1e-15, gamma_tol = 1e-15)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path * "p2/", dtRatios; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path * "p3/", dtRatios; relaxation_solver = relaxation_solver)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path * "p4/", dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path * "p3/", dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path * "p4/", dtRatios; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
@@ -99,9 +101,9 @@ sol = Trixi.solve(ode, ode_algorithm,
 
 ###############################################################################
 # Plot section
-
+#=
 using Plots
 pd = PlotData2D(sol)
 
 plot(pd["rho"], title = "\$ρ, t_f = 3.0\$", xlabel = "\$x\$", ylabel = "\$y \$", c = :jet)
-
+=#
