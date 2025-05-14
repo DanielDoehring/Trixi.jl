@@ -397,11 +397,12 @@ end
     integrator.t += integrator.gamma * integrator.dt
 
     #println("t: ", integrator.t, " gamma: ", integrator.gamma)
-    # Write t and gamma to a file
+    # Write t and gamma to file for plotting
+    #=
     open("relaxation_log.txt", "a") do file
         write(file, "$(integrator.t) $(integrator.gamma)\n")
     end
-    
+    =#
     return nothing
 end
 end # @muladd

@@ -87,7 +87,7 @@ equations_parabolic = CompressibleNavierStokesDiffusion1D(equations, mu = mu_bar
                                                           Prandtl = prandtl_number(),
                                                           gradient_variables = GradientVariablesPrimitive())
 
-PolyDeg = 3 # 1, 2, 3                                                          
+PolyDeg = 1
 solver = DGSEM(polydeg = PolyDeg, surface_flux = flux_hlle)
 
 domain_length = 4.0
@@ -98,7 +98,7 @@ refinement_patches = ((type = "box", coordinates_min = (-1.0,),
                        coordinates_max = (1.0,)),)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 2,
+                initial_refinement_level = 4, # 2 to 7
                 periodicity = false,
                 refinement_patches = refinement_patches,
                 n_cells_max = 30_000)
@@ -156,7 +156,6 @@ boundary_conditions_parabolic = (; x_neg = boundary_condition_parabolic,
 # The LDG scheme can be used by specifying the keyword
 # solver_parabolic = ViscousFormulationLocalDG()
 # in the semidiscretization call below.
-# TODO: Use LDG!
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions,
@@ -177,10 +176,8 @@ alive_callback = AliveCallback(alive_interval = 10000)
 
 analysis_interval = 1_000_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     analysis_errors = [:l2_error, :l1_error, :linf_error,
-                                         :l2_error_primitive,
-                                         :l1_error_primitive,
-                                         :linf_error_primitive],
+                                     analysis_errors = [:l2_error, :l1_error, :linf_error],
+                                         #:l2_error_primitive, :l1_error_primitive, :linf_error_primitive],
                                      analysis_integrals = (;))
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
@@ -192,18 +189,17 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 dtRatios = [1, 0.25]
 basepath = "/home/daniel/git/Paper_PERRK/Data/ViscousShock/"
 
-# TODO: Perform convergence study with different parameter of the relaxation solver!
 relaxation_solver = Trixi.RelaxationSolverBisection(gamma_min = 0.8,
-                                                    root_tol = eps(Float64),
-                                                    gamma_tol = 100 * eps(Float64))
+                                                    root_tol = 1e-15,
+                                                    gamma_tol = 1e-15)
 
-#=
+
 path = basepath * "p2/"
 Stages = [8, 4]
 
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
-=#
+
 
 #=
 path = basepath * "p3/"
@@ -213,13 +209,15 @@ Stages = [9, 5]
 ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
 =#
 
+#=
 path = basepath * "p4/"
 Stages = [10, 6]
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, relaxation_solver = relaxation_solver)
+=#
 
-dtRef = 8.75e-3 # TODO: If we switch to LDG this may be increased and convergence rates may be as expected
+dtRef = 8.75e-3
 max_level = Trixi.maximum_level(mesh.tree)
 dt = dtRef / 4.0^(max_level - 2)
 
@@ -231,7 +229,7 @@ sol = Trixi.solve(ode, ode_algorithm,
 ###############################################################################
 
 # Plot IC & grid
-
+#=
 using Plots
 
 pd = PlotData1D(sol)
@@ -254,3 +252,4 @@ plot!(pd["p"], title = "Viscous Shock: Initial Solution",
       titlefont = font("Computer Modern", 18),
       legendfont = font("Computer Modern", 16),
       legend = :topright)
+=#
