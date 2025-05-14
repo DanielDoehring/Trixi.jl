@@ -1,4 +1,5 @@
 using Trixi
+using OrdinaryDiffEqLowStorageRK
 
 ###############################################################################
 
@@ -8,22 +9,29 @@ prandtl_number() = 0.72
 # Follows problem C3.5 of the 2015 Third International Workshop on High-Order CFD Methods
 # https://www1.grc.nasa.gov/research-and-engineering/hiocfd/
 
-Re = 5 * 10^6
-chord = 275.80 # inches = 7.005 m
+Re = 5 * 10^6 # C3.5 testcase
 
-c = 13504 # inches/s = 343 m/s
+chord = 7.005 # m = 275.80 inches
+c = 343.0 # m/s = 13504 inches/s
+rho() = 1.293 # kg/m^3 = 2.1199e-5 kg/inches^3
 
-#p = 101325 # Pa
-#rho = c^2 / (gamma * p)
+#chord = 275.80 # inches = 7.005 m
+#c = 13504 # inches/s = 343 m/s
+#rho() = 2.1199e-5 # kg/inches^3 = 1.293 kg/m^3
 
-rho() = 2.1199e-5 # kg/inches^3 = 1.293 kg/m^3
+# TODO: Figure out the "real" Reynolds number based on the "true" chord length
+chord = 7.005 / 40 # m = 275.80 inches
+c = 343.0/40 # m/s = 13504 inches/s
+rho() = 1.293*40^3 # kg/m^3 = 2.1199e-5 kg/inches^3
+
 p() = c^2 * rho() / gamma
-
-U() = 0.85 * c
+M = 0.85
+U() = M * c
 
 convective_timescale = chord / U() # seconds
 
 mu() = rho() * chord * U()/Re
+println("Viscosity: ", mu())
 
 equations = CompressibleEulerEquations3D(gamma)
 equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
@@ -31,17 +39,20 @@ equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
 
 @inline function initial_condition(x, t, equations)
     # set the freestream flow parameters
-    # TODO: Convert to inch-based units
     #rho_freestream = 1.293
-    rho_freestream = 2.1199e-5
+    #rho_freestream = 2.1199e-5
+    rho_freestream = 1.293 * 40^3
 
     #v1 = 291.55
-    v1 = 11478.4
+    #v1 = 11478.4
+    v1 = 291.55 / 40
+
     v2 = 0.0
     v3 = 0.0
 
     #p_freestream = 108657.255
-    p_freestream = 2761.291129417143
+    #p_freestream = 2761.291129417143
+    p_freestream = 108657.255 * 40
 
     prim = SVector(rho_freestream, v1, v2, v3, p_freestream)
     return prim2cons(prim, equations)
@@ -70,7 +81,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 
 #mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
 base_path = "/storage/home/daniel/CRM/"
-mesh_file = base_path * "crm_q3_lin_relabel.inp"
+#mesh_file = base_path * "crm_q3_lin_relabel.inp"
+mesh_file = base_path * "crm_q3_lin_relabel_m.inp"
 
 boundary_symbols = [:SYMMETRY,
                     :FARFIELD,
@@ -107,8 +119,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                                                     boundary_conditions_para))
 
 tspan = (0.0, 7.5e-4) # 1e-5 for debugging only (plot aircraft elements)
-#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
-ode = semidiscretize(semi, tspan) # Everything else
+ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+#ode = semidiscretize(semi, tspan) # Everything else
 
 
 #=
@@ -128,11 +140,12 @@ ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100_000
+analysis_interval = 10
 
 force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
 
-A = 297360 # inch^2 = 191.8 m^2
+A = 297360.0 # inch^2 = 191.8 m^2
+#A = 191.8 # m^2 = 297360.0 inch^2
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p(), rho(),
                                                                            U(), A))
@@ -143,8 +156,8 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     #analysis_integrals = (lift_coefficient,),
-                                     analysis_integrals = (),
+                                     analysis_integrals = (lift_coefficient,),
+                                     #analysis_integrals = (),
                                      #analysis_pointwise = (pressure_coefficient,)
                                      )
 
@@ -163,25 +176,26 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 
 ## k = 2 ##
 
+#=
 cfl_0() = 0.8
 #cfl_max() = 1.5 # For first run with PERRK
 
 # Copied from below for one run
-#cfl_max() = 1.3 # (Second) run PERRK Multi
-cfl_max() = 2.1 # PERRK Standalone 15
+cfl_max() = 1.3 # (Second) run PERRK Multi
+#cfl_max() = 2.1 # PERRK Standalone 15
 #cfl_max() = 0.5 # R-CKL43
 #cfl_max() = 0.4 # R-RK33
 
 t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
-
+=#
 
 ### CFL Numbers restarted from 2.8e-4 ###
 
 # IDEA: Use these CFL numbers (with ramp-up) for timings from 0->7.5e-4
 
-#cfl = 1.3 # PERRK Multi
+cfl = 0.8 # PERRK Multi
 
 # CFL numbers for other integrators
 #cfl = 2.2 # PERRK Standalone 15
@@ -195,7 +209,8 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         #save_solution,
                         #save_restart,
-                        stepsize_callback)
+                        stepsize_callback
+                        )
 
 # Run the simulation
 ###############################################################################
@@ -243,7 +258,7 @@ newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamm
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
 
-ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
