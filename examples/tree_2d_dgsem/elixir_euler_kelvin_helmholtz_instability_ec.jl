@@ -92,15 +92,15 @@ dtRatios = [42]
 relaxation_solver = Trixi.RelaxationSolverSecant(max_iterations = 10, root_tol = 1e-15, gamma_tol = 1e-15)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path * "p2/", dtRatios; relaxation_solver = relaxation_solver)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path * "p3/", dtRatios; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path * "p4/", dtRatios; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path * "p3/", dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path * "p4/", dtRatios; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
                   save_everystep=false, callback=callbacks);
 
 ###############################################################################
-# Plot section
+# Plot section (plot in paper from paraview & save_solution CB)
 #=
 using Plots
 pd = PlotData2D(sol)
