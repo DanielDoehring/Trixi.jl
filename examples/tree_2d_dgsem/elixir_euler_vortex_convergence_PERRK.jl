@@ -1,5 +1,3 @@
-
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -175,10 +173,8 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 dtRatios = [1, 0.5, 0.25]
-basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
-#basepath = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
-
-newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-14, gamma_tol = eps(Float64))
+#basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
+basepath = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/"
 
 # p = 2
 #=
@@ -194,7 +190,7 @@ Stages = [16, 8, 4]
 path = basepath * "p3/"
 #ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios,
-                                                       relaxation_solver = newton)
+                                                       relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-14, gamma_tol = eps(Float64)))
 =#
 
 # p = 4
@@ -203,7 +199,7 @@ Stages = [15, 9, 5]
 path = basepath * "p4/"
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios,
-                                                       relaxation_solver = newton)
+                                                       relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-14, gamma_tol = eps(Float64)))
 
 
 dt = 0.004 * CFL_Convergence # Timestep in asymptotic regime
