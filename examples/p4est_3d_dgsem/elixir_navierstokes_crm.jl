@@ -1,5 +1,4 @@
 using Trixi
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 
 ###############################################################################
 
@@ -33,13 +32,16 @@ equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
 @inline function initial_condition(x, t, equations)
     # set the freestream flow parameters
     # TODO: Convert to inch-based units
-    rho_freestream = 1.293
+    #rho_freestream = 1.293
+    rho_freestream = 2.1199e-5
 
-    v1 = 291.55
+    #v1 = 291.55
+    v1 = 11478.4
     v2 = 0.0
     v3 = 0.0
 
-    p_freestream = 108657.255
+    #p_freestream = 108657.255
+    p_freestream = 2761.291129417143
 
     prim = SVector(rho_freestream, v1, v2, v3, p_freestream)
     return prim2cons(prim, equations)
