@@ -1,4 +1,3 @@
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -9,35 +8,24 @@ equations = IdealGlmMhdEquations2D(gamma)
 
 initial_condition = initial_condition_convergence_test
 
-# Get the DG approximation space
 volume_flux = (flux_central, flux_nonconservative_powell)
-solver = DGSEM(polydeg = 3,
+solver = DGSEM(polydeg = 2, # 2, 3, 4
                surface_flux = (flux_lax_friedrichs, flux_nonconservative_powell),
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
-# Get the curved quad mesh from a mapping function
-# Mapping as described in https://arxiv.org/abs/1809.01178
 function mapping(xi_, eta_)
     # Transform input variables between -1 and 1 onto [0, sqrt(2)]
     # Note, we use the domain [0, sqrt(2)]^2 for the Alfvén wave convergence test case
-    xi = 0.5 * sqrt(2) * xi_ + 0.5 * sqrt(2)
-    eta = 0.5 * sqrt(2) * eta_ + 0.5 * sqrt(2)
-
-    y = eta +
-        sqrt(2) / 12 * (cos(1.5 * pi * (2 * xi - sqrt(2)) / sqrt(2)) *
-         cos(0.5 * pi * (2 * eta - sqrt(2)) / sqrt(2)))
-
-    x = xi +
-        sqrt(2) / 12 * (cos(0.5 * pi * (2 * xi - sqrt(2)) / sqrt(2)) *
-         cos(2 * pi * (2 * y - sqrt(2)) / sqrt(2)))
+    x = 0.5 * sqrt(2) * (xi_ + 1)
+    y = 0.5 * sqrt(2) * (eta_ + 1)
 
     return SVector(x, y)
 end
 
-cells_per_dimension = (4, 4)
+N = 64
+cells_per_dimension = (N, N)
 mesh = StructuredMesh(cells_per_dimension, mapping)
 
-# create the semi discretization object
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
 ###############################################################################
@@ -48,9 +36,10 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100
+analysis_interval = 100_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = false,
+                                     analysis_errors = [:l2_error, :l1_error, :linf_error],
                                      extra_analysis_integrals = (entropy, energy_total,
                                                                  energy_kinetic,
                                                                  energy_internal,
@@ -59,11 +48,10 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-save_solution = SaveSolutionCallback(interval = 100,
-                                     save_initial_solution = true,
-                                     save_final_solution = true,
-                                     solution_variables = cons2prim)
-cfl = 2.0
+cfl = 4.0 # p2
+#cfl = 2.5 # p3
+#cfl = 1.0 # p4
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
@@ -71,13 +59,44 @@ glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
-                        save_solution,
                         stepsize_callback,
                         glm_speed_callback)
 
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            ode_default_options()..., callback = callbacks);
+basepath = "/home/daniel/git/Paper_PERRK/Data/Alfven_Wave/"
+
+Stages = [14, 13, 12, 11, 10]
+dtRatios = [42, 42, 42, 42, 42] # Not relevant (random assignment)
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10, root_tol = 1e-15, gamma_tol = eps(Float64))
+
+
+path = basepath * "k2/p2/"
+ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+
+
+#=
+path = basepath * "k3/p3/"
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+=#
+
+#=
+path = basepath * "k4/p4/"
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+=#
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = 42.0,
+                  save_everystep = false, callback = callbacks);
+
+###############################################################################
+
+#=
+using Plots
+
+pd = PlotData2D(sol)
+
+plot(pd["B1"])
+plot!(getmesh(pd))
+=#
