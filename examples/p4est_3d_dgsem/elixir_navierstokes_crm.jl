@@ -8,10 +8,11 @@ prandtl_number() = 0.72
 # Follows problem C3.5 of the 2015 Third International Workshop on High-Order CFD Methods
 # https://www1.grc.nasa.gov/research-and-engineering/hiocfd/
 
-Re = 5 * 10^6 # C3.5 testcase
+#Re = 5 * 10^6 # C3.5 testcase
+Re = 5 * 10^6 / 0.0254
 
 chord = 7.005 # m = 275.80 inches
-chord = 7.005 * 0.0254 # m = 7.005 inches
+#chord = 7.005 * 0.0254 # m = 7.005 inches (conversion from running case for mesh in inches)
 
 c = 343.0 # m/s = 13504 inches/s
 rho() = 1.293 # kg/m^3 = 2.1199e-5 kg/inches^3
@@ -102,16 +103,16 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                                                     boundary_conditions_para))
 
 
-tspan = (0.0, 7.5e-4) # 1e-5 for debugging only (plot aircraft elements)
+tspan = (0.0, 1.5e-5) # Restart from 1.5e-5 for second run with smaller CFL
 ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan) # Everything else
 
 #=
 # For PERK Multi coefficient measurements
-restart_file = "restart_75e-5.h5"
+restart_file = "restart_15e-6.h5"
 restart_filename = joinpath("out", restart_file)
 
-tspan = (load_time(restart_filename), 1e-3) # 7.5e-4 for figure, e.g. pressure on aircraft
+tspan = (load_time(restart_filename), 1e-4)
 
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan, restart_filename)
@@ -144,7 +145,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(alive_interval = 100)
 
-save_sol_interval = 2500
+save_sol_interval = 5000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
@@ -155,12 +156,10 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory = "out")
 
-## k = 2 ##
-
 cfl_0() = 0.8
 #cfl_max() = 1.5 # For first run with PERRK
 
-# For Re = 200M
+# For Re = ~200M
 cfl_max() = 1.3 # (Second) run PERRK Multi
 #cfl_max() = 2.1 # PERRK Standalone 15
 #cfl_max() = 0.5 # R-CKL43
@@ -170,12 +169,9 @@ t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
-#cfl = 1.3 # PERRK Multi
+## Restarted simulations ##
 
-# CFL numbers for other integrators
-#cfl = 2.2 # PERRK Standalone 15
-#cfl = 0.5 # R-CKL43
-#cfl = 0.4 # R-RK33
+#cfl = 1.2 # PERRK Multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
@@ -183,7 +179,7 @@ callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
                         #save_solution,
-                        #save_restart,
+                        save_restart,
                         stepsize_callback
                         )
 
@@ -229,10 +225,10 @@ Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
-#=
+
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
-=#
+
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
