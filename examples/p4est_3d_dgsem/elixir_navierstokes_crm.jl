@@ -104,8 +104,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 
 # Restart from 1.5e-5 for second run with smaller CFL
-# Use this run also for timings/performance comparison
-tspan = (0.0, 1.5e-5)
+#tspan = (0.0, 1.5e-5)
+
+# Use for timings this:
+tspan = (0.0, 5e-6)
 
 #ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 ode = semidiscretize(semi, tspan) # Everything else
@@ -164,13 +166,13 @@ cfl_0() = 0.8 # PERRK
 
 # For Re = ~200M
 #cfl_max() = 1.3 # (Second) run PERRK Multi
-#cfl_max() = 2.1 # PERRK Standalone 15
+cfl_max() = 2.1 # PERRK Standalone 15
 
 t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
-cfl = 0.5 # R-CKL43
+#cfl = 0.5 # R-CKL43
 #cfl = 0.4 # R-RK33
 
 ## Restarted simulations ##
@@ -221,7 +223,7 @@ dtRatios_red_p3 = [
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 
@@ -229,6 +231,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/
                                                  relaxation_solver = newton)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
