@@ -102,15 +102,16 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-#=
+
 # Restart from 1.5e-5 for second run with smaller CFL
 # Use this run also for timings/performance comparison
 tspan = (0.0, 1.5e-5)
 
-ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
-#ode = semidiscretize(semi, tspan) # Everything else
-=#
+#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+ode = semidiscretize(semi, tspan) # Everything else
 
+
+#=
 ## Second run: Confirm increased robustness of relaxed multirate method ##
 restart_file = "restart_15e-6.h5"
 restart_filename = joinpath("out", restart_file)
@@ -119,14 +120,14 @@ tspan = (load_time(restart_filename), 1e-4)
 
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan, restart_filename)
-
+=#
 
 # Callbacks
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 100_000
 
 force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
 
@@ -159,22 +160,22 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory = "out")
 
-cfl_0() = 0.8
-#cfl_max() = 1.5 # For first run with PERRK
+cfl_0() = 0.8 # PERRK
 
 # For Re = ~200M
-cfl_max() = 1.3 # (Second) run PERRK Multi
+#cfl_max() = 1.3 # (Second) run PERRK Multi
 #cfl_max() = 2.1 # PERRK Standalone 15
-#cfl_max() = 0.5 # R-CKL43
-#cfl_max() = 0.4 # R-RK33
 
 t_ramp_up() = 1e-6
 
-#cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+
+cfl = 0.5 # R-CKL43
+#cfl = 0.4 # R-RK33
 
 ## Restarted simulations ##
 
-cfl = 1.2 # PERRK Multi
+#cfl = 1.2 # PERRK Multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
@@ -182,17 +183,12 @@ callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
                         #save_solution,
-                        save_restart,
+                        #save_restart,
                         stepsize_callback
                         )
 
 # Run the simulation
 ###############################################################################
-
-#ode_alg = Trixi.PairedExplicitRK3(Stages_complete[end], base_path)
-#ode_alg = Trixi.PairedExplicitRK3(12, base_path)
-
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path * "p3/", dtRatios_complete_p3)
 
 dtRatios_complete_p3 = [ 
     0.00106435123831034,
@@ -226,13 +222,13 @@ dtRatios_red_p3 = [
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
-#=
+
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
-=#
-#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+
+ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
