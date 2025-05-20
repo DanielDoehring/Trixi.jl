@@ -165,15 +165,15 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 cfl_0() = 0.8 # PERRK
 
 # For Re = ~200M
-#cfl_max() = 1.3 # (Second) run PERRK Multi
-cfl_max() = 2.1 # PERRK Standalone 15
+cfl_max() = 1.3 # (Second) run PERRK Multi
+#cfl_max() = 2.1 # PERRK Standalone 15
 
 t_ramp_up() = 1e-6
 
-cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+#cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 #cfl = 0.5 # R-CKL43
-#cfl = 0.4 # R-RK33
+cfl = 0.4 # R-RK33
 
 ## Restarted simulations ##
 
@@ -226,14 +226,14 @@ Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
-
+#=
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
-
-ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+=#
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
-#ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
+ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0,
                   save_everystep = false, callback = callbacks);
