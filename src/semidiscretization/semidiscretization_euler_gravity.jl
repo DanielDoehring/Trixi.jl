@@ -630,8 +630,10 @@ function timestep_gravity_2N!(cache, u_euler, tau, dtau, gravity_parameters,
         # Source term: Jeans instability OR coupling convergence test OR blast wave
         # put in gravity source term proportional to Euler density
         # OBS! subtract off the background density ρ_0 (spatial mean value)
-        @threaded for i in 1:n_elements
-            @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
+        # Note: Adding to `du_gravity` is essentially adding to `du_ode`!
+        @threaded for element in 1:n_elements
+            @views @. du_gravity[1, .., element] += grav_scale *
+                                                    (u_euler[1, .., element] - rho0)
         end
 
         a_stage = a[stage]
@@ -697,8 +699,10 @@ function timestep_gravity_3Sstar!(cache, u_euler, tau, dtau, gravity_parameters,
         # Source term: Jeans instability OR coupling convergence test OR blast wave
         # put in gravity source term proportional to Euler density
         # OBS! subtract off the background density ρ_0 around which the Jeans instability is perturbed
-        @threaded for i in 1:n_elements
-            @views @. du_gravity[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
+        # Note: Adding to `du_gravity` is essentially adding to `du_ode`!
+        @threaded for element in 1:n_elements
+            @views @. du_gravity[1, .., element] += grav_scale *
+                                                    (u_euler[1, .., element] - rho0)
         end
 
         delta_stage = delta[stage]
