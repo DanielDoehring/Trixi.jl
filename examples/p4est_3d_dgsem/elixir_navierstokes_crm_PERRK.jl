@@ -87,7 +87,7 @@ velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
 bc_body = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
 
-bc_symmetry_plane_para = BoundaryConditionNavierStokesWall(SymmetryPlane(), heat_bc)
+bc_symmetry_plane_para = BoundaryConditionNavierStokesWall(Slip(), heat_bc)
 
 boundary_conditions_para = Dict(:SYMMETRY => bc_symmetry_plane_para, # Symmetry
                                 :FARFIELD => bc_farfield, # Farfield: bc_farfield
@@ -102,27 +102,25 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-
-# Restart from 1.5e-5 for second run with smaller CFL
-#tspan = (0.0, 1.5e-5)
+# Run until crashes
+#tspan = (0.0, 1e-4)
 
 # Use for timings this:
-tspan = (0.0, 5e-6)
+#tspan = (0.0, 5e-6)
 
 #ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
-ode = semidiscretize(semi, tspan) # Everything else
+#ode = semidiscretize(semi, tspan) # Everything else
 
-
-#=
 ## Second run: Confirm increased robustness of relaxed multirate method ##
 restart_file = "restart_15e-6.h5"
 restart_filename = joinpath("out", restart_file)
 
+# Run until crashes
 tspan = (load_time(restart_filename), 1e-4)
 
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan, restart_filename)
-=#
+
 
 # Callbacks
 ###############################################################################
@@ -144,14 +142,13 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = (lift_coefficient,),
-                                     #analysis_integrals = (),
-                                     #analysis_pointwise = (pressure_coefficient,)
+                                     analysis_integrals = (lift_coefficient,)
+                                     #analysis_integrals = ()
                                      )
 
 alive_callback = AliveCallback(alive_interval = 100)
 
-save_sol_interval = 5000
+save_sol_interval = 15000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
@@ -165,7 +162,7 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 cfl_0() = 0.8 # PERRK
 
 # For Re = ~200M
-cfl_max() = 1.3 # (Second) run PERRK Multi
+cfl_max() = 1.3 # PERRK Multi
 #cfl_max() = 2.1 # PERRK Standalone 15
 
 t_ramp_up() = 1e-6
@@ -173,11 +170,11 @@ t_ramp_up() = 1e-6
 #cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 #cfl = 0.5 # R-CKL43
-cfl = 0.4 # R-RK33
+#cfl = 0.4 # R-RK33
 
 ## Restarted simulations ##
 
-#cfl = 1.2 # PERRK Multi
+cfl = 1.2 # PERRK Multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
@@ -226,14 +223,14 @@ Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
-#=
+
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
-=#
-#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+
+ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
-ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
+#ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0,
                   save_everystep = false, callback = callbacks);

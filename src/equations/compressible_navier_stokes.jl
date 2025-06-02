@@ -26,31 +26,6 @@ struct NoSlip{F}
     boundary_value_function::F # value of the velocity vector on the boundary
 end
 
-@doc raw"""
-    struct SymmetryPlane
-
-Creates a symmetric velocity boundary condition which eliminates any normal velocity across the boundary, i.e., 
-allows only the tangential velocity to be non-zero.
-The density is simply copied from the inner fluid cell to the outer ghost cell.
-When combined with the heat boundary condition [`Adiabatic`](@ref), this creates a truly symmetric boundary condition.
-Any boundary on which this condition is applied thus acts as a symmetry plane for the flow.
-
-In contrast to the [`NoSlip`](@ref) boundary condition, `SymmetryPlane` does not require supplied function.
-Instead, the boundary velocity is always set to
-```math
-    \boldsymbol{v}_{\mathrm{Bnd}} = \boldsymbol{v}_{\mathrm{Fluid}} - 2 v_n \boldsymbol{n}_{\mathrm{Fluid}}
-```
-where `\boldsymbol{n}_{\mathrm{Fluid}}` is fluid-cell outward-pointing (i.e., into the boundary pointing) normal unit vector and
-```math
-    v_n = \boldsymbol{v}_{\mathrm{Fluid}} \cdot \boldsymbol{n}_{\mathrm{Fluid}}
-```
-measures the alignment of the velocity with the domain normal.
-The (purely) hyperbolic equivalent boundary condition is [`boundary_condition_symmetry_plane`](@ref).
-
-Note that in 1D this degenerates to the [`NoSlip`](@ref) boundary condition which must be used instead.
-"""
-struct SymmetryPlane end
-
 """
     struct Slip
 

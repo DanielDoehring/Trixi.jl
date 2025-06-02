@@ -382,8 +382,6 @@ end
     return flux_inner
 end
 
-# TODO: parabolic. `SymmetryPlane` boundary conditions (see 3D)
-
 # specialized BC impositions for GradientVariablesEntropy.
 
 # This should return a SVector containing the boundary values of entropy variables.
