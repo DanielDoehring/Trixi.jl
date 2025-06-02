@@ -102,15 +102,16 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-# Run until crashes
+# Run until crashes (standard multirate vs. relaxed multirate method)
 #tspan = (0.0, 1e-4)
 
-# Use for timings this:
-#tspan = (0.0, 5e-6)
+# Use for timings
+tspan = (0.0, 5e-6)
 
 #ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan) # Everything else
 
+#=
 ## Second run: Confirm increased robustness of relaxed multirate method ##
 restart_file = "restart_15e-6.h5"
 restart_filename = joinpath("out", restart_file)
@@ -120,7 +121,7 @@ tspan = (load_time(restart_filename), 1e-4)
 
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan, restart_filename)
-
+=#
 
 # Callbacks
 ###############################################################################
@@ -167,14 +168,14 @@ cfl_max() = 1.3 # PERRK Multi
 
 t_ramp_up() = 1e-6
 
-#cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 #cfl = 0.5 # R-CKL43
 #cfl = 0.4 # R-RK33
 
 ## Restarted simulations ##
 
-cfl = 1.2 # PERRK Multi
+#cfl = 1.2 # PERRK Multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
@@ -220,14 +221,15 @@ dtRatios_red_p3 = [
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
+#=
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
-
-ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
+=#
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
