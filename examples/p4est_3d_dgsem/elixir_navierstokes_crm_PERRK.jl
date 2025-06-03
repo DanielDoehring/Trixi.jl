@@ -108,7 +108,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Use for timings
 tspan = (0.0, 5e-6)
 
-#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
 #ode = semidiscretize(semi, tspan) # Everything else
 
 #=
@@ -221,14 +221,14 @@ dtRatios_red_p3 = [
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
-#=
+
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
 
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
-=#
+
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
