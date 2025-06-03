@@ -71,24 +71,39 @@ amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       med_level=Refinement+3, med_threshold=0.7, # med_level = current level
                                       max_level=Refinement+5, max_threshold=0.9)
 
+amr_interval = 7 # PERK p3 4, 6, 11
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval=7, # PERK p3 4, 6, 11
+                           interval=amr_interval,
                            adapt_initial_condition=true,
                            adapt_initial_condition_only_refine=true)
 
-analysis_interval = 1000
+analysis_interval = 5 # For entropy write-out
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = Symbol[])
+                                     #analysis_integrals = Symbol[]
+                                     analysis_integrals = (entropy,),
+                                     analysis_filename = "entropy_standard.dat",
+                                     #analysis_filename = "entropy_ER.dat",
+                                     save_analysis = true
+                                     )
 
-alive_callback = AliveCallback(alive_interval = 50)
+alive_interval = 1 # For finding crash time standard scheme
+alive_interval = 50
+alive_callback = AliveCallback(alive_interval = alive_interval)
 
-stepsize_callback = StepsizeCallback(cfl=3.8) # p = 3, E = 4, 6, 11
+cfl = 3.8 # p = 3, E = 4, 6, 11
+stepsize_callback = StepsizeCallback(cfl=cfl)
+
+save_solution = SaveSolutionCallback(interval = analysis_interval,
+                                     save_initial_solution = false,
+                                     save_final_solution = true,
+                                     solution_variables = cons2prim)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
                         amr_callback,
+                        #save_solution,
                         stepsize_callback)
 
 ###############################################################################
@@ -106,8 +121,3 @@ sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
                   save_everystep=false, callback=callbacks);
 
-###############################################################################
-using Plots
-
-pd = PlotData2D(sol)
-plot(pd["rho"], title = "\$ρ, t_f = 3.0\$", xlabel = "\$x\$", ylabel = "\$y \$", c = :jet)
