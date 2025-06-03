@@ -244,6 +244,8 @@ function relaxation_solver!(integrator,
         #integrator.gamma = 1 - integrator.dt^(ORDER - 1)
     end
 
+    # TODO: Can we store `S_old` by using `r_gamma` here for the next timestep?
+
     return nothing
 end
 
@@ -327,6 +329,8 @@ function relaxation_solver!(integrator,
         #integrator.gamma = 1 - integrator.dt^(ORDER - 1)
     end
 
+    # TODO: Can we store `S_old` by using `r_1` here for the next timestep?
+
     return nothing
 end
 
@@ -358,6 +362,7 @@ function relaxation_solver!(integrator,
                                                               equations, dg, cache)
 
         if abs(r_gamma) <= root_tol
+            # TODO: Can we store `S_old` by using `r_gamma` here for the next timestep?
             break
         end
 

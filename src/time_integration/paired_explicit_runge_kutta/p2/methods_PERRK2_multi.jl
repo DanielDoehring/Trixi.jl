@@ -9,19 +9,22 @@ struct PairedExplicitRelaxationRK2Multi{RelaxationSolver} <:
        AbstractPairedExplicitRKMulti{2}
     PERK2Multi::PairedExplicitRK2Multi
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
 end
 
 function PairedExplicitRelaxationRK2Multi(stages::Vector{Int64},
                                           base_path_mon_coeffs::AbstractString,
                                           dt_ratios;
                                           bS = 1.0, cS = 0.5,
-                                          relaxation_solver = RelaxationSolverNewton())
+                                          relaxation_solver = RelaxationSolverNewton(),
+                                          recompute_entropy = true)
     return PairedExplicitRelaxationRK2Multi{typeof(relaxation_solver)}(PairedExplicitRK2Multi(stages,
                                                                                               base_path_mon_coeffs,
                                                                                               dt_ratios;
                                                                                               bS = bS,
                                                                                               cS = cS),
-                                                                       relaxation_solver)
+                                                                       relaxation_solver,
+                                                                       recompute_entropy)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -73,6 +76,8 @@ mutable struct PairedExplicitRelaxationRK2MultiIntegrator{RealT <: Real, uType,
     # Entropy Relaxation additions
     gamma::RealT
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
+    S_old::RealT # Old entropy value, either last timestep or initial value
 end
 
 mutable struct PairedExplicitRelaxationRK2MultiParabolicIntegrator{RealT <: Real, uType,
@@ -125,6 +130,8 @@ mutable struct PairedExplicitRelaxationRK2MultiParabolicIntegrator{RealT <: Real
     # We need another register to temporarily store the changes due to the hyperbolic part only.
     # The changes due to the parabolic part are stored in the usual `du` register.
     du_tmp::uType
+    recompute_entropy::Bool
+    S_old::RealT # Old entropy value, either last timestep or initial value
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
@@ -163,7 +170,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     # For entropy relaxation
-    gamma = one(eltype(u0))
+    RealT = eltype(u0)
+    gamma = one(RealT)
 
     # TODO: Call different function for mpi_isparallel() == true
     partition_variables!(level_info_elements,
@@ -215,6 +223,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                                                          -1, n_levels,
                                                                          gamma,
                                                                          alg.relaxation_solver,
+                                                                         alg.recompute_entropy,
+                                                                         floatmin(RealT),
                                                                          du_tmp)
     else # Hyperbolic case
         integrator = PairedExplicitRelaxationRK2MultiIntegrator(u0, du, u_tmp,
@@ -243,7 +253,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                                                 level_u_indices_elements,
                                                                 -1, n_levels,
                                                                 gamma,
-                                                                alg.relaxation_solver)
+                                                                alg.relaxation_solver,
+                                                                alg.recompute_entropy,
+                                                                floatmin(RealT))
     end
 
     # initialize callbacks
