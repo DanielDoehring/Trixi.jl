@@ -9,43 +9,50 @@ struct PairedExplicitRelaxationRK3{RelaxationSolver} <:
        AbstractPairedExplicitRKSingle{3}
     PERK3::PairedExplicitRK3
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
 end
 
 # Constructor for previously computed A Coeffs
 function PairedExplicitRelaxationRK3(num_stages, base_path_a_coeffs::AbstractString,
                                      dt_opt = nothing;
                                      cS2 = 1.0f0,
-                                     relaxation_solver = RelaxationSolverNewton())
+                                     relaxation_solver = RelaxationSolverNewton(),
+                                     recompute_entropy = true)
     return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
                                                                                     base_path_a_coeffs,
                                                                                     dt_opt;
                                                                                     cS2 = cS2),
-                                                                  relaxation_solver)
+                                                                  relaxation_solver,
+                                                                  recompute_entropy)
 end
 
 # Constructor that computes Butcher matrix A coefficients from a semidiscretization
 function PairedExplicitRelaxationRK3(num_stages, tspan,
                                      semi::AbstractSemidiscretization;
                                      verbose = false, cS2 = 1.0f0,
-                                     relaxation_solver = RelaxationSolverNewton())
+                                     relaxation_solver = RelaxationSolverNewton(),
+                                     recompute_entropy = true)
     return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
                                                                                     tspan,
                                                                                     semi;
                                                                                     verbose = verbose,
                                                                                     cS2 = cS2),
-                                                                  relaxation_solver)
+                                                                  relaxation_solver,
+                                                                  recompute_entropy)
 end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a list of eigenvalues
 function PairedExplicitRelaxationRK3(num_stages, tspan, eig_vals::Vector{ComplexF64};
                                      verbose = false, cS2 = 1.0f0,
-                                     relaxation_solver = RelaxationSolverNewton())
+                                     relaxation_solver = RelaxationSolverNewton(),
+                                     recompute_entropy = true)
     return PairedExplicitRelaxationRK3{typeof(relaxation_solver)}(PairedExplicitRK3(num_stages,
                                                                                     tspan,
                                                                                     eig_vals;
                                                                                     verbose = verbose,
                                                                                     cS2 = cS2),
-                                                                  relaxation_solver)
+                                                                  relaxation_solver,
+                                                                  recompute_entropy)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -79,6 +86,8 @@ mutable struct PairedExplicitRelaxationRK3Integrator{RealT <: Real, uType,
     # Entropy Relaxation additions
     gamma::RealT
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
+    S_old::RealT # Old entropy value, either last timestep or initial value
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
@@ -96,7 +105,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
     iter = 0
 
     # For entropy relaxation
-    gamma = one(eltype(u0))
+    RealT = eltype(u0)
+    gamma = one(RealT)
 
     integrator = PairedExplicitRelaxationRK3Integrator(u0, du, u_tmp,
                                                        t0, tdir, dt, zero(dt),
@@ -110,7 +120,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3;
                                                                                kwargs...),
                                                        false, true, false,
                                                        k1, kS1,
-                                                       gamma, alg.relaxation_solver)
+                                                       gamma,
+                                                       alg.relaxation_solver,
+                                                       alg.recompute_entropy,
+                                                       floatmin(RealT))
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -148,9 +161,17 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
 
     mesh, equations, dg, cache = mesh_equations_solver_cache(prob.p)
 
+    if !integrator.recompute_entropy && integrator.t == first(prob.tspan)
+        u_wrap = wrap_array(integrator.u, prob.p)
+        integrator.S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+    end
+
     @trixi_timeit timer() "Paired Explicit Relaxation RK ODE integration step" begin
         u_wrap = wrap_array(integrator.u, prob.p)
-        S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+        if integrator.recompute_entropy
+            integrator.S_old = integrate(entropy_math, u_wrap, mesh, equations, dg,
+                                         cache)
+        end
 
         PERK_k1!(integrator, prob.p)
 
@@ -192,7 +213,8 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
         @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
                                                                      u_tmp_wrap, u_wrap,
                                                                      du_wrap,
-                                                                     S_old, dS,
+                                                                     integrator.S_old,
+                                                                     dS,
                                                                      mesh, equations,
                                                                      dg, cache,
                                                                      integrator.relaxation_solver)

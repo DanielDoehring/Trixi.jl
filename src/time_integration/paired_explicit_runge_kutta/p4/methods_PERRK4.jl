@@ -10,18 +10,21 @@ struct PairedExplicitRelaxationRK4{RelaxationSolver} <:
        AbstractPairedExplicitRKSingle{4}
     PERK4::PairedExplicitRK4
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
 end
 
 # Constructor for previously computed A Coeffs
 function PairedExplicitRelaxationRK4(num_stages, base_path_a_coeffs::AbstractString,
                                      dt_opt = nothing;
                                      cS3 = 1.0f0,
-                                     relaxation_solver = RelaxationSolverNewton())
+                                     relaxation_solver = RelaxationSolverNewton(),
+                                     recompute_entropy = true)
     return PairedExplicitRelaxationRK4{typeof(relaxation_solver)}(PairedExplicitRK4(num_stages,
                                                                                     base_path_a_coeffs,
                                                                                     dt_opt;
                                                                                     cS3 = cS3),
-                                                                  relaxation_solver)
+                                                                  relaxation_solver,
+                                                                  recompute_entropy)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -54,6 +57,8 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType,
     # Entropy Relaxation additions
     gamma::RealT
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
+    S_old::RealT # Old entropy value, either last timestep or initial value
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
@@ -69,7 +74,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
     iter = 0
 
     # For entropy relaxation
-    gamma = one(eltype(u0))
+    RealT = eltype(u0)
+    gamma = one(RealT)
 
     integrator = PairedExplicitRelaxationRK4Integrator(u0, du, u_tmp,
                                                        t0, tdir, dt, zero(dt),
@@ -83,7 +89,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
                                                                                kwargs...),
                                                        false, true, false,
                                                        k1,
-                                                       gamma, alg.relaxation_solver)
+                                                       gamma,
+                                                       alg.relaxation_solver,
+                                                       alg.recompute_entropy,
+                                                       floatmin(RealT))
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -153,12 +162,15 @@ end
     end
 
     u_wrap = wrap_array(integrator.u, integrator.p)
-    S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+    if integrator.recompute_entropy
+        integrator.S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
+    end
 
     @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
                                                                  u_tmp_wrap, u_wrap,
                                                                  du_wrap,
-                                                                 S_old, dS,
+                                                                 integrator.S_old,
+                                                                 dS,
                                                                  mesh, equations,
                                                                  dg, cache,
                                                                  integrator.relaxation_solver)
@@ -192,6 +204,12 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{4}
        isapprox(integrator.t + integrator.dt, t_end)
         integrator.dt = t_end - integrator.t
         terminate!(integrator)
+    end
+
+    if !integrator.recompute_entropy && integrator.t == first(prob.tspan)
+        u_wrap = wrap_array(integrator.u, prob.p)
+        mesh, equations, dg, cache = mesh_equations_solver_cache(prob.p)
+        integrator.S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
     end
 
     @trixi_timeit timer() "Paired Explicit Relaxation RK ODE integration step" begin

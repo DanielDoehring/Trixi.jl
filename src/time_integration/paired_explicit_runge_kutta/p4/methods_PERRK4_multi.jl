@@ -9,18 +9,21 @@ struct PairedExplicitRelaxationRK4Multi{RelaxationSolver} <:
        AbstractPairedExplicitRKMulti{4}
     PERK4Multi::PairedExplicitRK4Multi
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
 end
 
 function PairedExplicitRelaxationRK4Multi(stages::Vector{Int64},
                                           base_path_a_coeffs::AbstractString,
                                           dt_ratios;
                                           cS3 = 1.0f0,
-                                          relaxation_solver = RelaxationSolverNewton())
+                                          relaxation_solver = RelaxationSolverNewton(),
+                                          recompute_entropy = true)
     return PairedExplicitRelaxationRK4Multi{typeof(relaxation_solver)}(PairedExplicitRK4Multi(stages,
                                                                                               base_path_a_coeffs,
                                                                                               dt_ratios;
                                                                                               cS3 = cS3),
-                                                                       relaxation_solver)
+                                                                       relaxation_solver,
+                                                                       recompute_entropy)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -72,6 +75,9 @@ mutable struct PairedExplicitRelaxationRK4MultiIntegrator{RealT <: Real, uType,
     # Entropy Relaxation additions
     gamma::RealT
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
+    S_old::RealT # Old entropy value, either last timestep or initial value
+
     # For AMR: Counting RHS evals
     #RHSCalls::Int64
 end
@@ -121,6 +127,8 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
     # Entropy Relaxation additions
     gamma::RealT
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
+    S_old::RealT # Old entropy value, either last timestep or initial value
 
     # Addition for hyperbolic-parabolic problems:
     # We need another register to temporarily store the changes due to the hyperbolic part only.
@@ -164,7 +172,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     # For entropy relaxation
-    gamma = one(eltype(u0))
+    RealT = eltype(u0)
+    gamma = one(RealT)
 
     # TODO: Call different function for mpi_isparallel() == true
     partition_variables!(level_info_elements,
@@ -216,6 +225,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          -1, n_levels,
                                                                          gamma,
                                                                          alg.relaxation_solver,
+                                                                         alg.recompute_entropy,
+                                                                         floatmin(RealT),
                                                                          du_tmp)
     else # Hyperbolic case
         integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp,
@@ -244,7 +255,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                 level_u_indices_elements,
                                                                 -1, n_levels,
                                                                 gamma,
-                                                                alg.relaxation_solver)
+                                                                alg.relaxation_solver,
+                                                                alg.recompute_entropy,
+                                                                floatmin(RealT))
         # For AMR: Counting RHS evals 
         # 0)
     end
