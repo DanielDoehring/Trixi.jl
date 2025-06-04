@@ -126,13 +126,13 @@ mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real
     # Entropy Relaxation additions
     gamma::RealT
     relaxation_solver::RelaxationSolver
+    recompute_entropy::Bool
+    S_old::RealT # Old entropy value, either last timestep or initial value
 
     # Addition for hyperbolic-parabolic problems:
     # We need another register to temporarily store the changes due to the hyperbolic part only.
     # The changes due to the parabolic part are stored in the usual `du` register.
     du_tmp::uType
-    recompute_entropy::Bool
-    S_old::RealT # Old entropy value, either last timestep or initial value
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
