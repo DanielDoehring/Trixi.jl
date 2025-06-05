@@ -418,41 +418,6 @@ end
     return flux_inner
 end
 
-@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:Slip,
-                                                                        <:Adiabatic})(flux_inner,
-                                                                                      u_inner,
-                                                                                      normal::AbstractVector,
-                                                                                      x,
-                                                                                      t,
-                                                                                      operator_type::Gradient,
-                                                                                      equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
-    v1_outer, v2_outer, v3_outer = velocity_symmetry_plane(normal,
-                                                           u_inner[2],
-                                                           u_inner[3],
-                                                           u_inner[4])
-
-    return SVector(u_inner[1], v1_outer, v2_outer, v3_outer, u_inner[5])
-end
-
-@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:Slip,
-                                                                        <:Adiabatic})(flux_inner,
-                                                                                      u_inner,
-                                                                                      normal::AbstractVector,
-                                                                                      x,
-                                                                                      t,
-                                                                                      operator_type::Divergence,
-                                                                                      equations::CompressibleNavierStokesDiffusion3D{GradientVariablesPrimitive})
-    normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x,
-                                                                                                           t,
-                                                                                                           equations)
-    # Normal stresses should be 0. This implies also that `normal_energy_flux = normal_heat_flux`.
-    # For details, see Section 4.2 of 
-    # "Entropy stable modal discontinuous Galerkin schemes and wall boundary conditions
-    #  for the compressible Navier-Stokes equations" by Chan, Lin, Warburton 2022.
-    # DOI: 10.1016/j.jcp.2021.110723
-    return SVector(flux_inner[1], 0, 0, 0, normal_heat_flux)
-end
-
 # specialized BC impositions for GradientVariablesEntropy.
 
 # This should return a SVector containing the boundary values of entropy variables.

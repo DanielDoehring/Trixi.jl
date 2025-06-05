@@ -131,6 +131,7 @@ plot!(pd["rho"], xlabel = "\$x\$",
       linewidth = 3, color = RGB(0, 84 / 256, 159 / 256),
       guidefont = font("Computer Modern", 16), tickfont = font("Computer Modern", 14),
       yticks = -0.2:0.4:1.4,
+      xticks = [-2, -1, -0.5, 0, 0.5, 1, 2],
       legend = true)
 
 plot!(pd["v1"],
