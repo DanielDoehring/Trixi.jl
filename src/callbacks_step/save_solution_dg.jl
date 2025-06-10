@@ -402,7 +402,6 @@ end
 function average_interface_values!(data, cache,
                                    mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                    equations, dg::DG)
-
     @unpack interfaces = cache
     index_range = eachnode(dg)
 
@@ -430,10 +429,10 @@ function average_interface_values!(data, cache,
         for j in eachnode(dg)
             for i in eachnode(dg)
                 for v in eachvariable(equations)
-                    #=
-                    interfaces.u[1, v, i, j, interface] = data[v, i_primary, j_primary,
-                                                            k_primary, primary_element]
-                    =#
+                    interfaces_[1, v, i, j, interface] = 0.5 *
+                                                         data[v, i_primary, j_primary,
+                                                              k_primary,
+                                                              primary_element]
                 end
                 i_primary += i_primary_step_i
                 j_primary += j_primary_step_i
@@ -462,9 +461,10 @@ function average_interface_values!(data, cache,
         for j in eachnode(dg)
             for i in eachnode(dg)
                 for v in eachvariable(equations)
-                    interfaces.u[2, v, i, j, interface] = u[v, i_secondary, j_secondary,
-                                                            k_secondary,
-                                                            secondary_element]
+                    interfaces_[2, v, i, j, interface] += 0.5 * data[v, i_secondary,
+                                                               j_secondary,
+                                                               k_secondary,
+                                                               secondary_element]
                 end
                 i_secondary += i_secondary_step_i
                 j_secondary += j_secondary_step_i
@@ -478,5 +478,4 @@ function average_interface_values!(data, cache,
 
     return nothing
 end
-
 end # @muladd
