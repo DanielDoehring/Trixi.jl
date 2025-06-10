@@ -399,14 +399,14 @@ function save_solution_file_on_root(data, time, dt, timestep, n_vars,
     return filename
 end
 
-function average_interface_values!(data, cache, u,
+function average_interface_values!(data, cache,
                                    mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                    equations, dg::DG)
 
     @unpack interfaces = cache
     index_range = eachnode(dg)
 
-    data_ = copy(data)
+    interfaces_ = copy(interfaces.u)
 
     @threaded for interface in eachinterface(dg, cache)
         # Copy solution data from the primary element using "delayed indexing" with
@@ -431,7 +431,7 @@ function average_interface_values!(data, cache, u,
             for i in eachnode(dg)
                 for v in eachvariable(equations)
                     #=
-                    interfaces.u[1, v, i, j, interface] = data_[v, i_primary, j_primary,
+                    interfaces.u[1, v, i, j, interface] = data[v, i_primary, j_primary,
                                                             k_primary, primary_element]
                     =#
                 end
