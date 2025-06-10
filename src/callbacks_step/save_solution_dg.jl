@@ -596,7 +596,7 @@ function average_interface_values!(data, cache,
     index_range = eachnode(dg)
 
     interfaces_ = zeros(nvariables(equations),
-                        nnodes(dg), nnodes(dg),
+                        nnodes(dg),
                         ninterfaces(interfaces))
 
     # Record mean of the solution data on `interfaces_`
@@ -705,7 +705,7 @@ function average_interface_values!(data, cache,
     index_range = eachnode(dg)
 
     interfaces_ = zeros(nvariables(equations),
-                        nnodes(dg), nnodes(dg), nnodes(dg),
+                        nnodes(dg), nnodes(dg),
                         ninterfaces(interfaces))
 
     # Record mean of the solution data on `interfaces_`
