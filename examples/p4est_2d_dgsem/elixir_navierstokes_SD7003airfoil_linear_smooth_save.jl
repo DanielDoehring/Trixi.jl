@@ -97,9 +97,11 @@ function average_interface_values!(data, cache,
     @unpack interfaces = cache
     index_range = eachnode(dg)
 
-    interfaces_ = zeros(nvariables(equations),
+    interface_values = zeros(nvariables(equations),
                         nnodes(dg),
                         Trixi.ninterfaces(interfaces))
+
+    node_counter = Dict{SVector{2, Float64}, Int}()
 
     # Record mean of the solution data on `interfaces_`
     Trixi.@threaded for interface in Trixi.eachinterface(dg, cache)
@@ -120,8 +122,12 @@ function average_interface_values!(data, cache,
         j_primary = j_primary_start
         for i in eachnode(dg)
             for v in eachvariable(equations)
-                interfaces_[v, i, interface] = 0.5 * data[v, i_primary, j_primary,
-                                                    primary_element]
+                interface_values[v, i, interface] = data[v, i_primary, j_primary, primary_element]
+
+                x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
+                                          i_primary, j_primary, primary_element)
+
+                node_counter[x] = get(node_counter, x, 0) + 1
             end
             i_primary += i_primary_step
             j_primary += j_primary_step
@@ -141,8 +147,12 @@ function average_interface_values!(data, cache,
         j_secondary = j_secondary_start
         for i in eachnode(dg)
             for v in eachvariable(equations)
-                interfaces_[v, i, interface] += 0.5 * data[v, i_secondary, j_secondary,
-                                                     secondary_element]
+                interface_values[v, i, interface] += data[v, i_secondary, j_secondary, secondary_element]
+
+                x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
+                                          i_secondary, j_secondary, secondary_element)
+
+                node_counter[x] = get(node_counter, x, 0) + 1
             end
             i_secondary += i_secondary_step
             j_secondary += j_secondary_step
@@ -168,8 +178,10 @@ function average_interface_values!(data, cache,
         j_primary = j_primary_start
         for i in eachnode(dg)
             for v in eachvariable(equations)
-                data[v, i_primary, j_primary, primary_element] = interfaces_[v, i,
-                                                                             interface]
+                x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
+                                          i_primary, j_primary, primary_element)
+                n = node_counter[x]
+                data[v, i_primary, j_primary, primary_element] = interface_values[v, i, interface] / n
             end
             i_primary += i_primary_step
             j_primary += j_primary_step
@@ -189,8 +201,10 @@ function average_interface_values!(data, cache,
         j_secondary = j_secondary_start
         for i in eachnode(dg)
             for v in eachvariable(equations)
-                data[v, i_secondary, j_secondary, secondary_element] = interfaces_[v, i,
-                                                                                   interface]
+                x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
+                                          i_secondary, j_secondary, secondary_element)
+                n = node_counter[x]
+                data[v, i_secondary, j_secondary, secondary_element] = interface_values[v, i, interface] / n
             end
             i_secondary += i_secondary_step
             j_secondary += j_secondary_step
