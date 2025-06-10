@@ -398,4 +398,85 @@ function save_solution_file_on_root(data, time, dt, timestep, n_vars,
 
     return filename
 end
+
+function average_interface_values!(data, cache, u,
+                                   mesh::Union{P4estMesh{3}, T8codeMesh{3}},
+                                   equations, dg::DG)
+
+    @unpack interfaces = cache
+    index_range = eachnode(dg)
+
+    data_ = copy(data)
+
+    @threaded for interface in eachinterface(dg, cache)
+        # Copy solution data from the primary element using "delayed indexing" with
+        # a start value and two step sizes to get the correct face and orientation.
+        # Note that in the current implementation, the interface will be
+        # "aligned at the primary element", i.e., the indices of the primary side
+        # will always run forwards.
+        primary_element = interfaces.neighbor_ids[1, interface]
+        primary_indices = interfaces.node_indices[1, interface]
+
+        i_primary_start, i_primary_step_i, i_primary_step_j = index_to_start_step_3d(primary_indices[1],
+                                                                                     index_range)
+        j_primary_start, j_primary_step_i, j_primary_step_j = index_to_start_step_3d(primary_indices[2],
+                                                                                     index_range)
+        k_primary_start, k_primary_step_i, k_primary_step_j = index_to_start_step_3d(primary_indices[3],
+                                                                                     index_range)
+
+        i_primary = i_primary_start
+        j_primary = j_primary_start
+        k_primary = k_primary_start
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                for v in eachvariable(equations)
+                    #=
+                    interfaces.u[1, v, i, j, interface] = data_[v, i_primary, j_primary,
+                                                            k_primary, primary_element]
+                    =#
+                end
+                i_primary += i_primary_step_i
+                j_primary += j_primary_step_i
+                k_primary += k_primary_step_i
+            end
+            i_primary += i_primary_step_j
+            j_primary += j_primary_step_j
+            k_primary += k_primary_step_j
+        end
+
+        # Copy solution data from the secondary element using "delayed indexing" with
+        # a start value and two step sizes to get the correct face and orientation.
+        secondary_element = interfaces.neighbor_ids[2, interface]
+        secondary_indices = interfaces.node_indices[2, interface]
+
+        i_secondary_start, i_secondary_step_i, i_secondary_step_j = index_to_start_step_3d(secondary_indices[1],
+                                                                                           index_range)
+        j_secondary_start, j_secondary_step_i, j_secondary_step_j = index_to_start_step_3d(secondary_indices[2],
+                                                                                           index_range)
+        k_secondary_start, k_secondary_step_i, k_secondary_step_j = index_to_start_step_3d(secondary_indices[3],
+                                                                                           index_range)
+
+        i_secondary = i_secondary_start
+        j_secondary = j_secondary_start
+        k_secondary = k_secondary_start
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                for v in eachvariable(equations)
+                    interfaces.u[2, v, i, j, interface] = u[v, i_secondary, j_secondary,
+                                                            k_secondary,
+                                                            secondary_element]
+                end
+                i_secondary += i_secondary_step_i
+                j_secondary += j_secondary_step_i
+                k_secondary += k_secondary_step_i
+            end
+            i_secondary += i_secondary_step_j
+            j_secondary += j_secondary_step_j
+            k_secondary += k_secondary_step_j
+        end
+    end
+
+    return nothing
+end
+
 end # @muladd
