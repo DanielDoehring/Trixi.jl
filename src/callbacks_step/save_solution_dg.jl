@@ -399,14 +399,316 @@ function save_solution_file_on_root(data, time, dt, timestep, n_vars,
     return filename
 end
 
+### Follow logic of `prolong2interfaces!` ###
+
+## Retrieve surface values, average and write back to `data` ##
+function average_interface_values!(data, cache,
+                                   mesh::TreeMesh{1}, equations, dg::DG)
+    @unpack interfaces = cache
+    @unpack neighbor_ids = interfaces
+    interfaces_u = interfaces.u
+
+    @threaded for interface in eachinterface(dg, cache)
+        left_element = neighbor_ids[1, interface]
+        right_element = neighbor_ids[2, interface]
+
+        # interface in x-direction
+        for v in eachvariable(equations)
+            u_average = 0.5 *
+                        (data[v, nnodes(dg), left_element] + data[v, 1, right_element])
+            data[v, nnodes(dg), left_element] = u_average
+            data[v, 1, right_element] = u_average
+        end
+    end
+
+    return nothing
+end
+
+function average_interface_values!(data, cache,
+                                   mesh::TreeMesh{2}, equations, dg::DG)
+    @unpack interfaces = cache
+    @unpack orientations, neighbor_ids = interfaces
+    interfaces_u = interfaces.u
+
+    @threaded for interface in eachinterface(dg, cache)
+        left_element = neighbor_ids[1, interface]
+        right_element = neighbor_ids[2, interface]
+
+        if orientations[interface] == 1
+            # interface in x-direction
+            for j in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * (data[v, nnodes(dg), j, left_element] +
+                             data[v, 1, j, right_element])
+                data[v, nnodes(dg), j, left_element] = u_average
+                data[v, 1, j, right_element] = u_average
+            end
+        else # if orientations[interface] == 2
+            # interface in y-direction
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * (data[v, i, nnodes(dg), left_element] +
+                             data[v, i, 1, right_element])
+                data[v, i, nnodes(dg), left_element] = u_average
+                data[v, i, 1, right_element] = u_average
+            end
+        end
+    end
+
+    return nothing
+end
+
+function average_interface_values!(data, cache,
+                                   mesh::TreeMesh{3}, equations, dg::DG)
+    @unpack interfaces = cache
+    @unpack orientations, neighbor_ids = interfaces
+    interfaces_u = interfaces.u
+
+    @threaded for interface in eachinterface(dg, cache)
+        left_element = neighbor_ids[1, interface]
+        right_element = neighbor_ids[2, interface]
+
+        if orientations[interface] == 1
+            # interface in x-direction
+            for k in eachnode(dg), j in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * (data[v, nnodes(dg), j, k, left_element] +
+                             data[v, 1, j, k, right_element])
+                data[v, nnodes(dg), j, k, left_element] = u_average
+                data[v, 1, j, k, right_element] = u_average
+            end
+        elseif orientations[interface] == 2
+            # interface in y-direction
+            for k in eachnode(dg), i in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * (data[v, i, nnodes(dg), k, left_element] +
+                             data[v, i, 1, k, right_element])
+                data[v, i, nnodes(dg), k, left_element] = u_average
+                data[v, i, 1, k, right_element] = u_average
+            end
+        else # if orientations[interface] == 3
+            # interface in z-direction
+            for j in eachnode(dg), i in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * (data[v, i, j, nnodes(dg), left_element] +
+                             data[v, i, j, 1, right_element])
+                data[v, i, j, nnodes(dg), left_element] = u_average
+                data[v, i, j, 1, right_element] = u_average
+            end
+        end
+    end
+
+    return nothing
+end
+
+function average_interface_values!(data, cache,
+                                   mesh::UnstructuredMesh2D, equations, dg::DG)
+    @unpack interfaces = cache
+    @unpack element_ids, element_side_ids = interfaces
+    interfaces_u = interfaces.u
+
+    @threaded for interface in eachinterface(dg, cache)
+        primary_element = element_ids[1, interface]
+        secondary_element = element_ids[2, interface]
+
+        primary_side = element_side_ids[1, interface]
+        secondary_side = element_side_ids[2, interface]
+
+        # Record average
+        if primary_side == 1
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * data[v, i, 1, primary_element]
+            end
+        elseif primary_side == 2
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * data[v, nnodes(dg), i, primary_element]
+            end
+        elseif primary_side == 3
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * data[v, i, nnodes(dg), primary_element]
+            end
+        else # primary_side == 4
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average = 0.5 * data[v, 1, i, primary_element]
+            end
+        end
+
+        if secondary_side == 1
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average += 0.5 * data[v, i, 1, secondary_element]
+            end
+        elseif secondary_side == 2
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average += 0.5 * data[v, nnodes(dg), i, secondary_element]
+            end
+        elseif secondary_side == 3
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average += 0.5 * data[v, i, nnodes(dg), secondary_element]
+            end
+        else # secondary_side == 4
+            for i in eachnode(dg), v in eachvariable(equations)
+                u_average += 0.5 * data[v, 1, i, secondary_element]
+            end
+        end
+
+        # Write back to `data`
+        if primary_side == 1
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, i, 1, primary_element] = u_average
+            end
+        elseif primary_side == 2
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, nnodes(dg), i, primary_element] = u_average
+            end
+        elseif primary_side == 3
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, i, nnodes(dg), primary_element] = u_average
+            end
+        else # primary_side == 4
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, 1, i, primary_element] = u_average
+            end
+        end
+
+        if secondary_side == 1
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, i, 1, secondary_element] = u_average
+            end
+        elseif secondary_side == 2
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, nnodes(dg), i, secondary_element] = u_average
+            end
+        elseif secondary_side == 3
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, i, nnodes(dg), secondary_element] = u_average
+            end
+        else # secondary_side == 4
+            for i in eachnode(dg), v in eachvariable(equations)
+                data[v, 1, i, secondary_element] = u_average
+            end
+        end
+    end
+
+    return nothing
+end
+
+## Retrieve surface values, average in `interfaces_` and then write back to `data` ##
+function average_interface_values!(data, cache,
+                                   mesh::Union{P4estMesh{2}, P4estMeshView{2},
+                                               T8codeMesh{2}},
+                                   equations, dg::DG)
+    @unpack interfaces = cache
+    index_range = eachnode(dg)
+
+    interfaces_ = zeros(nvariables(equations),
+                        nnodes(dg), nnodes(dg),
+                        ninterfaces(interfaces))
+
+    # Record mean of the solution data on `interfaces_`
+    @threaded for interface in eachinterface(dg, cache)
+        # Copy solution data from the primary element using "delayed indexing" with
+        # a start value and a step size to get the correct face and orientation.
+        # Note that in the current implementation, the interface will be
+        # "aligned at the primary element", i.e., the index of the primary side
+        # will always run forwards.
+        primary_element = interfaces.neighbor_ids[1, interface]
+        primary_indices = interfaces.node_indices[1, interface]
+
+        i_primary_start, i_primary_step = index_to_start_step_2d(primary_indices[1],
+                                                                 index_range)
+        j_primary_start, j_primary_step = index_to_start_step_2d(primary_indices[2],
+                                                                 index_range)
+
+        i_primary = i_primary_start
+        j_primary = j_primary_start
+        for i in eachnode(dg)
+            for v in eachvariable(equations)
+                interfaces_[v, i, interface] = 0.5 * data[v, i_primary, j_primary,
+                                                    primary_element]
+            end
+            i_primary += i_primary_step
+            j_primary += j_primary_step
+        end
+
+        # Copy solution data from the secondary element using "delayed indexing" with
+        # a start value and a step size to get the correct face and orientation.
+        secondary_element = interfaces.neighbor_ids[2, interface]
+        secondary_indices = interfaces.node_indices[2, interface]
+
+        i_secondary_start, i_secondary_step = index_to_start_step_2d(secondary_indices[1],
+                                                                     index_range)
+        j_secondary_start, j_secondary_step = index_to_start_step_2d(secondary_indices[2],
+                                                                     index_range)
+
+        i_secondary = i_secondary_start
+        j_secondary = j_secondary_start
+        for i in eachnode(dg)
+            for v in eachvariable(equations)
+                interfaces_[v, i, interface] += 0.5 * data[v, i_secondary, j_secondary,
+                                                     secondary_element]
+            end
+            i_secondary += i_secondary_step
+            j_secondary += j_secondary_step
+        end
+    end
+
+    # Write averaged values back to `data`
+    @threaded for interface in eachinterface(dg, cache)
+        # Copy solution data from the primary element using "delayed indexing" with
+        # a start value and a step size to get the correct face and orientation.
+        # Note that in the current implementation, the interface will be
+        # "aligned at the primary element", i.e., the index of the primary side
+        # will always run forwards.
+        primary_element = interfaces.neighbor_ids[1, interface]
+        primary_indices = interfaces.node_indices[1, interface]
+
+        i_primary_start, i_primary_step = index_to_start_step_2d(primary_indices[1],
+                                                                 index_range)
+        j_primary_start, j_primary_step = index_to_start_step_2d(primary_indices[2],
+                                                                 index_range)
+
+        i_primary = i_primary_start
+        j_primary = j_primary_start
+        for i in eachnode(dg)
+            for v in eachvariable(equations)
+                data[v, i_primary, j_primary, primary_element] = interfaces_[v, i,
+                                                                             interface]
+            end
+            i_primary += i_primary_step
+            j_primary += j_primary_step
+        end
+
+        # Copy solution data from the secondary element using "delayed indexing" with
+        # a start value and a step size to get the correct face and orientation.
+        secondary_element = interfaces.neighbor_ids[2, interface]
+        secondary_indices = interfaces.node_indices[2, interface]
+
+        i_secondary_start, i_secondary_step = index_to_start_step_2d(secondary_indices[1],
+                                                                     index_range)
+        j_secondary_start, j_secondary_step = index_to_start_step_2d(secondary_indices[2],
+                                                                     index_range)
+
+        i_secondary = i_secondary_start
+        j_secondary = j_secondary_start
+        for i in eachnode(dg)
+            for v in eachvariable(equations)
+                data[v, i_secondary, j_secondary, secondary_element] = interfaces_[v, i,
+                                                                                   interface]
+            end
+            i_secondary += i_secondary_step
+            j_secondary += j_secondary_step
+        end
+    end
+
+    return nothing
+end
+
 function average_interface_values!(data, cache,
                                    mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                    equations, dg::DG)
     @unpack interfaces = cache
     index_range = eachnode(dg)
 
-    interfaces_ = copy(interfaces.u)
+    interfaces_ = zeros(nvariables(equations),
+                        nnodes(dg), nnodes(dg), nnodes(dg),
+                        ninterfaces(interfaces))
 
+    # Record mean of the solution data on `interfaces_`
     @threaded for interface in eachinterface(dg, cache)
         # Copy solution data from the primary element using "delayed indexing" with
         # a start value and two step sizes to get the correct face and orientation.
@@ -429,10 +731,10 @@ function average_interface_values!(data, cache,
         for j in eachnode(dg)
             for i in eachnode(dg)
                 for v in eachvariable(equations)
-                    interfaces_[1, v, i, j, interface] = 0.5 *
-                                                         data[v, i_primary, j_primary,
-                                                              k_primary,
-                                                              primary_element]
+                    interfaces_[v, i, j, interface] = 0.5 * data[v, i_primary,
+                                                           j_primary,
+                                                           k_primary,
+                                                           primary_element]
                 end
                 i_primary += i_primary_step_i
                 j_primary += j_primary_step_i
@@ -461,10 +763,80 @@ function average_interface_values!(data, cache,
         for j in eachnode(dg)
             for i in eachnode(dg)
                 for v in eachvariable(equations)
-                    interfaces_[2, v, i, j, interface] += 0.5 * data[v, i_secondary,
-                                                               j_secondary,
-                                                               k_secondary,
-                                                               secondary_element]
+                    interfaces_[v, i, j, interface] += 0.5 * data[v, i_secondary,
+                                                            j_secondary,
+                                                            k_secondary,
+                                                            secondary_element]
+                end
+                i_secondary += i_secondary_step_i
+                j_secondary += j_secondary_step_i
+                k_secondary += k_secondary_step_i
+            end
+            i_secondary += i_secondary_step_j
+            j_secondary += j_secondary_step_j
+            k_secondary += k_secondary_step_j
+        end
+    end
+
+    # Write averaged values back to `data`
+    @threaded for interface in eachinterface(dg, cache)
+        # Copy solution data from the primary element using "delayed indexing" with
+        # a start value and two step sizes to get the correct face and orientation.
+        # Note that in the current implementation, the interface will be
+        # "aligned at the primary element", i.e., the indices of the primary side
+        # will always run forwards.
+        primary_element = interfaces.neighbor_ids[1, interface]
+        primary_indices = interfaces.node_indices[1, interface]
+
+        i_primary_start, i_primary_step_i, i_primary_step_j = index_to_start_step_3d(primary_indices[1],
+                                                                                     index_range)
+        j_primary_start, j_primary_step_i, j_primary_step_j = index_to_start_step_3d(primary_indices[2],
+                                                                                     index_range)
+        k_primary_start, k_primary_step_i, k_primary_step_j = index_to_start_step_3d(primary_indices[3],
+                                                                                     index_range)
+
+        i_primary = i_primary_start
+        j_primary = j_primary_start
+        k_primary = k_primary_start
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                for v in eachvariable(equations)
+                    data[v, i_primary, j_primary, k_primary, primary_element] = interfaces_[v,
+                                                                                            i,
+                                                                                            j,
+                                                                                            interface]
+                end
+                i_primary += i_primary_step_i
+                j_primary += j_primary_step_i
+                k_primary += k_primary_step_i
+            end
+            i_primary += i_primary_step_j
+            j_primary += j_primary_step_j
+            k_primary += k_primary_step_j
+        end
+
+        # Copy solution data from the secondary element using "delayed indexing" with
+        # a start value and two step sizes to get the correct face and orientation.
+        secondary_element = interfaces.neighbor_ids[2, interface]
+        secondary_indices = interfaces.node_indices[2, interface]
+
+        i_secondary_start, i_secondary_step_i, i_secondary_step_j = index_to_start_step_3d(secondary_indices[1],
+                                                                                           index_range)
+        j_secondary_start, j_secondary_step_i, j_secondary_step_j = index_to_start_step_3d(secondary_indices[2],
+                                                                                           index_range)
+        k_secondary_start, k_secondary_step_i, k_secondary_step_j = index_to_start_step_3d(secondary_indices[3],
+                                                                                           index_range)
+
+        i_secondary = i_secondary_start
+        j_secondary = j_secondary_start
+        k_secondary = k_secondary_start
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                for v in eachvariable(equations)
+                    data[v, i_secondary, j_secondary, k_secondary, secondary_element] = interfaces_[v,
+                                                                                                    i,
+                                                                                                    j,
+                                                                                                    interface]
                 end
                 i_secondary += i_secondary_step_i
                 j_secondary += j_secondary_step_i
