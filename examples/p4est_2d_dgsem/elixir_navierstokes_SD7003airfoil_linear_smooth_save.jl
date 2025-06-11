@@ -89,7 +89,6 @@ ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
 
-# TODO: Corner-node treatment!
 function average_interface_values!(data, cache,
                                    mesh::Union{P4estMesh{2}, P4estMeshView{2},
                                                T8codeMesh{2}},
@@ -100,11 +99,10 @@ function average_interface_values!(data, cache,
     interface_values = zeros(nvariables(equations),
                         nnodes(dg),
                         Trixi.ninterfaces(interfaces))
-
     node_counter = Dict{SVector{2, Float64}, Int}()
 
     # Record mean of the solution data on `interfaces_`
-    Trixi.@threaded for interface in Trixi.eachinterface(dg, cache)
+    for interface in Trixi.eachinterface(dg, cache)
         # Copy solution data from the primary element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
         # Note that in the current implementation, the interface will be
@@ -121,13 +119,11 @@ function average_interface_values!(data, cache,
         i_primary = i_primary_start
         j_primary = j_primary_start
         for i in eachnode(dg)
+            x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
+                                      i_primary, j_primary, primary_element)
+            node_counter[x] = get(node_counter, x, 0) + 1
             for v in eachvariable(equations)
-                interface_values[v, i, interface] = data[v, i_primary, j_primary, primary_element]
-
-                x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
-                                          i_primary, j_primary, primary_element)
-
-                node_counter[x] = get(node_counter, x, 0) + 1
+                interface_values[v, i, interface] = 0.5 * data[v, i_primary, j_primary, primary_element]
             end
             i_primary += i_primary_step
             j_primary += j_primary_step
@@ -147,12 +143,7 @@ function average_interface_values!(data, cache,
         j_secondary = j_secondary_start
         for i in eachnode(dg)
             for v in eachvariable(equations)
-                interface_values[v, i, interface] += data[v, i_secondary, j_secondary, secondary_element]
-
-                x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
-                                          i_secondary, j_secondary, secondary_element)
-
-                node_counter[x] = get(node_counter, x, 0) + 1
+                interface_values[v, i, interface] += 0.5 * data[v, i_secondary, j_secondary, secondary_element]
             end
             i_secondary += i_secondary_step
             j_secondary += j_secondary_step
@@ -160,7 +151,7 @@ function average_interface_values!(data, cache,
     end
 
     # Write averaged values back to `data`
-    Trixi.@threaded for interface in Trixi.eachinterface(dg, cache)
+    for interface in Trixi.eachinterface(dg, cache)
         # Copy solution data from the primary element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
         # Note that in the current implementation, the interface will be
@@ -187,6 +178,7 @@ function average_interface_values!(data, cache,
             j_primary += j_primary_step
         end
 
+        #=
         # Copy solution data from the secondary element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
         secondary_element = interfaces.neighbor_ids[2, interface]
@@ -200,15 +192,16 @@ function average_interface_values!(data, cache,
         i_secondary = i_secondary_start
         j_secondary = j_secondary_start
         for i in eachnode(dg)
-            for v in eachvariable(equations)
-                x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
-                                          i_secondary, j_secondary, secondary_element)
-                n = node_counter[x]
-                data[v, i_secondary, j_secondary, secondary_element] = interface_values[v, i, interface] / n
-            end
+            x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg,
+                                      i_secondary, j_secondary, secondary_element)
+
+            n = node_counter[x]
+            data[:, i_secondary, j_secondary, secondary_element] = interface_values[x] / n
+
             i_secondary += i_secondary_step
             j_secondary += j_secondary_step
         end
+        =#
     end
 
     return nothing
@@ -310,6 +303,6 @@ callbacks = CallbackSet(save_solution, summary_callback)
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
+sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(),
             dt = 1e-3,
             save_everystep = false, callback = callbacks);
