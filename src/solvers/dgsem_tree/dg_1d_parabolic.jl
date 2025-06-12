@@ -72,7 +72,7 @@ function rhs_parabolic!(du, u, t, mesh::TreeMesh{1},
     # Prolong solution to interfaces
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache_parabolic, flux_viscous, mesh, equations_parabolic,
-                            dg.surface_integral, dg, cache, interface_indices)
+                            dg, cache, interface_indices)
     end
 
     # Calculate interface fluxes
@@ -159,11 +159,10 @@ function calc_volume_integral!(du, flux_viscous,
 end
 
 # This is the version used when calculating the divergence of the viscous fluxes
-# We pass the `surface_integral` argument solely for dispatch
 function prolong2interfaces!(cache_parabolic, flux_viscous,
                              mesh::TreeMesh{1},
                              equations_parabolic::AbstractEquationsParabolic,
-                             surface_integral, dg::DG, cache::NamedTuple,
+                             dg::DG, cache::NamedTuple,
                              interface_indices = eachinterface(dg, cache))
     @unpack interfaces = cache_parabolic
     @unpack neighbor_ids = interfaces
@@ -492,7 +491,6 @@ function calc_gradient!(gradients, u_transformed, t, mesh::TreeMesh{1},
     @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(cache_parabolic,
                                                                    u_transformed, mesh,
                                                                    equations_parabolic,
-                                                                   dg.surface_integral,
                                                                    dg, cache,
                                                                    interface_indices)
 

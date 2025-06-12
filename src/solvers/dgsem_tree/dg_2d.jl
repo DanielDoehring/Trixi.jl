@@ -132,8 +132,7 @@ function rhs!(du, u, t,
 
     # Prolong solution to interfaces
     @trixi_timeit timer() "prolong2interfaces" begin
-        prolong2interfaces!(cache, u, mesh, equations,
-                            dg.surface_integral, dg, interface_indices)
+        prolong2interfaces!(cache, u, mesh, equations, dg, interface_indices)
     end
 
     # Calculate interface fluxes
@@ -563,7 +562,7 @@ end
 end
 
 function prolong2interfaces!(cache, u,
-                             mesh::TreeMesh{2}, equations, surface_integral, dg::DG,
+                             mesh::TreeMesh{2}, equations, dg::DG,
                              interface_indices = eachinterface(dg, cache))
     @unpack interfaces = cache
     @unpack orientations, neighbor_ids = interfaces

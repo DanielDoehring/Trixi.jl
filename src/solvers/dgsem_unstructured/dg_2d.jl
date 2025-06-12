@@ -55,8 +55,7 @@ function rhs!(du, u, t,
 
     # Prolong solution to interfaces
     @trixi_timeit timer() "prolong2interfaces" begin
-        prolong2interfaces!(cache, u, mesh, equations,
-                            dg.surface_integral, dg, interface_indices)
+        prolong2interfaces!(cache, u, mesh, equations, dg, interface_indices)
     end
 
     # Calculate interface fluxes
@@ -142,11 +141,10 @@ function calc_volume_integral!(du, u,
 end
 
 # prolong the solution into the convenience array in the interior interface container
-# We pass the `surface_integral` argument solely for dispatch
 # Note! this routine is for quadrilateral elements with "right-handed" orientation
 function prolong2interfaces!(cache, u,
                              mesh::UnstructuredMesh2D,
-                             equations, surface_integral, dg::DG,
+                             equations, dg::DG,
                              interface_indices = eachinterface(dg, cache))
     @unpack interfaces = cache
     @unpack element_ids, element_side_ids = interfaces
