@@ -55,7 +55,10 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 3.2)
+# PERK stable
+tspan = (0.0, 2.73)
+# PERRK stable
+#tspan = (0.0, 3.2)
 
 ode = semidiscretize(semi, tspan)
 
@@ -78,6 +81,7 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition_only_refine=true)
 
 analysis_interval = 5 # For entropy write-out
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      analysis_errors = Symbol[],
                                      #analysis_integrals = Symbol[]
@@ -114,8 +118,8 @@ dtRatios = [42.0, 42.0, 42.0]
 
 path = "/home/daniel/git/Paper_PERRK/Data/Kelvin_Helmholtz/Viscous_Discretization/k3/"
 
-ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
