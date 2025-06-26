@@ -169,8 +169,9 @@ function compute_all_nodes()
     # First 6 cells of size 0.5
     for i in 1:6
         cell_max = cell_min + 0.5
-        #nodes = gauss_lobatto_nodes(cell_min, cell_max)
-        nodes = gauss_lobatto_nodes_inward(cell_min, cell_max)
+        nodes = gauss_lobatto_nodes(cell_min, cell_max)
+        #nodes = gauss_lobatto_nodes_inward(cell_min, cell_max)
+
         append!(all_nodes, nodes)
         cell_min = cell_max
     end
@@ -178,8 +179,9 @@ function compute_all_nodes()
     # Next 8 cells of size 0.25
     for i in 1:8
         cell_max = cell_min + 0.25
-        #nodes = gauss_lobatto_nodes(cell_min, cell_max)
-        nodes = gauss_lobatto_nodes_inward(cell_min, cell_max)
+        nodes = gauss_lobatto_nodes(cell_min, cell_max)
+        #nodes = gauss_lobatto_nodes_inward(cell_min, cell_max)
+        
         append!(all_nodes, nodes)
         cell_min = cell_max
     end
@@ -187,8 +189,9 @@ function compute_all_nodes()
     # Last 6 cells of size 0.5
     for i in 1:6
         cell_max = cell_min + 0.5
-        #nodes = gauss_lobatto_nodes(cell_min, cell_max)
-        nodes = gauss_lobatto_nodes_inward(cell_min, cell_max)
+        nodes = gauss_lobatto_nodes(cell_min, cell_max)
+        #nodes = gauss_lobatto_nodes_inward(cell_min, cell_max)
+
         append!(all_nodes, nodes)
         cell_min = cell_max
     end
@@ -201,6 +204,8 @@ all_nodes = compute_all_nodes()
 
 using DelimitedFiles
 #writedlm("Inward_GLL_nodes.txt", all_nodes)
+writedlm("GLL_nodes.txt", all_nodes)
+
 #writedlm("u_Relaxation.txt", sol.u[end])
 #writedlm("u_Standard.txt", sol.u[end])
 
