@@ -28,7 +28,6 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-#=
 # Ensure that rho and p are the same across symmetry line and allow only 
 # tangential velocity
 @inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
@@ -53,7 +52,6 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
     return flux
 end
-=#
 
 polydeg = 2
 basis = LobattoLegendreBasis(polydeg)
@@ -89,7 +87,7 @@ boundary_symbols = [:Symmetry,
 
 mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
 
-boundary_conditions = Dict(:Symmetry => boundary_condition_symmetry_plane, # Symmetry: bc_symmetry
+boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
                            :FarField => bc_farfield, # Farfield: bc_farfield
                            :BottomWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
                            :TopWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
@@ -152,7 +150,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      #analysis_pointwise = (pressure_coefficient,)
                                      )
 
-alive_callback = AliveCallback(alive_interval = 200)
+alive_callback = AliveCallback(alive_interval = 1) # 200
 
 save_sol_interval = analysis_interval
 
@@ -215,12 +213,12 @@ newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 
 ## k = 2, p = 3 ##
 
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, base_path)
-
+#=
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
                                                  relaxation_solver = newton)
-
+=#
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = newton)                                                 
 
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
