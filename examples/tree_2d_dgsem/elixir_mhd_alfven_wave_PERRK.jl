@@ -94,6 +94,7 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios; r
 
 Stages = [14, 8, 6]
 path = basepath * "k4/p4/"
+# TODO: Could check without relaxation for convergence
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
