@@ -1,4 +1,3 @@
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -13,13 +12,19 @@ initial_condition = initial_condition_convergence_test
 k = 4 # p4
 
 volume_flux = (flux_central, flux_nonconservative_powell)
+#volume_flux = (flux_hindenlang_gassner, flux_nonconservative_powell)
+
+surface_flux = (flux_lax_friedrichs, flux_nonconservative_powell)
+#surface_flux = (FluxHLL(min_max_speed_davis), flux_nonconservative_powell)
+
 solver = DGSEM(polydeg = k,
-               surface_flux = (flux_lax_friedrichs, flux_nonconservative_powell),
+               surface_flux = surface_flux,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 coordinates_min = (0.0, 0.0)
 coordinates_max = (sqrt(2.0), sqrt(2.0))
 
+# TODO: Check only one refinement box
 refinement_patches = ((type = "box", 
                        coordinates_min = (0.25 * sqrt(2), 0.25 * sqrt(2)),
                        coordinates_max = (0.75 * sqrt(2), 0.75 * sqrt(2))),
@@ -27,7 +32,7 @@ refinement_patches = ((type = "box",
                        coordinates_min = (0.375 * sqrt(2), 0.375 * sqrt(2)),
                        coordinates_max = (0.625 * sqrt(2), 0.625 * sqrt(2))))
 
-base_ref = 7 # Start from 3 up to 7
+base_ref = 5 # Start from 3 up to 7
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = base_ref,
@@ -58,7 +63,7 @@ cfl = 2.7 # p4
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
+glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl) # glm_scale = 0.5
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
@@ -69,7 +74,8 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-basepath = "/home/daniel/git/Paper_PERRK/Data/Alfven_Wave/"
+#basepath = "/home/daniel/git/Paper_PERRK/Data/Alfven_Wave/"
+basepath = "/storage/home/daniel/PERRK/Data/Alfven_Wave/"
 
 dtRatios = [1, 0.5, 0.25]
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10, root_tol = 1e-15, gamma_tol = eps(Float64))
@@ -88,6 +94,7 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios; r
 
 Stages = [14, 8, 6]
 path = basepath * "k4/p4/"
+# TODO: Could check without relaxation for convergence
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_algorithm,
