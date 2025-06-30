@@ -432,7 +432,6 @@ function Base.resize!(integrator::SubDiagRelaxationIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
-    resize!(integrator.direction, new_size)
 
     resize!(integrator.direction, new_size)
 end
