@@ -1,4 +1,3 @@
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 # This is the classic 1D viscous shock wave problem with analytical solution
@@ -165,8 +164,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span `tspan`
-tspan = (0.0, 0.5)
-#tspan = (0.0, 0.0) # For plotting of IC
+#tspan = (0.0, 0.5)
+tspan = (0.0, 0.0) # For plotting of IC
 
 ode = semidiscretize(semi, tspan; split_problem = false)
 
@@ -229,7 +228,7 @@ sol = Trixi.solve(ode, ode_algorithm,
 ###############################################################################
 
 # Plot IC & grid
-#=
+
 using Plots
 
 pd = PlotData1D(sol)
@@ -252,4 +251,3 @@ plot!(pd["p"], title = "Viscous Shock: Initial Solution",
       titlefont = font("Computer Modern", 18),
       legendfont = font("Computer Modern", 16),
       legend = :topright)
-=#
