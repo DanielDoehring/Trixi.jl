@@ -765,7 +765,7 @@ function partition_variables!(level_info_elements,
 
         # CARE: This is for testcase with special assignment
         #level = rand(1:n_levels)
-        ##level = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
+        #level = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
 
         append!(level_info_elements[level], element_id)
 
