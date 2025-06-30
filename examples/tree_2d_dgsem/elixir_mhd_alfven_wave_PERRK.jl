@@ -24,7 +24,7 @@ solver = DGSEM(polydeg = k,
 coordinates_min = (0.0, 0.0)
 coordinates_max = (sqrt(2.0), sqrt(2.0))
 
-# TODO: Check only one refinement box
+# TODO: Could check only one refinement box
 refinement_patches = ((type = "box", 
                        coordinates_min = (0.25 * sqrt(2), 0.25 * sqrt(2)),
                        coordinates_max = (0.75 * sqrt(2), 0.75 * sqrt(2))),
@@ -32,7 +32,7 @@ refinement_patches = ((type = "box",
                        coordinates_min = (0.375 * sqrt(2), 0.375 * sqrt(2)),
                        coordinates_max = (0.625 * sqrt(2), 0.625 * sqrt(2))))
 
-base_ref = 5 # Start from 3 up to 7
+base_ref = 7 # Start from 3 up to 7
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = base_ref,
@@ -96,6 +96,8 @@ Stages = [14, 8, 6]
 path = basepath * "k4/p4/"
 # TODO: Could check without relaxation for convergence
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
