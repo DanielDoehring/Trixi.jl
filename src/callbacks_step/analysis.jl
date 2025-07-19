@@ -12,12 +12,8 @@
                            save_analysis=false,
                            output_directory="out",
                            analysis_filename="analysis.dat",
-                           analysis_errors = union(default_analysis_errors(equations),
-                                                   extra_analysis_errors),
-                           extra_analysis_integrals = (),
-                           analysis_integrals = union(default_analysis_integrals(equations),
-                                                      extra_analysis_integrals),
-                           analysis_pointwise = ())
+                           extra_analysis_errors=Symbol[],
+                           extra_analysis_integrals=())
 
 Analyze a numerical solution every `interval` time steps and print the
 results to the screen. If `save_analysis`, the results are also saved in
