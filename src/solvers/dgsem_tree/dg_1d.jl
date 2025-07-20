@@ -395,7 +395,6 @@ end
     return nothing
 end
 
-# We pass the `surface_integral` argument solely for dispatch
 function prolong2interfaces!(cache, u,
                              mesh::TreeMesh{1}, equations, dg::DG,
                              interface_indices = eachinterface(dg, cache))
