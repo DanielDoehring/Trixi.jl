@@ -440,9 +440,7 @@ function calc_interface_flux!(surface_flux_values,
 
         # Copy flux to left and right element storage
         for v in eachvariable(equations)
-            #surface_flux_values[v, left_direction, left_id] += flux[v]
             surface_flux_values[v, left_direction, left_id] = flux[v]
-            #surface_flux_values[v, right_direction, right_id] += flux[v]
             surface_flux_values[v, right_direction, right_id] = flux[v]
         end
     end
@@ -628,13 +626,10 @@ function calc_surface_integral!(du, u, mesh::Union{TreeMesh{1}, StructuredMesh{1
             # surface at -x
             du[v, 1, element] = (du[v, 1, element] -
                                  surface_flux_values[v, 1, element] * factor_1)
-            
-            surface_flux_values[v, 1, element] = zero(eltype(du))
 
             # surface at +x
             du[v, nnodes(dg), element] = (du[v, nnodes(dg), element] +
                                           surface_flux_values[v, 2, element] * factor_2)
-            surface_flux_values[v, 2, element] = zero(eltype(du))
         end
     end
 
