@@ -670,7 +670,8 @@ function rhs!(du, u, t, mesh, equations,
                                                                   dg.volume_integral,
                                                                   dg, cache)
 
-    @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(cache, u, mesh, equations, dg)
+    @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(cache, u, mesh,
+                                                                   equations, dg)
 
     @trixi_timeit timer() "interface flux" calc_interface_flux!(cache,
                                                                 dg.surface_integral,

@@ -142,8 +142,7 @@ dtRatios = [
 
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK2Multi(Stages, path, dtRatios,
-                                                       relaxation_solver = relaxation_solver,
-                                                       recompute_entropy = false)
+                                                       relaxation_solver = relaxation_solver)
 =#
 
 #=
@@ -165,8 +164,7 @@ dtRatios = [
 
 #ode_algorithm = Trixi.PairedExplicitRK3Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios, 
-                                                       relaxation_solver = relaxation_solver,
-                                                       recompute_entropy = false)
+                                                       relaxation_solver = relaxation_solver)
 =#
 
 
@@ -185,8 +183,7 @@ dtRatios = [
 
 #ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios, 
-                                                       relaxation_solver = relaxation_solver,
-                                                       recompute_entropy = false)
+                                                       relaxation_solver = relaxation_solver)
 
 
 sol = Trixi.solve(ode, ode_algorithm,

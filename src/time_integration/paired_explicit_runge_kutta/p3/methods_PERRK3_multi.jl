@@ -9,21 +9,18 @@ struct PairedExplicitRelaxationRK3Multi{RelaxationSolver} <:
        AbstractPairedExplicitRKMulti{3}
     PERK3Multi::PairedExplicitRK3Multi
     relaxation_solver::RelaxationSolver
-    recompute_entropy::Bool
 end
 
 function PairedExplicitRelaxationRK3Multi(stages::Vector{Int64},
                                           base_path_a_coeffs::AbstractString,
                                           dt_ratios;
                                           cS2::Float64 = 1.0,
-                                          relaxation_solver = RelaxationSolverNewton(),
-                                          recompute_entropy = true)
+                                          relaxation_solver = RelaxationSolverNewton())
     return PairedExplicitRelaxationRK3Multi{typeof(relaxation_solver)}(PairedExplicitRK3Multi(stages,
                                                                                               base_path_a_coeffs,
                                                                                               dt_ratios,
                                                                                               cS2 = cS2),
-                                                                       relaxation_solver,
-                                                                       recompute_entropy)
+                                                                       relaxation_solver)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -74,10 +71,9 @@ mutable struct PairedExplicitRelaxationRK3MultiIntegrator{RealT <: Real, uType,
     n_levels::Int64
 
     # Entropy Relaxation additions
-    gamma::RealT
-    relaxation_solver::RelaxationSolver
-    recompute_entropy::Bool
-    S_old::RealT # Old entropy value, either last timestep or initial value
+    gamma::RealT # Relaxation parameter
+    S_old::RealT # Entropy of previous iterate
+    relaxation_solver::AbstractRelaxationSolver
 end
 
 mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real, uType,
@@ -124,10 +120,9 @@ mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real
     n_levels::Int64
 
     # Entropy Relaxation additions
-    gamma::RealT
-    relaxation_solver::RelaxationSolver
-    recompute_entropy::Bool
-    S_old::RealT # Old entropy value, either last timestep or initial value
+    gamma::RealT # Relaxation parameter
+    S_old::RealT # Entropy of previous iterate
+    relaxation_solver::AbstractRelaxationSolver
 
     # Addition for hyperbolic-parabolic problems:
     # We need another register to temporarily store the changes due to the hyperbolic part only.
@@ -173,8 +168,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     # For entropy relaxation
-    RealT = eltype(u0)
-    gamma = one(RealT)
+    gamma = one(eltype(u))
+    u_wrap = wrap_array(u, semi)
+    S_old = integrate(entropy, u_wrap, mesh, equations, solver, cache)
 
     # TODO: Call different function for mpi_isparallel() == true
     partition_variables!(level_info_elements,
@@ -224,10 +220,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
                                                                          level_info_mpi_mortars_acc,
                                                                          level_u_indices_elements,
                                                                          -1, n_levels,
-                                                                         gamma,
+                                                                         gamma, S_old,
                                                                          alg.relaxation_solver,
-                                                                         alg.recompute_entropy,
-                                                                         floatmin(RealT),
                                                                          du_tmp)
     else # Hyperbolic case
         integrator = PairedExplicitRelaxationRK3MultiIntegrator(u0, du, u_tmp,
@@ -255,10 +249,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
                                                                 level_info_mpi_mortars_acc,
                                                                 level_u_indices_elements,
                                                                 -1, n_levels,
-                                                                gamma,
-                                                                alg.relaxation_solver,
-                                                                alg.recompute_entropy,
-                                                                floatmin(RealT))
+                                                                gamma, S_old,
+                                                                alg.relaxation_solver)
     end
 
     # initialize callbacks

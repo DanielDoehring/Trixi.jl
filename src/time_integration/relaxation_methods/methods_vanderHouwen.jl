@@ -5,13 +5,67 @@
 @muladd begin
 #! format: noindent
 
+@doc raw"""
+    vanderHouwenAlgorithm
+
+Abstract type for sub-diagonal Runge-Kutta methods, i.e., 
+methods with a Butcher tableau of the form
+```math
+\begin{array}
+    {c|c|c c c c c c}
+    i & \boldsymbol c & & & A & & & \\
+    \hline
+    1 & 0 & & & & & & \\
+    2 & c_2 & a_{21} & & & & & \\
+    3 & c_3 & b_1 & a_{32} & & & & \\ 
+    4 & c_4 & b_1 & b_2 & a_{43} & & & \\ 
+    \vdots & \vdots & \vdots & \vdots & \ddots & \ddots & & \\
+    S & c_S & b_1 & b_2 & \dots & b_{S-2} & a_{S, S-1} & \\
+    \hline
+    & & b_1 & b_2 & \dots & b_{S-2} & b_{S-1} & b_S
+\end{array}
+```
+
+Currently implemented methods are the Carpenter-Kennedy-Lewis 4-stage, 3rd-order method [`CKL43`](@ref)
+and the Carpenter-Kennedy-Lewis 5-stage, 4th-order method [`CKL54`](@ref) which are optimized for the 
+compressible Navier-Stokes equations.
+"""
 abstract type vanderHouwenAlgorithm end
+
+"""
+    vanderHouwenRelaxationAlgorithm
+
+Abstract type for van-der-Houwen type Runge-Kutta algorithms (see [`vanderHouwenAlgorithm`](@ref)) 
+with relaxation to achieve entropy-conservation/stability.
+In addition to the standard Runge-Kutta method, these algorithms are equipped with a
+relaxation solver [`AbstractRelaxationSolver`](@ref) which is used to compute the relaxation parameter ``\\gamma``.
+This allows the relaxation methods to suppress entropy defects due to the time stepping.
+
+For details on the relaxation procedure, see
+- Ketcheson (2019)
+  Relaxation Runge-Kutta Methods: Conservation and Stability for Inner-Product Norms
+  [DOI: 10.1137/19M1263662](https://doi.org/10.1137/19M1263662)
+- Ranocha et al. (2020)
+  Relaxation Runge-Kutta Methods: Fully Discrete Explicit Entropy-Stable Schemes for the Compressible Euler and Navier-Stokes Equations  
+  [DOI: 10.1137/19M1263480](https://doi.org/10.1137/19M1263480)
+
+Currently implemented methods are the Carpenter-Kennedy-Lewis 4-stage, 3rd-order method [`RelaxationCKL43`](@ref)
+and the Carpenter-Kennedy-Lewis 5-stage, 4th-order method [`RelaxationCKL54`](@ref) which are optimized for the 
+compressible Navier-Stokes equations.
+"""
 abstract type vanderHouwenRelaxationAlgorithm end
 
 """
     CKL43()
 
-Carpenter-Kennedy-Lewis 4-stage, 3rd-order Runge-Kutta method.
+Carpenter-Kennedy-Lewis 4-stage, 3rd-order low-storage Runge-Kutta method,
+optimized for the compressible Navier-Stokes equations.
+Implemented as a [`vanderHouwenAlgorithm`](@ref).
+For the exact coefficients consult the original paper:
+
+- Kennedy, Carpenter, Lewis (2000)
+  Low-storage, explicit Runge-Kutta schemes for the compressible Navier-Stokes equations
+  [DOI: 10.1016/S0168-9274(99)00141-5](https://doi.org/10.1016/S0168-9274(99)00141-5)
 """
 struct CKL43 <: vanderHouwenAlgorithm
     a::SVector{4, Float64}
@@ -36,9 +90,16 @@ function CKL43()
     return CKL43(a, b, c)
 end
 
-struct RelaxationCKL43{RelaxationSolver} <: vanderHouwenRelaxationAlgorithm
+"""
+    RelaxationCKL43(; relaxation_solver = RelaxationSolverNewton())
+
+Relaxation version of the 4-stage, 3rd-order low-storage Runge-Kutta method [`CKL43()`](@ref), 
+implemented as a [`vanderHouwenRelaxationAlgorithm`](@ref).
+The default relaxation solver [`AbstractRelaxationSolver`](@ref) is [`RelaxationSolverNewton`](@ref).
+"""
+struct RelaxationCKL43{AbstractRelaxationSolver} <: vanderHouwenRelaxationAlgorithm
     van_der_houwen_alg::CKL43
-    relaxation_solver::RelaxationSolver
+    relaxation_solver::AbstractRelaxationSolver
 end
 function RelaxationCKL43(; relaxation_solver = RelaxationSolverNewton())
     return RelaxationCKL43{typeof(relaxation_solver)}(CKL43(), relaxation_solver)
@@ -47,7 +108,14 @@ end
 """
     CKL54()
 
-Carpenter-Kennedy-Lewis 5-stage, 4th-order Runge-Kutta method.
+Carpenter-Kennedy-Lewis 5-stage, 4th-order low-storage Runge-Kutta method,
+optimized for the compressible Navier-Stokes equations.
+Implemented as a [`vanderHouwenAlgorithm`](@ref).
+For the exact coefficients consult the original paper:
+
+- Kennedy, Carpenter, Lewis (2000)
+  Low-storage, explicit Runge-Kutta schemes for the compressible Navier-Stokes equations
+  [DOI: 10.1016/S0168-9274(99)00141-5](https://doi.org/10.1016/S0168-9274(99)00141-5)
 """
 struct CKL54 <: vanderHouwenAlgorithm
     a::SVector{5, Float64}
@@ -75,9 +143,16 @@ function CKL54()
     return CKL54(a, b, c)
 end
 
-struct RelaxationCKL54{RelaxationSolver} <: vanderHouwenRelaxationAlgorithm
+"""
+    RelaxationCKL54(; relaxation_solver = RelaxationSolverNewton())
+
+Relaxation version of the 4-stage, 3rd-order low-storage Runge-Kutta method [`CKL54()`](@ref), 
+implemented as a [`vanderHouwenRelaxationAlgorithm`](@ref).
+The default relaxation solver [`AbstractRelaxationSolver`](@ref) is [`RelaxationSolverNewton`](@ref).
+"""
+struct RelaxationCKL54{AbstractRelaxationSolver} <: vanderHouwenRelaxationAlgorithm
     van_der_houwen_alg::CKL54
-    relaxation_solver::RelaxationSolver
+    relaxation_solver::AbstractRelaxationSolver
 end
 function RelaxationCKL54(; relaxation_solver = RelaxationSolverNewton())
     return RelaxationCKL54{typeof(relaxation_solver)}(CKL54(), relaxation_solver)
@@ -87,31 +162,10 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct vanderHouwenIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
-                                      SimpleIntegrator2NOptions} <:
-               AbstractTimeIntegrator
-    u::uType
-    du::uType
-    u_tmp::uType
-    t::RealT
-    dt::RealT # current time step
-    dtcache::RealT # ignored
-    iter::Int # current number of time steps (iteration)
-    p::Params # will be the semidiscretization from Trixi.jl
-    sol::Sol # faked
-    f::F # `rhs` of the semidiscretization
-    alg::Alg
-    opts::SimpleIntegrator2NOptions
-    finalstep::Bool # added for convenience
-    # Addition for efficient implementation
-    k_prev::uType
-end
-
 mutable struct vanderHouwenRelaxationIntegrator{RealT <: Real, uType, Params, Sol, F,
-                                                Alg,
-                                                SimpleIntegrator2NOptions,
-                                                RelaxationSolver} <:
-               AbstractTimeIntegrator
+                                                Alg, SimpleIntegratorOptions,
+                                                AbstractRelaxationSolver} <:
+               RelaxationIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -122,55 +176,20 @@ mutable struct vanderHouwenRelaxationIntegrator{RealT <: Real, uType, Params, So
     p::Params # will be the semidiscretization from Trixi.jl
     sol::Sol # faked
     f::F # `rhs` of the semidiscretization
-    alg::Alg
-    opts::SimpleIntegrator2NOptions
+    alg::Alg # `vanderHouwenRelaxationAlgorithm`
+    opts::SimpleIntegratorOptions
     finalstep::Bool # added for convenience
     # Addition for efficient implementation
     k_prev::uType
-    # For entropy relaxation
-    direction::uType
-    gamma::RealT
-    relaxation_solver::RelaxationSolver
-end
-
-# Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
-function Base.getproperty(integrator::Union{vanderHouwenIntegrator,
-                                            vanderHouwenRelaxationIntegrator},
-                          field::Symbol)
-    if field === :stats
-        return (naccept = getfield(integrator, :iter),)
-    end
-    # general fallback
-    return getfield(integrator, field)
-end
-
-function init(ode::ODEProblem, alg::vanderHouwenAlgorithm;
-              dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
-    u = copy(ode.u0)
-    du = similar(u)
-    u_tmp = copy(u)
-    k_prev = similar(u)
-
-    t = first(ode.tspan)
-    iter = 0
-
-    integrator = vanderHouwenIntegrator(u, du, u_tmp, t, dt, zero(dt), iter, ode.p,
-                                        (prob = ode,), ode.f, alg,
-                                        SimpleIntegrator2NOptions(callback, ode.tspan;
-                                                                  kwargs...), false,
-                                        k_prev)
-
-    # initialize callbacks
-    if callback isa CallbackSet
-        foreach(callback.continuous_callbacks) do cb
-            throw(ArgumentError("Continuous callbacks are unsupported with van-der-Houwen time integration methods."))
-        end
-        foreach(callback.discrete_callbacks) do cb
-            cb.initialize(cb, integrator.u, integrator.t, integrator)
-        end
-    end
-
-    return integrator
+    # Addition for Relaxation methodology
+    direction::uType # RK update, i.e., sum of stages K_i times weights b_i
+    gamma::RealT # Relaxation parameter
+    S_old::RealT # Entropy of previous iterate
+    relaxation_solver::AbstractRelaxationSolver
+    # Note: Could add another register which would store the summed-up 
+    # dot products ∑ₖ (wₖ ⋅ kₖ) and then integrate only once and not per stage k
+    # Could also add option `recompute_entropy` for entropy-conservative problems
+    # to save redundant computations.
 end
 
 function init(ode::ODEProblem, alg::vanderHouwenRelaxationAlgorithm;
@@ -184,18 +203,21 @@ function init(ode::ODEProblem, alg::vanderHouwenRelaxationAlgorithm;
     iter = 0
 
     # For entropy relaxation
-    direction = similar(u)
+    direction = zero(u)
     gamma = one(eltype(u))
+    semi = ode.p
+    u_wrap = wrap_array(u, semi)
+    S_old = integrate(entropy, u_wrap, semi.mesh, semi.equations, semi.solver,
+                      semi.cache)
 
     integrator = vanderHouwenRelaxationIntegrator(u, du, u_tmp, t, dt, zero(dt), iter,
-                                                  ode.p,
-                                                  (prob = ode,), ode.f,
+                                                  ode.p, (prob = ode,), ode.f,
                                                   alg.van_der_houwen_alg,
-                                                  SimpleIntegrator2NOptions(callback,
-                                                                            ode.tspan;
-                                                                            kwargs...),
+                                                  SimpleIntegratorOptions(callback,
+                                                                          ode.tspan;
+                                                                          kwargs...),
                                                   false,
-                                                  k_prev, direction, gamma,
+                                                  k_prev, direction, gamma, S_old,
                                                   alg.relaxation_solver)
 
     # initialize callbacks
@@ -213,84 +235,12 @@ end
 
 # Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
 function solve(ode::ODEProblem,
-               alg::Union{vanderHouwenAlgorithm, vanderHouwenRelaxationAlgorithm};
+               alg::vanderHouwenRelaxationAlgorithm;
                dt, callback = nothing, kwargs...)
     integrator = init(ode, alg, dt = dt, callback = callback; kwargs...)
 
     # Start actual solve
     solve!(integrator)
-end
-
-function step!(integrator::vanderHouwenIntegrator)
-    @unpack prob = integrator.sol
-    @unpack alg = integrator
-    t_end = last(prob.tspan)
-    callbacks = integrator.opts.callback
-
-    @assert !integrator.finalstep
-    if isnan(integrator.dt)
-        error("time step size `dt` is NaN")
-    end
-
-    # if the next iteration would push the simulation beyond the end time, set dt accordingly
-    if integrator.t + integrator.dt > t_end ||
-       isapprox(integrator.t + integrator.dt, t_end)
-        integrator.dt = t_end - integrator.t
-        terminate!(integrator)
-    end
-
-    @trixi_timeit timer() "VdH RK integration step" begin
-        num_stages = length(alg.c)
-
-        # First stage
-        integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
-        @threaded for i in eachindex(integrator.du)
-            integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
-        end
-
-        # Second to last stage
-        for stage in 2:num_stages
-            @threaded for i in eachindex(integrator.u)
-                integrator.u_tmp[i] = integrator.u[i] +
-                                      alg.a[stage] * integrator.dt * integrator.du[i]
-            end
-
-            integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                         integrator.t + alg.c[stage] * integrator.dt)
-
-            @threaded for i in eachindex(integrator.u)
-                integrator.u[i] += alg.b[stage - 1] * integrator.dt *
-                                   integrator.k_prev[i]
-                integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
-            end
-        end
-
-        # Update solution
-        @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += integrator.dt * alg.b[num_stages] * integrator.du[i]
-        end
-    end
-
-    integrator.iter += 1
-    integrator.t += integrator.dt
-
-    @trixi_timeit timer() "Step-Callbacks" begin
-        # handle callbacks
-        if callbacks isa CallbackSet
-            foreach(callbacks.discrete_callbacks) do cb
-                if cb.condition(integrator.u, integrator.t, integrator)
-                    cb.affect!(integrator)
-                end
-                return nothing
-            end
-        end
-    end
-
-    # respect maximum number of iterations
-    if integrator.iter >= integrator.opts.maxiters && !integrator.finalstep
-        @warn "Interrupted. Larger maxiters is needed."
-        terminate!(integrator)
-    end
 end
 
 function step!(integrator::vanderHouwenRelaxationIntegrator)
@@ -315,16 +265,16 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
         num_stages = length(alg.c)
 
         mesh, equations, dg, cache = mesh_equations_solver_cache(prob.p)
-
         u_wrap = wrap_array(integrator.u, prob.p)
-        S_old = integrate(entropy_math, u_wrap, mesh, equations, dg, cache)
-
         u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
 
         # First stage
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
+        # Try to enable optimizations due to `muladd` by computing this factor only once, see
+        # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224529532
+        b1dt = alg.b[1] * integrator.dt
         @threaded for i in eachindex(integrator.u)
-            integrator.direction[i] = alg.b[1] * integrator.du[i] * integrator.dt
+            integrator.direction[i] = b1dt * integrator.du[i]
 
             integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
         end
@@ -332,11 +282,11 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
         du_wrap = wrap_array(integrator.du, prob.p)
         # Entropy change due to first stage
         dS = alg.b[1] * integrator.dt *
-             int_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
+             integrate_w_dot_stage(du_wrap, u_wrap, mesh, equations, dg, cache)
 
+        a2_dt = alg.a[2] * integrator.dt
         @threaded for i in eachindex(integrator.u)
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  alg.a[2] * integrator.dt * integrator.du[i]
+            integrator.u_tmp[i] = integrator.u[i] + a2_dt * integrator.du[i]
         end
 
         # Second to last stage
@@ -344,17 +294,23 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
             integrator.f(integrator.du, integrator.u_tmp, prob.p,
                          integrator.t + alg.c[stage] * integrator.dt)
 
-            dS += alg.b[stage] * integrator.dt *
-                  int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+            # Entropy change due to current stage
+            bs_dt = alg.b[stage] * integrator.dt
+            dS += bs_dt *
+                  integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
+            bsminus1_minus_as = alg.b[stage - 1] - alg.a[stage]
             @threaded for i in eachindex(integrator.u)
-                integrator.direction[i] += alg.b[stage] * integrator.du[i] *
-                                           integrator.dt
+                # Try to enable optimizations due to `muladd` by avoidin `+=`
+                # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
+                integrator.direction[i] = integrator.direction[i] +
+                                          bs_dt * integrator.du[i]
 
-                integrator.u_tmp[i] += integrator.dt *
-                                       ((alg.b[stage - 1] - alg.a[stage]) *
-                                        integrator.k_prev[i] +
-                                        alg.a[stage + 1] * integrator.du[i])
+                # Subtract previous stage contribution from `u_tmp` and add most recent one
+                integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                      integrator.dt *
+                                      (bsminus1_minus_as * integrator.k_prev[i] +
+                                       alg.a[stage + 1] * integrator.du[i])
 
                 integrator.k_prev[i] = integrator.du[i] # Faster than broadcasted version (with .=)
             end
@@ -364,20 +320,19 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
                      integrator.t + alg.c[num_stages] * integrator.dt)
 
-        dS += alg.b[num_stages] * integrator.dt *
-              int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+        bs_dt = alg.b[num_stages] * integrator.dt
+        dS += bs_dt *
+              integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
         @threaded for i in eachindex(integrator.u)
-            integrator.direction[i] += alg.b[num_stages] * integrator.du[i] *
-                                       integrator.dt
+            integrator.direction[i] = integrator.direction[i] + bs_dt * integrator.du[i]
         end
 
         direction_wrap = wrap_array(integrator.direction, prob.p)
 
         @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,
                                                                      u_tmp_wrap, u_wrap,
-                                                                     direction_wrap,
-                                                                     S_old, dS,
+                                                                     direction_wrap, dS,
                                                                      mesh, equations,
                                                                      dg, cache,
                                                                      integrator.relaxation_solver)
@@ -387,7 +342,8 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
 
         # Do relaxed update
         @threaded for i in eachindex(integrator.u)
-            integrator.u[i] += integrator.gamma * integrator.direction[i]
+            integrator.u[i] = integrator.u[i] +
+                              integrator.gamma * integrator.direction[i]
         end
     end
 
@@ -411,19 +367,12 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
 end
 
 # used for AMR
-function Base.resize!(integrator::vanderHouwenIntegrator, new_size)
-    resize!(integrator.u, new_size)
-    resize!(integrator.du, new_size)
-    resize!(integrator.u_tmp, new_size)
-    resize!(integrator.k_prev, new_size)
-end
-
 function Base.resize!(integrator::vanderHouwenRelaxationIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
     resize!(integrator.k_prev, new_size)
-
+    # Relaxation addition
     resize!(integrator.direction, new_size)
 end
 end # @muladd

@@ -12,7 +12,8 @@ include("polynomial_optimizer.jl")
 
 # Abstract base type for both single/standalone and multi-level 
 # PERK (Paired Explicit Runge-Kutta) time integration schemes
-abstract type AbstractPairedExplicitRK{ORDER} end
+abstract type AbstractPairedExplicitRK{ORDER} <: AbstractTimeIntegrationAlgorithm end
+
 # Abstract base type for single/standalone PERK time integration schemes
 abstract type AbstractPairedExplicitRKSingle{ORDER} <: AbstractPairedExplicitRK{ORDER} end
 # Abstract base type for single/standalone PERK time integration schemes
@@ -21,7 +22,7 @@ abstract type AbstractPairedExplicitRKMulti{ORDER} <: AbstractPairedExplicitRK{O
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
 mutable struct PairedExplicitRKOptions{Callback, TStops}
     callback::Callback # callbacks; used in Trixi
-    adaptive::Bool # whether the algorithm is adaptive
+    adaptive::Bool # whether the algorithm is adaptive (false)
     dtmax::Float64 # ignored
     maxiters::Int # maximal number of time steps
     tstops::TStops # tstops from https://diffeq.sciml.ai/v6.8/basics/common_solver_opts/#Output-Control-1; ignored
@@ -73,6 +74,28 @@ abstract type AbstractPairedExplicitRKEulerAcousticMultiIntegrator{ORDER} <:
 # i.e., the `PERK_k...` are called.
 abstract type AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER} <:
               AbstractPairedExplicitRKMultiParabolicIntegrator{ORDER} end
+
+@inline function update_t_relaxation!(integrator::AbstractPairedExplicitRelaxationRKIntegrator)
+    # Check if due to entropy relaxation the final step is not reached
+    if integrator.finalstep == true && integrator.gamma != 1
+        # If we would go beyond the final time, clip gamma at 1.0
+        #if integrator.gamma > 1.0
+        integrator.gamma = 1
+        #else # If we are below the final time, reset finalstep flag
+        #    integrator.finalstep = false
+        #end
+    end
+    integrator.t += integrator.gamma * integrator.dt
+
+    # Write t and gamma to file for plotting
+    #=
+    open("relaxation_log.txt", "a") do file
+        write(file, "$(integrator.t) $(integrator.gamma)\n")
+    end
+    =#
+    return nothing
+end
+
 """
     calculate_cfl(ode_algorithm::AbstractPairedExplicitRK, ode)
 
@@ -97,16 +120,6 @@ function calculate_cfl(ode_algorithm::AbstractPairedExplicitRK, ode)
     return cfl_number
 end
 
-# Forward integrator.stats.naccept to integrator.iter (see GitHub PR#771)
-function Base.getproperty(integrator::AbstractPairedExplicitRKIntegrator,
-                          field::Symbol)
-    if field === :stats
-        return (naccept = getfield(integrator, :iter),)
-    end
-    # general fallback
-    return getfield(integrator, field)
-end
-
 """
     add_tstop!(integrator::AbstractPairedExplicitRKIntegrator, t)
 Add a time stop during the time integration process.
@@ -125,15 +138,6 @@ end
 
 has_tstop(integrator::AbstractPairedExplicitRKIntegrator) = !isempty(integrator.opts.tstops)
 first_tstop(integrator::AbstractPairedExplicitRKIntegrator) = first(integrator.opts.tstops)
-
-# Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
-function solve(ode::ODEProblem, alg::AbstractPairedExplicitRK;
-               dt, callback = nothing, kwargs...)
-    integrator = init(ode, alg, dt = dt, callback = callback; kwargs...)
-
-    # Start actual solve
-    solve!(integrator)
-end
 
 function solve!(integrator::AbstractPairedExplicitRKIntegrator)
     @unpack prob = integrator.sol
@@ -416,21 +420,10 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
 end
 
 # get a cache where the RHS can be stored
-get_du(integrator::AbstractPairedExplicitRKIntegrator) = integrator.du
 get_tmp_cache(integrator::AbstractPairedExplicitRKIntegrator) = (integrator.u_tmp,)
 
 # some algorithms from DiffEq like FSAL-ones need to be informed when a callback has modified u
 u_modified!(integrator::AbstractPairedExplicitRKIntegrator, ::Bool) = false
-
-# used by adaptive timestepping algorithms in DiffEq
-function set_proposed_dt!(integrator::AbstractPairedExplicitRKIntegrator,
-                          dt)
-    (integrator.dt = dt; integrator.dtcache = dt)
-end
-
-function get_proposed_dt(integrator::AbstractPairedExplicitRKIntegrator)
-    return integrator.dt
-end
 
 # stop the time integration
 function terminate!(integrator::AbstractPairedExplicitRKIntegrator)
@@ -530,9 +523,6 @@ end
 
 # Multirate/partitioned helpers
 include("partitioning.jl")
-
-# Paired Explicit Relaxation RK (PERRK) helpers
-include("entropy_relaxation.jl")
 
 include("p2/methods_PERK2.jl")
 include("p3/methods_PERK3.jl")
