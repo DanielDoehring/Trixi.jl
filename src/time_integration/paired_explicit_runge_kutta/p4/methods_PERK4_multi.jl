@@ -471,7 +471,9 @@ end
         for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
             a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
-                integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                #integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                # Try optimize for `@muladd`: avoid `+=`
+                integrator.u_tmp[i] = integrator.u_tmp[i] + a2_dt * integrator.du[i]
             end
         end
 
@@ -487,7 +489,9 @@ end
             for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
                 a2_dt = alg.a_matrices[alg.num_methods, 2, stage - 2] * integrator.dt
                 @threaded for i in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                    #integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                    # Try optimize for `@muladd`: avoid `+=`
+                    integrator.u_tmp[i] = integrator.u_tmp[i] + a2_dt * integrator.du[i]
                 end
             end
         end

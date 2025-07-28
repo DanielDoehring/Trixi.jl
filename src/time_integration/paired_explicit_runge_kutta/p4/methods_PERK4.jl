@@ -327,7 +327,9 @@ end
     @threaded for i in eachindex(integrator.u)
         # Note that 'k1' carries the values of K_{S-1}
         # and that we construct 'K_S' "in-place" from 'integrator.du'
-        integrator.u[i] += b_dt * (integrator.k1[i] + integrator.du[i])
+        #integrator.u[i] += b_dt * (integrator.k1[i] + integrator.du[i])
+        # Try optimize for `@muladd`: avoid `+=`
+        integrator.u[i] = integrator.u[i] + b_dt * (integrator.k1[i] + integrator.du[i])
     end
 end
 

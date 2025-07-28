@@ -203,7 +203,9 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{2}
         # Do relaxed update
         @threaded for i in eachindex(integrator.u)
             # Note: We re-use `du` for the "direction"
-            integrator.u[i] += integrator.gamma * integrator.du[i]
+            #integrator.u[i] += integrator.gamma * integrator.du[i]
+            # Try optimize for `@muladd`: avoid `+=`
+            integrator.u[i] = integrator.u[i] + integrator.gamma * integrator.du[i]
         end
     end
 

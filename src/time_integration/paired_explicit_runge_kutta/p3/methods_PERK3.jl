@@ -287,7 +287,13 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
             # "Own" PairedExplicitRK based on SSPRK33.
             # Note that 'kS1' carries the values of K_{S-1}
             # and that we construct 'K_S' "in-place" from 'integrator.du'
+            #=
             integrator.u[i] += integrator.dt *
+                               (integrator.k1[i] + integrator.kS1[i] +
+                                4 * integrator.du[i]) / 6
+            =#
+            # Try to optimize for `@muladd`: avoid `+=`
+            integrator.u[i] = integrator.u[i] + integrator.dt *
                                (integrator.k1[i] + integrator.kS1[i] +
                                 4 * integrator.du[i]) / 6
         end

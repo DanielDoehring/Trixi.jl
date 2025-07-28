@@ -301,7 +301,7 @@ function step!(integrator::vanderHouwenRelaxationIntegrator)
 
             bsminus1_minus_as = alg.b[stage - 1] - alg.a[stage]
             @threaded for i in eachindex(integrator.u)
-                # Try to enable optimizations due to `muladd` by avoidin `+=`
+                # Try to enable optimizations due to `muladd` by avoiding `+=`
                 # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
                 integrator.direction[i] = integrator.direction[i] +
                                           bs_dt * integrator.du[i]
