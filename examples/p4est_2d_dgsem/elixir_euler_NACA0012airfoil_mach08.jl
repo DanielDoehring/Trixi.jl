@@ -98,8 +98,8 @@ cfl_max() = 4.8
 #cfl_max() = 1.5
 
 # R-RKCKL54
-cfl_0() = 1.5
-cfl_max() = 1.9
+#cfl_0() = 1.5
+#cfl_max() = 1.9
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -141,13 +141,13 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/NACA0012_Mach08/rusanov
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 
 #ode_alg = Trixi.PairedExplicitRK4Multi(Stages_p4, path, dtRatios_p4)
-#ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages_p4, path, dtRatios_p4; relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages_p4[1], path; relaxation_solver = relaxation_solver)
 
 #ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
-ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);

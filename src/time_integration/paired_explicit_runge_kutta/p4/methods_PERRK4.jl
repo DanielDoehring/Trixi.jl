@@ -111,13 +111,11 @@ end
     mesh, equations, dg, cache = mesh_equations_solver_cache(p)
 
     for stage in 1:2
+        a1_dt = alg.a_matrix_constant[1, stage] * integrator.dt
+        a2_dt = alg.a_matrix_constant[2, stage] * integrator.dt
         @threaded for i in eachindex(integrator.u)
             integrator.u_tmp[i] = integrator.u[i] +
-                                  integrator.dt *
-                                  (alg.a_matrix_constant[1, stage] *
-                                   integrator.k1[i] +
-                                   alg.a_matrix_constant[2, stage] *
-                                   integrator.du[i])
+                                  a1_dt * integrator.k1[i] + a2_dt * integrator.du[i]
         end
 
         integrator.f(integrator.du, integrator.u_tmp, p,
@@ -129,15 +127,16 @@ end
     du_wrap = wrap_array(integrator.du, p)
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # Entropy change due to S-1 stage
-    dS = 0.5 * integrator.dt * # 0.5 = b_{S-1}
+    b_dt = 0.5 * integrator.dt # 0.5 = b_{S-1}
+    dS = b_dt *
          integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Last stage
+    a1_dt = alg.a_matrix_constant[1, 3] * integrator.dt
+    a2_dt = alg.a_matrix_constant[2, 3] * integrator.dt
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
-                              integrator.dt *
-                              (alg.a_matrix_constant[1, 3] * integrator.k1[i] +
-                               alg.a_matrix_constant[2, 3] * integrator.du[i])
+                              a1_dt * integrator.k1[i] + a2_dt * integrator.du[i]
 
         # Store K_{S-1} in `k1`                               
         integrator.k1[i] = integrator.du[i] # Faster than broadcasted version (with .=)
@@ -148,14 +147,13 @@ end
                  integrator)
 
     # Entropy change due to last (i = S) stage
-    dS += 0.5 * integrator.dt * # 0.5 = b_{S}
+    dS += b_dt * # 0.5 = b_{S}
           integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Note: We re-use `du` for the "direction"
     # Note: For efficiency, we multiply the direction with dt already here!
     @threaded for i in eachindex(integrator.u)
-        integrator.du[i] = 0.5 * integrator.dt * (integrator.k1[i] +
-                                                  integrator.du[i])
+        integrator.du[i] = b_dt * (integrator.k1[i] + integrator.du[i])
     end
 
     u_wrap = wrap_array(integrator.u, integrator.p)

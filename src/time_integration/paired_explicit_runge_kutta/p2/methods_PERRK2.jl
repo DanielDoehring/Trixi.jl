@@ -164,8 +164,11 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{2}
 
         u_wrap = wrap_array(integrator.u, prob.p)
         k1_wrap = wrap_array(integrator.k1, prob.p)
+
+        # NOTE: Consider omitting this for b1 = 0 (most common choice)
         # Entropy change due to first stage
-        dS = alg.b1 * integrator.dt *
+        b1_dt = alg.b1 * integrator.dt
+        dS = b1_dt *
              integrate_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache)
 
         PERK_k2!(integrator, prob.p, alg)
@@ -178,14 +181,13 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{2}
         du_wrap = wrap_array(integrator.du, prob.p)
         u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
         # Entropy change due to last (i = S) stage
-        dS += alg.bS * integrator.dt *
+        bS_dt = alg.bS * integrator.dt
+        dS += bS_dt *
               integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
         # Note: We reuse `du` for the "direction"
         @threaded for i in eachindex(integrator.u)
-            integrator.du[i] = integrator.dt *
-                               (alg.b1 * integrator.k1[i] +
-                                alg.bS * integrator.du[i])
+            integrator.du[i] = b1_dt * integrator.k1[i] + bS_dt * integrator.du[i]
         end
 
         @trixi_timeit timer() "Relaxation solver" relaxation_solver!(integrator,

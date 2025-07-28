@@ -443,13 +443,12 @@ end
         ### Optimized implementation for PERK4 case: Own method for each level with c[i] = 1.0, i = 2, S - 4 ###
 
         for level in 1:alg.max_add_levels[stage]
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
+            a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      (alg.a_matrices[level, 1, stage - 2] *
-                                       integrator.k1[i] +
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i])
+                                      a1_dt * integrator.k1[i] +
+                                      a2_dt * integrator.du[i]
             end
         end
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
@@ -463,37 +462,32 @@ end
 
         # Loop over different methods with own associated level
         for level in 1:min(alg.num_methods, integrator.n_levels)
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[i]
+                                      a1_dt * integrator.k1[i]
             end
         end
         for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
+            a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
-                integrator.u_tmp[i] += integrator.dt *
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i]
+                integrator.u_tmp[i] += a2_dt * integrator.du[i]
             end
         end
 
         # "Remainder": Non-efficiently integrated
         for level in (alg.num_methods + 1):(integrator.n_levels)
+            a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                      integrator.k1[i]
+                                      a1_dt * integrator.k1[i]
             end
         end
         if alg.max_add_levels[stage] == alg.num_methods
             for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+                a2_dt = alg.a_matrices[alg.num_methods, 2, stage - 2] * integrator.dt
                 @threaded for i in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[i] += integrator.dt *
-                                           alg.a_matrices[alg.num_methods, 2,
-                                                          stage - 2] *
-                                           integrator.du[i]
+                    integrator.u_tmp[i] += a2_dt * integrator.du[i]
                 end
             end
         end

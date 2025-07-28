@@ -186,24 +186,23 @@ end
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
                                             AbstractPairedExplicitRelaxationRKSingleIntegrator},
                           p, alg)
+    c_dt = alg.c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] +
-                              alg.c[2] * integrator.dt * integrator.k1[i]
+        integrator.u_tmp[i] = integrator.u[i] + c_dt * integrator.k1[i]
     end
 
-    integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[2] * integrator.dt)
+    integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + c_dt)
 end
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
                                             AbstractPairedExplicitRelaxationRKSingleIntegrator},
                           p, alg, stage)
     # Construct current state
+    a1_dt = alg.a_matrix[1, stage - 2] * integrator.dt
+    a2_dt = alg.a_matrix[2, stage - 2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
-                              integrator.dt *
-                              (alg.a_matrix[1, stage - 2] * integrator.k1[i] +
-                               alg.a_matrix[2, stage - 2] * integrator.du[i])
+                              a1_dt * integrator.k1[i] + a2_dt * integrator.du[i]
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
@@ -213,15 +212,14 @@ end
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                             AbstractPairedExplicitRelaxationRKMultiIntegrator},
                           p, alg)
+    c_dt = alg.c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] +
-                              alg.c[2] * integrator.dt * integrator.k1[i]
+        integrator.u_tmp[i] = integrator.u[i] + c_dt * integrator.k1[i]
     end
 
     # k2: Only evaluated at finest level (1)
     integrator.f(integrator.du, integrator.u_tmp, p,
-                 integrator.t + alg.c[2] * integrator.dt,
-                 integrator, 1)
+                 integrator.t + c_dt, integrator, 1)
 end
 
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
@@ -274,22 +272,20 @@ end
 
         # "PERK4" style
         for level in 1:alg.max_add_levels[stage]
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
+            a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      (alg.a_matrices[level, 1, stage - 2] *
-                                       integrator.k1[i] +
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i])
+                                      a1_dt * integrator.k1[i] +
+                                      a2_dt * integrator.du[i]
             end
         end
 
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+            a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[i]
+                                      a1_dt * integrator.k1[i]
             end
         end
     else
@@ -297,37 +293,32 @@ end
 
         # Loop over different methods with own associated level
         for level in 1:min(alg.num_methods, integrator.n_levels)
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[level, 1, stage - 2] *
-                                      integrator.k1[i]
+                                      a1_dt * integrator.k1[i]
             end
         end
         for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
+            a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
-                integrator.u_tmp[i] += integrator.dt *
-                                       alg.a_matrices[level, 2, stage - 2] *
-                                       integrator.du[i]
+                integrator.u_tmp[i] += a2_dt * integrator.du[i]
             end
         end
 
         # "Remainder": Non-efficiently integrated
         for level in (alg.num_methods + 1):(integrator.n_levels)
+            a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      integrator.dt *
-                                      alg.a_matrices[alg.num_methods, 1, stage - 2] *
-                                      integrator.k1[i]
+                                      a1_dt * integrator.k1[i]
             end
         end
         if alg.max_add_levels[stage] == alg.num_methods
             for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+                a2_dt = alg.a_matrices[alg.num_methods, 2, stage - 2] * integrator.dt
                 @threaded for i in integrator.level_u_indices_elements[level]
-                    integrator.u_tmp[i] += integrator.dt *
-                                           alg.a_matrices[alg.num_methods, 2,
-                                                          stage - 2] *
-                                           integrator.du[i]
+                    integrator.u_tmp[i] += a2_dt * integrator.du[i]
                 end
             end
         end
