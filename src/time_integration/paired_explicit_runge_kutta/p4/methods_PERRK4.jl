@@ -54,7 +54,7 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType,
     # Entropy Relaxation additions
     gamma::RealT # Relaxation parameter
     S_old::RealT # Entropy of previous iterate
-    relaxation_solver::AbstractRelaxationSolver
+    relaxation_solver::RelaxationSolver
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
@@ -70,9 +70,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4;
     iter = 0
 
     # For entropy relaxation
-    gamma = one(eltype(u))
+    gamma = one(eltype(u0))
     semi = ode.p
-    u_wrap = wrap_array(u, semi)
+    u_wrap = wrap_array(u0, semi)
     S_old = integrate(entropy, u_wrap, semi.mesh, semi.equations, semi.solver,
                       semi.cache)
 
@@ -130,7 +130,7 @@ end
     u_tmp_wrap = wrap_array(integrator.u_tmp, p)
     # Entropy change due to S-1 stage
     dS = 0.5 * integrator.dt * # 0.5 = b_{S-1}
-         int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+         integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Last stage
     @threaded for i in eachindex(integrator.u)
@@ -149,7 +149,7 @@ end
 
     # Entropy change due to last (i = S) stage
     dS += 0.5 * integrator.dt * # 0.5 = b_{S}
-          int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+          integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
     # Note: We re-use `du` for the "direction"
     # Note: For efficiency, we multiply the direction with dt already here!

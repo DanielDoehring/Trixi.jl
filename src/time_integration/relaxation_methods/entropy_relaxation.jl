@@ -187,7 +187,7 @@ function relaxation_solver!(integrator, u_tmp_wrap, u_wrap, dir_wrap, dS,
     return nothing
 end
 
-struct RelaxationSolverSecant{RealT <: Real} <: RelaxationSolver
+struct RelaxationSolverSecant{RealT <: Real} <: AbstractRelaxationSolver
     # General parameters
     max_iterations::Int # Maximum number of bisection iterations
     root_tol::RealT     # Function-tolerance for the relaxation equation

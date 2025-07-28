@@ -73,7 +73,7 @@ mutable struct PairedExplicitRelaxationRK3MultiIntegrator{RealT <: Real, uType,
     # Entropy Relaxation additions
     gamma::RealT # Relaxation parameter
     S_old::RealT # Entropy of previous iterate
-    relaxation_solver::AbstractRelaxationSolver
+    relaxation_solver::RelaxationSolver
 end
 
 mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real, uType,
@@ -122,7 +122,7 @@ mutable struct PairedExplicitRelaxationRK3MultiParabolicIntegrator{RealT <: Real
     # Entropy Relaxation additions
     gamma::RealT # Relaxation parameter
     S_old::RealT # Entropy of previous iterate
-    relaxation_solver::AbstractRelaxationSolver
+    relaxation_solver::RelaxationSolver
 
     # Addition for hyperbolic-parabolic problems:
     # We need another register to temporarily store the changes due to the hyperbolic part only.
@@ -168,9 +168,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     # For entropy relaxation
-    gamma = one(eltype(u))
-    u_wrap = wrap_array(u, semi)
-    S_old = integrate(entropy, u_wrap, mesh, equations, solver, cache)
+    gamma = one(eltype(u0))
+    u_wrap = wrap_array(u0, semi)
+    S_old = integrate(entropy, u_wrap, mesh, equations, dg, cache)
 
     # TODO: Call different function for mpi_isparallel() == true
     partition_variables!(level_info_elements,

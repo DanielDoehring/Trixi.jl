@@ -102,9 +102,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2;
     iter = 0
 
     # For entropy relaxation
-    gamma = one(eltype(u))
+    gamma = one(eltype(u0))
     semi = ode.p
-    u_wrap = wrap_array(u, semi)
+    u_wrap = wrap_array(u0, semi)
     S_old = integrate(entropy, u_wrap, semi.mesh, semi.equations, semi.solver,
                       semi.cache)
 
@@ -166,7 +166,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{2}
         k1_wrap = wrap_array(integrator.k1, prob.p)
         # Entropy change due to first stage
         dS = alg.b1 * integrator.dt *
-             int_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache)
+             integrate_w_dot_stage(k1_wrap, u_wrap, mesh, equations, dg, cache)
 
         PERK_k2!(integrator, prob.p, alg)
 
@@ -179,7 +179,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{2}
         u_tmp_wrap = wrap_array(integrator.u_tmp, prob.p)
         # Entropy change due to last (i = S) stage
         dS += alg.bS * integrator.dt *
-              int_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
+              integrate_w_dot_stage(du_wrap, u_tmp_wrap, mesh, equations, dg, cache)
 
         # Note: We reuse `du` for the "direction"
         @threaded for i in eachindex(integrator.u)

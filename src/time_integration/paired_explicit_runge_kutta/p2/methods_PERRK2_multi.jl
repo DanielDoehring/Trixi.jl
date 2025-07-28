@@ -165,8 +165,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
     level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     # For entropy relaxation
-    gamma = one(eltype(u))
-    u_wrap = wrap_array(u, semi)
+    gamma = one(eltype(u0))
+    u_wrap = wrap_array(u0, semi)
     S_old = integrate(entropy, u_wrap, mesh, equations, dg, cache)
 
     # TODO: Call different function for mpi_isparallel() == true

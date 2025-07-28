@@ -124,7 +124,6 @@ function RelaxationRK44(; relaxation_solver = RelaxationSolverNewton())
     return RelaxationRK44{typeof(relaxation_solver)}(RK44(), relaxation_solver)
 end
 
-
 """
     TS64()
 
