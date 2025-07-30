@@ -293,9 +293,11 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
                                 4 * integrator.du[i]) / 6
             =#
             # Try to optimize for `@muladd`: avoid `+=`
-            integrator.u[i] = integrator.u[i] + integrator.dt *
-                               (integrator.k1[i] + integrator.kS1[i] +
-                                4 * integrator.du[i]) / 6
+            integrator.u[i] = integrator.u[i] +
+                              integrator.dt *
+                              (integrator.k1[i] +
+                               integrator.kS1[i] +
+                               4 * integrator.du[i]) / 6
         end
     end
 
