@@ -5,7 +5,6 @@
 @muladd begin
 #! format: noindent
 
-using NLsolve
 using NonlinearSolve
 
 # Abstract base type for time integration schemes of storage class `2N`
@@ -49,6 +48,9 @@ mutable struct LobattoIII3AIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
     alg::Alg # AbstractLobattoRKAlgorithm
     opts::SimpleIntegratorOptions
     finalstep::Bool # added for convenience
+
+    # For nonlinear solve
+    k_nonlinear::uType
 end
 
 function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
@@ -57,13 +59,16 @@ function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
     du = zero(u)
     u_tmp = zero(u)
 
+    k_nonlinear = zero(u)
+
     t = first(ode.tspan)
     iter = 0
     integrator = LobattoIII3AIntegrator(u, du, u_tmp,
                                         t, dt, zero(dt), iter,
                                         ode.p, (prob = ode,), ode.f, alg,
                                         SimpleIntegratorOptions(callback, ode.tspan;
-                                                                kwargs...), false)
+                                                                kwargs...), false,
+                                        k_nonlinear)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -78,13 +83,17 @@ function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
     return integrator
 end
 
-function stage_residual!(residual, implicit_stage, integrator::LobattoIII3AIntegrator,
-                         prob, alg::LobattoIIIA_p2)
+function stage_residual!(residual, implicit_stage, p)
+    integrator = p[1]
+    @unpack prob = integrator.sol
+    @unpack alg = integrator
+
     a_dt = alg.A[1, 2] * integrator.dt
     @threaded for i in eachindex(integrator.u_tmp)
         integrator.u_tmp[i] = integrator.u[i] + a_dt * implicit_stage[i]
     end
-    integrator.f(integrator.du, integrator.u_tmp, prob.p, integrator.t + alg.c[2] * integrator.dt)
+    integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                 integrator.t + alg.c[2] * integrator.dt)
 
     @threaded for i in eachindex(residual)
         residual[i] = implicit_stage[i] - integrator.du[i]
@@ -92,24 +101,6 @@ function stage_residual!(residual, implicit_stage, integrator::LobattoIII3AInteg
 
     return nothing
 end
-
-#=
-function stage_residual!(residual, implicit_stage, p)
-    @unpack prob, alg, dt, t, u, u_tmp, du = p
-
-    a_dt = alg.A[1, 2] * dt
-    @threaded for i in eachindex(u_tmp)
-        u_tmp[i] = u[i] + a_dt * implicit_stage[i]
-    end
-    integrator.f(du, u_tmp, prob.p, t + alg.c[2] * dt)
-
-    @threaded for i in eachindex(residual)
-        residual[i] = implicit_stage[i] - du[i]
-    end
-
-    return nothing
-end
-=#
 
 function step!(integrator::LobattoIII3AIntegrator)
     @unpack prob = integrator.sol
@@ -136,6 +127,7 @@ function step!(integrator::LobattoIII3AIntegrator)
         b_dt = alg.b[1] * integrator.dt
         @threaded for i in eachindex(integrator.du)
             integrator.u[i] = integrator.u[i] + b_dt * integrator.du[i]
+            integrator.k_nonlinear[i] = integrator.u[i]
         end
 
         #=
@@ -150,26 +142,20 @@ function step!(integrator::LobattoIII3AIntegrator)
         end
         =#
 
-        objective_function! = (residual, implicit_stage) -> stage_residual!(residual, implicit_stage, integrator, prob, alg)
-
         @trixi_timeit timer() "nlsolve + update" begin
-          sol = nlsolve(objective_function!, integrator.u; inplace = true) # TODO: Advanced initialization instead of u?
+            #u0 = copy(integrator.u)
+            # TODO: Sparsity structure & coloring vector of the Jacobian
+            #nonlinear_eq = NonlinearProblem{true, SciMLBase.FullSpecialize}(stage_residual!, integrator.k_nonlinear, (integrator,))
+            nonlinear_eq = NonlinearProblem{true}(stage_residual!,
+                                                  integrator.k_nonlinear, (integrator,))
 
-          #=
-          #nonlinear_eq = NonlinearProblem{true, SciMLBase.FullSpecialize}(stage_residual!, integrator.u, integrator)
-          p = (prob = prob, alg = alg, dt = integrator.dt,
-              t = integrator.t, u = integrator.u, du = integrator.du,
-              u_tmp = integrator.u_tmp)
+            sol = SciMLBase.solve(nonlinear_eq,
+                                  NewtonRaphson(autodiff = AutoFiniteDiff()))
 
-          nonlinear_eq = NonlinearProblem(stage_residual!, integrator.u, p)
-          print(nonlinear_eq)
-
-          sol = solve(nonlinear_eq, NewtonRaphson());
-          =#
-
-          @threaded for i in eachindex(integrator.du)
-              integrator.u[i] = integrator.u[i] + b_dt * sol.zero[i]
-          end
+            @threaded for i in eachindex(integrator.du)
+                #integrator.u[i] = integrator.u[i] + b_dt * integrator.k_nonlinear[i]
+                integrator.u[i] = integrator.u[i] + b_dt * sol.u[i]
+            end
         end
     end
 
