@@ -15,8 +15,8 @@ Composed of the implicit and explicit midpoint rules.
 """
 struct IMEX_Midpoint_Midpoint <: AbstractIMEXAlgorithm
     # Reduced matrices: Do not store first row full of zeros
-    A_im::SMatrix{1, 2, Float64} # Implicit (Lobatto IIIA) part
-    A_ex::SMatrix{1, 2, Float64} # Explicit (Heun) part
+    A_im::SMatrix{1, 2, Float64} # Implicit midpoint part
+    A_ex::SMatrix{1, 2, Float64} # Explicit midpoint part
     b::SVector{2, Float64}
     c::SVector{2, Float64}
 
@@ -52,7 +52,7 @@ mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, 
     finalstep::Bool # added for convenience
 
     # For nonlinear solve
-    k_nonlinear::uType
+    k_nonlin::uType
 
     # TODO: Try using NonlinearFunction as integrator field with iip & specialize, see 
     # https://docs.sciml.ai/NonlinearSolve/stable/basics/nonlinear_functions/#SciMLBase.NonlinearFunction
@@ -61,8 +61,8 @@ mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, 
     # or try to get the sparsity detector from "SparseConnectivityTracer.jl" to work
 
     # For split problems solved with IMEX methods
-    du_tmp::uType # Additional storage for the split-part of the rhs! function
-    u_tmp2::uType # Additional storage for the intermediate u approximation
+    du_para::uType # Additional storage for the split-part of the rhs! function
+    u_nonlin::uType # Additional storage for the intermediate u approximation
 end
 
 function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
@@ -70,10 +70,10 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     u = copy(ode.u0)
     du = zero(u)
     u_tmp = zero(u)
-    du_tmp = zero(u)
+    du_para = zero(u)
 
-    k_nonlinear = zero(u)
-    u_tmp2 = zero(u)
+    k_nonlin = zero(u)
+    u_nonlin = zero(u)
 
     t = first(ode.tspan)
     iter = 0
@@ -84,7 +84,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
                                             SimpleIntegratorOptions(callback,
                                                                     ode.tspan;
                                                                     kwargs...), false,
-                                            k_nonlinear, du_tmp, u_tmp2)
+                                            k_nonlin, du_para, u_nonlin)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -100,17 +100,17 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
 end
 
 function stage_residual_midpoint!(residual, implicit_stage, p)
-    @unpack alg, dt, t, u_tmp, u_tmp2, u, du, semi, f1 = p
+    @unpack alg, dt, t, u_tmp, u_nonlin, u, du_para, semi, f1 = p
 
     a_dt = alg.A_im[1, 2] * dt
     @threaded for i in eachindex(u_tmp)
         # Hard-coded for IMEX midpoint method
-        u_tmp2[i] = u_tmp[i] + a_dt * implicit_stage[i]
+        u_nonlin[i] = u_tmp[i] + a_dt * implicit_stage[i]
     end
-    f1(du, u_tmp2, semi, t + alg.c[2] * dt)
+    f1(du_para, u_nonlin, semi, t + alg.c[2] * dt)
 
     @threaded for i in eachindex(residual)
-        residual[i] = implicit_stage[i] - du[i]
+        residual[i] = implicit_stage[i] - du_para[i]
     end
 
     return nothing
@@ -137,29 +137,29 @@ function step!(integrator::MidpointMidpointIntegrator)
     @trixi_timeit timer() "MidpointMidpointIntegrator ODE integration step" begin
         ### First stage ###
         # f1(u) not needed, can skip computation
-        integrator.f.f2(integrator.du_tmp, integrator.u, prob.p, integrator.t) # Hyperbolic part
+        integrator.f.f2(integrator.du, integrator.u, prob.p, integrator.t) # Hyperbolic part
 
         ### Second stage: Split into implicit and explicit solves ###
 
         # Build intermediate stage for implicit step: Explicit contributions
         a_dt = alg.A_ex[1, 1] * integrator.dt
         @threaded for i in eachindex(integrator.u_tmp)
-            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.du_tmp[i]
+            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.du[i]
         end
 
         # Set initial guess for nonlinear solve
         @threaded for i in eachindex(integrator.u)
-            integrator.k_nonlinear[i] = integrator.u[i]
+            integrator.k_nonlin[i] = integrator.u[i]
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
-                 u_tmp = integrator.u_tmp, u_tmp2 = integrator.u_tmp2,
-                 u = integrator.u, du = integrator.du,
+                 u_tmp = integrator.u_tmp, u_nonlin = integrator.u_nonlin,
+                 u = integrator.u, du_para = integrator.du_para,
                  semi = prob.p, f1 = integrator.f.f1)
 
             nonlinear_eq = NonlinearProblem{true}(stage_residual_midpoint!,
-                                                  integrator.k_nonlinear, p)
+                                                  integrator.k_nonlin, p)
 
             SciMLBase.solve(nonlinear_eq,
                             NewtonRaphson(autodiff = AutoFiniteDiff()),
@@ -170,18 +170,18 @@ function step!(integrator::MidpointMidpointIntegrator)
         # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
         a_dt = alg.A_im[1, 2] * integrator.dt
         @threaded for i in eachindex(integrator.u_tmp)
-            integrator.u_tmp[i] = integrator.u_tmp[i] + a_dt * integrator.k_nonlinear[i]
+            integrator.u_tmp[i] = integrator.u_tmp[i] + a_dt * integrator.k_nonlin[i]
         end
 
         # Compute the explicit part of the second stage
-        integrator.f.f2(integrator.du_tmp, integrator.u_tmp, prob.p,
+        integrator.f.f2(integrator.du, integrator.u_tmp, prob.p,
                         integrator.t + alg.c[2] * integrator.dt)
 
         ### Final update ###
         b_dt = alg.b[2] * integrator.dt
-        @threaded for i in eachindex(integrator.du_tmp)
+        @threaded for i in eachindex(integrator.du)
             integrator.u[i] = integrator.u[i] +
-                              b_dt * (integrator.k_nonlinear[i] + integrator.du_tmp[i])
+                              b_dt * (integrator.k_nonlin[i] + integrator.du[i])
         end
     end
 
@@ -225,8 +225,9 @@ function Base.resize!(integrator::MidpointMidpointIntegrator, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
     # For nonlinear solve
-    resize!(integrator.k_nonlinear, new_size)
+    resize!(integrator.k_nonlin, new_size)
     # For split problems
-    resize!(integrator.du_tmp, new_size)
+    resize!(integrator.du_para, new_size)
+    resize!(integrator.u_nonlin, new_size)
 end
 end # @muladd
