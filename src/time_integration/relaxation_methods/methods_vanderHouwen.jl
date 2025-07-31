@@ -30,7 +30,7 @@ Currently implemented methods are the Carpenter-Kennedy-Lewis 4-stage, 3rd-order
 and the Carpenter-Kennedy-Lewis 5-stage, 4th-order method [`CKL54`](@ref) which are optimized for the 
 compressible Navier-Stokes equations.
 """
-abstract type vanderHouwenAlgorithm end
+abstract type vanderHouwenAlgorithm <: AbstractTimeIntegrationAlgorithm end
 
 """
     vanderHouwenRelaxationAlgorithm
@@ -53,7 +53,7 @@ Currently implemented methods are the Carpenter-Kennedy-Lewis 4-stage, 3rd-order
 and the Carpenter-Kennedy-Lewis 5-stage, 4th-order method [`RelaxationCKL54`](@ref) which are optimized for the 
 compressible Navier-Stokes equations.
 """
-abstract type vanderHouwenRelaxationAlgorithm end
+abstract type vanderHouwenRelaxationAlgorithm <: AbstractRelaxationTimeIntegrationAlgorithm end
 
 """
     CKL43()
