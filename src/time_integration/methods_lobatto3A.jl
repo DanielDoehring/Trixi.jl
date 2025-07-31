@@ -36,7 +36,7 @@ struct LobattoIIIA_p2 <: AbstractLobattoRKAlgorithm
     end
 end
 
-# For PERK3 if works
+# For PERK3 if IMEX-PERK works
 """
     LobattoIIIA_p4()
 
