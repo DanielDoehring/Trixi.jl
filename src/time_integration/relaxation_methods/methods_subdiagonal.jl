@@ -51,7 +51,8 @@ For details on the relaxation procedure, see
 Currently implemented are the third-order, three-stage method by Ralston [`Ralston3`](@ref) 
 and the canonical fourth-order, four-stage method by Kutta [`RK44`](@ref).
 """
-abstract type SubDiagonalRelaxationAlgorithm <: AbstractRelaxationTimeIntegrationAlgorithm end
+abstract type SubDiagonalRelaxationAlgorithm <:
+              AbstractRelaxationTimeIntegrationAlgorithm end
 
 """
     Ralston3()
