@@ -7,12 +7,19 @@
 
 using NonlinearSolve
 
+# Advanced packages
+#using SparseConnectivityTracer
+#using LinearSolve # for KrylovJL_GMRES
+
 # Abstract base type for time integration schemes of storage class `2N`
 abstract type AbstractLobattoRKAlgorithm <: AbstractTimeIntegrationAlgorithm end
 
 """
     LobattoIIIA_p2()
 
+Two-stage, second-order Lobatto IIIA (diagonally-)implicit Runge-Kutta method.
+Equivalent to trapezoidal rule/Crank-Nicolson scheme.
+A-stable, but neither L-stable or B-stable.
 See https://en.wikipedia.org/wiki/List_of_Runge%E2%80%93Kutta_methods#Lobatto_IIIA_methods
 """
 struct LobattoIIIA_p2 <: AbstractLobattoRKAlgorithm
@@ -51,6 +58,12 @@ mutable struct LobattoIII3AIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
 
     # For nonlinear solve
     k_nonlinear::uType
+
+    # TODO: Try using NonlinearFunction as integrator field with iip & specialize, see 
+    # https://docs.sciml.ai/NonlinearSolve/stable/basics/nonlinear_functions/#SciMLBase.NonlinearFunction
+    #
+    # then, one can also supply sparsity structure and coloring vector of the Jacobian
+    # or try to get the sparsity detector from "SparseConnectivityTracer.jl" to work
 end
 
 function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
@@ -63,6 +76,7 @@ function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
 
     t = first(ode.tspan)
     iter = 0
+
     integrator = LobattoIII3AIntegrator(u, du, u_tmp,
                                         t, dt, zero(dt), iter,
                                         ode.p, (prob = ode,), ode.f, alg,
@@ -84,19 +98,16 @@ function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
 end
 
 function stage_residual!(residual, implicit_stage, p)
-    integrator = p[1]
-    @unpack prob = integrator.sol
-    @unpack alg = integrator
+    @unpack alg, dt, t, u_tmp, u, du, semi, f = p
 
-    a_dt = alg.A[1, 2] * integrator.dt
-    @threaded for i in eachindex(integrator.u_tmp)
-        integrator.u_tmp[i] = integrator.u[i] + a_dt * implicit_stage[i]
+    a_dt = alg.A[1, 2] * dt
+    @threaded for i in eachindex(u_tmp)
+        u_tmp[i] = u[i] + a_dt * implicit_stage[i]
     end
-    integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                 integrator.t + alg.c[2] * integrator.dt)
+    f(du, u_tmp, semi, t + alg.c[2] * dt)
 
     @threaded for i in eachindex(residual)
-        residual[i] = implicit_stage[i] - integrator.du[i]
+        residual[i] = implicit_stage[i] - du[i]
     end
 
     return nothing
@@ -127,7 +138,7 @@ function step!(integrator::LobattoIII3AIntegrator)
         b_dt = alg.b[1] * integrator.dt
         @threaded for i in eachindex(integrator.du)
             integrator.u[i] = integrator.u[i] + b_dt * integrator.du[i]
-            integrator.k_nonlinear[i] = integrator.u[i]
+            integrator.k_nonlinear[i] = integrator.u[i] # Set initial guess for nonlinear solve
         end
 
         #=
@@ -142,19 +153,21 @@ function step!(integrator::LobattoIII3AIntegrator)
         end
         =#
 
-        @trixi_timeit timer() "nlsolve + update" begin
-            #u0 = copy(integrator.u)
-            # TODO: Sparsity structure & coloring vector of the Jacobian
-            #nonlinear_eq = NonlinearProblem{true, SciMLBase.FullSpecialize}(stage_residual!, integrator.k_nonlinear, (integrator,))
-            nonlinear_eq = NonlinearProblem{true}(stage_residual!,
-                                                  integrator.k_nonlinear, (integrator,))
+        @trixi_timeit timer() "nonlinear solve + update" begin
+            p = (alg = alg, dt = integrator.dt, t = integrator.t,
+                 u_tmp = integrator.u_tmp, u = integrator.u, du = integrator.du,
+                 semi = prob.p, f = integrator.f)
 
-            sol = SciMLBase.solve(nonlinear_eq,
-                                  NewtonRaphson(autodiff = AutoFiniteDiff()))
+            nonlinear_eq = NonlinearProblem{true}(stage_residual!,
+                                                  integrator.k_nonlinear, p)
+
+            SciMLBase.solve(nonlinear_eq,
+                            NewtonRaphson(autodiff = AutoFiniteDiff()),
+                            #NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
+                            alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
 
             @threaded for i in eachindex(integrator.du)
-                #integrator.u[i] = integrator.u[i] + b_dt * integrator.k_nonlinear[i]
-                integrator.u[i] = integrator.u[i] + b_dt * sol.u[i]
+                integrator.u[i] = integrator.u[i] + b_dt * integrator.k_nonlinear[i]
             end
         end
     end
@@ -198,6 +211,7 @@ function Base.resize!(integrator::LobattoIII3AIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
-    # TODO
+    # For nonlinear solve
+    resize!(integrator.k_nonlinear, new_size)
 end
 end # @muladd
