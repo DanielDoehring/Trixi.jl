@@ -72,6 +72,8 @@ mutable struct LobattoIII3Ap2HeunIntegrator{RealT <: Real, uType, Params, Sol, F
 
     # For split problems
     du_tmp::uType # Additional storage for the split-part of the rhs! function
+    u_tmp2::uType # Additional storage for the intermediate u approximation
+    k1::uType # Naive implementation: add register for k1
 end
 
 function init(ode::ODEProblem, alg::LobattoIIIA_p2_Heun;
@@ -82,6 +84,8 @@ function init(ode::ODEProblem, alg::LobattoIIIA_p2_Heun;
     du_tmp = zero(u)
 
     k_nonlinear = zero(u)
+    u_tmp2 = zero(u)
+    k1 = zero(u)
 
     t = first(ode.tspan)
     iter = 0
@@ -92,7 +96,7 @@ function init(ode::ODEProblem, alg::LobattoIIIA_p2_Heun;
                                               SimpleIntegratorOptions(callback,
                                                                       ode.tspan;
                                                                       kwargs...), false,
-                                              k_nonlinear, du_tmp)
+                                              k_nonlinear, du_tmp, u_tmp2, k1)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -107,14 +111,14 @@ function init(ode::ODEProblem, alg::LobattoIIIA_p2_Heun;
     return integrator
 end
 
-function stage_residual_imex!(residual, implicit_stage, p)
-    @unpack alg, dt, t, u_tmp, u, du, semi, f1 = p
+function stage_residual_Lobatto3Ap2Heun!(residual, implicit_stage, p)
+    @unpack alg, dt, t, u_tmp, u_tmp2, u, du, semi, f1 = p
 
     a_dt = alg.A_im[1, 2] * dt
     @threaded for i in eachindex(u_tmp)
-        u_tmp[i] = u[i] + a_dt * implicit_stage[i]
+        u_tmp2[i] = u_tmp[i] + a_dt * implicit_stage[i]
     end
-    f1(du, u_tmp, semi, t + alg.c[2] * dt)
+    f1(du, u_tmp2, semi, t + alg.c[2] * dt)
 
     @threaded for i in eachindex(residual)
         residual[i] = implicit_stage[i] - du[i]
@@ -142,26 +146,29 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
     end
 
     @trixi_timeit timer() "LobattoIII3Ap2HeunIntegrator ODE integration step" begin
-        # First stage for Lobatto type IIIA methods:
+        ### First stage ###
         integrator.f.f1(integrator.du, integrator.u, prob.p, integrator.t) # Parabolic part
         integrator.f.f2(integrator.du_tmp, integrator.u, prob.p, integrator.t) # Hyperbolic part
 
-        b_dt = alg.b[1] * integrator.dt
-        @threaded for i in eachindex(integrator.du)
-            # Build overall update for first stage
-            integrator.du[i] = integrator.du[i] + integrator.du_tmp[i]
-            # Update u and start building intermediate solution (utilize that A_im[1, 2] = b[1])
-            integrator.u[i] = integrator.u[i] + b_dt * integrator.du[i]
-            integrator.k_nonlinear[i] = integrator.u[i] # Set initial guess for nonlinear solve
+        ### Second stage: Split into implicit and explicit solves ###
+
+        # Build intermediate stage for implicit step: Explicit contributions
+        a_ex_dt = alg.A_ex[1, 1] * integrator.dt
+        a_im_dt = alg.A_im[1, 1] * integrator.dt
+        @threaded for i in eachindex(integrator.u_tmp)
+            integrator.u_tmp[i] = integrator.u[i] + a_ex_dt * integrator.du_tmp[i] +
+                                  a_im_dt * integrator.du[i]
+            # Store for final update
+            integrator.k1[i] = integrator.du[i] + integrator.du_tmp[i]
         end
 
-        # Second stage: Split into implicit and explicit solves
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
-                 u_tmp = integrator.u_tmp, u = integrator.u, du = integrator.du,
+                 u_tmp = integrator.u_tmp, u_tmp2 = integrator.u_tmp2,
+                 u = integrator.u, du = integrator.du,
                  semi = prob.p, f1 = integrator.f.f1)
 
-            nonlinear_eq = NonlinearProblem{true}(stage_residual_imex!,
+            nonlinear_eq = NonlinearProblem{true}(stage_residual_Lobatto3Ap2Heun!,
                                                   integrator.k_nonlinear, p)
 
             SciMLBase.solve(nonlinear_eq,
@@ -170,22 +177,23 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
                             alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
 
-        # Hyperbolic part is done explicitly
-
-        # Build intermediate stage for Heun's method
-        a_dt = 0.5 * integrator.dt # = (alg.A_ex[1, 1] - alg.b[1]) * integrator.dt
+        # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
+        a_im_dt = alg.A_im[1, 2] * integrator.dt
         @threaded for i in eachindex(integrator.u_tmp)
-            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.du[i]
+            integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                  a_im_dt * integrator.k_nonlinear[i]
         end
 
         # Compute the explicit part of the second stage
         integrator.f.f2(integrator.du_tmp, integrator.u_tmp, prob.p,
                         integrator.t + alg.c[2] * integrator.dt)
 
-        # Do overall update
+        ### Final update ###
+        b_dt = alg.b[2] * integrator.dt # = alg.b[1] * integrator.dt
         @threaded for i in eachindex(integrator.du_tmp)
             integrator.u[i] = integrator.u[i] +
-                              b_dt * (integrator.k_nonlinear[i] + integrator.du_tmp[i])
+                              b_dt * (integrator.k1[i] + integrator.k_nonlinear[i] +
+                               integrator.du_tmp[i])
         end
     end
 

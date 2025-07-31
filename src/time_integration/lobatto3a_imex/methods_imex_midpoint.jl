@@ -70,8 +70,9 @@ mutable struct MidpointIMEXIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
     # then, one can also supply sparsity structure and coloring vector of the Jacobian
     # or try to get the sparsity detector from "SparseConnectivityTracer.jl" to work
 
-    # For split problems
+    # For split problems solved with IMEX methods
     du_tmp::uType # Additional storage for the split-part of the rhs! function
+    u_tmp2::uType # Additional storage for the intermediate u approximation
 end
 
 function init(ode::ODEProblem, alg::Midpoint_IMEX;
@@ -82,6 +83,7 @@ function init(ode::ODEProblem, alg::Midpoint_IMEX;
     du_tmp = zero(u)
 
     k_nonlinear = zero(u)
+    u_tmp2 = zero(u)
 
     t = first(ode.tspan)
     iter = 0
@@ -92,7 +94,7 @@ function init(ode::ODEProblem, alg::Midpoint_IMEX;
                                         SimpleIntegratorOptions(callback,
                                                                 ode.tspan;
                                                                 kwargs...), false,
-                                        k_nonlinear, du_tmp)
+                                        k_nonlinear, du_tmp, u_tmp2)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -108,9 +110,7 @@ function init(ode::ODEProblem, alg::Midpoint_IMEX;
 end
 
 function stage_residual_midpoint!(residual, implicit_stage, p)
-    @unpack alg, dt, t, u_tmp, u, du, semi, f1 = p
-
-    u_tmp2 = copy(u_tmp)
+    @unpack alg, dt, t, u_tmp, u_tmp2, u, du, semi, f1 = p
 
     a_dt = alg.A_im[1, 2] * dt
     @threaded for i in eachindex(u_tmp)
@@ -145,13 +145,11 @@ function step!(integrator::MidpointIMEXIntegrator)
     end
 
     @trixi_timeit timer() "MidpointIMEXIntegrator ODE integration step" begin
-        # First stage
+        ### First stage ###
         # f1(u) not needed, can skip computation
         integrator.f.f2(integrator.du_tmp, integrator.u, prob.p, integrator.t) # Hyperbolic part
 
-        # Second stage: Split into implicit and explicit solves
-
-        # Hyperbolic part is done explicitly
+        ### Second stage: Split into implicit and explicit solves ###
 
         # Build intermediate stage for implicit step: Explicit contributions
         a_dt = alg.A_ex[1, 1] * integrator.dt
@@ -166,7 +164,8 @@ function step!(integrator::MidpointIMEXIntegrator)
 
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
-                 u_tmp = integrator.u_tmp, u = integrator.u, du = integrator.du,
+                 u_tmp = integrator.u_tmp, u_tmp2 = integrator.u_tmp2,
+                 u = integrator.u, du = integrator.du,
                  semi = prob.p, f1 = integrator.f.f1)
 
             nonlinear_eq = NonlinearProblem{true}(stage_residual_midpoint!,
@@ -178,17 +177,17 @@ function step!(integrator::MidpointIMEXIntegrator)
                             alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
 
-        # Compute the intermediate approximation: Take the implicit solution into account
+        # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
         a_dt = alg.A_im[1, 2] * integrator.dt
         @threaded for i in eachindex(integrator.u_tmp)
             integrator.u_tmp[i] = integrator.u_tmp[i] + a_dt * integrator.k_nonlinear[i]
         end
 
-        # Perform "explicit" step
+        # Compute the explicit part of the second stage
         integrator.f.f2(integrator.du_tmp, integrator.u_tmp, prob.p,
                         integrator.t + alg.c[2] * integrator.dt)
 
-        # Do overall update
+        ### Final update ###
         b_dt = alg.b[2] * integrator.dt
         @threaded for i in eachindex(integrator.du_tmp)
             integrator.u[i] = integrator.u[i] +
