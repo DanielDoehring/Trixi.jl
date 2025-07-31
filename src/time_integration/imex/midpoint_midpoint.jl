@@ -5,14 +5,6 @@
 @muladd begin
 #! format: noindent
 
-using NonlinearSolve
-
-# Advanced packages
-#using SparseConnectivityTracer
-#using LinearSolve # for KrylovJL_GMRES
-
-abstract type AbstractIMEXAlgorithm <: AbstractTimeIntegrationAlgorithm end
-
 """
     IMEX_Midpoint_Midpoint()
 
@@ -38,15 +30,13 @@ struct IMEX_Midpoint_Midpoint <: AbstractIMEXAlgorithm
     end
 end
 
-abstract type AbstracIMEXTimeIntegrator <: AbstractTimeIntegrator end
-
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct MidpointIMEXIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
-                                      SimpleIntegratorOptions} <:
-               AbstracIMEXTimeIntegrator
+mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
+                                          SimpleIntegratorOptions} <:
+               AbstractIMEXTimeIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -88,13 +78,13 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     t = first(ode.tspan)
     iter = 0
 
-    integrator = MidpointIMEXIntegrator(u, du, u_tmp,
-                                        t, dt, zero(dt), iter,
-                                        ode.p, (prob = ode,), ode.f, alg,
-                                        SimpleIntegratorOptions(callback,
-                                                                ode.tspan;
-                                                                kwargs...), false,
-                                        k_nonlinear, du_tmp, u_tmp2)
+    integrator = MidpointMidpointIntegrator(u, du, u_tmp,
+                                            t, dt, zero(dt), iter,
+                                            ode.p, (prob = ode,), ode.f, alg,
+                                            SimpleIntegratorOptions(callback,
+                                                                    ode.tspan;
+                                                                    kwargs...), false,
+                                            k_nonlinear, du_tmp, u_tmp2)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -126,7 +116,7 @@ function stage_residual_midpoint!(residual, implicit_stage, p)
     return nothing
 end
 
-function step!(integrator::MidpointIMEXIntegrator)
+function step!(integrator::MidpointMidpointIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -144,7 +134,7 @@ function step!(integrator::MidpointIMEXIntegrator)
         terminate!(integrator)
     end
 
-    @trixi_timeit timer() "MidpointIMEXIntegrator ODE integration step" begin
+    @trixi_timeit timer() "MidpointMidpointIntegrator ODE integration step" begin
         ### First stage ###
         # f1(u) not needed, can skip computation
         integrator.f.f2(integrator.du_tmp, integrator.u, prob.p, integrator.t) # Hyperbolic part
@@ -218,19 +208,19 @@ function step!(integrator::MidpointIMEXIntegrator)
 end
 
 # get a cache where the RHS can be stored
-get_tmp_cache(integrator::MidpointIMEXIntegrator) = (integrator.u_tmp,)
+get_tmp_cache(integrator::MidpointMidpointIntegrator) = (integrator.u_tmp,)
 
 # some algorithms from DiffEq like FSAL-ones need to be informed when a callback has modified u
-u_modified!(integrator::MidpointIMEXIntegrator, ::Bool) = false
+u_modified!(integrator::MidpointMidpointIntegrator, ::Bool) = false
 
 # stop the time integration
-function terminate!(integrator::MidpointIMEXIntegrator)
+function terminate!(integrator::MidpointMidpointIntegrator)
     integrator.finalstep = true
     empty!(integrator.opts.tstops)
 end
 
 # used for AMR
-function Base.resize!(integrator::MidpointIMEXIntegrator, new_size)
+function Base.resize!(integrator::MidpointMidpointIntegrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)

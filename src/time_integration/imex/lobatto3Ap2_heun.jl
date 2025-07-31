@@ -5,30 +5,22 @@
 @muladd begin
 #! format: noindent
 
-using NonlinearSolve
-
-# Advanced packages
-#using SparseConnectivityTracer
-#using LinearSolve # for KrylovJL_GMRES
-
-abstract type AbstractLobattoRKIMEXAlgorithm <: AbstractTimeIntegrationAlgorithm end
-
 """
-    IMEX_LobattoIIIA_p2_Heun()
+    IMEX_LobattoIIIAp2_Heun()
 
 Two-stage, second-order Implicit-Explicit (IMEX) Runge-Kutta method.
 Composed of the Lobatto IIIA (diagonally-)implicit Runge-Kutta method and Heun's method.
 
 # TODO: Link to IMEX papers by Ascher
 """
-struct IMEX_LobattoIIIA_p2_Heun <: AbstractLobattoRKIMEXAlgorithm
+struct IMEX_LobattoIIIAp2_Heun <: AbstractIMEXAlgorithm
     # Reduced matrices: Do not store first row full of zeros
     A_im::SMatrix{1, 2, Float64} # Implicit (Lobatto IIIA) part
     A_ex::SMatrix{1, 2, Float64} # Explicit (Heun) part
     b::SVector{2, Float64}
     c::SVector{2, Float64}
 
-    function IMEX_LobattoIIIA_p2_Heun()
+    function IMEX_LobattoIIIAp2_Heun()
         A_im = SMatrix{1, 2}(0.5, 0.5)
         A_ex = SMatrix{1, 2}(1.0, 0.0)
         b = SVector(0.5, 0.5)
@@ -38,15 +30,13 @@ struct IMEX_LobattoIIIA_p2_Heun <: AbstractLobattoRKIMEXAlgorithm
     end
 end
 
-abstract type AbstractLobatto3AIMEXTimeIntegrator <: AbstractTimeIntegrator end
-
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
 mutable struct LobattoIII3Ap2HeunIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                             SimpleIntegratorOptions} <:
-               AbstractLobatto3AIMEXTimeIntegrator
+               AbstractIMEXTimeIntegrator
     u::uType
     du::uType
     u_tmp::uType
@@ -76,7 +66,7 @@ mutable struct LobattoIII3Ap2HeunIntegrator{RealT <: Real, uType, Params, Sol, F
     k1::uType # Naive implementation: add register for k1
 end
 
-function init(ode::ODEProblem, alg::IMEX_LobattoIIIA_p2_Heun;
+function init(ode::ODEProblem, alg::IMEX_LobattoIIIAp2_Heun;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u = copy(ode.u0)
     du = zero(u)
