@@ -3,12 +3,12 @@ using Trixi
 ###############################################################################
 # semidiscretization of the linear advection diffusion equation
 
-advection_velocity = 0.01
+advection_velocity = 0.05
 equations = LinearScalarAdvectionEquation1D(advection_velocity)
-diffusivity() = 0.5
+diffusivity() = 0.05
 equations_parabolic = LaplaceDiffusion1D(diffusivity(), equations)
 
-solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
+solver = DGSEM(polydeg = 5, surface_flux = flux_lax_friedrichs)
 
 coordinates_min = -convert(Float64, pi)
 coordinates_max = convert(Float64, pi)
@@ -50,8 +50,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-# Create ODE problem with time span from 0.0 to 1.0
-tspan = (0.0, 5.0)
+tspan = (0.0, 10.0)
 ode = semidiscretize(semi, tspan, split_problem = true)
 
 summary_callback = SummaryCallback()
@@ -62,6 +61,8 @@ callbacks = CallbackSet(summary_callback, analysis_callback)
 ###############################################################################
 # run the simulation
 
-ode_alg = Trixi.LobattoIIIA_p2_Heun()
-sol = Trixi.solve(ode, ode_alg, dt = 0.3,
+#ode_alg = Trixi.LobattoIIIA_p2_Heun() # Seems not to converge with second order
+ode_alg = Trixi.Midpoint_IMEX() # Seems not to converge with second order
+
+sol = Trixi.solve(ode, ode_alg, dt = 2.0,
                   save_everystep = false, callback = callbacks);
