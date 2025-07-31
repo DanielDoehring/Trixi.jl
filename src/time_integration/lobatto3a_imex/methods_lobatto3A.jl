@@ -11,7 +11,6 @@ using NonlinearSolve
 #using SparseConnectivityTracer
 #using LinearSolve # for KrylovJL_GMRES
 
-# Abstract base type for time integration schemes of storage class `2N`
 abstract type AbstractLobattoRKAlgorithm <: AbstractTimeIntegrationAlgorithm end
 
 """
@@ -66,7 +65,7 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct LobattoIII3AIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
+mutable struct LobattoIII3Ap2Integrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                       SimpleIntegratorOptions} <: AbstractTimeIntegrator
     u::uType
     du::uType
@@ -92,7 +91,7 @@ mutable struct LobattoIII3AIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
     # or try to get the sparsity detector from "SparseConnectivityTracer.jl" to work
 end
 
-function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
+function init(ode::ODEProblem, alg::LobattoIIIA_p2;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u = copy(ode.u0)
     du = zero(u)
@@ -103,7 +102,7 @@ function init(ode::ODEProblem, alg::AbstractLobattoRKAlgorithm;
     t = first(ode.tspan)
     iter = 0
 
-    integrator = LobattoIII3AIntegrator(u, du, u_tmp,
+    integrator = LobattoIII3Ap2Integrator(u, du, u_tmp,
                                         t, dt, zero(dt), iter,
                                         ode.p, (prob = ode,), ode.f, alg,
                                         SimpleIntegratorOptions(callback, ode.tspan;
@@ -139,7 +138,7 @@ function stage_residual!(residual, implicit_stage, p)
     return nothing
 end
 
-function step!(integrator::LobattoIII3AIntegrator)
+function step!(integrator::LobattoIII3Ap2Integrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -157,7 +156,7 @@ function step!(integrator::LobattoIII3AIntegrator)
         terminate!(integrator)
     end
 
-    @trixi_timeit timer() "LobattoIII3AIntegrator ODE integration step" begin
+    @trixi_timeit timer() "LobattoIII3Ap2Integrator ODE integration step" begin
         # First without splitting of f:
         integrator.f(integrator.du, integrator.u, prob.p, integrator.t)
 
@@ -221,19 +220,19 @@ function step!(integrator::LobattoIII3AIntegrator)
 end
 
 # get a cache where the RHS can be stored
-get_tmp_cache(integrator::LobattoIII3AIntegrator) = (integrator.u_tmp,)
+get_tmp_cache(integrator::LobattoIII3Ap2Integrator) = (integrator.u_tmp,)
 
 # some algorithms from DiffEq like FSAL-ones need to be informed when a callback has modified u
-u_modified!(integrator::LobattoIII3AIntegrator, ::Bool) = false
+u_modified!(integrator::LobattoIII3Ap2Integrator, ::Bool) = false
 
 # stop the time integration
-function terminate!(integrator::LobattoIII3AIntegrator)
+function terminate!(integrator::LobattoIII3Ap2Integrator)
     integrator.finalstep = true
     empty!(integrator.opts.tstops)
 end
 
 # used for AMR
-function Base.resize!(integrator::LobattoIII3AIntegrator, new_size)
+function Base.resize!(integrator::LobattoIII3Ap2Integrator, new_size)
     resize!(integrator.u, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp, new_size)
