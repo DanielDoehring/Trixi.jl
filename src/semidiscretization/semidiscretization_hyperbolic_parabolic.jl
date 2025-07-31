@@ -454,7 +454,9 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
         rhs_parabolic!(du_ode, u_ode, semi, t)
 
         @threaded for i in eachindex(du_ode)
-            du_ode[i] += integrator.du_tmp[i]
+            # Try to enable optimizations due to `muladd` by avoiding `+=`
+            # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
+            du_ode[i] = du_ode[i] + integrator.du_tmp[i]
         end
     end
 end
@@ -469,7 +471,9 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
         rhs_parabolic!(du_ode, u_ode, semi, t)
 
         @threaded for i in eachindex(du_ode)
-            du_ode[i] += du_tmp[i]
+            # Try to enable optimizations due to `muladd` by avoiding `+=`
+            # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
+            du_ode[i] = du_ode[i] + du_tmp[i]
         end
     end
 end
@@ -492,7 +496,9 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
 
         for level in 1:max_level
             @threaded for i in u_indices[level]
-                du_ode[i] += du_tmp[i]
+                # Try to enable optimizations due to `muladd` by avoiding `+=`
+                # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
+                du_ode[i] = du_ode[i] + du_tmp[i]
             end
         end
     end

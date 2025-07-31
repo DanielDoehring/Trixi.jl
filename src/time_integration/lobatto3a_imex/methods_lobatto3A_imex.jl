@@ -108,16 +108,16 @@ function init(ode::ODEProblem, alg::LobattoIIIA_p2_Heun;
 end
 
 function stage_residual_imex!(residual, implicit_stage, p)
-    @unpack alg, dt, t, u_tmp, u, du_tmp, semi, f1 = p
+    @unpack alg, dt, t, u_tmp, u, du, semi, f1 = p
 
     a_dt = alg.A_im[1, 2] * dt
     @threaded for i in eachindex(u_tmp)
         u_tmp[i] = u[i] + a_dt * implicit_stage[i]
     end
-    f1(du_tmp, u_tmp, semi, t + alg.c[2] * dt)
+    f1(du, u_tmp, semi, t + alg.c[2] * dt)
 
     @threaded for i in eachindex(residual)
-        residual[i] = implicit_stage[i] - du_tmp[i]
+        residual[i] = implicit_stage[i] - du[i]
     end
 
     return nothing
@@ -155,22 +155,10 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
             integrator.k_nonlinear[i] = integrator.u[i] # Set initial guess for nonlinear solve
         end
 
-        # Hyperbolic part is done explicitly
-
-        # Build intermediate stage for Heun's method
-        #a_dt = (alg.A_ex[1, 1] - alg.b[1]) * integrator.dt
-        a_dt = 0.5 * integrator.dt
-        @threaded for i in eachindex(integrator.u_tmp)
-            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.du[i]
-        end
-        # Compute the explicit part of the second stage
-        integrator.f.f2(integrator.du, integrator.u_tmp, prob.p,
-                        integrator.t + alg.c[2] * integrator.dt)
-
         # Second stage: Split into implicit and explicit solves
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
-                 u_tmp = integrator.u_tmp, u = integrator.u, du_tmp = integrator.du_tmp,
+                 u_tmp = integrator.u_tmp, u = integrator.u, du = integrator.du,
                  semi = prob.p, f1 = integrator.f.f1)
 
             nonlinear_eq = NonlinearProblem{true}(stage_residual_imex!,
@@ -182,10 +170,22 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
                             alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
 
+        # Hyperbolic part is done explicitly
+
+        # Build intermediate stage for Heun's method
+        a_dt = 0.5 * integrator.dt # = (alg.A_ex[1, 1] - alg.b[1]) * integrator.dt
+        @threaded for i in eachindex(integrator.u_tmp)
+            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.du[i]
+        end
+
+        # Compute the explicit part of the second stage
+        integrator.f.f2(integrator.du_tmp, integrator.u_tmp, prob.p,
+                        integrator.t + alg.c[2] * integrator.dt)
+
         # Do overall update
-        @threaded for i in eachindex(integrator.du)
+        @threaded for i in eachindex(integrator.du_tmp)
             integrator.u[i] = integrator.u[i] +
-                              b_dt * (integrator.k_nonlinear[i] + integrator.du[i])
+                              b_dt * (integrator.k_nonlinear[i] + integrator.du_tmp[i])
         end
     end
 

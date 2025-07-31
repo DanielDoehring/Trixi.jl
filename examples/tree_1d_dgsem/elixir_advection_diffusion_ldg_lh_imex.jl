@@ -63,5 +63,5 @@ callbacks = CallbackSet(summary_callback, analysis_callback)
 # run the simulation
 
 ode_alg = Trixi.LobattoIIIA_p2_Heun()
-sol = Trixi.solve(ode, ode_alg, dt = 0.1/2,
+sol = Trixi.solve(ode, ode_alg, dt = 0.3,
                   save_everystep = false, callback = callbacks);
