@@ -124,9 +124,9 @@ mutable struct PairedExplicitRelaxationRK2MultiParabolicIntegrator{RealT <: Real
     relaxation_solver::RelaxationSolver
 
     # Addition for hyperbolic-parabolic problems:
-    # We need another register to temporarily store the changes due to the hyperbolic part only.
-    # The changes due to the parabolic part are stored in the usual `du` register.
-    du_tmp::uType
+    # We need another register to temporarily store the changes due to the parabolic part only.
+    # The changes due to the hyperbolic part are stored in the usual `du` register.
+    du_para::uType
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
@@ -191,7 +191,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
     ### Done with setting up for handling of level-dependent integration ###
 
     if isa(semi, SemidiscretizationHyperbolicParabolic)
-        du_tmp = zero(u0)
+        du_para = zero(u0)
         integrator = PairedExplicitRelaxationRK2MultiParabolicIntegrator(u0, du, u_tmp,
                                                                          t0, tdir,
                                                                          dt, zero(dt),
@@ -219,7 +219,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                                                          -1, n_levels,
                                                                          gamma, S_old,
                                                                          alg.relaxation_solver,
-                                                                         du_tmp)
+                                                                         du_para)
     else # Hyperbolic case
         integrator = PairedExplicitRelaxationRK2MultiIntegrator(u0, du, u_tmp,
                                                                 t0, tdir,

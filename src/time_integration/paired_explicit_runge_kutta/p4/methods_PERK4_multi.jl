@@ -197,9 +197,9 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType,
     n_levels::Int64
 
     # Addition for hyperbolic-parabolic problems:
-    # We need another register to temporarily store the changes due to the hyperbolic part only.
-    # The changes due to the parabolic part are stored in the usual `du` register.
-    du_tmp::uType
+    # We need another register to temporarily store the changes due to the parabolic part only.
+    # The changes due to the hyperbolic part are stored in the usual `du` register.
+    du_para::uType
 end
 
 mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real, uType,
@@ -344,7 +344,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
 
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
-        du_tmp = zero(u0)
+        du_para = zero(u0)
         integrator = PairedExplicitRK4MultiParabolicIntegrator(u0, du, u_tmp,
                                                                t0, tdir,
                                                                dt, zero(dt),
@@ -367,7 +367,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                                level_info_mpi_mortars_acc,
                                                                level_u_indices_elements,
                                                                -1, n_levels,
-                                                               du_tmp)
+                                                               du_para)
     elseif isa(semi, SemidiscretizationEulerAcoustics)
         u_prev = copy(u0)
         t_prev = t0

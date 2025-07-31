@@ -450,13 +450,13 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    integrator)
     @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
         # Implementation of split ODE problem in OrdinaryDiffEq
-        rhs!(integrator.du_tmp, u_ode, semi, t)
-        rhs_parabolic!(du_ode, u_ode, semi, t)
+        rhs!(du_ode, u_ode, semi, t)
+        rhs_parabolic!(integrator.du_para, u_ode, semi, t)
 
         @threaded for i in eachindex(du_ode)
             # Try to enable optimizations due to `muladd` by avoiding `+=`
             # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
-            du_ode[i] = du_ode[i] + integrator.du_tmp[i]
+            du_ode[i] = du_ode[i] + integrator.du_para[i]
         end
     end
 end
@@ -466,14 +466,14 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t)
     @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
         # Implementation of split ODE problem in OrdinaryDiffEq
-        du_tmp = similar(du_ode) # This obviously allocates
-        rhs!(du_tmp, u_ode, semi, t)
-        rhs_parabolic!(du_ode, u_ode, semi, t)
+        du_para = similar(du_ode) # This obviously allocates
+        rhs!(du_ode, u_ode, semi, t)
+        rhs_parabolic!(du_para, u_ode, semi, t)
 
         @threaded for i in eachindex(du_ode)
             # Try to enable optimizations due to `muladd` by avoiding `+=`
             # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
-            du_ode[i] = du_ode[i] + du_tmp[i]
+            du_ode[i] = du_ode[i] + du_para[i]
         end
     end
 end
@@ -481,16 +481,16 @@ end
 # `rhs_hyperbolic_parabolic!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
-                                   du_tmp,
+                                   du_para,
                                    max_level,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,
                                    u_indices)
     @trixi_timeit timer() "rhs_hyperbolic_parabolic! (part.)" begin
-        rhs!(du_tmp, u_ode, semi, t,
+        rhs!(du_ode, u_ode, semi, t,
              element_indices, interface_indices,
              boundary_indices, mortar_indices)
-        rhs_parabolic!(du_ode, u_ode, semi, t,
+        rhs_parabolic!(du_para, u_ode, semi, t,
                        element_indices, interface_indices,
                        boundary_indices, mortar_indices)
 
@@ -498,7 +498,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
             @threaded for i in u_indices[level]
                 # Try to enable optimizations due to `muladd` by avoiding `+=`
                 # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
-                du_ode[i] = du_ode[i] + du_tmp[i]
+                du_ode[i] = du_ode[i] + du_para[i]
             end
         end
     end
@@ -508,12 +508,12 @@ function _jacobian_ad_forward(semi::SemidiscretizationHyperbolicParabolic, t0, u
                               du_ode, config)
     new_semi = remake(semi, uEltype = eltype(config))
 
-    du_tmp = Vector{eltype(config)}(undef, length(du_ode))
+    du_para = Vector{eltype(config)}(undef, length(du_ode)) # This obviously allocates
     J = ForwardDiff.jacobian(du_ode, u0_ode, config) do du_ode, u_ode
         # Implementation of split ODE problem in OrdinaryDiffEq
-        rhs!(du_tmp, u_ode, new_semi, t0)
-        rhs_parabolic!(du_ode, u_ode, new_semi, t0)
-        du_ode .+= du_tmp
+        rhs!(du_ode, u_ode, new_semi, t0)
+        rhs_parabolic!(du_para, u_ode, new_semi, t0)
+        du_ode .+= du_para
     end
 
     return J

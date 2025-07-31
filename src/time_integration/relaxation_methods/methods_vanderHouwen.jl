@@ -233,16 +233,6 @@ function init(ode::ODEProblem, alg::vanderHouwenRelaxationAlgorithm;
     return integrator
 end
 
-# Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
-function solve(ode::ODEProblem,
-               alg::vanderHouwenRelaxationAlgorithm;
-               dt, callback = nothing, kwargs...)
-    integrator = init(ode, alg, dt = dt, callback = callback; kwargs...)
-
-    # Start actual solve
-    solve!(integrator)
-end
-
 function step!(integrator::vanderHouwenRelaxationIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator

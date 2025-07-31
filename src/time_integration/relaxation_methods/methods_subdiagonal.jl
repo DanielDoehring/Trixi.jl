@@ -257,16 +257,6 @@ function init(ode::ODEProblem, alg::SubDiagonalRelaxationAlgorithm;
     return integrator
 end
 
-# Fakes `solve`: https://diffeq.sciml.ai/v6.8/basics/overview/#Solving-the-Problems-1
-function solve(ode::ODEProblem,
-               alg::SubDiagonalRelaxationAlgorithm;
-               dt, callback = nothing, kwargs...)
-    integrator = init(ode, alg, dt = dt, callback = callback; kwargs...)
-
-    # Start actual solve
-    solve!(integrator)
-end
-
 function step!(integrator::SubDiagonalRelaxationIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator

@@ -75,7 +75,8 @@ abstract type AbstractPairedExplicitRKEulerAcousticMultiIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER} <:
               AbstractPairedExplicitRKMultiParabolicIntegrator{ORDER} end
 
-@inline function update_t_relaxation!(integrator::AbstractPairedExplicitRelaxationRKIntegrator)
+@inline function update_t_relaxation!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator,
+                                                        AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator})
     # Check if due to entropy relaxation the final step is not reached
     if integrator.finalstep == true && integrator.gamma != 1
         # If we would go beyond the final time, clip gamma at 1.0
@@ -376,7 +377,7 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrat
     # PERK stage
     resize!(integrator.k1, new_size)
     # Addition for multirate PERK methods for parabolic problems
-    resize!(integrator.du_tmp, new_size)
+    resize!(integrator.du_para, new_size)
 end
 
 function Base.resize!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleIntegrator,
@@ -494,7 +495,7 @@ end
                                            integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
                                            max_level)
     rhs_hyperbolic_parabolic!(du_ode, u_ode, semi, t,
-                              integrator.du_tmp,
+                              integrator.du_para,
                               max_level,
                               integrator.level_info_elements_acc[max_level],
                               integrator.level_info_interfaces_acc[max_level],
