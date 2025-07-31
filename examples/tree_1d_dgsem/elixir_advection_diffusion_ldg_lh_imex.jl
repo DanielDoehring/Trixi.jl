@@ -61,8 +61,8 @@ callbacks = CallbackSet(summary_callback, analysis_callback)
 ###############################################################################
 # run the simulation
 
-ode_alg = Trixi.LobattoIIIA_p2_Heun()
-#ode_alg = Trixi.Midpoint_IMEX()
+ode_alg = Trixi.IMEX_LobattoIIIA_p2_Heun()
+#ode_alg = Trixi.IMEX_Midpoint_Midpoint()
 
-sol = Trixi.solve(ode, ode_alg, dt = 2.0/4,
+sol = Trixi.solve(ode, ode_alg, dt = 2.0,
                   save_everystep = false, callback = callbacks);

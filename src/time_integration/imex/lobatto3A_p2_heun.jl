@@ -14,21 +14,21 @@ using NonlinearSolve
 abstract type AbstractLobattoRKIMEXAlgorithm <: AbstractTimeIntegrationAlgorithm end
 
 """
-    LobattoIIIA_p2_Heun()
+    IMEX_LobattoIIIA_p2_Heun()
 
 Two-stage, second-order Implicit-Explicit (IMEX) Runge-Kutta method.
 Composed of the Lobatto IIIA (diagonally-)implicit Runge-Kutta method and Heun's method.
 
 # TODO: Link to IMEX papers by Ascher
 """
-struct LobattoIIIA_p2_Heun <: AbstractLobattoRKIMEXAlgorithm
+struct IMEX_LobattoIIIA_p2_Heun <: AbstractLobattoRKIMEXAlgorithm
     # Reduced matrices: Do not store first row full of zeros
     A_im::SMatrix{1, 2, Float64} # Implicit (Lobatto IIIA) part
     A_ex::SMatrix{1, 2, Float64} # Explicit (Heun) part
     b::SVector{2, Float64}
     c::SVector{2, Float64}
 
-    function LobattoIIIA_p2_Heun()
+    function IMEX_LobattoIIIA_p2_Heun()
         A_im = SMatrix{1, 2}(0.5, 0.5)
         A_ex = SMatrix{1, 2}(1.0, 0.0)
         b = SVector(0.5, 0.5)
@@ -76,7 +76,7 @@ mutable struct LobattoIII3Ap2HeunIntegrator{RealT <: Real, uType, Params, Sol, F
     k1::uType # Naive implementation: add register for k1
 end
 
-function init(ode::ODEProblem, alg::LobattoIIIA_p2_Heun;
+function init(ode::ODEProblem, alg::IMEX_LobattoIIIA_p2_Heun;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u = copy(ode.u0)
     du = zero(u)

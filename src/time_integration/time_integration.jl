@@ -101,5 +101,5 @@ include("methods_SSP.jl")
 include("relaxation_methods/relaxation_methods.jl")
 include("paired_explicit_runge_kutta/paired_explicit_runge_kutta.jl")
 
-include("lobatto3a_imex/lobatto3A_imex.jl")
+include("imex/imex.jl")
 end # @muladd
