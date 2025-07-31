@@ -28,11 +28,37 @@ struct LobattoIIIA_p2 <: AbstractLobattoRKAlgorithm
     c::SVector{2, Float64}
 
     function LobattoIIIA_p2()
-        a = SMatrix{1, 2}(0.5, 0.5)
+        A = SMatrix{1, 2}(0.5, 0.5)
         b = SVector(0.5, 0.5)
         c = SVector(0, 1)
 
         new(a, b, c)
+    end
+end
+
+# For PERK3 if works
+"""
+    LobattoIIIA_p4()
+
+Three-stage, fourth-order Lobatto IIIA (diagonally-)implicit Runge-Kutta method.
+A-stable, but neither L-stable or B-stable.
+See https://en.wikipedia.org/wiki/List_of_Runge%E2%80%93Kutta_methods#Lobatto_IIIA_methods
+"""
+struct LobattoIIIA_p4 <: AbstractLobattoRKAlgorithm
+    A::SMatrix{2, 3, Float64}
+    b::SVector{3, Float64}
+    c::SVector{3, Float64}
+
+    function LobattoIIIA_p4()
+        # Fill matrix in column-major order
+        # Rows:            1     2
+        A = SMatrix{2, 3}(5/24, 1/6,  # First column
+                          1/3, 2/3,   # Second column
+                          -1/24, 1/6) # Third column 
+        b = SVector(1/6, 2/3, 1/6)
+        c = SVector(0, 0.5, 1)
+
+        new(A, b, c)
     end
 end
 
