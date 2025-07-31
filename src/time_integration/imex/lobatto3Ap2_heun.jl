@@ -10,8 +10,11 @@
 
 Two-stage, second-order Implicit-Explicit (IMEX) Runge-Kutta method.
 Composed of the Lobatto IIIA (diagonally-)implicit Runge-Kutta method and Heun's method.
-
-# TODO: Link to IMEX papers by Ascher
+The implicit method is A-stable, but neither B-stable or L-stable.
+For more details see for instance
+https://en.wikipedia.org/wiki/List_of_Runge%E2%80%93Kutta_methods#Heun's_method
+and
+https://en.wikipedia.org/wiki/List_of_Runge%E2%80%93Kutta_methods#Lobatto_IIIA_methods .
 """
 struct IMEX_LobattoIIIAp2_Heun <: AbstractIMEXAlgorithm
     # Reduced matrices: Do not store first row full of zeros

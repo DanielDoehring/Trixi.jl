@@ -10,8 +10,12 @@
 
 Two-stage, second-order Implicit-Explicit (IMEX) Runge-Kutta method.
 Composed of the implicit and explicit midpoint rules.
+The implicit method is A-stable (belongs to family of Gauss-Legendre methods), but neither B-stable or L-stable.
 
-# TODO: Link to IMEX papers by Ascher
+For more details, see
+- Uri M. Ascher, Steven J. Ruuth, Raymond J. Spiteri(1997)
+  Implicit-explicit Runge-Kutta methods for time-dependent partial differential equations.
+  [DOI: 10.1016/S0168-9274(97)00056-1](https://doi.org/10.1016/S0168-9274(97)00056-1)
 """
 struct IMEX_Midpoint_Midpoint <: AbstractIMEXAlgorithm
     # Reduced matrices: Do not store first row full of zeros
