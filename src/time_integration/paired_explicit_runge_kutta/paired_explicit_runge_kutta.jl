@@ -16,8 +16,17 @@ abstract type AbstractPairedExplicitRK{ORDER} <: AbstractTimeIntegrationAlgorith
 
 # Abstract base type for single/standalone PERK time integration schemes
 abstract type AbstractPairedExplicitRKSingle{ORDER} <: AbstractPairedExplicitRK{ORDER} end
-# Abstract base type for single/standalone PERK time integration schemes
+# Abstract base type for multirate PERK time integration schemes
 abstract type AbstractPairedExplicitRKMulti{ORDER} <: AbstractPairedExplicitRK{ORDER} end
+
+# Split algorithms: Different Butcher tableaus for the implicit and explicit parts,
+# targeting hyperbolic-parabolic problems
+# Abstract base type for single/standalone PERK split-problem time integration schemes
+abstract type AbstractSplitPairedExplicitRKSingle{ORDER} <:
+              AbstractPairedExplicitRKSingle{ORDER} end
+# Abstract base type for multirate PERK split-problem time integration schemes
+abstract type AbstractSplitPairedExplicitRKMulti{ORDER} <:
+              AbstractPairedExplicitRKMulti{ORDER} end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
 mutable struct PairedExplicitRKOptions{Callback, TStops}
@@ -51,6 +60,18 @@ abstract type AbstractPairedExplicitRKMultiIntegrator{ORDER} <:
 
 abstract type AbstractPairedExplicitRKMultiParabolicIntegrator{ORDER} <:
               AbstractPairedExplicitRKMultiIntegrator{ORDER} end
+
+# Split Integrators
+abstract type AbstractSplitPairedExplicitRKIntegrator{ORDER} <:
+              AbstractPairedExplicitRKIntegrator{ORDER} end
+
+abstract type AbstractSplitPairedExplicitRKSingleIntegrator{ORDER} <:
+              AbstractSplitPairedExplicitRKIntegrator{ORDER} end
+
+abstract type AbstractSplitPairedExplicitRKMultiIntegrator{ORDER} <:
+              AbstractSplitPairedExplicitRKIntegrator{ORDER} end
+
+# TODO: Could also do split relaxation integrators (still fully explicit)
 
 # Relaxation integrators              
 abstract type AbstractPairedExplicitRelaxationRKIntegrator{ORDER} <:
@@ -184,6 +205,12 @@ end
     integrator.f(integrator.k1, integrator.u, p, integrator.t, integrator)
 end
 
+@inline function PERK_k1!(integrator::AbstractSplitPairedExplicitRKIntegrator,
+                          p)
+    integrator.f.f2(integrator.k1, integrator.u, p, integrator.t) # Hyperbolic part
+    integrator.f.f1(integrator.k1_para, integrator.u, p, integrator.t) # Parabolic part
+end
+
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
                                             AbstractPairedExplicitRelaxationRKSingleIntegrator},
                           p, alg)
@@ -193,6 +220,18 @@ end
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + c_dt)
+end
+
+@inline function PERK_k2!(integrator::AbstractSplitPairedExplicitRKSingleIntegrator,
+                          p, alg)
+    c_dt = alg.c[2] * integrator.dt
+    @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              c_dt * (integrator.k1[i] + integrator.k1_para[i])
+    end
+
+    integrator.f.f2(integrator.du, integrator.u_tmp, p, integrator.t + c_dt) # Hyperbolic part
+    integrator.f.f1(integrator.du_para, integrator.u_tmp, p, integrator.t + c_dt) # Parabolic part
 end
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
@@ -208,6 +247,36 @@ end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[stage] * integrator.dt)
+end
+
+@inline function PERK_ki!(integrator::AbstractSplitPairedExplicitRKSingleIntegrator,
+                          p, alg, stage)
+    # Construct current state
+    a1_dt = alg.a_matrix[1, stage - 2] * integrator.dt
+    a2_dt = alg.a_matrix[2, stage - 2] * integrator.dt
+    a1_para_dt = alg.a_matrix_para[1, stage - 2] * integrator.dt
+    a2_para_dt = alg.a_matrix_para[2, stage - 2] * integrator.dt
+
+    @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              a1_dt * integrator.k1[i] + a2_dt * integrator.du[i] +
+                              a1_para_dt * integrator.k1_para[i] +
+                              a2_para_dt * integrator.du_para[i]
+    end
+
+    integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                    integrator.t + alg.c[stage] * integrator.dt) # Hyperbolic part
+    integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                    integrator.t + alg.c[stage] * integrator.dt) # Parabolic part
+
+    if stage == alg.num_stages
+        # Accumulate parabolic and hyperbolic contributions into `du`
+        # This allows re-using `step!` for `AbstractPairedExplicitRKIntegrator{2}`
+        @threaded for i in eachindex(integrator.du)
+            # Try optimize for `@muladd`: avoid `+=`
+            integrator.du[i] = integrator.du[i] + integrator.du_para[i]
+        end
+    end
 end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
@@ -413,6 +482,18 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
     if :semi_gravity in fieldnames(typeof(integrator.p))
         partition_u_gravity!(integrator)
     end
+end
+
+function Base.resize!(integrator::AbstractSplitPairedExplicitRKIntegrator,
+                      new_size)
+    resize!(integrator.u, new_size)
+    resize!(integrator.du, new_size)
+    resize!(integrator.u_tmp, new_size)
+    # PERK stage
+    resize!(integrator.k1, new_size)
+    # Parabolic du
+    resize!(integrator.du_para, new_size)
+    resize!(integrator.k1_para, new_size)
 end
 
 # get a cache where the RHS can be stored
