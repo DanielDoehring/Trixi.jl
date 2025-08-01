@@ -6,53 +6,49 @@
 #! format: noindent
 
 @doc raw"""
-    PairedExplicitRKSplit2(num_stages,
-                          base_path_monomial_coeffs::AbstractString,
-                          base_path_monomial_coeffs_para::AbstractString;
-                          dt_opt = nothing, bS = 1.0, cS = 0.5)
+    PairedExplicitRKSplit3(num_stages, 
+                           base_path_a_coeffs::AbstractString,
+                           base_path_a_coeffs_para::AbstractString,
+                           dt_opt = nothing;
+                           cS2 = 1.0f0)
 """
-struct PairedExplicitRKSplit2 <:
-       AbstractPairedExplicitRKSingle{2}
-    num_stages::Int
+struct PairedExplicitRKSplit3 <:
+       AbstractPairedExplicitRKSingle{3}
+    num_stages::Int # S
 
     a_matrix::Matrix{Float64}
     a_matrix_para::Matrix{Float64}
     c::Vector{Float64}
-    b1::Float64
-    bS::Float64
-    cS::Float64
 
     dt_opt::Union{Float64, Nothing}
 end
 
-# Constructor that reads the coefficients from a file
-function PairedExplicitRKSplit2(num_stages,
-                                base_path_monomial_coeffs::AbstractString,
-                                base_path_monomial_coeffs_para::AbstractString;
-                                dt_opt = nothing,
-                                bS = 1.0, cS = 0.5)
-    @assert num_stages>=2 "PERK2 requires at least two stages"
-    # If the user has the monomial coefficients, they also must have the optimal time step
-    a_matrix, c = compute_PairedExplicitRK2_butcher_tableau(num_stages,
-                                                            base_path_monomial_coeffs,
-                                                            bS, cS)
+# Constructor for previously computed A Coeffs
+function PairedExplicitRKSplit3(num_stages,
+                                base_path_a_coeffs::AbstractString,
+                                base_path_a_coeffs_para::AbstractString,
+                                dt_opt = nothing;
+                                cS2 = 1.0f0)
+    @assert num_stages>=3 "PERK3 requires at least three stages"
+    a_matrix, c = compute_PairedExplicitRK3_butcher_tableau(num_stages,
+                                                            base_path_a_coeffs;
+                                                            cS2)
 
-    a_matrix_para, _ = compute_PairedExplicitRK2_butcher_tableau(num_stages,
-                                                                 base_path_monomial_coeffs_para,
-                                                                 bS, cS)
+    a_matrix_para, _ = compute_PairedExplicitRK3_butcher_tableau(num_stages,
+                                                                 base_path_a_coeffs_para;
+                                                                 cS2)
 
-    return PairedExplicitRKSplit2(num_stages, a_matrix, a_matrix_para, c, 1 - bS, bS,
-                                  cS, dt_opt)
+    return PairedExplicitRKSplit3(num_stages, a_matrix, a_matrix_para, c, dt_opt)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
-# which are used in Trixi.
-mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
+# which are used in Trixi.jl.
+mutable struct PairedExplicitRKSplit3Integrator{RealT <: Real, uType,
                                                 Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKSplitSingleIntegrator{2}
+               AbstractPairedExplicitRKSplitSingleIntegrator{3}
     u::uType
     du::uType
     u_tmp::uType
@@ -64,33 +60,38 @@ mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRKSplit2
+    alg::PairedExplicitRKSplit3
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
     force_stepfail::Bool
-    # Additional PERK register
+    # Additional PERK3 registers
     k1::uType
+    kS1::uType
     # For split (hyperbolic-parabolic) problems
-    du_para::uType # Stores the parabolic part of the overall rhs!
-    k1_para::uType # Additional PERK register for the parabolic part
+    du_para::uType
+    k1_para::uType
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
+function init(ode::ODEProblem, alg::PairedExplicitRKSplit3;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
     u_tmp = zero(u0)
 
-    k1 = zero(u0) # Additional PERK register
-    du_para = zero(u0) # Stores the parabolic part of the overall rhs!
-    k1_para = zero(u0) # Additional PERK register for the parabolic part
+    # Additional PERK3 registers
+    k1 = zero(u0)
+    kS1 = zero(u0)
+
+    # For split (hyperbolic-parabolic) problems
+    du_para = zero(u0)
+    k1_para = zero(u0)
 
     t0 = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRKSplit2Integrator(u0, du, u_tmp,
+    integrator = PairedExplicitRKSplit3Integrator(u0, du, u_tmp,
                                                   t0, tdir, dt, zero(dt),
                                                   iter, ode.p,
                                                   (prob = ode,), ode.f,
@@ -99,7 +100,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
                                                                           ode.tspan;
                                                                           kwargs...),
                                                   false, true, false,
-                                                  k1, du_para, k1_para)
+                                                  k1, kS1,
+                                                  du_para, k1_para)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -114,7 +116,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
     return integrator
 end
 
-function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{2})
+function step!(integrator::AbstractPairedExplicitRKSplitIntegrator{3})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -139,22 +141,32 @@ function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{2})
         PERK_k1!(integrator, prob.p)
         PERK_k2!(integrator, prob.p, alg)
 
-        # Higher stages
-        for stage in 3:(alg.num_stages)
+        for stage in 3:(alg.num_stages - 1)
             PERK_ki!(integrator, prob.p, alg, stage)
         end
 
+        # We need to store `du` of the S-1 stage in `kS1` for the final update:
         @threaded for i in eachindex(integrator.u)
+            integrator.kS1[i] = integrator.du[i] + integrator.du_para[i] # Faster than broadcasted version (with .=)
+        end
+
+        PERK_ki!(integrator, prob.p, alg, alg.num_stages)
+
+        @threaded for i in eachindex(integrator.u)
+            # "Own" PairedExplicitRK based on SSPRK33.
+            # Note that 'kS1' carries the values of K_{S-1}
+            # and that we construct 'K_S' "in-place" from 'integrator.du'
             #=
             integrator.u[i] += integrator.dt *
-                               (alg.b1 * (integrator.k1[i] + integrator.k1_para[i]) +
-                                alg.bS * (integrator.du[i] + integrator.du_para[i]))
+                               (integrator.k1[i] + integrator.kS1[i] +
+                                4 * integrator.du[i]) / 6
             =#
-
-            # More performant version for b1 = 0
-            # Try optimize for `@muladd`: avoid `+=`
+            # Try to optimize for `@muladd`: avoid `+=`
             integrator.u[i] = integrator.u[i] +
-                              integrator.dt * (integrator.du[i] + integrator.du_para[i])
+                              integrator.dt *
+                              (integrator.k1[i] + integrator.k1_para[i] +
+                               integrator.kS1[i] +
+                               4 * (integrator.du[i] + integrator.du_para[i])) / 6
         end
     end
 
@@ -178,5 +190,18 @@ function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{2})
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+end
+
+function Base.resize!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{3},
+                      new_size)
+    resize!(integrator.u, new_size)
+    resize!(integrator.du, new_size)
+    resize!(integrator.u_tmp, new_size)
+
+    resize!(integrator.k1, new_size)
+    resize!(integrator.kS1, new_size)
+
+    resize!(integrator.du_para, new_size)
+    resize!(integrator.k1_para, new_size)
 end
 end # @muladd

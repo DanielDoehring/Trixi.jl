@@ -5,7 +5,7 @@ using Trixi
 
 advection_velocity = 1.0
 equations = LinearScalarAdvectionEquation1D(advection_velocity)
-diffusivity() = 0.02
+diffusivity() = 0.015
 equations_parabolic = LaplaceDiffusion1D(diffusivity(), equations)
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
@@ -55,8 +55,13 @@ summary_callback = SummaryCallback()
 
 analysis_callback = AnalysisCallback(semi, interval = 100)
 
+# p = 2
 cfl = 2.5 # Stable for a = 1.0, d = 0.01 with advection-only optimized spectra
 cfl = 2.5 # Stable for a = 1.0, d = 0.02 with advection & diffusion optimized spectra
+
+# p = 3
+cfl = 2.5 # Stable for a = 1.0, d = 0.01 with advection-only optimized spectra
+cfl = 2.5 # Stable for a = 1.0, d = 0.015 with advection & diffusion optimized spectra
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -69,13 +74,16 @@ callbacks = CallbackSet(summary_callback,
 
 path = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection/"
 
-#path_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection/"
+#path_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection/" # For test only
 path_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Diffusion/"
 
 Stages = 8
 
-#ode_alg = Trixi.PairedExplicitRK2(Stages, path)
-ode_alg = Trixi.PairedExplicitRKSplit2(Stages, path, path_para)
+#ode_alg = Trixi.PairedExplicitRK2(Stages, path * "p2/")
+#ode_alg = Trixi.PairedExplicitRKSplit2(Stages, path * "p2/", path_para * "p2/")
+
+ode_alg = Trixi.PairedExplicitRK3(Stages, path * "p3/")
+ode_alg = Trixi.PairedExplicitRKSplit3(Stages, path * "p3/", path_para * "p3/")
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 0.2,

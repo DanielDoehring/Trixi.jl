@@ -203,12 +203,16 @@ end
 @inline function PERK_k1!(integrator::AbstractPairedExplicitRKIntegrator,
                           p)
     integrator.f(integrator.k1, integrator.u, p, integrator.t, integrator)
+
+    return nothing
 end
 
 @inline function PERK_k1!(integrator::AbstractPairedExplicitRKSplitIntegrator,
                           p)
     integrator.f.f2(integrator.k1, integrator.u, p, integrator.t) # Hyperbolic part
     integrator.f.f1(integrator.k1_para, integrator.u, p, integrator.t) # Parabolic part
+
+    return nothing
 end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
@@ -220,6 +224,8 @@ end
     end
 
     integrator.f(integrator.du, integrator.u_tmp, p, integrator.t + c_dt)
+
+    return nothing
 end
 
 @inline function PERK_k2!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator,
@@ -232,6 +238,8 @@ end
 
     integrator.f.f2(integrator.du, integrator.u_tmp, p, integrator.t + c_dt) # Hyperbolic part
     integrator.f.f1(integrator.du_para, integrator.u_tmp, p, integrator.t + c_dt) # Parabolic part
+
+    return nothing
 end
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKSingleIntegrator,
@@ -247,6 +255,8 @@ end
 
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + alg.c[stage] * integrator.dt)
+
+    return nothing
 end
 
 @inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator,
@@ -269,14 +279,7 @@ end
     integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
                     integrator.t + alg.c[stage] * integrator.dt) # Parabolic part
 
-    if stage == alg.num_stages
-        # Accumulate parabolic and hyperbolic contributions into `du`
-        # This allows re-using `step!` for `AbstractPairedExplicitRKIntegrator{2}`
-        @threaded for i in eachindex(integrator.du)
-            # Try optimize for `@muladd`: avoid `+=`
-            integrator.du[i] = integrator.du[i] + integrator.du_para[i]
-        end
-    end
+    return nothing
 end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
@@ -290,6 +293,8 @@ end
     # k2: Only evaluated at finest level (1)
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + c_dt, integrator, 1)
+
+    return nothing
 end
 
 @inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
@@ -404,6 +409,8 @@ end
     # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
     integrator.coarsest_lvl = min(alg.max_active_levels[stage],
                                   integrator.n_levels)
+
+    return nothing
 end
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
@@ -426,6 +433,8 @@ end
                      integrator,
                      integrator.coarsest_lvl)
     end
+
+    return nothing
 end
 
 # used for AMR (Adaptive Mesh Refinement)
