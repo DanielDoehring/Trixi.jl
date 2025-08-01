@@ -75,7 +75,7 @@ path_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Diffusion/"
 Stages = 8
 
 #ode_alg = Trixi.PairedExplicitRK2(Stages, path)
-ode_alg = Trixi.SplitPairedExplicitRK2(Stages, path, path_para)
+ode_alg = Trixi.PairedExplicitRKSplit2(Stages, path, path_para)
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 0.2,
