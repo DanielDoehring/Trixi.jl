@@ -65,7 +65,7 @@ mutable struct LobattoIII3Ap2HeunIntegrator{RealT <: Real, uType, Params, Sol, F
 
     # For split problems
     du_para::uType # Additional storage for the split-part of the rhs! function
-    u_nonlin::uType # Additional storage for the intermediate u approximation
+    u_nonlin::uType # Additional storage for the intermediate u approximation in nonlinear solver
     k1::uType # Naive implementation: add register for k1
 end
 

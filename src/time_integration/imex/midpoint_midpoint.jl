@@ -66,7 +66,7 @@ mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, 
 
     # For split problems solved with IMEX methods
     du_para::uType # Additional storage for the split-part of the rhs! function
-    u_nonlin::uType # Additional storage for the intermediate u approximation
+    u_nonlin::uType # Additional storage for the intermediate u approximation in nonlinear solver
 end
 
 function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
