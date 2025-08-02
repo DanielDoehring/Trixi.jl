@@ -392,4 +392,7 @@ include("methods_PERK4_multi.jl")
 # Paired Explicit Relaxation Runge-Kutta (PERRK) methods
 include("methods_PERRK4.jl")
 include("methods_PERRK4_multi.jl")
+
+# Split methods targeting hyperbolic-parabolic problems
+include("methods_PERKS4.jl")
 end # @muladd

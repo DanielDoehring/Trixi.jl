@@ -13,7 +13,7 @@
                            cS2 = 1.0f0)
 """
 struct PairedExplicitRKSplit3 <:
-       AbstractPairedExplicitRKSingle{3}
+       AbstractPairedExplicitRKSplitSingle{3}
     num_stages::Int # S
 
     a_matrix::Matrix{Float64}

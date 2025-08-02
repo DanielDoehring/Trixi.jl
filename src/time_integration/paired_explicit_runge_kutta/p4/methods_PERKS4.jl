@@ -6,53 +6,58 @@
 #! format: noindent
 
 @doc raw"""
-    PairedExplicitRKSplit2(num_stages,
-                          base_path_monomial_coeffs::AbstractString,
-                          base_path_monomial_coeffs_para::AbstractString;
-                          dt_opt = nothing, bS = 1.0, cS = 0.5)
+    PairedExplicitRKSplit4(num_stages,
+                           base_path_a_coeffs::AbstractString,
+                           base_path_a_coeffs_para::AbstractString,
+                           dt_opt = nothing;
+                           cS3 = 1.0f0)
 """
-struct PairedExplicitRKSplit2 <:
-       AbstractPairedExplicitRKSplitSingle{2}
-    num_stages::Int
+struct PairedExplicitRKSplit4 <:
+       AbstractPairedExplicitRKSingle{4}
+    num_stages::Int # S
 
-    a_matrix::Matrix{Float64}
-    a_matrix_para::Matrix{Float64}
+    # Optimized coefficients, i.e., flexible part of the Butcher array matrix A.
+    a_matrix::Union{Matrix{Float64}, Nothing}
+    a_matrix_para::Union{Matrix{Float64}, Nothing}
+
+    # This part of the Butcher array matrix A is constant for all PERK methods, i.e., 
+    # regardless of the optimized coefficients.
+    #a_matrix_constant::SMatrix{2, 3, Float64}
+    # NOTE: Somehow SMatrix allocates for Single PERK4, but not Multirate...
+    a_matrix_constant::Matrix{Float64}
+
     c::Vector{Float64}
-    b1::Float64
-    bS::Float64
-    cS::Float64
 
     dt_opt::Union{Float64, Nothing}
 end
 
-# Constructor that reads the coefficients from a file
-function PairedExplicitRKSplit2(num_stages,
-                                base_path_monomial_coeffs::AbstractString,
-                                base_path_monomial_coeffs_para::AbstractString;
-                                dt_opt = nothing,
-                                bS = 1.0, cS = 0.5)
-    @assert num_stages>=2 "PERK2 requires at least two stages"
-    # If the user has the monomial coefficients, they also must have the optimal time step
-    a_matrix, c = compute_PairedExplicitRK2_butcher_tableau(num_stages,
-                                                            base_path_monomial_coeffs,
-                                                            bS, cS)
+# Constructor for previously computed A Coeffs
+function PairedExplicitRKSplit4(num_stages,
+                                base_path_a_coeffs::AbstractString,
+                                base_path_a_coeffs_para::AbstractString,
+                                dt_opt = nothing;
+                                cS3 = 1.0f0)  # Default value for best internal stability
+    @assert num_stages>=5 "PERK4 requires at least five stages"
+    a_matrix, a_matrix_constant, c = compute_PairedExplicitRK4_butcher_tableau(num_stages,
+                                                                               base_path_a_coeffs,
+                                                                               cS3)
 
-    a_matrix_para, _ = compute_PairedExplicitRK2_butcher_tableau(num_stages,
-                                                                 base_path_monomial_coeffs_para,
-                                                                 bS, cS)
+    a_matrix_para, _, _ = compute_PairedExplicitRK4_butcher_tableau(num_stages,
+                                                                    base_path_a_coeffs_para,
+                                                                    cS3)
 
-    return PairedExplicitRKSplit2(num_stages, a_matrix, a_matrix_para, c, 1 - bS, bS,
-                                  cS, dt_opt)
+    return PairedExplicitRKSplit4(num_stages, a_matrix, a_matrix_para,
+                                  a_matrix_constant, c, dt_opt)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
-# which are used in Trixi.
-mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
+# which are used in Trixi.jl.
+mutable struct PairedExplicitRKSplit4Integrator{RealT <: Real, uType,
                                                 Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKSplitSingleIntegrator{2}
+               AbstractPairedExplicitRKSplitSingleIntegrator{4}
     u::uType
     du::uType
     u_tmp::uType
@@ -64,7 +69,7 @@ mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRKSplit2
+    alg::PairedExplicitRKSplit4
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -76,7 +81,7 @@ mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
     k1_para::uType # Additional PERK register for the parabolic part
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
+function init(ode::ODEProblem, alg::PairedExplicitRKSplit4;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
@@ -90,7 +95,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRKSplit2Integrator(u0, du, u_tmp,
+    integrator = PairedExplicitRKSplit4Integrator(u0, du, u_tmp,
                                                   t0, tdir, dt, zero(dt),
                                                   iter, ode.p,
                                                   (prob = ode,), ode.f,
@@ -114,7 +119,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
     return integrator
 end
 
-function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{2})
+function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{4})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -135,27 +140,27 @@ function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{2})
     end
 
     @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
-        # First and second stage are identical across all single/standalone PERK methods
         PERK_k1!(integrator, prob.p)
         PERK_k2!(integrator, prob.p, alg)
 
-        # Higher stages
-        for stage in 3:(alg.num_stages)
+        # Higher stages until "constant" stages
+        for stage in 3:(alg.num_stages - 3)
             PERK_ki!(integrator, prob.p, alg, stage)
         end
 
-        @threaded for i in eachindex(integrator.u)
-            #=
-            integrator.u[i] += integrator.dt *
-                               (alg.b1 * (integrator.k1[i] + integrator.k1_para[i]) +
-                                alg.bS * (integrator.du[i] + integrator.du_para[i]))
-            =#
-
-            # More performant version for b1 = 0
-            # Try optimize for `@muladd`: avoid `+=`
-            integrator.u[i] = integrator.u[i] +
-                              integrator.dt * (integrator.du[i] + integrator.du_para[i])
+        # Accumulate hyperbolic and parabolic contributions into `du` and `k1`
+        # to reuse `PERK4_kS2_to_kS!`
+        @threaded for i in eachindex(integrator.du)
+            # Try to optimize for `@muladd`: avoid `+=`
+            integrator.du[i] = integrator.du[i] + integrator.du_para[i]
         end
+        # Access registers after another to allow for optimized memory access
+        @threaded for i in eachindex(integrator.du)
+            # Try to optimize for `@muladd`: avoid `+=`
+            integrator.k1[i] = integrator.k1[i] + integrator.k1_para[i]
+        end
+
+        PERK4_kS2_to_kS!(integrator, prob.p, alg)
     end
 
     integrator.iter += 1
@@ -164,11 +169,10 @@ function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{2})
     @trixi_timeit timer() "Step-Callbacks" begin
         # handle callbacks
         if callbacks isa CallbackSet
-            foreach(callbacks.discrete_callbacks) do cb
+            for cb in callbacks.discrete_callbacks
                 if cb.condition(integrator.u, integrator.t, integrator)
                     cb.affect!(integrator)
                 end
-                return nothing
             end
         end
     end

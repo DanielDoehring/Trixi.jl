@@ -500,7 +500,7 @@ function Base.resize!(integrator::AbstractPairedExplicitRKSplitIntegrator,
     resize!(integrator.u_tmp, new_size)
     # PERK stage
     resize!(integrator.k1, new_size)
-    # Parabolic du
+    # Parabolic/split-approach additions
     resize!(integrator.du_para, new_size)
     resize!(integrator.k1_para, new_size)
 end

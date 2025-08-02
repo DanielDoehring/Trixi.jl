@@ -5,7 +5,7 @@ using Trixi
 
 advection_velocity = 1.0
 equations = LinearScalarAdvectionEquation1D(advection_velocity)
-diffusivity() = 0.015
+diffusivity() = 0.02
 equations_parabolic = LaplaceDiffusion1D(diffusivity(), equations)
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
@@ -55,14 +55,10 @@ summary_callback = SummaryCallback()
 
 analysis_callback = AnalysisCallback(semi, interval = 100)
 
-# p = 2
-cfl = 2.5 # Stable for a = 1.0, d = 0.01 with advection-only optimized spectra
-cfl = 2.5 # Stable for a = 1.0, d = 0.02 with advection & diffusion optimized spectra
-
-# p = 3
-cfl = 2.5 # Stable for a = 1.0, d = 0.01 with advection-only optimized spectra
-cfl = 2.5 # Stable for a = 1.0, d = 0.015 with advection & diffusion optimized spectra
-# TODO: Check if this CFL is larger compared to one scheme optimized for Advection & Diffusion spectrum
+# p = 4
+cfl = 1.4 # Stable for a = 1.0, d = 0.02 with advection-only optimized coefficients
+cfl = 1.2 # Stable for a = 1.0, d = 0.02 with advection-diffusion jointly optimized coefficients
+cfl = 0.9 # Stable for a = 1.0, d = 0.02 with advection-diffusion separately optimized coefficients
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -73,18 +69,19 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-path = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection/"
+base_path = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection_Diffusion/a1d002/"
 
-#path_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection/" # For test only
-path_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Diffusion/"
+path_adv = base_path * "p4/" * "Adv/"
+path_adv_diff = base_path * "p4/" * "AdvDiff/"
+path_diff = base_path * "p4/" * "Diff/"
 
 Stages = 8
 
-#ode_alg = Trixi.PairedExplicitRK2(Stages, path * "p2/")
-#ode_alg = Trixi.PairedExplicitRKSplit2(Stages, path * "p2/", path_para * "p2/")
+#ode_alg = Trixi.PairedExplicitRK4(Stages, path_adv)
+ode_alg = Trixi.PairedExplicitRK4(Stages, path_adv_diff)
 
-ode_alg = Trixi.PairedExplicitRK3(Stages, path * "p3/")
-ode_alg = Trixi.PairedExplicitRKSplit3(Stages, path * "p3/", path_para * "p3/")
+#ode_alg = Trixi.PairedExplicitRKSplit4(Stages, path_adv, path_adv)
+ode_alg = Trixi.PairedExplicitRKSplit4(Stages, path_adv, path_diff)
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 0.2,
