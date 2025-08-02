@@ -62,7 +62,7 @@ cfl = 2.5 # Stable for a = 1.0, d = 0.02 with advection & diffusion optimized sp
 # p = 3
 cfl = 2.5 # Stable for a = 1.0, d = 0.01 with advection-only optimized spectra
 cfl = 2.5 # Stable for a = 1.0, d = 0.015 with advection & diffusion optimized spectra
-# TODO: Check if larger CFL is possible for Advection & Diffusion spectrum optimized
+# TODO: Check if this CFL is larger compared to one scheme optimized for Advection & Diffusion spectrum
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
