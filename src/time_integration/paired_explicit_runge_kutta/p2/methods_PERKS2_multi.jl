@@ -48,10 +48,10 @@ function PairedExplicitRK2SplitMulti(stages::Vector{Int64},
                                                                                  bS, cS)
 
     return PairedExplicitRK2SplitMulti(minimum(stages), length(stages), num_stages,
-                                       stages,
-                                       dt_ratios,
+                                       stages, dt_ratios,
                                        a_matrices, a_matrices_para,
-                                       c, 1 - bS, bS, active_levels,
+                                       c, 1 - bS, bS,
+                                       active_levels,
                                        max_active_levels, max_add_levels)
 end
 
