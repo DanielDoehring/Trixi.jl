@@ -114,7 +114,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Split;
     return integrator
 end
 
-function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{2})
+function step!(integrator::AbstractPairedExplicitRKSplitIntegrator{2})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)

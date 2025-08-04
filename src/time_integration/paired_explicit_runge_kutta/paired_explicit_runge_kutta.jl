@@ -558,12 +558,10 @@ end
 
         # Hyperbolic part
         integrator.f.f2(integrator.du, integrator.u_tmp, p,
-                        integrator.t + alg.c[stage] * integrator.dt,
-                        integrator)
+                        integrator.t + alg.c[stage] * integrator.dt)
         # Parabolic part
         integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
-                        integrator.t + alg.c[stage] * integrator.dt,
-                        integrator)
+                        integrator.t + alg.c[stage] * integrator.dt)
     else
         # Hyperbolic part
         integrator.f.f2(integrator.du, integrator.u_tmp, p,
@@ -694,21 +692,6 @@ end
 # extension or by the NLsolve-specific code loaded by Requires.jl
 function solve_a_butcher_coeffs_unknown! end
 
-# Dummy argument `integrator` for same signature as `rhs_hyperbolic_parabolic!` for non-split ODE problems
-# TODO: Not sure if still needed
-@inline function rhs!(du_ode, u_ode, semi::AbstractSemidiscretization, t,
-                      integrator)
-    rhs!(du_ode, u_ode, semi, t)
-end
-@inline function (f::SplitFunction)(du_ode, u_ode, semi::AbstractSemidiscretization, t,
-                                    integrator)
-    f(du_ode, u_ode, semi, t)
-end
-@inline function (f::SplitFunction)(du_ode, u_ode, semi::AbstractSemidiscretization, t,
-                                    integrator, level)
-    f(du_ode, u_ode, semi, t, integrator)
-end
-
 # Depending on the `semi`, different fields from `integrator` need to be passed on.
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
                       integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
@@ -720,6 +703,30 @@ end
          integrator.level_info_boundaries_acc[max_level],
          #integrator.level_info_boundaries_orientation_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
+end
+
+# Required for split methods
+@inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
+                      integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                      max_level)
+    rhs!(du_ode, u_ode, semi, t,
+         integrator.level_info_elements_acc[max_level],
+         integrator.level_info_interfaces_acc[max_level],
+         integrator.level_info_boundaries_acc[max_level],
+         #integrator.level_info_boundaries_orientation_acc[max_level],
+         integrator.level_info_mortars_acc[max_level])
+end
+
+@inline function rhs_parabolic!(du_ode, u_ode,
+                                semi::SemidiscretizationHyperbolicParabolic, t,
+                                integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                                max_level)
+    rhs_parabolic!(du_ode, u_ode, semi, t,
+                   integrator.level_info_elements_acc[max_level],
+                   integrator.level_info_interfaces_acc[max_level],
+                   integrator.level_info_boundaries_acc[max_level],
+                   #integrator.level_info_boundaries_orientation_acc[max_level],
+                   integrator.level_info_mortars_acc[max_level])
 end
 
 @inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,

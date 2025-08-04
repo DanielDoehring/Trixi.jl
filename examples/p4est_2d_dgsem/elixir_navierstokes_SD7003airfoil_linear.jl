@@ -1,4 +1,3 @@
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -59,8 +58,8 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
-path = "/storage/home/daniel/PERK4/SD7003/"
-#path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
+#path = "/storage/home/daniel/PERK4/SD7003/"
+path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
@@ -86,14 +85,15 @@ tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is
 #ode = semidiscretize(semi, tspan)
 ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
 
-#=
+
 # For PERK Multi coefficient measurements
-restart_file = "restart_000126960.h5"
-restart_filename = joinpath("out", restart_file)
+restart_file = "restart_000126951.h5"
+restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/restart_data/", restart_file)
 
 tspan = (30 * t_c, 35 * t_c)
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-=#
+ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+
 
 summary_callback = SummaryCallback()
 
@@ -138,6 +138,8 @@ cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
 #cfl = 2.5 # R-TS64
 #cfl = 2.6 # R-CKL54
 
+cfl = 7.6 # PERK2 unsplit/standard multi
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 # For plots etc
@@ -147,21 +149,22 @@ save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      solution_variables = cons2prim,
                                      output_directory = "out")
 
-alive_callback = AliveCallback(alive_interval = 1000)
+alive_callback = AliveCallback(alive_interval = 500)
 
 save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
                                    save_final_restart = true)
 
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        save_solution, # For plotting during measurement run
+                        #save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
-                        analysis_callback,
+                        #analysis_callback,
                         summary_callback);
 
 ###############################################################################
 # run the simulation
 
+#=
 dtRatios = [0.208310160790890, # 14
     0.172356930215766, # 12
     0.129859071602721, # 10
@@ -182,6 +185,24 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; r
 #ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+=#
+
+### Split-Multi methods ###
+dtRatios = [0.253144726232790162612, # 14
+    0.214041846963368698198, # 12
+    0.177173703567632401246, # 10
+    0.138494092598762108537, #  8
+    0.121607896165869533434, #  7
+    0.0975166462040988335502, #  6
+    0.0818171376613463507965, #  5
+    0.0656503721211265656166, #  4
+    0.0419871921542380732717, #  3
+    0.0209738927526359475451] / 0.253144726232790162612 #= 2 =#
+Stages = [14, 12, 10, 8, 7, 6, 5, 4, 3, 2]
+
+path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/"
+#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages, path_coeffs, path_coeffs, dtRatios)
 
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4

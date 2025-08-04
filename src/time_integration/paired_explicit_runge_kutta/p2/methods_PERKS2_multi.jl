@@ -29,6 +29,7 @@ end
 
 function PairedExplicitRK2SplitMulti(stages::Vector{Int64},
                                      base_path_mon_coeffs::AbstractString,
+                                     base_path_mon_coeffs_para::AbstractString,
                                      dt_ratios;
                                      bS = 1.0, cS = 0.5)
     num_stages = maximum(stages)
@@ -43,7 +44,7 @@ function PairedExplicitRK2SplitMulti(stages::Vector{Int64},
     # TODO: Parabolic duplications
     a_matrices_para, _, _, _, _ = compute_PairedExplicitRK2Multi_butcher_tableau(stages,
                                                                                  num_stages,
-                                                                                 base_path_mon_coeffs,
+                                                                                 base_path_mon_coeffs_para,
                                                                                  bS, cS)
 
     return PairedExplicitRK2SplitMulti(minimum(stages), length(stages), num_stages,
@@ -202,28 +203,28 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     ### Done with setting up for handling of level-dependent integration ###
     du_para = zero(u0)
-    integrator = PairedExplicitRK2MultiParabolicIntegrator(u0, du, u_tmp,
-                                                           t0, tdir,
-                                                           dt, zero(dt),
-                                                           iter, semi,
-                                                           (prob = ode,),
-                                                           ode.f,
-                                                           alg,
-                                                           PairedExplicitRKOptions(callback,
-                                                                                   ode.tspan;
-                                                                                   kwargs...),
-                                                           false, true, false,
-                                                           k1, du_para, k1_para,
-                                                           level_info_elements,
-                                                           level_info_elements_acc,
-                                                           level_info_interfaces_acc,
-                                                           level_info_mpi_interfaces_acc,
-                                                           level_info_boundaries_acc,
-                                                           level_info_boundaries_orientation_acc,
-                                                           level_info_mortars_acc,
-                                                           level_info_mpi_mortars_acc,
-                                                           level_u_indices_elements,
-                                                           -1, n_levels)
+    integrator = PairedExplicitRK2SplitMultiIntegrator(u0, du, u_tmp,
+                                                       t0, tdir,
+                                                       dt, zero(dt),
+                                                       iter, semi,
+                                                       (prob = ode,),
+                                                       ode.f,
+                                                       alg,
+                                                       PairedExplicitRKOptions(callback,
+                                                                               ode.tspan;
+                                                                               kwargs...),
+                                                       false, true, false,
+                                                       k1, du_para, k1_para,
+                                                       level_info_elements,
+                                                       level_info_elements_acc,
+                                                       level_info_interfaces_acc,
+                                                       level_info_mpi_interfaces_acc,
+                                                       level_info_boundaries_acc,
+                                                       level_info_boundaries_orientation_acc,
+                                                       level_info_mortars_acc,
+                                                       level_info_mpi_mortars_acc,
+                                                       level_u_indices_elements,
+                                                       -1, n_levels)
 
     # initialize callbacks
     if callback isa CallbackSet
