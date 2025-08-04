@@ -82,8 +82,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 
-#ode = semidiscretize(semi, tspan)
-ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
 
 
 # For PERK Multi coefficient measurements
@@ -91,6 +91,8 @@ restart_file = "restart_000126951.h5"
 restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/restart_data/", restart_file)
 
 tspan = (30 * t_c, 35 * t_c)
+tspan = (30 * t_c, 31 * t_c) # For testing only
+
 ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 #ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
@@ -139,6 +141,7 @@ cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
 #cfl = 2.6 # R-CKL54
 
 cfl = 7.6 # PERK2 unsplit/standard multi
+cfl = 8.7 # PERK2 unsplit/standard multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -158,7 +161,7 @@ callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (d
                         alive_callback, # Not needed for measurement run
                         #save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
-                        #analysis_callback,
+                        analysis_callback,
                         summary_callback);
 
 ###############################################################################
@@ -200,9 +203,11 @@ dtRatios = [0.253144726232790162612, # 14
     0.0209738927526359475451] / 0.253144726232790162612 #= 2 =#
 Stages = [14, 12, 10, 8, 7, 6, 5, 4, 3, 2]
 
-path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/"
+path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/full_rhs/"
+path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/para_rhs/"
+
 #ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
-ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages, path_coeffs, path_coeffs, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages, path_coeffs, path_coeffs_para, dtRatios)
 
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
