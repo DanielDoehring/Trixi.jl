@@ -424,7 +424,6 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     u = wrap_array(u_ode, mesh, equations_parabolic, solver, cache_parabolic)
     du = wrap_array(du_ode, mesh, equations_parabolic, solver, cache_parabolic)
 
-    # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
     @trixi_timeit timer() "rhs_parabolic! (part.)" rhs_parabolic!(du, u, t, mesh,
                                                                   equations_parabolic,
@@ -447,7 +446,7 @@ end
 # `rhs_hyperbolic_parabolic!` for non-split ODE problems
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
-                                   integrator)
+                                   integrator) # TODO: Dispatch on integrator type required?
     @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
         # Implementation of split ODE problem in OrdinaryDiffEq
         rhs!(du_ode, u_ode, semi, t)
@@ -481,7 +480,7 @@ end
 # `rhs_hyperbolic_parabolic!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t,
-                                   du_para,
+                                   du_para, # This argument is passed in for non-split integrators
                                    max_level,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,

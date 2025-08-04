@@ -218,9 +218,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
     ### Set datastructures for handling of level-dependent integration ###
     semi = ode.p
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
+    n_dims = ndims(mesh) # Spatial dimension
 
     n_levels = get_n_levels(mesh, alg)
-    n_dims = ndims(mesh) # Spatial dimension
 
     level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
     level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]

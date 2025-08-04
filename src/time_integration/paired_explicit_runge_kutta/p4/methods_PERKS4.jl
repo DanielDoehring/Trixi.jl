@@ -6,13 +6,13 @@
 #! format: noindent
 
 @doc raw"""
-    PairedExplicitRKSplit4(num_stages,
+    PairedExplicitRK4Split(num_stages,
                            base_path_a_coeffs::AbstractString,
                            base_path_a_coeffs_para::AbstractString,
                            dt_opt = nothing;
                            cS3 = 1.0f0)
 """
-struct PairedExplicitRKSplit4 <:
+struct PairedExplicitRK4Split <:
        AbstractPairedExplicitRKSingle{4}
     num_stages::Int # S
 
@@ -32,7 +32,7 @@ struct PairedExplicitRKSplit4 <:
 end
 
 # Constructor for previously computed A Coeffs
-function PairedExplicitRKSplit4(num_stages,
+function PairedExplicitRK4Split(num_stages,
                                 base_path_a_coeffs::AbstractString,
                                 base_path_a_coeffs_para::AbstractString,
                                 dt_opt = nothing;
@@ -46,7 +46,7 @@ function PairedExplicitRKSplit4(num_stages,
                                                                     base_path_a_coeffs_para,
                                                                     cS3)
 
-    return PairedExplicitRKSplit4(num_stages, a_matrix, a_matrix_para,
+    return PairedExplicitRK4Split(num_stages, a_matrix, a_matrix_para,
                                   a_matrix_constant, c, dt_opt)
 end
 
@@ -54,7 +54,7 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct PairedExplicitRKSplit4Integrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK4SplitIntegrator{RealT <: Real, uType,
                                                 Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSplitSingleIntegrator{4}
@@ -69,7 +69,7 @@ mutable struct PairedExplicitRKSplit4Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRKSplit4
+    alg::PairedExplicitRK4Split
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -81,7 +81,7 @@ mutable struct PairedExplicitRKSplit4Integrator{RealT <: Real, uType,
     k1_para::uType # Additional PERK register for the parabolic part
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRKSplit4;
+function init(ode::ODEProblem, alg::PairedExplicitRK4Split;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
@@ -95,7 +95,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRKSplit4;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRKSplit4Integrator(u0, du, u_tmp,
+    integrator = PairedExplicitRK4SplitIntegrator(u0, du, u_tmp,
                                                   t0, tdir, dt, zero(dt),
                                                   iter, ode.p,
                                                   (prob = ode,), ode.f,

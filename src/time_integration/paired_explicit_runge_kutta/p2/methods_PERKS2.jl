@@ -6,12 +6,12 @@
 #! format: noindent
 
 @doc raw"""
-    PairedExplicitRKSplit2(num_stages,
+    PairedExplicitRK2Split(num_stages,
                           base_path_monomial_coeffs::AbstractString,
                           base_path_monomial_coeffs_para::AbstractString;
                           dt_opt = nothing, bS = 1.0, cS = 0.5)
 """
-struct PairedExplicitRKSplit2 <:
+struct PairedExplicitRK2Split <:
        AbstractPairedExplicitRKSplitSingle{2}
     num_stages::Int
 
@@ -26,7 +26,7 @@ struct PairedExplicitRKSplit2 <:
 end
 
 # Constructor that reads the coefficients from a file
-function PairedExplicitRKSplit2(num_stages,
+function PairedExplicitRK2Split(num_stages,
                                 base_path_monomial_coeffs::AbstractString,
                                 base_path_monomial_coeffs_para::AbstractString;
                                 dt_opt = nothing,
@@ -41,7 +41,7 @@ function PairedExplicitRKSplit2(num_stages,
                                                                  base_path_monomial_coeffs_para,
                                                                  bS, cS)
 
-    return PairedExplicitRKSplit2(num_stages, a_matrix, a_matrix_para, c, 1 - bS, bS,
+    return PairedExplicitRK2Split(num_stages, a_matrix, a_matrix_para, c, 1 - bS, bS,
                                   cS, dt_opt)
 end
 
@@ -49,7 +49,7 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK2SplitIntegrator{RealT <: Real, uType,
                                                 Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSplitSingleIntegrator{2}
@@ -64,7 +64,7 @@ mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRKSplit2
+    alg::PairedExplicitRK2Split
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -76,7 +76,7 @@ mutable struct PairedExplicitRKSplit2Integrator{RealT <: Real, uType,
     k1_para::uType # Additional PERK register for the parabolic part
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
+function init(ode::ODEProblem, alg::PairedExplicitRK2Split;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)
@@ -90,7 +90,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRKSplit2;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-    integrator = PairedExplicitRKSplit2Integrator(u0, du, u_tmp,
+    integrator = PairedExplicitRK2SplitIntegrator(u0, du, u_tmp,
                                                   t0, tdir, dt, zero(dt),
                                                   iter, ode.p,
                                                   (prob = ode,), ode.f,
