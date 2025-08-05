@@ -66,7 +66,7 @@ mutable struct PairedExplicitRelaxationRK2Integrator{RealT <: Real, uType,
                                                      RelaxationSolver} <:
                AbstractPairedExplicitRelaxationRKSingleIntegrator{2}
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType # Used for building the argument to `f`
     t::RealT
     tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time

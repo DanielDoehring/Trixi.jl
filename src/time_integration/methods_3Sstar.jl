@@ -133,7 +133,7 @@ end
 mutable struct SimpleIntegrator3Sstar{RealT <: Real, uType, Params, Sol, F, Alg,
                                       SimpleIntegratorOptions} <: AbstractTimeIntegrator
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp1::uType
     u_tmp2::uType
     t::RealT

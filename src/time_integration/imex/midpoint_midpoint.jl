@@ -42,7 +42,7 @@ mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, 
                                           SimpleIntegratorOptions} <:
                AbstractIMEXTimeIntegrator
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType
     t::RealT
     dt::RealT # current time step

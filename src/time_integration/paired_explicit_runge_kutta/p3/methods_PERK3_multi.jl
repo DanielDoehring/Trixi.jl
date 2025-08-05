@@ -120,7 +120,7 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiIntegrator{3}
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType # Used for building the argument to `f`
     t::RealT
     tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
@@ -163,7 +163,7 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{3}
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType # Used for building the argument to `f`
     t::RealT
     tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time

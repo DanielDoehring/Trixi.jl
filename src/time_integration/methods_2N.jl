@@ -95,7 +95,7 @@ end
 mutable struct SimpleIntegrator2N{RealT <: Real, uType, Params, Sol, F, Alg,
                                   SimpleIntegratorOptions} <: AbstractTimeIntegrator
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType
     t::RealT
     dt::RealT # current time step

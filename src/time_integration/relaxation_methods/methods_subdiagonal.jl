@@ -195,7 +195,7 @@ mutable struct SubDiagonalRelaxationIntegrator{RealT <: Real, uType, Params, Sol
                                                AbstractRelaxationSolver} <:
                RelaxationIntegrator
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType # Used for building the argument to `f`
     t::RealT
     dt::RealT # current time step

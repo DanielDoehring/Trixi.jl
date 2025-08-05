@@ -193,7 +193,7 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType,
                                            PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSingleIntegrator{4}
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType # Used for building the argument to `f`
     t::RealT
     tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
@@ -217,7 +217,7 @@ mutable struct PairedExplicitRK4EulerAcousticIntegrator{RealT <: Real, uType,
                                                         PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKEulerAcousticSingleIntegrator{4}
     u::uType
-    du::uType
+    du::uType # In-place output of `f`
     u_tmp::uType # Used for building the argument to `f`
     t::RealT
     tdir::RealT # DIRection of time integration, i.e, if one marches forward or backward in time
