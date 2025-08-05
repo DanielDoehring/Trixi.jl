@@ -9,8 +9,8 @@ struct PairedExplicitRK2SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{2}
     # TODO: Parabolic duplications
     num_stage_evals_min::Int64
-    num_methods::Int64
-    num_stages::Int64
+    num_methods::Int64 # Number of optimized PERK family members, i.e., R
+    num_stages::Int64 # = maximum number of stages
     stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
     dt_ratios::Vector{Float64}
@@ -22,8 +22,10 @@ struct PairedExplicitRK2SplitMulti <:
     bS::Float64
 
     # TODO: Parabolic duplications
+    # active = evaluated levels
     active_levels::Vector{Vector{Int64}}
-    max_active_levels::Vector{Int64}
+    max_active_levels::Vector{Int64} # highest active level per stage
+    # highest added level in the argument of the evaluated `rhs!` per stage
     max_add_levels::Vector{Int64}
 end
 
