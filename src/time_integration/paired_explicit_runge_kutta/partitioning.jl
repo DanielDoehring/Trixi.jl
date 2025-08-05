@@ -38,7 +38,6 @@ function partition_variables!(level_info_elements,
                               level_info_elements_acc,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
-                              level_info_boundaries_orientation_acc,
                               level_info_mortars_acc,
                               n_levels, n_dims, mesh::TreeMesh, dg, cache, alg)
     @unpack elements, interfaces, boundaries = cache
@@ -154,39 +153,6 @@ function partition_variables!(level_info_elements,
         for l in level_id:n_levels
             push!(level_info_boundaries_acc[l], boundary_id)
         end
-
-        # For orientation-side wise specific treatment
-        if boundaries.orientations[boundary_id] == 1 # x Boundary
-            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][2], boundary_id)
-                end
-            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][1], boundary_id)
-                end
-            end
-        elseif boundaries.orientations[boundary_id] == 2 # y Boundary
-            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][4], boundary_id)
-                end
-            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][3], boundary_id)
-                end
-            end
-        elseif boundaries.orientations[boundary_id] == 3 # z Boundary
-            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][6], boundary_id)
-                end
-            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][5], boundary_id)
-                end
-            end
-        end
     end
 
     if n_dims > 1
@@ -220,7 +186,6 @@ function partition_variables!(level_info_elements,
                               level_info_elements_acc,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
-                              level_info_boundaries_orientation_acc,
                               level_info_mortars_acc,
                               # MPI additions
                               level_info_mpi_interfaces_acc,
@@ -296,39 +261,6 @@ function partition_variables!(level_info_elements,
         for l in level_id:n_levels
             push!(level_info_boundaries_acc[l], boundary_id)
         end
-
-        # For orientation-side wise specific treatment
-        if boundaries.orientations[boundary_id] == 1 # x Boundary
-            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][2], boundary_id)
-                end
-            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][1], boundary_id)
-                end
-            end
-        elseif boundaries.orientations[boundary_id] == 2 # y Boundary
-            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][4], boundary_id)
-                end
-            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][3], boundary_id)
-                end
-            end
-        elseif boundaries.orientations[boundary_id] == 3 # z Boundary
-            if boundaries.neighbor_sides[boundary_id] == 1 # Boundary on negative coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][6], boundary_id)
-                end
-            else # boundaries.neighbor_sides[boundary_id] == 2 Boundary on positive coordinate side
-                for l in level_id:n_levels
-                    push!(level_info_boundaries_orientation_acc[l][5], boundary_id)
-                end
-            end
-        end
     end
 
     if n_dims > 1
@@ -387,7 +319,6 @@ function partition_variables!(level_info_elements,
                               level_info_elements_acc,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
-                              level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
                               level_info_mortars_acc,
                               n_levels, n_dims, mesh::P4estMesh, dg, cache, alg)
     @unpack elements, interfaces, boundaries, mortars = cache
@@ -541,7 +472,6 @@ function partition_variables!(level_info_elements,
                               level_info_elements_acc,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
-                              level_info_boundaries_orientation_acc, # TODO: Not yet adapted for P4est!
                               level_info_mortars_acc,
                               # MPI additions
                               level_info_mpi_interfaces_acc,
@@ -716,7 +646,6 @@ function partition_variables!(level_info_elements,
                               level_info_elements_acc,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
-                              level_info_boundaries_orientation_acc,
                               level_info_mortars_acc,
                               n_levels, n_dims, mesh::StructuredMesh, dg, cache, alg)
     nnodes = length(dg.basis.nodes)

@@ -539,8 +539,7 @@ end
     else
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t + alg.c[stage] * integrator.dt,
-                     integrator,
-                     integrator.coarsest_lvl)
+                     integrator, integrator.coarsest_lvl)
     end
 
     return nothing
@@ -566,13 +565,11 @@ end
         # Hyperbolic part
         integrator.f.f2(integrator.du, integrator.u_tmp, p,
                         integrator.t + alg.c[stage] * integrator.dt,
-                        integrator,
-                        integrator.coarsest_lvl)
+                        integrator, integrator.coarsest_lvl)
         # Parabolic part
         integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
                         integrator.t + alg.c[stage] * integrator.dt,
-                        integrator,
-                        integrator.coarsest_lvl)
+                        integrator, integrator.coarsest_lvl)
     end
 
     return nothing
@@ -701,7 +698,6 @@ function solve_a_butcher_coeffs_unknown! end
          integrator.level_info_elements_acc[max_level],
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
-         #integrator.level_info_boundaries_orientation_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
 end
 
@@ -713,7 +709,6 @@ end
          integrator.level_info_elements_acc[max_level],
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
-         #integrator.level_info_boundaries_orientation_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
 end
 
@@ -725,7 +720,6 @@ end
                    integrator.level_info_elements_acc[max_level],
                    integrator.level_info_interfaces_acc[max_level],
                    integrator.level_info_boundaries_acc[max_level],
-                   #integrator.level_info_boundaries_orientation_acc[max_level],
                    integrator.level_info_mortars_acc[max_level])
 end
 
@@ -740,7 +734,6 @@ end
                               integrator.level_info_elements_acc[max_level],
                               integrator.level_info_interfaces_acc[max_level],
                               integrator.level_info_boundaries_acc[max_level],
-                              #integrator.level_info_boundaries_orientation_acc[max_level],
                               integrator.level_info_mortars_acc[max_level],
                               integrator.level_u_indices_elements)
 end
@@ -753,7 +746,6 @@ end
          integrator.level_info_elements_acc[max_level],
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
-         #integrator.level_info_boundaries_orientation_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
 end
 

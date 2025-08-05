@@ -146,7 +146,6 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType,
     level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
 
     level_info_boundaries_acc::Vector{Vector{Int64}}
-    level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}}
 
     level_info_mortars_acc::Vector{Vector{Int64}}
     level_info_mpi_mortars_acc::Vector{Vector{Int64}}
@@ -188,7 +187,6 @@ mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType,
     level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
 
     level_info_boundaries_acc::Vector{Vector{Int64}}
-    level_info_boundaries_orientation_acc::Vector{Vector{Vector{Int64}}}
 
     level_info_mortars_acc::Vector{Vector{Int64}}
     level_info_mpi_mortars_acc::Vector{Vector{Int64}}
@@ -229,9 +227,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
     level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
 
     level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
-    level_info_boundaries_orientation_acc = [[Vector{Int64}()
-                                              for _ in 1:(2 * n_dims)]
-                                             for _ in 1:n_levels]
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
@@ -243,9 +238,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
         partition_variables!(level_info_elements,
                              level_info_elements_acc,
                              level_info_interfaces_acc,
-                             level_info_boundaries_acc,
-                             level_info_boundaries_orientation_acc,
-                             level_info_mortars_acc,
+                             level_info_boundaries_acc, level_info_mortars_acc,
                              n_levels, n_dims, mesh, dg, cache, alg)
     else
         if mesh isa ParallelP4estMesh
@@ -280,7 +273,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                              level_info_elements_acc,
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
-                             level_info_boundaries_orientation_acc,
                              level_info_mortars_acc,
                              # MPI additions
                              level_info_mpi_interfaces_acc,
@@ -318,7 +310,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                                                level_info_interfaces_acc,
                                                                level_info_mpi_interfaces_acc,
                                                                level_info_boundaries_acc,
-                                                               level_info_boundaries_orientation_acc,
                                                                level_info_mortars_acc,
                                                                level_info_mpi_mortars_acc,
                                                                level_u_indices_elements,
@@ -342,7 +333,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                                       level_info_interfaces_acc,
                                                       level_info_mpi_interfaces_acc,
                                                       level_info_boundaries_acc,
-                                                      level_info_boundaries_orientation_acc,
                                                       level_info_mortars_acc,
                                                       level_info_mpi_mortars_acc,
                                                       level_u_indices_elements,

@@ -411,7 +411,6 @@ end
          integrator.level_info_elements_acc,
          integrator.level_info_interfaces_acc,
          integrator.level_info_boundaries_acc,
-         #integrator.level_info_boundaries_orientation_acc,
          integrator.level_info_mortars_acc,
          integrator.n_levels) # Pass on `n_levels` to `rhs!` of a `SemidiscretizationEulerGravity` for PERKMulti timestep
 end
@@ -421,7 +420,6 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
               level_info_elements_acc,
               level_info_interfaces_acc,
               level_info_boundaries_acc,
-              #level_info_boundaries_orientation_acc,
               level_info_mortars_acc,
               n_levels)
     @unpack semi_euler, semi_gravity, cache = semi
@@ -437,7 +435,6 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                                       level_info_elements_acc[max_level],
                                                       level_info_interfaces_acc[max_level],
                                                       level_info_boundaries_acc[max_level],
-                                                      #level_info_boundaries_orientation_acc[max_level],
                                                       level_info_mortars_acc[max_level])
 
     # compute gravitational potential and forces
@@ -446,7 +443,6 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                                                    level_info_elements_acc,
                                                                    level_info_interfaces_acc,
                                                                    level_info_boundaries_acc,
-                                                                   #level_info_boundaries_orientation_acc,
                                                                    level_info_mortars_acc,
                                                                    cache.level_u_gravity_indices_elements,
                                                                    n_levels)
@@ -539,7 +535,6 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_info_elements_acc,
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
-                         #level_info_boundaries_orientation_acc,
                          level_info_mortars_acc,
                          level_u_gravity_indices_elements,
                          n_levels)
@@ -569,7 +564,6 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_info_elements_acc,
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
-                         #level_info_boundaries_orientation_acc,
                          level_info_mortars_acc,
                          level_u_gravity_indices_elements,
                          n_levels)
@@ -830,7 +824,6 @@ end
                           level_info_elements_acc,
                           level_info_interfaces_acc,
                           level_info_boundaries_acc,
-                          #level_info_boundaries_orientation_acc,
                           level_info_mortars_acc)
     @threaded for i in eachindex(u)
         u_tmp[i] = u[i] + alg.c[2] * dtau * k1[i]
@@ -840,7 +833,6 @@ end
          level_info_elements_acc[1],
          level_info_interfaces_acc[1],
          level_info_boundaries_acc[1],
-         #level_info_boundaries_orientation_acc[1],
          level_info_mortars_acc[1])
 end
 
@@ -928,7 +920,6 @@ end
                           level_info_elements_acc,
                           level_info_interfaces_acc,
                           level_info_boundaries_acc,
-                          #level_info_boundaries_orientation_acc,
                           level_info_mortars_acc,
                           level_u_indices_elements,
                           n_levels,
@@ -955,7 +946,6 @@ end
              level_info_elements_acc[coarsest_lvl],
              level_info_interfaces_acc[coarsest_lvl],
              level_info_boundaries_acc[coarsest_lvl],
-             #level_info_boundaries_orientation_acc[coarsest_lvl],
              level_info_mortars_acc[coarsest_lvl])
 
         @threaded for i in level_info_elements_acc[coarsest_lvl]
@@ -1051,7 +1041,6 @@ end
                                          level_info_elements_acc,
                                          level_info_interfaces_acc,
                                          level_info_boundaries_acc,
-                                         #level_info_boundaries_orientation_acc,
                                          level_info_mortars_acc,
                                          level_u_gravity_indices_elements,
                                          n_levels)
@@ -1069,7 +1058,6 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
                                        level_info_elements_acc,
                                        level_info_interfaces_acc,
                                        level_info_boundaries_acc,
-                                       #level_info_boundaries_orientation_acc,
                                        level_info_mortars_acc,
                                        level_u_gravity_indices_elements,
                                        n_levels)
@@ -1093,9 +1081,7 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
     PERK_k2!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg,
              level_info_elements_acc,
              level_info_interfaces_acc,
-             level_info_boundaries_acc,
-             #level_info_boundaries_orientation_acc,
-             level_info_mortars_acc)
+             level_info_boundaries_acc, level_info_mortars_acc)
 
     @threaded for i in level_info_elements_acc[1]
         @views @. du_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
@@ -1106,7 +1092,6 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
                  level_info_elements_acc,
                  level_info_interfaces_acc,
                  level_info_boundaries_acc,
-                 #level_info_boundaries_orientation_acc,
                  level_info_mortars_acc,
                  level_u_gravity_indices_elements,
                  n_levels,
@@ -1162,7 +1147,6 @@ end
                                          level_info_elements_acc,
                                          level_info_interfaces_acc,
                                          level_info_boundaries_acc,
-                                         #level_info_boundaries_orientation_acc,
                                          level_info_mortars_acc,
                                          level_u_gravity_indices_elements,
                                          n_levels)
@@ -1180,7 +1164,6 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
                                        level_info_elements_acc,
                                        level_info_interfaces_acc,
                                        level_info_boundaries_acc,
-                                       #level_info_boundaries_orientation_acc,
                                        level_info_mortars_acc,
                                        level_u_gravity_indices_elements,
                                        n_levels)
@@ -1204,9 +1187,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
     PERK_k2!(du_ode, u_ode_tmp, u_ode, k1, semi_gravity, dtau, tau, alg,
              level_info_elements_acc,
              level_info_interfaces_acc,
-             level_info_boundaries_acc,
-             #level_info_boundaries_orientation_acc,
-             level_info_mortars_acc)
+             level_info_boundaries_acc, level_info_mortars_acc)
 
     @threaded for i in level_info_elements_acc[1]
         @views @. du_wrap[1, .., i] += grav_scale * (u_euler[1, .., i] - rho0)
@@ -1217,7 +1198,6 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
                  level_info_elements_acc,
                  level_info_interfaces_acc,
                  level_info_boundaries_acc,
-                 #level_info_boundaries_orientation_acc,
                  level_info_mortars_acc,
                  level_u_gravity_indices_elements,
                  n_levels,

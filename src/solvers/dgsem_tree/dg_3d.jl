@@ -195,7 +195,6 @@ function rhs!(du, u, t,
                             dg.surface_integral, dg, boundary_indices)
     end
 
-    # TODO: boundary_orientation_indices?
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
         calc_boundary_flux!(cache, t, boundary_conditions, mesh, equations,

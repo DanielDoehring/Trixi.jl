@@ -41,11 +41,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
 
                     integrator.level_info_boundaries_acc = [Vector{Int64}()
                                                             for _ in 1:(integrator.n_levels)]
-                    # For efficient treatment of boundaries we need additional datastructures
-                    integrator.level_info_boundaries_orientation_acc = [[Vector{Int64}()
-                                                                         for _ in 1:(2 * n_dims)]
-                    # Need here n_levels, otherwise this is not Vector{Vector{Int64}} but Vector{Vector{Vector{Int64}}
-                                                                        for _ in 1:(integrator.n_levels)]
+
                     integrator.level_info_mortars_acc = [Vector{Int64}()
                                                          for _ in 1:(integrator.n_levels)]
                     integrator.level_info_mpi_mortars_acc = [Vector{Int64}()
@@ -62,9 +58,6 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                         empty!(integrator.level_info_mpi_interfaces_acc[level])
 
                         empty!(integrator.level_info_boundaries_acc[level])
-                        for dim in 1:(2 * n_dims)
-                            empty!(integrator.level_info_boundaries_orientation_acc[level][dim])
-                        end
 
                         empty!(integrator.level_info_mortars_acc[level])
                         empty!(integrator.level_info_mpi_mortars_acc[level])
@@ -78,7 +71,6 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          integrator.level_info_elements_acc,
                                          integrator.level_info_interfaces_acc,
                                          integrator.level_info_boundaries_acc,
-                                         integrator.level_info_boundaries_orientation_acc,
                                          integrator.level_info_mortars_acc,
                                          integrator.n_levels, n_dims, mesh, dg,
                                          cache, integrator.alg)
@@ -87,7 +79,6 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          integrator.level_info_elements_acc,
                                          integrator.level_info_interfaces_acc,
                                          integrator.level_info_boundaries_acc,
-                                         integrator.level_info_boundaries_orientation_acc,
                                          integrator.level_info_mortars_acc,
                                          # MPI additions
                                          integrator.level_info_mpi_interfaces_acc,
