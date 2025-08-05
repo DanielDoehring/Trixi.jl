@@ -244,7 +244,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, n_dims, mesh, dg, cache, alg)
+                             n_levels, n_dims, mesh, dg, cache, alg.dt_ratios)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
@@ -257,7 +257,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
 
             # Get (global) element distribution to accordingly balance the solver
             partition_variables!(level_info_elements, n_levels, n_dims,
-                                 mesh, dg, cache, alg)
+                                 mesh, dg, cache, alg.dt_ratios)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
@@ -283,7 +283,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
                              # MPI additions
                              level_info_mpi_interfaces_acc,
                              level_info_mpi_mortars_acc,
-                             n_levels, n_dims, mesh, dg, cache, alg)
+                             n_levels, n_dims, mesh, dg, cache, alg.dt_ratios)
     end
 
     for i in 1:n_levels
