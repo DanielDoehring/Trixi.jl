@@ -93,8 +93,8 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 31 * t_c) # For testing only
 
-#ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 
 summary_callback = SummaryCallback()
@@ -140,8 +140,10 @@ cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
 #cfl = 2.5 # R-TS64
 #cfl = 2.6 # R-CKL54
 
-cfl = 7.6 # PERK2 unsplit/standard multi
-#cfl = 8.7 # PERK2 split multi
+#cfl = 7.6 # PERK2 unsplit/standard multi
+cfl = 8.7 # PERK2 split multi with same stages & distribution
+
+cfl = 7.9 # PERK2 split multi with different stages & distribution
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -168,6 +170,9 @@ callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (d
 # run the simulation
 
 #=
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13)
+
+Stages = [14, 12, 10, 8, 7, 6, 5]
 dtRatios = [0.208310160790890, # 14
     0.172356930215766, # 12
     0.129859071602721, # 10
@@ -175,10 +180,6 @@ dtRatios = [0.208310160790890, # 14
     0.069255720146485, #  7
     0.049637258180915, #  6
     0.030629777558366] / 0.208310160790890 #= 5 =#
-Stages = [14, 12, 10, 8, 7, 6, 5]
-
-
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
@@ -191,23 +192,48 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; r
 =#
 
 ### Split-Multi methods ###
+Stages = [14, 12, 10, 8, 7, 6, 5, 4, 3, 2]
 dtRatios = [0.253144726232790162612, # 14
-    0.214041846963368698198, # 12
-    0.177173703567632401246, # 10
-    0.138494092598762108537, #  8
-    0.121607896165869533434, #  7
+    0.214041846963368698198,  # 12
+    0.177173703567632401246,  # 10
+    0.138494092598762108537,  #  8
+    0.121607896165869533434,  #  7
     0.0975166462040988335502, #  6
     0.0818171376613463507965, #  5
     0.0656503721211265656166, #  4
     0.0419871921542380732717, #  3
     0.0209738927526359475451] / 0.253144726232790162612 #= 2 =#
-Stages = [14, 12, 10, 8, 7, 6, 5, 4, 3, 2]
 
 path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/full_rhs/"
+
+# Can run with these stages with cfl 8.7
+Stages_para = [14, 12, 10, 7, 6, 5, 4, 3, 2]
+dtRatios_para = [3008.7179235408357, # 14
+    1762.72919916304,   # 12
+    842.7395049162385,  # 10
+    375.2614698283665,  # 7
+    272.91099615894865, # 6
+    186.2882904812082,  # 5
+    115.33971622203154, # 4
+    59.942706190483364, # 3
+    19.14860438454724] / 3008.7179235408357 #= 2 =#
+
+Stages_para = [10, 7, 6, 5, 4, 3, 2]
+dtRatios_para = [842.7395049162385,  # 10
+    375.2614698283665,  # 7
+    272.91099615894865, # 6
+    186.2882904812082,  # 5
+    115.33971622203154, # 4
+    59.942706190483364, # 3
+    19.14860438454724] / 842.7395049162385 #= 2 =#
+
+
 path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/para_rhs/"
 
-ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages, path_coeffs, path_coeffs_para, dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages, Stages_para,
+                                                  path_coeffs, path_coeffs_para,
+                                                  dtRatios, dtRatios_para)
 
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4

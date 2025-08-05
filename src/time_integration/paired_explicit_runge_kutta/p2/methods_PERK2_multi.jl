@@ -63,6 +63,23 @@ function compute_PairedExplicitRK2Multi_butcher_tableau(stages::Vector{Int64},
             push!(add_levels[stage], level)
         end
     end
+
+    # Additional treatment for split methods when the maximum number of stages
+    # of the parabolic part does not match the hyperbolic part.
+    for i in 1:num_stages
+        # For `active_levels` (active/evaluated levels/stages):
+        # Set to 0 to indicate no evaluation
+        if active_levels[i] == []
+            active_levels[i] = [0] # `0` encodes no evaluation; also compatible with `maximum.` below
+        end
+
+        # For `add_levels` (added levels in construction of the `rhs!` argument):
+        # Set to 1, which follows from the (internal) consistency requirement
+        if add_levels[i] == []
+            add_levels[i] = [1] # Ensure that at least the first method is added
+        end
+    end
+
     max_active_levels = maximum.(active_levels)
     max_add_levels = maximum.(add_levels)
 

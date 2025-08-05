@@ -189,7 +189,7 @@ function solve!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleInt
     @trixi_timeit timer() "main loop" while !integrator.finalstep
         # Store variables of previous time step
         integrator.t_prev = integrator.t
-        integrator.u_prev .= integrator.u # TODO: Not sure if faster than @threaded loop!
+        integrator.u_prev .= integrator.u # TODO: Probably slower than @threaded loop!
 
         step!(integrator)
     end
@@ -306,12 +306,14 @@ end
     end
 
     # k2: Only evaluated at finest level (1)
-    # Hyperbolic part
+    # Hyperbolic part: Always evaluated
     integrator.f.f2(integrator.du, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)
     # Parabolic part
-    integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
-                    integrator.t + c_dt, integrator, 1)
+    if alg.num_stages_para == alg.num_stages # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
+        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                        integrator.t + c_dt, integrator, 1)
+    end
 
     return nothing
 end
@@ -432,6 +434,8 @@ end
     return nothing
 end
 
+# Version with SAME number of stages for hyperbolic and parabolic part
+#=
 @inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                                                alg, stage)
     if alg.num_methods == integrator.n_levels
@@ -521,6 +525,153 @@ end
 
     return nothing
 end
+=#
+
+# Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
+@inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                                               alg, stage)
+    if alg.num_methods == integrator.n_levels
+        # "PERK4" style
+        for level in 1:alg.max_add_levels[stage]
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
+            a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      a1_dt * integrator.k1[i] +
+                                      a2_dt * integrator.du[i]
+            end
+        end
+
+        for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+            a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      a1_dt * integrator.k1[i]
+            end
+        end
+    else
+        ### General implementation: Not own method for each grid level ###
+
+        # Loop over different methods with own associated level
+        for level in 1:min(alg.num_methods, integrator.n_levels)
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      a1_dt * integrator.k1[i]
+            end
+        end
+        for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
+            a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements[level]
+                #integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                # Try optimize for `@muladd`: avoid `+=`
+                integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                      a2_dt * integrator.du[i]
+            end
+        end
+
+        # "Remainder": Non-efficiently integrated
+        for level in (alg.num_methods + 1):(integrator.n_levels)
+            a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      a1_dt * integrator.k1[i]
+            end
+        end
+        if alg.max_add_levels[stage] == alg.num_methods
+            for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+                a2_dt = alg.a_matrices[alg.num_methods, 2, stage - 2] * integrator.dt
+                @threaded for i in integrator.level_u_indices_elements[level]
+                    #integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                    # Try optimize for `@muladd`: avoid `+=`
+                    integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                          a2_dt * integrator.du[i]
+                end
+            end
+        end
+    end
+
+    # For statically non-uniform meshes/characteristic speeds
+    #integrator.coarsest_lvl = alg.max_active_levels[stage]
+
+    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+    integrator.coarsest_lvl = min(alg.max_active_levels[stage],
+                                  integrator.n_levels)
+
+    # Parabolic contribution, add to `u_tmp`!
+    if alg.num_methods_para == integrator.n_levels_para
+        # "PERK4" style
+        for level in 1:alg.max_add_levels_para[stage]
+            a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] * integrator.dt
+            a2_para_dt = alg.a_matrices_para[level, 2, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements_para[level]
+                integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                      a1_para_dt * integrator.k1_para[i] +
+                                      a2_para_dt * integrator.du_para[i]
+            end
+        end
+
+        for level in (alg.max_add_levels_para[stage] + 1):(integrator.n_levels_para)
+            a1_para_dt = alg.a_matrices_para[alg.num_methods_para, 1, stage - 2] *
+                         integrator.dt
+            @threaded for i in integrator.level_u_indices_elements_para[level]
+                integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                      a1_para_dt * integrator.k1_para[i]
+            end
+        end
+    else
+        ### General implementation: Not own method for each grid level ###
+
+        # Loop over different methods with own associated level
+        for level in 1:min(alg.num_methods_para, integrator.n_levels_para)
+            a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements_para[level]
+                integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                      a1_para_dt * integrator.k1_para[i]
+            end
+        end
+        for level in 1:min(alg.max_add_levels_para[stage], integrator.n_levels_para)
+            a2_para_dt = alg.a_matrices_para[level, 2, stage - 2] * integrator.dt
+            @threaded for i in integrator.level_u_indices_elements_para[level]
+                #integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                # Try optimize for `@muladd`: avoid `+=`
+                integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                      a2_para_dt * integrator.du_para[i]
+            end
+        end
+
+        # "Remainder": Non-efficiently integrated
+        for level in (alg.num_methods_para + 1):(integrator.n_levels_para)
+            a1_para_dt = alg.a_matrices_para[alg.num_methods_para, 1, stage - 2] *
+                         integrator.dt
+            @threaded for i in integrator.level_u_indices_elements_para[level]
+                integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                      a1_para_dt * integrator.k1_para[i]
+            end
+        end
+        if alg.max_add_levels_para[stage] == alg.num_methods_para
+            for level in (alg.max_add_levels_para[stage] + 1):(integrator.n_levels_para)
+                a2_para_dt = alg.a_matrices_para[alg.num_methods, 2, stage - 2] *
+                             integrator.dt
+                @threaded for i in integrator.level_u_indices_elements_para[level]
+                    #integrator.u_tmp[i] += a2_dt * integrator.du[i]
+                    # Try optimize for `@muladd`: avoid `+=`
+                    integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                          a2_para_dt * integrator.du_para[i]
+                end
+            end
+        end
+    end
+
+    # For statically non-uniform meshes/characteristic speeds
+    #integrator.coarsest_lvl = alg.max_active_levels[stage]
+
+    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+    integrator.coarsest_lvl_para = min(alg.max_active_levels_para[stage],
+                                       integrator.n_levels_para)
+
+    return nothing
+end
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                             AbstractPairedExplicitRelaxationRKMultiIntegrator},
@@ -545,6 +696,8 @@ end
     return nothing
 end
 
+# Version with SAME number of stages for hyperbolic and parabolic part
+#=
 @inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                           p, alg, stage)
     PERKMulti_intermediate_stage!(integrator, alg, stage)
@@ -570,6 +723,43 @@ end
         integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
                         integrator.t + alg.c[stage] * integrator.dt,
                         integrator, integrator.coarsest_lvl)
+    end
+
+    return nothing
+end
+=#
+
+# Version with DIFFERENT number of stages for hyperbolic and parabolic part
+@inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                          p, alg, stage)
+    PERKMulti_intermediate_stage!(integrator, alg, stage)
+
+    # Check if there are fewer integrators than grid levels (non-optimal method)
+    if integrator.coarsest_lvl == alg.num_methods
+        # NOTE: This is supposedly more efficient than setting
+        #integrator.coarsest_lvl = integrator.n_levels
+        # and then using the level-dependent version
+        integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                        integrator.t + alg.c[stage] * integrator.dt)
+    else
+        integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                        integrator.t + alg.c[stage] * integrator.dt,
+                        integrator, integrator.coarsest_lvl)
+    end
+
+    # Parabolic contribution
+    if integrator.coarsest_lvl_para != 0 # CHeck if evaluation is required at all
+        if integrator.coarsest_lvl_para == alg.num_methods_para
+            # NOTE: This is supposedly more efficient than setting
+            #integrator.coarsest_lvl = integrator.n_levels
+            # and then using the level-dependent version
+            integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                            integrator.t + alg.c[stage] * integrator.dt)
+        else
+            integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                            integrator.t + alg.c[stage] * integrator.dt,
+                            integrator, integrator.coarsest_lvl_para)
+        end
     end
 
     return nothing
@@ -712,6 +902,8 @@ end
          integrator.level_info_mortars_acc[max_level])
 end
 
+# Version with SAME stage distribution for hyperbolic and parabolic part
+#=
 @inline function rhs_parabolic!(du_ode, u_ode,
                                 semi::SemidiscretizationHyperbolicParabolic, t,
                                 integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
@@ -721,6 +913,19 @@ end
                    integrator.level_info_interfaces_acc[max_level],
                    integrator.level_info_boundaries_acc[max_level],
                    integrator.level_info_mortars_acc[max_level])
+end
+=#
+
+# Version with DIFFERENT stage distribution for hyperbolic and parabolic part
+@inline function rhs_parabolic!(du_ode, u_ode,
+                                semi::SemidiscretizationHyperbolicParabolic, t,
+                                integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                                max_level)
+    rhs_parabolic!(du_ode, u_ode, semi, t,
+                   integrator.level_info_elements_para_acc[max_level],
+                   integrator.level_info_interfaces_para_acc[max_level],
+                   integrator.level_info_boundaries_para_acc[max_level],
+                   integrator.level_info_mortars_para_acc[max_level])
 end
 
 @inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,
