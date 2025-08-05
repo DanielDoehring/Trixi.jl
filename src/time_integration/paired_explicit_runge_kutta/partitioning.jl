@@ -430,8 +430,8 @@ function partition_variables!(level_info_elements,
 end
 
 # Assign number of stage evaluations to elements for stage-evaluations weighted MPI load balancing.
-function partition_variables!(level_info_elements,
-                              n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
+function partition_variables!(level_info_elements, n_levels, n_dims,
+                              mesh::ParallelP4estMesh, dg, cache,
                               alg)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache

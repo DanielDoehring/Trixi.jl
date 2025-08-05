@@ -170,7 +170,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     partition_variables!(level_info_elements,
                          level_info_elements_acc,
                          level_info_interfaces_acc,
-                         level_info_boundaries_acc, level_info_mortars_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
                          n_levels, n_dims, mesh, dg, cache, alg.PERK4Multi)
 
     for i in 1:n_levels
