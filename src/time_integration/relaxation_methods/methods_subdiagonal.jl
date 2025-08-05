@@ -196,7 +196,7 @@ mutable struct SubDiagonalRelaxationIntegrator{RealT <: Real, uType, Params, Sol
                RelaxationIntegrator
     u::uType
     du::uType
-    u_tmp::uType
+    u_tmp::uType # Used for building the argument to `f`
     t::RealT
     dt::RealT # current time step
     dtcache::RealT # ignored

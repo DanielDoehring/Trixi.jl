@@ -190,7 +190,7 @@ mutable struct PairedExplicitRK3Integrator{RealT <: Real, uType,
                AbstractPairedExplicitRKSingleIntegrator{3}
     u::uType
     du::uType
-    u_tmp::uType
+    u_tmp::uType # Used for building the argument to `f`
     t::RealT
     tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
     dt::RealT # current time step

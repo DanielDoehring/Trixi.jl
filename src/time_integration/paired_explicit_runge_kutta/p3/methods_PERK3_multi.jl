@@ -121,15 +121,15 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType,
                AbstractPairedExplicitRKMultiIntegrator{3}
     u::uType
     du::uType
-    u_tmp::uType
+    u_tmp::uType # Used for building the argument to `f`
     t::RealT
-    tdir::RealT
+    tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F
+    f::F # `rhs!` of the semidiscretization
     alg::PairedExplicitRK3Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
@@ -164,15 +164,15 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType,
                AbstractPairedExplicitRKMultiParabolicIntegrator{3}
     u::uType
     du::uType
-    u_tmp::uType
+    u_tmp::uType # Used for building the argument to `f`
     t::RealT
-    tdir::RealT
+    tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
     dt::RealT # current time step
     dtcache::RealT # Used for euler-acoustic coupling
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F
+    f::F # `rhs!` of the semidiscretization
     alg::PairedExplicitRK3Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience

@@ -35,15 +35,15 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real, uType,
                AbstractPairedExplicitRelaxationRKSingleIntegrator{4}
     u::uType
     du::uType
-    u_tmp::uType
+    u_tmp::uType # Used for building the argument to `f`
     t::RealT
-    tdir::RealT
+    tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
     dt::RealT # current time step
     dtcache::RealT # manually set time step
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F
+    f::F # `rhs!` of the semidiscretization
     alg::PairedExplicitRK4
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
