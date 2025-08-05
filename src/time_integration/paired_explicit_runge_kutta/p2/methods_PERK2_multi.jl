@@ -76,15 +76,17 @@ struct PairedExplicitRK2Multi <:
     num_stages::Int64 # = maximum number of stages
     stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
+    # Δt of the different methods divided by Δt_max
     dt_ratios::Vector{Float64}
 
+    # Butcher tableau variables
     a_matrices::Array{Float64, 3}
     c::Vector{Float64}
     b1::Float64
     bS::Float64
 
     # active = evaluated levels
-    active_levels::Vector{Vector{Int64}}
+    active_levels::Vector{Vector{Int64}} # List of evaluated levels per stage
     max_active_levels::Vector{Int64} # highest active level per stage
     # highest added level in the argument of the evaluated `rhs!` per stage
     max_add_levels::Vector{Int64}
