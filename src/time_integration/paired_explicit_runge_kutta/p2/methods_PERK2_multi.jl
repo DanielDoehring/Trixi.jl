@@ -138,7 +138,7 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType,
     # Additional PERK register
     k1::uType
 
-    # Variables managing level-depending integration
+    # Variables managing level-dependent integration
     level_info_elements::Vector{Vector{Int64}}
     level_info_elements_acc::Vector{Vector{Int64}}
 
@@ -180,7 +180,7 @@ mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType,
     # Additional PERK register
     k1::uType
 
-    # Variables managing level-depending integration
+    # Variables managing level-dependent integration
     level_info_elements::Vector{Vector{Int64}}
     level_info_elements_acc::Vector{Vector{Int64}}
 

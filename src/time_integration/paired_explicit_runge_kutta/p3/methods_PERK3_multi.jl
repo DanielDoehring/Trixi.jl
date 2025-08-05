@@ -139,7 +139,7 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType,
     k1::uType
     kS1::uType
 
-    # Variables managing level-depending integration
+    # Variables managing level-dependent integration
     level_info_elements::Vector{Vector{Int64}}
     level_info_elements_acc::Vector{Vector{Int64}}
 
@@ -182,7 +182,7 @@ mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType,
     k1::uType
     kS1::uType
 
-    # Variables managing level-depending integration
+    # Variables managing level-dependent integration
     level_info_elements::Vector{Vector{Int64}}
     level_info_elements_acc::Vector{Vector{Int64}}
 
