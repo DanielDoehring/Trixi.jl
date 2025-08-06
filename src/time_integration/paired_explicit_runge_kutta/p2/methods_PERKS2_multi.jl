@@ -6,7 +6,7 @@
 #! format: noindent
 
 # Version with SAME number of stages for hyperbolic and parabolic part
-#=
+
 struct PairedExplicitRK2SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{2}
     num_stage_evals_min::Int64
@@ -233,8 +233,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     return integrator
 end
-=#
 
+#=
+# Version with DIFFERENT number of stages for hyperbolic and parabolic part
 struct PairedExplicitRK2SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{2}
     num_stage_evals_min::Int64 # Assumed to be indentical for the hyperbolic and parabolic part
@@ -309,10 +310,7 @@ function PairedExplicitRK2SplitMulti(stages::Vector{Int64},
                                        max_add_levels_para_)
 end
 
-# This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
-# This implements the interface components described at
-# https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
-# which are used in Trixi.
+# Version with DIFFERENT number of stages and partitioning(!) for hyperbolic and parabolic part
 mutable struct PairedExplicitRK2SplitMultiIntegrator{RealT <: Real, uType,
                                                      Params, Sol, F,
                                                      PairedExplicitRKOptions} <:
@@ -541,4 +539,5 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     return integrator
 end
+=#
 end # @muladd

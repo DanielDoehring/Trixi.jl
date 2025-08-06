@@ -310,10 +310,10 @@ end
     integrator.f.f2(integrator.du, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)
     # Parabolic part
-    if alg.num_stages_para == alg.num_stages # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
-        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
-                        integrator.t + c_dt, integrator, 1)
-    end
+    #if alg.num_stages_para == alg.num_stages # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
+    integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                    integrator.t + c_dt, integrator, 1)
+    #end
 
     return nothing
 end
@@ -435,7 +435,7 @@ end
 end
 
 # Version with SAME number of stages for hyperbolic and parabolic part
-#=
+
 @inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                                                alg, stage)
     if alg.num_methods == integrator.n_levels
@@ -525,8 +525,8 @@ end
 
     return nothing
 end
-=#
 
+#=
 # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
 @inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                                                alg, stage)
@@ -672,6 +672,7 @@ end
 
     return nothing
 end
+=#
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                             AbstractPairedExplicitRelaxationRKMultiIntegrator},
@@ -682,7 +683,7 @@ end
     if integrator.coarsest_lvl == alg.num_methods
         # NOTE: This is supposedly more efficient than setting
         #integrator.coarsest_lvl = integrator.n_levels
-        # and then using the level-dependent version
+        # and then using the level-dependent function
 
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t + alg.c[stage] * integrator.dt,
@@ -697,7 +698,7 @@ end
 end
 
 # Version with SAME number of stages for hyperbolic and parabolic part
-#=
+
 @inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                           p, alg, stage)
     PERKMulti_intermediate_stage!(integrator, alg, stage)
@@ -706,7 +707,7 @@ end
     if integrator.coarsest_lvl == alg.num_methods
         # NOTE: This is supposedly more efficient than setting
         #integrator.coarsest_lvl = integrator.n_levels
-        # and then using the level-dependent version
+        # and then using the level-dependent function
 
         # Hyperbolic part
         integrator.f.f2(integrator.du, integrator.u_tmp, p,
@@ -727,8 +728,8 @@ end
 
     return nothing
 end
-=#
 
+#=
 # Version with DIFFERENT number of stages for hyperbolic and parabolic part
 @inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                           p, alg, stage)
@@ -738,7 +739,7 @@ end
     if integrator.coarsest_lvl == alg.num_methods
         # NOTE: This is supposedly more efficient than setting
         #integrator.coarsest_lvl = integrator.n_levels
-        # and then using the level-dependent version
+        # and then using the level-dependent function
         integrator.f.f2(integrator.du, integrator.u_tmp, p,
                         integrator.t + alg.c[stage] * integrator.dt)
     else
@@ -752,7 +753,7 @@ end
         if integrator.coarsest_lvl_para == alg.num_methods_para
             # NOTE: This is supposedly more efficient than setting
             #integrator.coarsest_lvl = integrator.n_levels
-            # and then using the level-dependent version
+            # and then using the level-dependent function
             integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
                             integrator.t + alg.c[stage] * integrator.dt)
         else
@@ -764,6 +765,7 @@ end
 
     return nothing
 end
+=#
 
 # used for AMR (Adaptive Mesh Refinement)
 function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator,
@@ -903,7 +905,7 @@ end
 end
 
 # Version with SAME stage distribution for hyperbolic and parabolic part
-#=
+
 @inline function rhs_parabolic!(du_ode, u_ode,
                                 semi::SemidiscretizationHyperbolicParabolic, t,
                                 integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
@@ -914,8 +916,8 @@ end
                    integrator.level_info_boundaries_acc[max_level],
                    integrator.level_info_mortars_acc[max_level])
 end
-=#
 
+#=
 # Version with DIFFERENT stage distribution for hyperbolic and parabolic part
 @inline function rhs_parabolic!(du_ode, u_ode,
                                 semi::SemidiscretizationHyperbolicParabolic, t,
@@ -927,6 +929,7 @@ end
                    integrator.level_info_boundaries_para_acc[max_level],
                    integrator.level_info_mortars_para_acc[max_level])
 end
+=#
 
 @inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                            semi::SemidiscretizationHyperbolicParabolic,
@@ -952,6 +955,18 @@ end
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
+end
+
+# Dummy argument `integrator` for same signature as `rhs_hyperbolic_parabolic!` for
+# hyperbolic-parabolic split ODE problems solved with non-split integrators, such 
+# as the single/standalone PERK schemes.
+@inline function rhs!(du_ode, u_ode, semi::AbstractSemidiscretization, t,
+                      integrator)
+    rhs!(du_ode, u_ode, semi, t)
+end
+@inline function (f::SplitFunction)(du_ode, u_ode, semi::AbstractSemidiscretization, t,
+                                    integrator)
+    f(du_ode, u_ode, semi, t)
 end
 
 # Multirate/partitioned helpers

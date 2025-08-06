@@ -81,6 +81,7 @@ Stages = 8
 ode_alg = Trixi.PairedExplicitRK4(Stages, path_adv_diff)
 
 #ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv, path_adv)
+ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv_diff, path_adv_diff)
 ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv, path_diff)
 
 sol = Trixi.solve(ode, ode_alg,

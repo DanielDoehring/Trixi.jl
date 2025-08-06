@@ -119,7 +119,64 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Split;
     return integrator
 end
 
-function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{4})
+@inline function PERK4_kS2_to_kS!(integrator::AbstractPairedExplicitRKSplitIntegrator{4},
+                                  p, alg)
+    for stage in 1:2
+        a1_dt = alg.a_matrix_constant[1, stage] * integrator.dt
+        a2_dt = alg.a_matrix_constant[2, stage] * integrator.dt
+        @threaded for i in eachindex(integrator.u)
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  a1_dt * integrator.k1[i] + # `k1` contains already parabolic part
+                                  a2_dt * (integrator.du[i] + integrator.du_para[i])
+        end
+
+        # Hyperbolic part
+        integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                        integrator.t +
+                        alg.c[alg.num_stages - 3 + stage] * integrator.dt)
+
+        # Parabolic part
+        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                        integrator.t +
+                        alg.c[alg.num_stages - 3 + stage] * integrator.dt)
+    end
+
+    # Last stage
+    a1_dt = alg.a_matrix_constant[1, 3] * integrator.dt
+    a2_dt = alg.a_matrix_constant[2, 3] * integrator.dt
+    @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              a1_dt * integrator.k1[i] +
+                              a2_dt * (integrator.du[i] + integrator.du_para[i])
+    end
+
+    @threaded for i in eachindex(integrator.u)
+        # Store K_{S-1} in `k1`
+        integrator.k1[i] = integrator.du[i] + integrator.du_para[i] # Faster than broadcasted version (with .=)
+    end
+
+    # Hyperbolic part
+    integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                    integrator.t + alg.c[alg.num_stages] * integrator.dt)
+
+    # Parabolic part
+    integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                    integrator.t + alg.c[alg.num_stages] * integrator.dt)
+
+    b_dt = 0.5 * integrator.dt # 0.5 = b_{S-1} = b_{S}
+    @threaded for i in eachindex(integrator.u)
+        # Note that 'k1' carries the values of K_{S-1}
+        # and that we construct 'K_S' "in-place" from 'integrator.du'
+        #integrator.u[i] += b_dt * (integrator.k1[i] + integrator.du[i])
+        # Try optimize for `@muladd`: avoid `+=`
+        integrator.u[i] = integrator.u[i] +
+                          b_dt *
+                          (integrator.k1[i] +
+                           integrator.du[i] + integrator.du_para[i])
+    end
+end
+
+function step!(integrator::AbstractPairedExplicitRKSplitIntegrator{4})
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -143,19 +200,14 @@ function step!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{4})
         PERK_k1!(integrator, prob.p)
         PERK_k2!(integrator, prob.p, alg)
 
-        # Higher stages until "constant" stages
+        # Higher stages until shared stages with constant Butcher tableau
         for stage in 3:(alg.num_stages - 3)
             PERK_ki!(integrator, prob.p, alg, stage)
         end
 
-        # Accumulate hyperbolic and parabolic contributions into `du` and `k1`
-        # to reuse `PERK4_kS2_to_kS!`
-        @threaded for i in eachindex(integrator.du)
-            # Try to optimize for `@muladd`: avoid `+=`
-            integrator.du[i] = integrator.du[i] + integrator.du_para[i]
-        end
-        # Access registers after another to allow for optimized memory access
-        @threaded for i in eachindex(integrator.du)
+        # Accumulate hyperbolic and parabolic contributions into `k1` for 
+        # last three stages with shared Butcher coefficients
+        @threaded for i in eachindex(integrator.k1)
             # Try to optimize for `@muladd`: avoid `+=`
             integrator.k1[i] = integrator.k1[i] + integrator.k1_para[i]
         end

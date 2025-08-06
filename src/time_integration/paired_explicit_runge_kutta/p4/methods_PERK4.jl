@@ -314,8 +314,9 @@ end
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] +
                               a1_dt * integrator.k1[i] + a2_dt * integrator.du[i]
-
-        # Store K_{S-1} in `k1`
+    end
+    # Store K_{S-1} in `k1`
+    @threaded for i in eachindex(integrator.u)
         integrator.k1[i] = integrator.du[i] # Faster than broadcasted version (with .=)
     end
 
@@ -357,7 +358,7 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{4})
         PERK_k1!(integrator, prob.p)
         PERK_k2!(integrator, prob.p, alg)
 
-        # Higher stages until "constant" stages
+        # Higher stages until shared stages with constant Butcher tableau
         for stage in 3:(alg.num_stages - 3)
             PERK_ki!(integrator, prob.p, alg, stage)
         end
@@ -395,4 +396,5 @@ include("methods_PERRK4_multi.jl")
 
 # Split methods targeting hyperbolic-parabolic problems
 include("methods_PERKS4.jl")
+include("methods_PERKS4_multi.jl")
 end # @muladd
