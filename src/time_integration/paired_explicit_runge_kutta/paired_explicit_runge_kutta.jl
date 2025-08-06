@@ -378,6 +378,7 @@ end
         end
 
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+            # For PERK4 Multi: `a` coefficient is 1 (could be minimally further optimized)
             a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
