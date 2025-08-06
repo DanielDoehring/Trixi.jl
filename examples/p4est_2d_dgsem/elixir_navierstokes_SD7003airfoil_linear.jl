@@ -146,10 +146,10 @@ cfl = 7.9 # PERK2 split multi with different stages (14, 10) & distribution
 
 cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
 #cfl = 5.6 # PERK 4 Multi Split E = 5, ..., 10
-#cfl = 6.1 # PERK 4 Multi Split (14, 10)
+cfl = 6.1 # PERK 4 Multi Split (14, 10)
 
-cfl = 7.4 # PEERRKS_4 Multi E = 5, ..., 14
-cfl = 6.7 # PERRK 4 Multi Split (14, 10)
+#cfl = 7.4 # PEERRKS_4 Multi E = 5, ..., 14
+#cfl = 6.6 # PERRK 4 Multi Split (14, 10) # TODO: Presults in more timesteps taken than with 6.1 non-relaxed!
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -289,12 +289,12 @@ ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages,
                                                   dtRatios)
 =#
 
-#=
+
 ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages, Stages_para,
                                                   path_coeffs, path_coeffs_para,
                                                   dtRatios, dtRatios_para)
-=#
 
+#=
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13)
 
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
@@ -302,7 +302,7 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path_coeffs, dtRa
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para, 
                                                             path_coeffs, path_coeffs_para,
                                                             dtRatios, dtRatios_para; relaxation_solver = relaxation_solver)
-
+=#
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
