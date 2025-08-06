@@ -151,7 +151,7 @@ function step!(integrator::AbstractPairedExplicitRKSplitIntegrator{2})
                                 alg.bS * (integrator.du[i] + integrator.du_para[i]))
             =#
 
-            # More performant version for b1 = 0
+            # More performant version for b1 = 0, bS = 1
             # Try optimize for `@muladd`: avoid `+=`
             integrator.u[i] = integrator.u[i] +
                               integrator.dt * (integrator.du[i] + integrator.du_para[i])
