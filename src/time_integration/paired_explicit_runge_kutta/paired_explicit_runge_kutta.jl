@@ -71,8 +71,6 @@ abstract type AbstractPairedExplicitRKSplitSingleIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRKSplitMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRKSplitIntegrator{ORDER} end
 
-# TODO: Could also do split relaxation integrators (still fully explicit)
-
 # Relaxation integrators              
 abstract type AbstractPairedExplicitRelaxationRKIntegrator{ORDER} <:
               AbstractPairedExplicitRKIntegrator{ORDER} end
@@ -82,6 +80,16 @@ abstract type AbstractPairedExplicitRelaxationRKSingleIntegrator{ORDER} <:
 
 abstract type AbstractPairedExplicitRelaxationRKMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRelaxationRKIntegrator{ORDER} end
+
+# Relaxation Split Integrators
+abstract type AbstractPairedExplicitRelaxationRKSplitIntegrator{ORDER} <:
+              AbstractPairedExplicitRKSplitIntegrator{ORDER} end
+
+abstract type AbstractPairedExplicitRelaxationRKSplitSingleIntegrator{ORDER} <: # Currently not implemented
+              AbstractPairedExplicitRelaxationRKSplitIntegrator{ORDER} end
+
+abstract type AbstractPairedExplicitRelaxationRKSplitMultiIntegrator{ORDER} <:
+              AbstractPairedExplicitRelaxationRKSplitIntegrator{ORDER} end
 
 # Euler-Acoustic integrators
 abstract type AbstractPairedExplicitRKEulerAcousticSingleIntegrator{ORDER} <:
@@ -97,7 +105,8 @@ abstract type AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator{ORDER} 
               AbstractPairedExplicitRKMultiParabolicIntegrator{ORDER} end
 
 @inline function update_t_relaxation!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator,
-                                                        AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator})
+                                                        AbstractPairedExplicitRelaxationRKMultiParabolicIntegrator,
+                                                        AbstractPairedExplicitRelaxationRKSplitMultiIntegrator})
     # Check if due to entropy relaxation the final step is not reached
     if integrator.finalstep == true && integrator.gamma != 1
         # If we would go beyond the final time, clip gamma at 1.0
@@ -320,7 +329,8 @@ end
 =#
 
 # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
-@inline function PERK_k2!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+@inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKSplitMultiIntegrator,
+                                            AbstractPairedExplicitRelaxationRKSplitMultiIntegrator},
                           p, alg)
     c_dt = alg.c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
@@ -552,7 +562,8 @@ end
 =#
 
 # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
-@inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+@inline function PERKMulti_intermediate_stage!(integrator::Union{AbstractPairedExplicitRKSplitMultiIntegrator,
+                                                                 AbstractPairedExplicitRelaxationRKSplitMultiIntegrator},
                                                alg, stage)
     if alg.num_methods == integrator.n_levels
         # "PERK4" style
@@ -754,7 +765,8 @@ end
 =#
 
 # Version with DIFFERENT number of stages for hyperbolic and parabolic part
-@inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+@inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKSplitMultiIntegrator,
+                                            AbstractPairedExplicitRelaxationRKSplitMultiIntegrator},
                           p, alg, stage)
     PERKMulti_intermediate_stage!(integrator, alg, stage)
 
@@ -917,7 +929,8 @@ end
 
 # Required for split methods
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
-                      integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                      integrator::Union{AbstractPairedExplicitRKSplitMultiIntegrator,
+                                        AbstractPairedExplicitRelaxationRKSplitMultiIntegrator},
                       max_level)
     rhs!(du_ode, u_ode, semi, t,
          integrator.level_info_elements_acc[max_level],
@@ -943,7 +956,8 @@ end
 # Version with DIFFERENT stage distribution for hyperbolic and parabolic part
 @inline function rhs_parabolic!(du_ode, u_ode,
                                 semi::SemidiscretizationHyperbolicParabolic, t,
-                                integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                                integrator::Union{AbstractPairedExplicitRKSplitMultiIntegrator,
+                                                  AbstractPairedExplicitRelaxationRKSplitMultiIntegrator},
                                 max_level)
     rhs_parabolic!(du_ode, u_ode, semi, t,
                    integrator.level_info_elements_para_acc[max_level],
