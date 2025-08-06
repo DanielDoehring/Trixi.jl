@@ -33,7 +33,7 @@ end
 end
 
 # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
-#=
+
 @inline function get_n_levels(mesh::Union{P4estMesh, StructuredMesh},
                               alg::AbstractPairedExplicitRKSplitMulti)
     n_levels = alg.num_methods
@@ -41,7 +41,6 @@ end
 
     return n_levels, n_levels_para
 end
-=#
 
 # TODO: Try out thread-parallelization of the assignment!
 

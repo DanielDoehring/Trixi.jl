@@ -6,7 +6,7 @@
 #! format: noindent
 
 # Version with SAME number of stages for hyperbolic and parabolic part
-
+#=
 struct PairedExplicitRK2SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{2}
     num_stage_evals_min::Int64
@@ -233,8 +233,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     return integrator
 end
+=#
 
-#=
 # Version with DIFFERENT number of stages for hyperbolic and parabolic part
 struct PairedExplicitRK2SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{2}
@@ -539,5 +539,4 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     return integrator
 end
-=#
 end # @muladd

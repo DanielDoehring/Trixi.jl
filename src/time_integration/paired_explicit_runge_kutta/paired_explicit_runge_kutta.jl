@@ -297,6 +297,8 @@ end
     return nothing
 end
 
+# Version with SAME number of stages for hyperbolic and parabolic part
+#=
 @inline function PERK_k2!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                           p, alg)
     c_dt = alg.c[2] * integrator.dt
@@ -310,10 +312,31 @@ end
     integrator.f.f2(integrator.du, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)
     # Parabolic part
-    #if alg.num_stages_para == alg.num_stages # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
     integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)
-    #end
+
+    return nothing
+end
+=#
+
+# Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
+@inline function PERK_k2!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
+                          p, alg)
+    c_dt = alg.c[2] * integrator.dt
+    @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              c_dt * (integrator.k1[i] + integrator.k1_para[i])
+    end
+
+    # k2: Only evaluated at finest level (1)
+    # Hyperbolic part: Always evaluated
+    integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                    integrator.t + c_dt, integrator, 1)
+    # Parabolic part
+    if alg.num_stages_para == alg.num_stages
+        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                        integrator.t + c_dt, integrator, 1)
+    end
 
     return nothing
 end
@@ -436,7 +459,7 @@ end
 end
 
 # Version with SAME number of stages for hyperbolic and parabolic part
-
+#=
 @inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                                                alg, stage)
     if alg.num_methods == integrator.n_levels
@@ -526,8 +549,8 @@ end
 
     return nothing
 end
+=#
 
-#=
 # Version with DIFFERENT number of stages and partitioning for hyperbolic and parabolic part
 @inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                                                alg, stage)
@@ -673,7 +696,6 @@ end
 
     return nothing
 end
-=#
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                             AbstractPairedExplicitRelaxationRKMultiIntegrator},
@@ -699,7 +721,7 @@ end
 end
 
 # Version with SAME number of stages for hyperbolic and parabolic part
-
+#=
 @inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                           p, alg, stage)
     PERKMulti_intermediate_stage!(integrator, alg, stage)
@@ -729,8 +751,8 @@ end
 
     return nothing
 end
+=#
 
-#=
 # Version with DIFFERENT number of stages for hyperbolic and parabolic part
 @inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
                           p, alg, stage)
@@ -766,7 +788,6 @@ end
 
     return nothing
 end
-=#
 
 # used for AMR (Adaptive Mesh Refinement)
 function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator,
@@ -906,7 +927,7 @@ end
 end
 
 # Version with SAME stage distribution for hyperbolic and parabolic part
-
+#=
 @inline function rhs_parabolic!(du_ode, u_ode,
                                 semi::SemidiscretizationHyperbolicParabolic, t,
                                 integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
@@ -917,8 +938,8 @@ end
                    integrator.level_info_boundaries_acc[max_level],
                    integrator.level_info_mortars_acc[max_level])
 end
+=#
 
-#=
 # Version with DIFFERENT stage distribution for hyperbolic and parabolic part
 @inline function rhs_parabolic!(du_ode, u_ode,
                                 semi::SemidiscretizationHyperbolicParabolic, t,
@@ -930,7 +951,6 @@ end
                    integrator.level_info_boundaries_para_acc[max_level],
                    integrator.level_info_mortars_para_acc[max_level])
 end
-=#
 
 @inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                            semi::SemidiscretizationHyperbolicParabolic,
