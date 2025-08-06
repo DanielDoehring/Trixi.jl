@@ -94,7 +94,7 @@ tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 31 * t_c) # For testing only
 
 ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 
 summary_callback = SummaryCallback()
@@ -145,6 +145,7 @@ cfl = 8.7 # PERK2 split multi with same stages & distribution
 #cfl = 7.9 # PERK2 split multi with different stages (14, 10) & distribution
 
 cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
+cfl = 5.6 # PERK 4 Multi Split E = 5, ..., 10
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -256,17 +257,23 @@ dtRatios = [0.208310160790890, # 14
     0.049637258180915, #  6
     0.030629777558366] / 0.208310160790890 #= 5 =#
 
-path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p4/full_rhs/"
+Stages = [10, 8, 7, 6, 5]
+dtRatios = [0.129859071602721, # 10
+    0.092778774946394, #  8
+    0.069255720146485, #  7
+    0.049637258180915, #  6
+    0.030629777558366] / 0.129859071602721 #= 5 =#
 
+path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p4/full_rhs/"
 path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p4/para_rhs/"
 
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path_coeffs, dtRatios)
 
-#=
+
 ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages,
-                                                  path_coeffs, path_coeffs,
+                                                  path_coeffs, path_coeffs_para,
                                                   dtRatios)
-=#
+
 
 #=
 Stages_para = Stages
