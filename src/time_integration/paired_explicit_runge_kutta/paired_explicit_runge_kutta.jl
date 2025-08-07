@@ -431,12 +431,11 @@ end
             end
         end
 
+        c_dt = alg.c[stage] * integrator.dt
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
-            # For PERK4 Multi: `a` coefficient is 1 (could be minimally further optimized)
-            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      a1_dt * integrator.k1[i]
+                                      c_dt * integrator.k1[i]
             end
         end
     else
@@ -503,12 +502,11 @@ end
         end
     end
 
+    c_dt = alg.c[stage] * integrator.dt
     for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
-        # For PERK4 Multi: `a` coefficient is 1 (could be minimally further optimized)
-        a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
         @threaded for i in integrator.level_u_indices_elements[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                  a1_dt * integrator.k1[i]
+                                  c_dt * integrator.k1[i]
         end
     end
 
@@ -627,11 +625,11 @@ end
             end
         end
 
+        c_dt = alg.c[stage] * integrator.dt
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
-            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
-                                      a1_dt * integrator.k1[i]
+                                      c_dt * integrator.k1[i]
             end
         end
     else
@@ -696,12 +694,11 @@ end
             end
         end
 
+        c_dt = alg.c[stage] * integrator.dt
         for level in (alg.max_add_levels_para[stage] + 1):(integrator.n_levels_para)
-            a1_para_dt = alg.a_matrices_para[alg.num_methods_para, 1, stage - 2] *
-                         integrator.dt
             @threaded for i in integrator.level_u_indices_elements_para[level]
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
-                                      a1_para_dt * integrator.k1_para[i]
+                                      c_dt * integrator.k1_para[i]
             end
         end
     else
