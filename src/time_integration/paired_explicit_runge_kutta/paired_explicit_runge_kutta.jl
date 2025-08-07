@@ -28,6 +28,16 @@ abstract type AbstractPairedExplicitRKSplitSingle{ORDER} <:
 abstract type AbstractPairedExplicitRKSplitMulti{ORDER} <:
               AbstractPairedExplicitRKMulti{ORDER} end
 
+abstract type AbstractPairedExplicitRKIMEX{ORDER} <: AbstractPairedExplicitRK{ORDER} end
+
+abstract type AbstractPairedExplicitRKIMEXSingle{ORDER} <:
+              AbstractPairedExplicitRKIMEX{ORDER} end
+
+abstract type AbstractPairedExplicitRKIMEXMulti{ORDER} <:
+              AbstractPairedExplicitRKIMEX{ORDER} end
+
+# TODO: Split IMEX
+
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
 mutable struct PairedExplicitRKOptions{Callback, TStops}
     callback::Callback # callbacks; used in Trixi
@@ -90,6 +100,16 @@ abstract type AbstractPairedExplicitRelaxationRKSplitSingleIntegrator{ORDER} <: 
 
 abstract type AbstractPairedExplicitRelaxationRKSplitMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRelaxationRKSplitIntegrator{ORDER} end
+
+# IMEX integrators
+abstract type AbstractPairedExplicitRKIMEXIntegrator{ORDER} <:
+              AbstractPairedExplicitRKIntegrator{ORDER} end
+
+abstract type AbstractPairedExplicitRKIMEXSingleIntegrator{ORDER} <:
+              AbstractPairedExplicitRKIMEXIntegrator{ORDER} end
+
+abstract type AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} <:
+              AbstractPairedExplicitRKIMEXIntegrator{ORDER} end
 
 # Euler-Acoustic integrators
 abstract type AbstractPairedExplicitRKEulerAcousticSingleIntegrator{ORDER} <:
@@ -292,14 +312,15 @@ end
 end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                            AbstractPairedExplicitRelaxationRKMultiIntegrator},
+                                            AbstractPairedExplicitRelaxationRKMultiIntegrator,
+                                            AbstractPairedExplicitRKIMEXMultiIntegrator},
                           p, alg)
     c_dt = alg.c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
         integrator.u_tmp[i] = integrator.u[i] + c_dt * integrator.k1[i]
     end
 
-    # k2: Only evaluated at finest level (1)
+    # k2: Only evaluated at finest (explicit) level: 1
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + c_dt, integrator, 1)
 
@@ -316,7 +337,7 @@ end
                               c_dt * (integrator.k1[i] + integrator.k1_para[i])
     end
 
-    # k2: Only evaluated at finest level (1)
+    # k2: Only evaluated at finest (explicit) level: 1
     # Hyperbolic part: Always evaluated
     integrator.f.f2(integrator.du, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)
@@ -338,7 +359,7 @@ end
                               c_dt * (integrator.k1[i] + integrator.k1_para[i])
     end
 
-    # k2: Only evaluated at finest level (1)
+    # k2: Only evaluated at finest (explicit) level: 1
     # Hyperbolic part: Always evaluated
     integrator.f.f2(integrator.du, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)
@@ -412,7 +433,7 @@ end
 
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             # For PERK4 Multi: `a` coefficient is 1 (could be minimally further optimized)
-            a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i]
@@ -468,6 +489,35 @@ end
     return nothing
 end
 
+@inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator,
+                                               alg, stage)
+    # CARE: Currently only implemented for matching number of methods and grid-levels!
+    ### Simplified implementation: Own method for each level ###
+    for level in 1:alg.max_add_levels[stage]
+        a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
+        a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  a1_dt * integrator.k1[i] +
+                                  a2_dt * integrator.du[i]
+        end
+    end
+
+    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+        # For PERK4 Multi: `a` coefficient is 1 (could be minimally further optimized)
+        a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                  a1_dt * integrator.k1[i]
+        end
+    end
+
+    # For statically non-uniform meshes/characteristic speeds
+    integrator.coarsest_lvl = alg.max_active_levels[stage]
+
+    return nothing
+end
+
 # Version with SAME number of stages for hyperbolic and parabolic part
 #=
 @inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
@@ -490,7 +540,7 @@ end
 
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
-            a1_para_dt = alg.a_matrices_para[alg.num_methods, 1, stage - 2] *
+            a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] *
                          integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
@@ -578,7 +628,7 @@ end
         end
 
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
-            a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
+            a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i]
@@ -709,7 +759,8 @@ end
 end
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                            AbstractPairedExplicitRelaxationRKMultiIntegrator},
+                                            AbstractPairedExplicitRelaxationRKMultiIntegrator,
+                                            AbstractPairedExplicitRKIMEXMultiIntegrator},
                           p, alg, stage)
     PERKMulti_intermediate_stage!(integrator, alg, stage)
 
@@ -918,7 +969,8 @@ function solve_a_butcher_coeffs_unknown! end
 # Depending on the `semi`, different fields from `integrator` need to be passed on.
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
                       integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                        AbstractPairedExplicitRelaxationRKMultiIntegrator},
+                                        AbstractPairedExplicitRelaxationRKMultiIntegrator,
+                                        AbstractPairedExplicitRKIMEXMultiIntegrator},
                       max_level)
     rhs!(du_ode, u_ode, semi, t,
          integrator.level_info_elements_acc[max_level],
