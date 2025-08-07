@@ -94,7 +94,7 @@ tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 31 * t_c) # For testing only
 
 ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
-#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
 
 summary_callback = SummaryCallback()
@@ -294,7 +294,7 @@ ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages, Stages_para,
                                                   path_coeffs, path_coeffs_para,
                                                   dtRatios, dtRatios_para)
 
-#=
+
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13)
 
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
@@ -302,7 +302,7 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path_coeffs, dtRa
 ode_algorithm = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para, 
                                                             path_coeffs, path_coeffs_para,
                                                             dtRatios, dtRatios_para; relaxation_solver = relaxation_solver)
-=#
+
 
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4

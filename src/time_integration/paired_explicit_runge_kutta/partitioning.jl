@@ -42,14 +42,15 @@ end
     return n_levels, n_levels_para
 end
 
-# TODO: Try out thread-parallelization of the assignment!
+# TODO: Try out (thread-)parallelization of the assignment!
 
 function partition_variables!(level_info_elements,
                               level_info_elements_acc,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels, n_dims, mesh::TreeMesh, dg, cache, dt_ratios)
+                              n_levels, n_dims, mesh::TreeMesh, dg, cache,
+                              dt_ratios)
     @unpack elements, interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)
@@ -104,13 +105,16 @@ function partition_variables!(level_info_elements,
     n_interfaces = length(interfaces.orientations)
     # Determine level for each interface
     for interface_id in 1:n_interfaces
-        # Get element id: Interfaces only between elements of same size
-        element_id = interfaces.neighbor_ids[1, interface_id]
+        # In 1D, interfaces are not necessarily between elements of same size
+        element_id1 = interfaces.neighbor_ids[1, interface_id]
+        element_id2 = interfaces.neighbor_ids[2, interface_id]
 
         # Determine level
-        level = mesh.tree.levels[elements.cell_ids[element_id]]
+        level1 = mesh.tree.levels[elements.cell_ids[element_id1]]
+        level2 = mesh.tree.levels[elements.cell_ids[element_id2]]
 
-        level_id = max_level + 1 - level
+        # Assign interface to the higher level of the two elements
+        level_id = max_level + 1 - max(level1, level2)
 
         # CARE: This is for testcase with special assignment
         #level_id = element_id_level[element_id]
@@ -192,6 +196,227 @@ function partition_variables!(level_info_elements,
     return nothing
 end
 
+function partition_variables_imex!(level_info_elements,
+                                   level_info_elements_acc,
+                                   level_info_interfaces_acc,
+                                   level_info_boundaries_acc,
+                                   level_info_mortars_acc,
+                                   n_levels, n_dims, mesh::TreeMesh, dg, cache,
+                                   dt_ratios)
+    @unpack elements, interfaces, boundaries = cache
+
+    max_level = maximum_level(mesh.tree)
+
+    n_elements = length(elements.cell_ids)
+
+    # CARE: This is for testcase with special assignment
+    #element_id_level = Dict{Int, Int}()
+
+    # Determine level for each element
+    for element_id in 1:n_elements
+        # Determine level
+        # NOTE: For really different grid sizes
+        level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+        # Convert to level id
+        level_id = max_level + 1 - level
+
+        # CARE: This is for testcase with special assignment
+        #level_id = rand(1:n_levels)
+        #level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
+        #element_id_level[element_id] = level_id
+
+        # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+        #=
+        c_max_el = 0.0
+        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element_id)
+
+            c = u_node[end]
+            if c > c_max_el
+                c_max_el = c
+            end
+        end
+        # Similar to procedure for P4est
+        level_id = findfirst(x -> x < c_max_el, dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level_id === nothing
+            level_id = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level_id = level_id - 1
+        end
+        =#
+
+        push!(level_info_elements[level_id], element_id)
+
+        # Add to accumulated container
+        # Exclude pushes to first level with is integrated implicitly
+        if level_id == 1
+            push!(level_info_elements_acc[1], element_id)
+        else
+            for l in level_id:n_levels
+                push!(level_info_elements_acc[l], element_id)
+            end
+        end
+    end
+
+    # These are the finest cells, which should be integrated with the IMEX method,
+    # which is due to historical reasons of the implementation the *LAST* method 
+    # in the time integration algorithm.
+    # Thus, we need to move it to the end and everything else to the front.
+    first_entry = level_info_elements[1]
+    for l in 1:(n_levels - 1)
+        level_info_elements[l] = level_info_elements[l + 1]
+    end
+    level_info_elements[n_levels] = first_entry
+
+    first_entry = level_info_elements_acc[1]
+    for l in 1:(n_levels - 1)
+        level_info_elements_acc[l] = level_info_elements_acc[l + 1]
+    end
+    level_info_elements_acc[n_levels] = first_entry
+
+    n_interfaces = length(interfaces.orientations)
+    # Determine level for each interface
+    for interface_id in 1:n_interfaces
+        # In 1D, interfaces are not necessarily between elements of same size
+        element_id1 = interfaces.neighbor_ids[1, interface_id]
+        element_id2 = interfaces.neighbor_ids[2, interface_id]
+
+        # Determine level
+        level1 = mesh.tree.levels[elements.cell_ids[element_id1]]
+        level2 = mesh.tree.levels[elements.cell_ids[element_id2]]
+
+        # TODO: Do I need to revisit this logic for the IMEX case when
+        # the smaller element has actually less stage evaluations (due to implicit logic) ?
+        # For more than 2 levels: check if one level_id is = 1, if that is the case use 2
+        # IDEA: Add to both levels?
+
+        #level_id = max_level + 1 - max(level1, level2)
+        level_id = max_level + 1 - min(level1, level2)
+
+        # CARE: This is for testcase with special assignment
+        #level_id = element_id_level[element_id]
+
+        # NOTE: For case with varying characteristic speeds
+        #=
+        el_id_1 = interfaces.neighbor_ids[1, interface_id]
+        el_id_2 = interfaces.neighbor_ids[2, interface_id]
+
+        level_1 = 0
+        level_2 = 0
+
+        for level in 1:n_levels
+            if el_id_1 in level_info_elements[level]
+                level_1 = level
+                break
+            end
+        end
+
+        for level in 1:n_levels
+            if el_id_2 in level_info_elements[level]
+                level_2 = level
+                break
+            end
+        end
+        level_id = min(level_1, level_2)
+        =#
+
+        if level_id == 1
+            push!(level_info_interfaces_acc[1], interface_id)
+        else
+            for l in level_id:n_levels
+                push!(level_info_interfaces_acc[l], interface_id)
+            end
+        end
+    end
+
+    # These are the finest interfaces, which should be integrated with the IMEX method,
+    # which is due to historical reasons of the implementation the *LAST* method 
+    # in the time integration algorithm.
+    # Thus, we need to move it to the end and everything else to the front.
+    first_entry = level_info_interfaces_acc[1]
+    for l in 1:(n_levels - 1)
+        level_info_interfaces_acc[l] = level_info_interfaces_acc[l + 1]
+    end
+    level_info_interfaces_acc[n_levels] = first_entry
+
+    n_boundaries = length(boundaries.orientations)
+    # Determine level for each boundary
+    for boundary_id in 1:n_boundaries
+        # Get element id (boundaries have only one unique associated element)
+        element_id = boundaries.neighbor_ids[boundary_id]
+
+        # Determine level
+        level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+        # Convert to level id
+        level_id = max_level + 1 - level
+
+        # CARE: This is for testcase with special assignment
+        #level_id = element_id_level[element_id]
+
+        # Add to accumulated container
+        if level_id == 1
+            push!(level_info_boundaries_acc[1], boundary_id)
+        else
+            for l in level_id:n_levels
+                push!(level_info_boundaries_acc[l], boundary_id)
+            end
+        end
+    end
+
+    # These are the finest boundaries, which should be integrated with the IMEX method,
+    # which is due to historical reasons of the implementation the *LAST* method 
+    # in the time integration algorithm.
+    # Thus, we need to move it to the end and everything else to the front.
+    first_entry = level_info_boundaries_acc[1]
+    for l in 1:(n_levels - 1)
+        level_info_boundaries_acc[l] = level_info_boundaries_acc[l + 1]
+    end
+    level_info_boundaries_acc[n_levels] = first_entry
+
+    if n_dims > 1
+        @unpack mortars = cache
+        n_mortars = length(mortars.orientations)
+
+        for mortar_id in 1:n_mortars
+            # This is by convention always one of the finer elements
+            element_id = mortars.neighbor_ids[1, mortar_id]
+
+            # Determine level
+            level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+            # Higher element's level determines this mortars' level
+            level_id = max_level + 1 - level
+
+            # CARE: This is for testcase with special assignment
+            #level_id = element_id_level[element_id]
+
+            # Add to accumulated container
+            if level_id == 1
+                push!(level_info_mortars_acc[1], mortar_id)
+            else
+                for l in level_id:n_levels
+                    push!(level_info_mortars_acc[l], mortar_id)
+                end
+            end
+        end
+
+        # These are the finest mortars, which should be integrated with the IMEX method,
+        # which is due to historical reasons of the implementation the *LAST* method 
+        # in the time integration algorithm.
+        # Thus, we need to move it to the end and everything else to the front.
+        first_entry = level_info_mortars_acc[1]
+        for l in 1:(n_levels - 1)
+            level_info_mortars_acc[l] = level_info_mortars_acc[l + 1]
+        end
+        level_info_mortars_acc[n_levels] = first_entry
+    end
+
+    return nothing
+end
+
 function partition_variables!(level_info_elements,
                               level_info_elements_acc,
                               level_info_interfaces_acc,
@@ -226,7 +451,7 @@ function partition_variables!(level_info_elements,
     n_interfaces = length(interfaces.orientations)
     # Determine level for each interface
     for interface_id in 1:n_interfaces
-        # Get element id: Interfaces only between elements of same size
+        # Get element id: Interfaces only between elements of same size for 2D TreeMesh
         element_id = interfaces.neighbor_ids[1, interface_id]
 
         # Determine level
@@ -273,52 +498,51 @@ function partition_variables!(level_info_elements,
         end
     end
 
-    if n_dims > 1
-        @unpack mortars, mpi_mortars = cache
-        n_mortars = length(mortars.orientations)
+    # Dispatched for 2D TreeMesh => always check for mortars
+    @unpack mortars, mpi_mortars = cache
+    n_mortars = length(mortars.orientations)
 
-        for mortar_id in 1:n_mortars
-            # This is by convention always one of the finer elements
-            element_id = mortars.neighbor_ids[1, mortar_id]
+    for mortar_id in 1:n_mortars
+        # This is by convention always one of the finer elements
+        element_id = mortars.neighbor_ids[1, mortar_id]
+
+        # Determine level
+        level = mesh.tree.levels[elements.cell_ids[element_id]]
+
+        # Higher element's level determines this mortars' level
+        level_id = max_level + 1 - level
+        # Add to accumulated container
+        for l in level_id:n_levels
+            push!(level_info_mortars_acc[l], mortar_id)
+        end
+    end
+
+    n_mpi_mortars = length(mpi_mortars.orientations)
+    for mortar_id in 1:n_mpi_mortars
+        # This is by convention always one of the finer elements
+        element_id = mpi_mortars.local_neighbor_ids[mortar_id][1]
+
+        #=
+        level = -1
+        for element_id in mpi_mortars.local_neighbor_ids[mortar_id]
 
             # Determine level
-            level = mesh.tree.levels[elements.cell_ids[element_id]]
+            level_cand = mesh.tree.levels[elements.cell_ids[element_id]]
 
-            # Higher element's level determines this mortars' level
-            level_id = max_level + 1 - level
-            # Add to accumulated container
-            for l in level_id:n_levels
-                push!(level_info_mortars_acc[l], mortar_id)
+            if level_cand > level
+                level = level_cand
             end
         end
+        =#
 
-        n_mpi_mortars = length(mpi_mortars.orientations)
-        for mortar_id in 1:n_mpi_mortars
-            # This is by convention always one of the finer elements
-            element_id = mpi_mortars.local_neighbor_ids[mortar_id][1]
+        # Determine level
+        level = mesh.tree.levels[elements.cell_ids[element_id]]
 
-            #=
-            level = -1
-            for element_id in mpi_mortars.local_neighbor_ids[mortar_id]
-
-                # Determine level
-                level_cand = mesh.tree.levels[elements.cell_ids[element_id]]
-
-                if level_cand > level
-                    level = level_cand
-                end
-            end
-            =#
-
-            # Determine level
-            level = mesh.tree.levels[elements.cell_ids[element_id]]
-
-            # Higher element's level determines this mortars' level
-            level_id = max_level + 1 - level
-            # Add to accumulated container
-            for l in level_id:n_levels
-                push!(level_info_mpi_mortars_acc[l], mortar_id)
-            end
+        # Higher element's level determines this mortars' level
+        level_id = max_level + 1 - level
+        # Add to accumulated container
+        for l in level_id:n_levels
+            push!(level_info_mpi_mortars_acc[l], mortar_id)
         end
     end
 
@@ -330,8 +554,10 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels, n_dims, mesh::P4estMesh, dg, cache, dt_ratios;
-                              dt_scaling_order = 1) # 1 for hyperbolic, 2 for parabolic 
+                              n_levels, n_dims, mesh::P4estMesh, dg, cache,
+                              dt_ratios;
+                              dt_scaling_order = 1, # 1 for hyperbolic, 2 for parabolic 
+                              imex_alg = false) # Flip first list of indices to the end
     @unpack elements, interfaces, boundaries, mortars = cache
 
     nnodes = length(dg.basis.nodes)
