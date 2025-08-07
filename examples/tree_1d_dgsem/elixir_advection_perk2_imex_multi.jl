@@ -38,7 +38,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_gauss,
 
 t_end = 1.0
 #t_end = length + 1
-t_end = 0.6
+t_end = 0.3
 
 ode = semidiscretize(semi, (0.0, t_end))
 

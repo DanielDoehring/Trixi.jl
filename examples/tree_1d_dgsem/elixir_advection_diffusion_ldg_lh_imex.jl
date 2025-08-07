@@ -54,12 +54,15 @@ tspan = (0.0, 10.0)
 ode = semidiscretize(semi, tspan, split_problem = true)
 
 summary_callback = SummaryCallback()
-analysis_callback = AnalysisCallback(semi, interval = 100)
+analysis_callback = AnalysisCallback(semi, interval = 100,
+                                     extra_analysis_errors = (:conservation_error,))
 
 callbacks = CallbackSet(summary_callback, analysis_callback)
 
 ###############################################################################
 # run the simulation
+
+# NOTE: If weird error messages show up (Intel mkl one) update packages, seemes to solve the thing
 
 ode_alg = Trixi.IMEX_Midpoint_Midpoint()
 #ode_alg = Trixi.IMEX_LobattoIIIAp2_Heun()
