@@ -88,7 +88,6 @@ end
 
 struct PairedExplicitRK4Multi <:
        AbstractPairedExplicitRKMulti{4}
-    num_stage_evals_min::Int64
     num_methods::Int64 # Number of optimized PERK family members, i.e., R
     num_stages::Int64 # = maximum number of stages
     stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
@@ -121,7 +120,7 @@ function PairedExplicitRK4Multi(stages::Vector{Int64},
                                                                     base_path_a_coeffs,
                                                                     cS3)
 
-    return PairedExplicitRK4Multi(minimum(stages), length(stages), num_stages, stages,
+    return PairedExplicitRK4Multi(length(stages), num_stages, stages,
                                   dt_ratios,
                                   a_matrices, a_matrix_constant, c,
                                   max_active_levels, max_add_levels)

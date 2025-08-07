@@ -70,7 +70,6 @@ end
 
 struct PairedExplicitRK3Multi <:
        AbstractPairedExplicitRKMulti{3}
-    num_stage_evals_min::Int64
     num_methods::Int64 # Number of optimized PERK family members, i.e., R
     num_stages::Int64 # = maximum number of stages
     stages::Vector{Int64}
@@ -103,7 +102,7 @@ function PairedExplicitRK3Multi(stages::Vector{Int64},
                                                                     base_path_a_coeffs,
                                                                     cS2)
 
-    return PairedExplicitRK3Multi(minimum(stages), length(stages), num_stages, stages,
+    return PairedExplicitRK3Multi(length(stages), num_stages, stages,
                                   dt_ratios,
                                   a_matrices, c,
                                   max_active_levels, max_add_levels)

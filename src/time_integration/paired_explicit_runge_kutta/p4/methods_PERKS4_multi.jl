@@ -15,7 +15,6 @@
 """
 struct PairedExplicitRK4SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{4}
-    num_stage_evals_min::Int64
     num_methods::Int64 # Number of optimized PERK family members, i.e., R
     num_stages::Int64 # = maximum number of stages
     stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
@@ -56,7 +55,7 @@ function PairedExplicitRK4SplitMulti(stages::Vector{Int64},
                                                                                     base_path_a_coeffs_para,
                                                                                     cS3)
 
-    return PairedExplicitRK4SplitMulti(minimum(stages), length(stages), num_stages,
+    return PairedExplicitRK4SplitMulti(length(stages), num_stages,
                                        stages,
                                        dt_ratios,
                                        a_matrices, a_matrices_para, a_matrix_constant,
@@ -244,8 +243,6 @@ end
 # Version with DIFFERENT number of stages for hyperbolic and parabolic part
 struct PairedExplicitRK4SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{4}
-    num_stage_evals_min::Int64 # Assumed to be indentical for the hyperbolic and parabolic part
-
     num_methods::Int64 # Number of optimized PERK family members, i.e., R
     num_stages::Int64 # = maximum number of stages
     stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
@@ -302,8 +299,7 @@ function PairedExplicitRK4SplitMulti(stages::Vector{Int64},
                                                                           base_path_mon_coeffs_para,
                                                                           cS3)
 
-    return PairedExplicitRK4SplitMulti(minimum(stages),
-                                       length(stages), num_stages, stages,
+    return PairedExplicitRK4SplitMulti(length(stages), num_stages, stages,
                                        length(stages_para), num_stages_para,
                                        stages_para,
                                        dt_ratios, dt_ratios_para,
