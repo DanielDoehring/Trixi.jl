@@ -166,8 +166,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
                              level_info_mortars_para_acc,
                              n_levels_para, n_dims, mesh, dg, cache,
                              alg.PERK4SplitMulti.dt_ratios_para,
-                             #dt_scaling_order = 2)
-                             dt_scaling_order = 1) # TODO: For debugging/testing only!
+                             dt_scaling_order = 2)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning

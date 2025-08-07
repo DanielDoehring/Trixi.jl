@@ -149,7 +149,7 @@ cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
 cfl = 6.1 # PERK 4 Multi Split (14, 10)
 
 #cfl = 7.4 # PEERRKS_4 Multi E = 5, ..., 14
-#cfl = 6.6 # PERRK 4 Multi Split (14, 10) # TODO: Presults in more timesteps taken than with 6.1 non-relaxed!
+cfl = 6.1 # PERRK 4 Multi Split (14, 10) # Seems to have no benefit of RESTARTED simulation from relaxation
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -303,6 +303,7 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para,
                                                             path_coeffs, path_coeffs_para,
                                                             dtRatios, dtRatios_para; relaxation_solver = relaxation_solver)
 =#
+
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
