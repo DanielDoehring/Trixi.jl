@@ -82,9 +82,9 @@ struct PairedExplicitRK3Multi <:
     a_matrices::Array{Float64, 3}
     c::Vector{Float64}
 
-    # highest active/evaluated level per stage
+    # highest active/evaluated level; per stage
     max_active_levels::Vector{Int64}
-    # highest added level in the argument of the evaluated `rhs!` per stage
+    # highest level where the last stage `du` is added in the argument of the evaluated `rhs!`; per stage
     max_add_levels::Vector{Int64}
 end
 

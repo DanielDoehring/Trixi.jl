@@ -23,9 +23,9 @@ struct PairedExplicitRK2SplitMulti <:
     b1::Float64
     bS::Float64
 
-    # highest active/evaluated level per stage
+    # highest active/evaluated level; per stage
     max_active_levels::Vector{Int64}
-    # highest added level in the argument of the evaluated `rhs!` per stage
+    # highest level where the last stage `du` is added in the argument of the evaluated `rhs!`; per stage
     max_add_levels::Vector{Int64}
 end
 
@@ -253,14 +253,14 @@ struct PairedExplicitRK2SplitMulti <:
     b1::Float64
     bS::Float64
 
-    # highest active/evaluated level per stage
+    # highest active/evaluated level; per stage
     max_active_levels::Vector{Int64}
-    # highest added level in the argument of the evaluated `rhs!` per stage
+    # highest level where the last stage `du` is added in the argument of the evaluated `rhs!`; per stage
     max_add_levels::Vector{Int64}
 
     # highest active level per stage for the parabolic part
     max_active_levels_para::Vector{Int64}
-    # highest added level in the argument of the evaluated `rhs!` per stage for the parabolic part
+    # highest level where the last stage `du` is added in the argument of the evaluated `rhs!`; per stage for the parabolic part
     max_add_levels_para::Vector{Int64}
 end
 
