@@ -45,11 +45,7 @@ ode = semidiscretize(semi, (0.0, t_end))
 summary_callback = SummaryCallback()
 
 analysis_callback = AnalysisCallback(semi, interval = 100,
-                                     extra_analysis_errors = (:conservation_error,),
-                                     extra_analysis_integrals = (Trixi.entropy_math,),
-                                     analysis_filename = "entropy_ER.dat",
-                                     #analysis_filename = "entropy_standard.dat",
-                                     save_analysis = true)
+                                     extra_analysis_errors = (:conservation_error,))
 cfl = 3.5 # [16, 8]
 #cfl = 5.5 # [32, 16]
 

@@ -287,13 +287,7 @@ function partition_variables_imex!(level_info_elements,
         level1 = mesh.tree.levels[elements.cell_ids[element_id1]]
         level2 = mesh.tree.levels[elements.cell_ids[element_id2]]
 
-        # TODO: Do I need to revisit this logic for the IMEX case when
-        # the smaller element has actually less stage evaluations (due to implicit logic) ?
-        # For more than 2 levels: check if one level_id is = 1, if that is the case use 2
-        # IDEA: Add to both levels?
-
-        #level_id = max_level + 1 - max(level1, level2)
-        level_id = max_level + 1 - min(level1, level2)
+        level_id = max_level + 1 - max(level1, level2)
 
         # CARE: This is for testcase with special assignment
         #level_id = element_id_level[element_id]
@@ -324,6 +318,13 @@ function partition_variables_imex!(level_info_elements,
 
         if level_id == 1
             push!(level_info_interfaces_acc[1], interface_id)
+            # TODO: Do I need to revisit this logic for the IMEX case when
+            # the smaller element has actually less stage evaluations (due to implicit logic) ?
+            # For more than 2 levels: check if one level_id is = 1, if that is the case use 2
+            # IDEA: Add to both levels?
+            if level1 != level2 # At interface between differently sized cells
+                push!(level_info_interfaces_acc[2], interface_id)
+            end
         else
             for l in level_id:n_levels
                 push!(level_info_interfaces_acc[l], interface_id)
