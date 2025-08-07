@@ -70,6 +70,8 @@ function compute_PairedExplicitRK2Multi_butcher_tableau(stages::Vector{Int64},
         # For `active_levels` (active/evaluated levels/stages):
         # Set to 0 to indicate no evaluation
         if active_levels[i] == []
+            # TODO: Change to `-1` to allow for an implicit scheme at level 0 ? Or push implicit scheme back at the end?
+            # Or shift for IMEX every scheme by one level - probably a lot of implementation re-doing
             active_levels[i] = [0] # `0` encodes no evaluation; also compatible with `maximum.` below
         end
 
@@ -83,7 +85,7 @@ function compute_PairedExplicitRK2Multi_butcher_tableau(stages::Vector{Int64},
     max_active_levels = maximum.(active_levels)
     max_add_levels = maximum.(add_levels)
 
-    return a_matrices, c, active_levels, max_active_levels, max_add_levels
+    return a_matrices, c, max_active_levels, max_add_levels
 end
 
 struct PairedExplicitRK2Multi <:
@@ -102,9 +104,8 @@ struct PairedExplicitRK2Multi <:
     b1::Float64
     bS::Float64
 
-    # active = evaluated levels
-    active_levels::Vector{Vector{Int64}} # List of evaluated levels per stage
-    max_active_levels::Vector{Int64} # highest active level per stage
+    # highest active/evaluated level per stage
+    max_active_levels::Vector{Int64}
     # highest added level in the argument of the evaluated `rhs!` per stage
     max_add_levels::Vector{Int64}
 end
@@ -116,7 +117,6 @@ function PairedExplicitRK2Multi(stages::Vector{Int64},
     num_stages = maximum(stages)
 
     a_matrices, c,
-    active_levels,
     max_active_levels,
     max_add_levels = compute_PairedExplicitRK2Multi_butcher_tableau(stages, num_stages,
                                                                     base_path_mon_coeffs,
@@ -124,7 +124,7 @@ function PairedExplicitRK2Multi(stages::Vector{Int64},
 
     return PairedExplicitRK2Multi(minimum(stages), length(stages), num_stages, stages,
                                   dt_ratios,
-                                  a_matrices, c, 1 - bS, bS, active_levels,
+                                  a_matrices, c, 1 - bS, bS,
                                   max_active_levels, max_add_levels)
 end
 

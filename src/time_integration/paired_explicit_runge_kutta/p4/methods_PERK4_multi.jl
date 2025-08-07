@@ -83,8 +83,7 @@ function compute_PairedExplicitRK4Multi_butcher_tableau(stages::Vector{Int64},
     max_active_levels = maximum.(active_levels)
     max_add_levels = maximum.(add_levels)
 
-    return a_matrices, a_matrix_constant, c, active_levels, max_active_levels,
-           max_add_levels
+    return a_matrices, a_matrix_constant, c, max_active_levels, max_add_levels
 end
 
 struct PairedExplicitRK4Multi <:
@@ -103,9 +102,8 @@ struct PairedExplicitRK4Multi <:
     a_matrix_constant::Matrix{Float64}
     c::Vector{Float64}
 
-    # active = evaluated levels
-    active_levels::Vector{Vector{Int64}} # List of evaluated levels per stage
-    max_active_levels::Vector{Int64} # highest active level per stage
+    # highest active/evaluated level per stage
+    max_active_levels::Vector{Int64}
     # highest added level in the argument of the evaluated `rhs!` per stage
     max_add_levels::Vector{Int64}
 end
@@ -118,7 +116,6 @@ function PairedExplicitRK4Multi(stages::Vector{Int64},
 
     a_matrices,
     a_matrix_constant, c,
-    active_levels,
     max_active_levels,
     max_add_levels = compute_PairedExplicitRK4Multi_butcher_tableau(stages, num_stages,
                                                                     base_path_a_coeffs,
@@ -126,7 +123,7 @@ function PairedExplicitRK4Multi(stages::Vector{Int64},
 
     return PairedExplicitRK4Multi(minimum(stages), length(stages), num_stages, stages,
                                   dt_ratios,
-                                  a_matrices, a_matrix_constant, c, active_levels,
+                                  a_matrices, a_matrix_constant, c,
                                   max_active_levels, max_add_levels)
 end
 

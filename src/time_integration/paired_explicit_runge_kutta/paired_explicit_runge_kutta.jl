@@ -784,7 +784,7 @@ end
     end
 
     # Parabolic contribution
-    if integrator.coarsest_lvl_para != 0 # CHeck if evaluation is required at all
+    if integrator.coarsest_lvl_para != 0 # Check if evaluation is required at all
         if integrator.coarsest_lvl_para == alg.num_methods_para
             # NOTE: This is supposedly more efficient than setting
             #integrator.coarsest_lvl = integrator.n_levels
