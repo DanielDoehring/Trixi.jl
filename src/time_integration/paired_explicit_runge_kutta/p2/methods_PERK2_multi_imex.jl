@@ -66,13 +66,14 @@ function compute_PairedExplicitRK2IMEXMulti_butcher_tableau(stages::Vector{Int64
         end
     end
 
-    # Add implicit method
-    push!(active_levels[end], num_methods) # Implicit midpoint method is evaluated in last stage
+    # Implicit midpoint method is evaluated in last stage.
+    # Not strictly necessary, but added for consistency here
+    push!(active_levels[end], num_methods)
 
     # First stage of implicit part is added at every level.
-    # We do not add this to `add_levels`, though, as the historic implementation employs 
-    # loops from `1 to max_add_levels[stage]`, which would then result in adding up all 
-    # (also coarser) methods.
+    # We do not reflect this in `add_levels`, though, as the implementation of the multirate PERK schemes
+    # employs loops from `1 to max_add_levels[stage]`, which would then result in adding up all 
+    # (especially all coarser) methods.
     # Thus, the implicit method is not present in the `add_levels` structure which only 
     # targets the explicit part.
     # The implicit contribution `k1` is added somewhat "manually" in every intermediate stage.
@@ -364,26 +365,8 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
         ### Final update ###
         b_dt = integrator.dt # Hard-coded for PERK2 IMEX midpoint method with bS = 1
-
-        #=
-        # Compute the explicit part of the last stage
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[alg.num_stages] * integrator.dt,
-                     integrator, alg.num_methods - 1)
-
-        # Add explicit contributions
-        for level in 1:(alg.num_methods - 1)
-            @threaded for i in integrator.level_u_indices_elements[level]
-                integrator.u[i] = integrator.u[i] + b_dt * integrator.du[i]
-            end
-        end
-        # Add implicit contribution
-        @threaded for i in integrator.level_u_indices_elements[alg.num_methods]
-            integrator.u[i] = integrator.u[i] + b_dt * integrator.k_nonlin[i]
-        end
-        =#
-
         # Joint (with explicit part) re-evaluation of implicit stage
+        # => Makes conservation much simpler
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
                      integrator.t + alg.c[alg.num_stages] * integrator.dt)
 
