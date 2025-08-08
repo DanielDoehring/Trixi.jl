@@ -333,12 +333,7 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             #integrator.k_nonlin[i] = integrator.u[i]
             integrator.k_nonlin[i] = integrator.du[i]
         end
-
-        #=
-        reset_interfaces!(prob.p.cache, prob.p.solver,
-                          integrator.level_info_interfaces_acc[alg.num_methods - 1])
-        =#
-
+        
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
                  u_tmp = integrator.u_tmp, u_nonlin = integrator.u_nonlin,
@@ -370,12 +365,6 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
                      integrator.t + alg.c[alg.num_stages] * integrator.dt,
                      integrator, alg.num_methods - 1)
-        #=
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[alg.num_stages] * integrator.dt,
-                     integrator, alg.num_methods - 1,
-                     true) # accumulate_fluxes
-        =#
         
         #=
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
