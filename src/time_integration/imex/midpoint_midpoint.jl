@@ -183,10 +183,11 @@ function step!(integrator::MidpointMidpointIntegrator)
 
         @trixi_timeit timer() "nonlinear solve" begin
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin)
-            sol = SciMLBase.solve!(integrator.nonlin_cache)
-            copyto!(integrator.k_nonlin, sol.u)
+            #sol = SciMLBase.solve!(integrator.nonlin_cache)
+            #copyto!(integrator.k_nonlin, sol.u)
             
-            #SciMLBase.solve!(integrator.nonlin_cache)
+            SciMLBase.solve!(integrator.nonlin_cache)
+            println(integrator.nonlin_cache.alias_u0)
         end
 
         # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
