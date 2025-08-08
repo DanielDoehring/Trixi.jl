@@ -67,5 +67,5 @@ callbacks = CallbackSet(summary_callback, analysis_callback)
 ode_alg = Trixi.IMEX_Midpoint_Midpoint()
 #ode_alg = Trixi.IMEX_LobattoIIIAp2_Heun()
 
-sol = Trixi.solve(ode, ode_alg, dt = 2.0,
+sol = Trixi.solve(ode, ode_alg, dt = 2.0/(2^0),
                   save_everystep = false, callback = callbacks);
