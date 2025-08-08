@@ -68,17 +68,17 @@ function compute_PairedExplicitRK2IMEXMulti_butcher_tableau(stages::Vector{Int64
 
     # Add implicit method
     push!(active_levels[end], num_methods) # Implicit midpoint method is evaluated in last stage
-    # TODO: First stage of implicit part is added at every level!
-    #push!(add_levels[end], num_methods) # Implicit midpoint method is added in last stage (in IMEX fashion, however)
+
+    # First stage of implicit part is added at every level.
+    # We do not add this to `add_levels`, though, as the historic implementation employs 
+    # loops from `1 to max_add_levels[stage]`, which would then result in adding up all 
+    # (also coarser) methods.
+    # Thus, the implicit method is not present in the `add_levels` structure which only 
+    # targets the explicit part.
+    # The implicit contribution `k1` is added somewhat "manually" in every intermediate stage.
 
     max_active_levels = maximum.(active_levels)
     max_add_levels = maximum.(add_levels)
-
-    for m in 1:num_methods
-        display(a_matrices[m, :, :])
-    end
-    display(max_active_levels)
-    display(max_add_levels)
 
     return a_matrices, c, max_active_levels, max_add_levels
 end
