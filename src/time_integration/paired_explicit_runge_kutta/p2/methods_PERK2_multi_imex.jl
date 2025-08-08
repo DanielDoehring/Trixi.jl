@@ -216,13 +216,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     println("level_info_elements: ", level_info_elements)
     println("level_info_elements_acc: ", level_info_elements_acc)
     println("level_info_interfaces_acc: ", level_info_interfaces_acc)
-    println("level_info_boundaries_acc: ", level_info_boundaries_acc)
-    println("level_info_mortars_acc: ", level_info_mortars_acc)
+    #println("level_info_boundaries_acc: ", level_info_boundaries_acc)
+    #println("level_info_mortars_acc: ", level_info_mortars_acc)
 
     # Set (initial) distribution of DG nodal values
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
     partition_u!(level_u_indices_elements, level_info_elements,
                  n_levels, u0, mesh, equations, dg, cache)
+
+    println("level_u_indices_elements: ", level_u_indices_elements)
 
     ### Done with setting up for handling of level-dependent integration ###
     integrator = PairedExplicitRK2IMEXMultiIntegrator(u0, du, u_tmp,
@@ -261,16 +263,23 @@ end
 
 function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
     @unpack alg, dt, t, u_tmp, u_nonlin, u, du, semi, f,
-    element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
+    element_indices, interface_indices, boundary_indices, mortar_indices, u_indices_level = p
 
+    # Set explicit contributions
+    for level in 1:(alg.num_methods - 1)
+        @threaded for i in u_indices_level[level]
+            u_nonlin[i] = u_tmp[i]
+        end
+    end
+    # Add implicit contribution
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
-    @threaded for i in u_indices
-        u_nonlin[i] = u_tmp[i] + a_dt * implicit_stage[i]
+    @threaded for i in u_indices_level[alg.num_methods]
+        u_nonlin[i] = u[i] + a_dt * implicit_stage[i]
     end
     f(du, u_nonlin, semi, t + alg.c[alg.num_stages] * dt,
       element_indices, interface_indices, boundary_indices, mortar_indices)
 
-    @threaded for i in u_indices
+    @threaded for i in u_indices_level[alg.num_methods]
         residual[i] = implicit_stage[i] - du[i]
     end
 
@@ -321,8 +330,14 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
         # Set initial guess for nonlinear solve
         @threaded for i in integrator.level_u_indices_elements[alg.num_methods]
-            integrator.k_nonlin[i] = integrator.u[i]
+            #integrator.k_nonlin[i] = integrator.u[i]
+            integrator.k_nonlin[i] = integrator.du[i]
         end
+
+        #=
+        reset_interfaces!(prob.p.cache, prob.p.solver,
+                          integrator.level_info_interfaces_acc[alg.num_methods - 1])
+        =#
 
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
@@ -334,27 +349,38 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
                  interface_indices = integrator.level_info_interfaces_acc[alg.num_methods],
                  boundary_indices = integrator.level_info_boundaries_acc[alg.num_methods],
                  mortar_indices = integrator.level_info_mortars_acc[alg.num_methods],
-                 u_indices = integrator.level_u_indices_elements[alg.num_methods])
+                 u_indices_level = integrator.level_u_indices_elements)
 
             nonlinear_eq = NonlinearProblem{true}(stage_residual_PERK2IMEXMulti!,
                                                   integrator.k_nonlin, p)
 
             SciMLBase.solve(nonlinear_eq,
-                            NewtonRaphson(autodiff = AutoFiniteDiff()),
-                            #NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
+                            #NewtonRaphson(autodiff = AutoFiniteDiff()), # Does not converge well
+                            NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
                             alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
 
         # Compute the intermediate approximation for the final explicit step: Take the implicit solution into account
         a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
         @threaded for i in integrator.level_u_indices_elements[alg.num_methods]
-            integrator.u_tmp[i] = integrator.u_tmp[i] + a_dt * integrator.k_nonlin[i]
+            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.k_nonlin[i]
         end
 
         # Compute the explicit part of the last stage
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
                      integrator.t + alg.c[alg.num_stages] * integrator.dt,
                      integrator, alg.num_methods - 1)
+        #=
+        integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                     integrator.t + alg.c[alg.num_stages] * integrator.dt,
+                     integrator, alg.num_methods - 1,
+                     true) # accumulate_fluxes
+        =#
+        
+        #=
+        integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                     integrator.t + alg.c[alg.num_stages] * integrator.dt)
+        =#
 
         ### Final update ###
         b_dt = integrator.dt # Hard-coded for PERK2 IMEX midpoint method with bS = 1
