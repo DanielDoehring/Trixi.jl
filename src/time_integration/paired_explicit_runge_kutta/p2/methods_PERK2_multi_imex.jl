@@ -170,6 +170,8 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     # For nonlinear solve
     k_nonlin::uType
     u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
+    # TODO: Try to store cache or Nonlinearproblem itself here, see
+    # https://docs.sciml.ai/NonlinearSolve/stable/basics/diagnostics_api/
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
