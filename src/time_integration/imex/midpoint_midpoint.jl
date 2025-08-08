@@ -182,45 +182,11 @@ function step!(integrator::MidpointMidpointIntegrator)
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
-            
-            SciMLBase.solve(integrator.nonlin_prob,
-                            NewtonRaphson(autodiff = AutoFiniteDiff()),
-                            #NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
-                            alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
-            
-
-            #=
-            nonlin_cache = SciMLBase.init(integrator.nonlin_prob,
-                                          NewtonRaphson(autodiff = AutoFiniteDiff()),
-                                          alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
-
-            SciMLBase.solve!(nonlin_cache)
-            integrator.k_nonlin = nonlin_cache.u # Update the nonlinear solution
-            #copyto!(integrator.k_nonlin, nonlin_cache.u)
-            =#
-
-            #=
-            p = (alg = alg, dt = integrator.dt, t = integrator.t,
-                 u_tmp = integrator.u_tmp, u_nonlin = integrator.u_nonlin,
-                 u = integrator.u, du_para = integrator.du_para,
-                 semi = prob.p, f1 = integrator.f.f1)
-
-            integrator.nonlin_cache.p = p
-
-            #integrator.nonlin_cache.u = integrator.k_nonlin
-            #copyto!(integrator.nonlin_cache.u, integrator.k_nonlin)
-
-            @threaded for i in eachindex(integrator.u)
-                integrator.nonlin_cache.u[i] = integrator.k_nonlin[i]
-            end
-
-            #SciMLBase.solve!(integrator.nonlin_cache)
-            #integrator.k_nonlin = nonlin_cache.u # Update the nonlinear solution
-            #copyto!(integrator.k_nonlin, integrator.nonlin_cache.u)
-
+            SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin)
             sol = SciMLBase.solve!(integrator.nonlin_cache)
             copyto!(integrator.k_nonlin, sol.u)
-            =#
+            
+            #SciMLBase.solve!(integrator.nonlin_cache)
         end
 
         # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
