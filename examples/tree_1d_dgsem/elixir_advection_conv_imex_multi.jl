@@ -56,9 +56,7 @@ ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([8], path, [1])
 
-dt = 0.05/(2^0) # 0.05 for explicit 8-16 pair
-
-dt = 0.1 / (2^0)
+dt = 0.05 / (2^3) # 0.05 for explicit 8-16 pair
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
