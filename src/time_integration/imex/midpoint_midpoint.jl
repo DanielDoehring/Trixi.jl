@@ -39,7 +39,8 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
 mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
-                                          SimpleIntegratorOptions} <:
+                                          SimpleIntegratorOptions,
+                                          NonlinProb, NonlinCache} <:
                AbstractIMEXTimeIntegrator
     u::uType
     du::uType # In-place output of `f`
@@ -67,6 +68,9 @@ mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, 
     # For split problems solved with IMEX methods
     du_para::uType # Stores the parabolic part of the overall rhs!
     u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
+
+    nonlin_prob::NonlinProb
+    nonlin_cache::NonlinCache
 end
 
 function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
@@ -76,11 +80,31 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     u_tmp = zero(u)
     du_para = zero(u)
 
+    t = first(ode.tspan)
+    iter = 0
+
     k_nonlin = zero(u)
     u_nonlin = zero(u)
 
-    t = first(ode.tspan)
-    iter = 0
+    # This creates references to the parameters
+    p = (alg = alg, dt = dt, t = t,
+         u_tmp = u_tmp, u_nonlin = u_nonlin,
+         u = u, du_para = du_para,
+         semi = ode.p, f1 = ode.f.f1)
+
+    nonlin_prob = NonlinearProblem{true}(stage_residual_midpoint!,
+                                         k_nonlin, p)
+
+    #=
+    nonlin_cache = SciMLBase.init(nonlin_prob,
+                                  NewtonRaphson(autodiff = AutoFiniteDiff());
+                                  alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
+                                  show_trace = Val(true), trace_level = TraceAll())
+    =#
+    nonlin_cache = SciMLBase.init(nonlin_prob,
+                                  NewtonRaphson(autodiff = AutoFiniteDiff());
+                                  #NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES());
+                                  alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
 
     integrator = MidpointMidpointIntegrator(u, du, u_tmp,
                                             t, dt, zero(dt), iter,
@@ -88,7 +112,8 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
                                             SimpleIntegratorOptions(callback,
                                                                     ode.tspan;
                                                                     kwargs...), false,
-                                            k_nonlin, du_para, u_nonlin)
+                                            k_nonlin, du_para, u_nonlin,
+                                            nonlin_prob, nonlin_cache)
 
     # initialize callbacks
     if callback isa CallbackSet
@@ -157,18 +182,45 @@ function step!(integrator::MidpointMidpointIntegrator)
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
+            
+            SciMLBase.solve(integrator.nonlin_prob,
+                            NewtonRaphson(autodiff = AutoFiniteDiff()),
+                            #NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
+                            alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+            
+
+            #=
+            nonlin_cache = SciMLBase.init(integrator.nonlin_prob,
+                                          NewtonRaphson(autodiff = AutoFiniteDiff()),
+                                          alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+
+            SciMLBase.solve!(nonlin_cache)
+            integrator.k_nonlin = nonlin_cache.u # Update the nonlinear solution
+            #copyto!(integrator.k_nonlin, nonlin_cache.u)
+            =#
+
+            #=
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
                  u_tmp = integrator.u_tmp, u_nonlin = integrator.u_nonlin,
                  u = integrator.u, du_para = integrator.du_para,
                  semi = prob.p, f1 = integrator.f.f1)
 
-            nonlinear_eq = NonlinearProblem{true}(stage_residual_midpoint!,
-                                                  integrator.k_nonlin, p)
+            integrator.nonlin_cache.p = p
 
-            SciMLBase.solve(nonlinear_eq,
-                            NewtonRaphson(autodiff = AutoFiniteDiff()),
-                            #NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
-                            alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+            #integrator.nonlin_cache.u = integrator.k_nonlin
+            #copyto!(integrator.nonlin_cache.u, integrator.k_nonlin)
+
+            @threaded for i in eachindex(integrator.u)
+                integrator.nonlin_cache.u[i] = integrator.k_nonlin[i]
+            end
+
+            #SciMLBase.solve!(integrator.nonlin_cache)
+            #integrator.k_nonlin = nonlin_cache.u # Update the nonlinear solution
+            #copyto!(integrator.k_nonlin, integrator.nonlin_cache.u)
+
+            sol = SciMLBase.solve!(integrator.nonlin_cache)
+            copyto!(integrator.k_nonlin, sol.u)
+            =#
         end
 
         # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
