@@ -321,6 +321,7 @@ function partition_variables_imex!(level_info_elements,
             # TODO: Do I need to revisit this logic for the IMEX case when
             # the smaller element has actually less stage evaluations (due to implicit logic) ?
             # For more than 2 levels: check if one level_id is = 1, if that is the case use 2
+
             # IDEA: Add to both levels?
             if level1 != level2 # At interface between differently sized cells
                 push!(level_info_interfaces_acc[2], interface_id)

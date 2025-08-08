@@ -8,17 +8,14 @@ equations = LinearScalarAdvectionEquation1D(advection_velocity)
 
 k = 3 # polynomial degree
 
-# Entropy-conservative flux:
-#num_flux = flux_central
-
 # Diffusive fluxes
 num_flux = flux_godunov
 #num_flux = flux_lax_friedrichs
 
 solver = DGSEM(polydeg = k, surface_flux = num_flux)
 
-coordinates_min = -4.0 # minimum coordinate
-coordinates_max = 4.0 # maximum coordinate
+coordinates_min = -4.0
+coordinates_max = 4.0
 length = coordinates_max - coordinates_min
 
 # One refinement only
@@ -38,7 +35,6 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_gauss,
 
 t_end = 1.0
 #t_end = length + 1
-t_end = 0.3
 
 ode = semidiscretize(semi, (0.0, t_end))
 
@@ -61,16 +57,15 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
-#path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/Joint/"
 
 dtRatios = [1, 0.5]
 Stages = [16, 8]
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([8], path, [1])
 
-dt = 0.3 # 0.3
+dt = 0.2 # 0.3 for explicit 8-16 pair
 sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
                   save_everystep = false, callback = callbacks);

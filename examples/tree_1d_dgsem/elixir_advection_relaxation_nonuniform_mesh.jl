@@ -17,8 +17,8 @@ num_flux = flux_godunov
 
 solver = DGSEM(polydeg = k, surface_flux = num_flux)
 
-coordinates_min = -4.0 # minimum coordinate
-coordinates_max = 4.0 # maximum coordinate
+coordinates_min = -4.0
+coordinates_max = 4.0
 length = coordinates_max - coordinates_min
 
 refinement_patches = ((type = "box", coordinates_min = (-1.0,),
