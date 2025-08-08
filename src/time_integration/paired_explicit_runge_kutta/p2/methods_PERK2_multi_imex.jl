@@ -161,6 +161,7 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     level_info_mortars_acc::Vector{Vector{Int64}}
 
     level_u_indices_elements::Vector{Vector{Int64}}
+    # TODO: `level_u_indices_elements_acc` makes sense for IMEX methods
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -350,7 +351,7 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
                                                   integrator.k_nonlin, p)
 
             SciMLBase.solve(nonlinear_eq,
-                            #NewtonRaphson(autodiff = AutoFiniteDiff()), # Does not converge well
+                            #NewtonRaphson(autodiff = AutoFiniteDiff()), # Does not converge
                             NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
                             alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
@@ -361,18 +362,15 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.k_nonlin[i]
         end
 
+        ### Final update ###
+        b_dt = integrator.dt # Hard-coded for PERK2 IMEX midpoint method with bS = 1
+
+        #=
         # Compute the explicit part of the last stage
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
                      integrator.t + alg.c[alg.num_stages] * integrator.dt,
                      integrator, alg.num_methods - 1)
-        
-        #=
-        integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[alg.num_stages] * integrator.dt)
-        =#
 
-        ### Final update ###
-        b_dt = integrator.dt # Hard-coded for PERK2 IMEX midpoint method with bS = 1
         # Add explicit contributions
         for level in 1:(alg.num_methods - 1)
             @threaded for i in integrator.level_u_indices_elements[level]
@@ -382,6 +380,15 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
         # Add implicit contribution
         @threaded for i in integrator.level_u_indices_elements[alg.num_methods]
             integrator.u[i] = integrator.u[i] + b_dt * integrator.k_nonlin[i]
+        end
+        =#
+
+        # Joint (with explicit part) re-evaluation of implicit stage
+        integrator.f(integrator.du, integrator.u_tmp, prob.p,
+                     integrator.t + alg.c[alg.num_stages] * integrator.dt)
+
+        @threaded for i in eachindex(integrator.u)
+            integrator.u[i] = integrator.u[i] + b_dt * integrator.du[i]
         end
     end
 
