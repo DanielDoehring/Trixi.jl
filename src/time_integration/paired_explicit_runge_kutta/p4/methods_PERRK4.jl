@@ -204,16 +204,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{4}
         PERK4_kS2_to_kS!(integrator, prob.p, alg)
     end
 
-    @trixi_timeit timer() "Step-Callbacks" begin
-        # handle callbacks
-        if callbacks isa CallbackSet
-            for cb in callbacks.discrete_callbacks
-                if cb.condition(integrator.u, integrator.t, integrator)
-                    cb.affect!(integrator)
-                end
-            end
-        end
-    end
+    @trixi_timeit timer() "Step-Callbacks" handle_callbacks!(callbacks, integrator)
 
     # respect maximum number of iterations
     if integrator.iter >= integrator.opts.maxiters && !integrator.finalstep
