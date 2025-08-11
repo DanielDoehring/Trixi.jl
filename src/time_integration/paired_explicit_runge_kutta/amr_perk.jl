@@ -24,7 +24,6 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                 mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
 
                 integrator.n_levels = get_n_levels(mesh, integrator.alg)
-                n_dims = ndims(mesh) # Spatial dimension
 
                 # TODO: Can you avoid complete re-assignment, i.e., only update/remove changed elements?
                 # Re-initialize storage for level-wise information
@@ -72,7 +71,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          integrator.level_info_interfaces_acc,
                                          integrator.level_info_boundaries_acc,
                                          integrator.level_info_mortars_acc,
-                                         integrator.n_levels, n_dims, mesh, dg,
+                                         integrator.n_levels, mesh, dg,
                                          cache, integrator.alg.dt_ratios)
                 else
                     partition_variables!(integrator.level_info_elements,
@@ -83,7 +82,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          # MPI additions
                                          integrator.level_info_mpi_interfaces_acc,
                                          integrator.level_info_mpi_mortars_acc,
-                                         integrator.n_levels, n_dims, mesh, dg,
+                                         integrator.n_levels, mesh, dg,
                                          cache, integrator.alg.dt_ratios)
                 end
 

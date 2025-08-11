@@ -277,7 +277,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     ### Set datastructures for handling of level-dependent integration ###
     semi = ode.p
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
-    n_dims = ndims(mesh) # Spatial dimension
 
     n_levels = get_n_levels(mesh, alg)
 
@@ -300,7 +299,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, n_dims, mesh, dg, cache, alg.dt_ratios)
+                             n_levels, mesh, dg, cache, alg.dt_ratios)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
@@ -312,7 +311,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
             old_global_first_quadrant = copy(global_first_quadrant)
 
             # Get (global) element distribution to accordingly balance the solver
-            partition_variables!(level_info_elements, n_levels, n_dims,
+            partition_variables!(level_info_elements, n_levels,
                                  mesh, dg, cache, alg.dt_ratios)
 
             # Balance such that each rank has the same number of RHS calls                                    
@@ -338,7 +337,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                              # MPI additions
                              level_info_mpi_interfaces_acc,
                              level_info_mpi_mortars_acc,
-                             n_levels, n_dims, mesh, dg, cache, alg.dt_ratios)
+                             n_levels, mesh, dg, cache, alg.dt_ratios)
     end
 
     for i in 1:n_levels

@@ -114,7 +114,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
     ### Set datastructures for handling of level-dependent integration ###
     semi = ode.p
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
-    n_dims = ndims(mesh) # Spatial dimension
 
     n_levels, n_levels_para = get_n_levels(mesh, alg.PERK4SplitMulti)
 
@@ -155,7 +154,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, n_dims, mesh, dg, cache,
+                             n_levels, mesh, dg, cache,
                              alg.PERK4SplitMulti.dt_ratios)
 
         # Partition parabolic helper variables
@@ -164,7 +163,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
                              level_info_interfaces_para_acc,
                              level_info_boundaries_para_acc,
                              level_info_mortars_para_acc,
-                             n_levels_para, n_dims, mesh, dg, cache,
+                             n_levels_para, mesh, dg, cache,
                              alg.PERK4SplitMulti.dt_ratios_para,
                              dt_scaling_order = 2)
     else
@@ -178,7 +177,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
             old_global_first_quadrant = copy(global_first_quadrant)
 
             # Get (global) element distribution to accordingly balance the solver
-            partition_variables!(level_info_elements, n_levels, n_dims,
+            partition_variables!(level_info_elements, n_levels,
                                  mesh, dg, cache, alg.PERK4SplitMulti.dt_ratios)
 
             # Balance such that each rank has the same number of RHS calls                                    
@@ -205,7 +204,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
                              # MPI additions
                              level_info_mpi_interfaces_acc,
                              level_info_mpi_mortars_acc,
-                             n_levels, n_dims, mesh, dg, cache,
+                             n_levels, mesh, dg, cache,
                              alg.PERK4SplitMulti.dt_ratios)
     end
 

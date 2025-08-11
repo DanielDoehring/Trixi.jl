@@ -49,7 +49,7 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels, n_dims, mesh::TreeMesh, dg, cache,
+                              n_levels, mesh::TreeMesh, dg, cache,
                               dt_ratios)
     @unpack elements, interfaces, boundaries = cache
 
@@ -169,7 +169,7 @@ function partition_variables!(level_info_elements,
         end
     end
 
-    if n_dims > 1
+    if ndims(mesh) > 1
         @unpack mortars = cache
         n_mortars = length(mortars.orientations)
 
@@ -201,7 +201,7 @@ function partition_variables_imex!(level_info_elements,
                                    level_info_interfaces_acc,
                                    level_info_boundaries_acc,
                                    level_info_mortars_acc,
-                                   n_levels, n_dims, mesh::TreeMesh, dg, cache,
+                                   n_levels, mesh::TreeMesh, dg, cache,
                                    dt_ratios)
     @unpack elements, interfaces, boundaries = cache
 
@@ -378,7 +378,7 @@ function partition_variables_imex!(level_info_elements,
     end
     level_info_boundaries_acc[n_levels] = first_entry
 
-    if n_dims > 1
+    if ndims(mesh) > 1
         @unpack mortars = cache
         n_mortars = length(mortars.orientations)
 
@@ -427,7 +427,7 @@ function partition_variables!(level_info_elements,
                               # MPI additions
                               level_info_mpi_interfaces_acc,
                               level_info_mpi_mortars_acc,
-                              n_levels, n_dims, mesh::ParallelTreeMesh{2}, dg, cache,
+                              n_levels, mesh::ParallelTreeMesh{2}, dg, cache,
                               dt_ratios)
     @unpack elements, interfaces, mpi_interfaces, boundaries = cache
 
@@ -556,7 +556,7 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels, n_dims, mesh::P4estMesh, dg, cache,
+                              n_levels, mesh::P4estMesh, dg, cache,
                               dt_ratios;
                               dt_scaling_order = 1, # 1 for hyperbolic, 2 for parabolic 
                               imex_alg = false) # Flip first list of indices to the end
@@ -669,7 +669,7 @@ function partition_variables!(level_info_elements,
 end
 
 # Assign number of stage evaluations to elements for stage-evaluations weighted MPI load balancing.
-function partition_variables!(level_info_elements, n_levels, n_dims,
+function partition_variables!(level_info_elements, n_levels,
                               mesh::ParallelP4estMesh, dg, cache,
                               dt_ratios)
     @unpack elements, interfaces, boundaries, mortars = cache
@@ -715,7 +715,7 @@ function partition_variables!(level_info_elements,
                               # MPI additions
                               level_info_mpi_interfaces_acc,
                               level_info_mpi_mortars_acc,
-                              n_levels, n_dims, mesh::ParallelP4estMesh, dg, cache,
+                              n_levels, mesh::ParallelP4estMesh, dg, cache,
                               dt_ratios)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
@@ -886,7 +886,7 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels, n_dims, mesh::StructuredMesh, dg, cache,
+                              n_levels, mesh::StructuredMesh, dg, cache,
                               dt_ratios)
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)

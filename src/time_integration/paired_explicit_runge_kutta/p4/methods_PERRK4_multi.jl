@@ -172,7 +172,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
-                         n_levels, n_dims, mesh, dg, cache, alg.PERK4Multi.dt_ratios)
+                         n_levels, mesh, dg, cache, alg.PERK4Multi.dt_ratios)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
