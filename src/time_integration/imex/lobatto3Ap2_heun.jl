@@ -123,12 +123,7 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
         error("time step size `dt` is NaN")
     end
 
-    # if the next iteration would push the simulation beyond the end time, set dt accordingly
-    if integrator.t + integrator.dt > t_end ||
-       isapprox(integrator.t + integrator.dt, t_end)
-        integrator.dt = t_end - integrator.t
-        terminate!(integrator)
-    end
+    limit_dt!(integrator)
 
     @trixi_timeit timer() "LobattoIII3Ap2HeunIntegrator ODE integration step" begin
         ### First stage ###

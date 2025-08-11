@@ -41,6 +41,17 @@ end
     return integrator.dt
 end
 
+@inline function limit_dt!(integrator::AbstractTimeIntegrator)
+    # if the next iteration would push the simulation beyond the end time, set dt accordingly
+    if integrator.t + integrator.dt > t_end ||
+       isapprox(integrator.t + integrator.dt, t_end)
+        integrator.dt = t_end - integrator.t
+        terminate!(integrator)
+    end
+
+    return nothing
+end
+
 function initialize_callbacks!(callbacks::Union{CallbackSet, Nothing},
                                integrator::AbstractTimeIntegrator)
     # initialize callbacks
