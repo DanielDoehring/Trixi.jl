@@ -91,15 +91,7 @@ function init(ode::ODEProblem, alg::IMEX_LobattoIIIAp2_Heun;
                                                                       kwargs...), false,
                                               k_nonlin, du_para, u_nonlin, k1)
 
-    # initialize callbacks
-    if callback isa CallbackSet
-        foreach(callback.continuous_callbacks) do cb
-            throw(ArgumentError("Continuous callbacks are unsupported."))
-        end
-        foreach(callback.discrete_callbacks) do cb
-            cb.initialize(cb, integrator.u, integrator.t, integrator)
-        end
-    end
+    initialize_callbacks!(callback, integrator)
 
     return integrator
 end
