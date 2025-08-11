@@ -92,8 +92,16 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
          du_para = du_para,
          semi = ode.p, f1 = ode.f.f1)
 
-    nonlin_prob = NonlinearProblem{true}(stage_residual_midpoint!,
-                                         k_nonlin, p)
+    # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
+    jac_prototype = get(kwargs, :jac_prototype, nothing)
+    colorvec = get(kwargs, :colorvec, nothing)
+
+    specialize = SciMLBase.FullSpecialize
+    nonlin_func = NonlinearFunction{true, specialize}(stage_residual_midpoint!;
+                                                      jac_prototype = jac_prototype,
+                                                      colorvec = colorvec)
+
+    nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
 
     #=
     nonlin_cache = SciMLBase.init(nonlin_prob,
@@ -183,10 +191,11 @@ function step!(integrator::MidpointMidpointIntegrator)
 
         @trixi_timeit timer() "nonlinear solve" begin
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin)
-            #sol = SciMLBase.solve!(integrator.nonlin_cache)
-            #copyto!(integrator.k_nonlin, sol.u)
-            
-            SciMLBase.solve!(integrator.nonlin_cache)
+            sol = SciMLBase.solve!(integrator.nonlin_cache)
+            copyto!(integrator.k_nonlin, sol.u)
+
+            # Works only if `alias_u0 = true` remains despite `reinit!`
+            #SciMLBase.solve!(integrator.nonlin_cache)
             #println(integrator.nonlin_cache.alias_u0)
         end
 
