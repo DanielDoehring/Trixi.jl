@@ -163,8 +163,7 @@ dt = 2.0 / (2^0) # Time step size
 
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         jac_prototype = jac_prototype, colorvec = colorvec);
+sol = Trixi.solve!(integrator);
 
-@time sol = Trixi.solve!(integrator);
-
-@time sol = Trixi.solve(ode, ode_alg, dt = dt,
-                        save_everystep = false, callback = callbacks);
+sol = Trixi.solve(ode, ode_alg, dt = dt,
+                  save_everystep = false, callback = callbacks);

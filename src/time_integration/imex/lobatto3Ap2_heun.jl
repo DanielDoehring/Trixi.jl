@@ -94,7 +94,7 @@ function init(ode::ODEProblem, alg::IMEX_LobattoIIIAp2_Heun;
     # initialize callbacks
     if callback isa CallbackSet
         foreach(callback.continuous_callbacks) do cb
-            throw(ArgumentError("Continuous callbacks are unsupported with the 2N storage time integration methods."))
+            throw(ArgumentError("Continuous callbacks are unsupported."))
         end
         foreach(callback.discrete_callbacks) do cb
             cb.initialize(cb, integrator.u, integrator.t, integrator)

@@ -190,6 +190,18 @@ end
 has_tstop(integrator::AbstractPairedExplicitRKIntegrator) = !isempty(integrator.opts.tstops)
 first_tstop(integrator::AbstractPairedExplicitRKIntegrator) = first(integrator.opts.tstops)
 
+function initialize_callbacks!(callback::Union{CallbackSet, Nothing},
+                               integrator::AbstractPairedExplicitRKIntegrator)
+    if callback isa CallbackSet
+        for cb in callback.continuous_callbacks
+            throw(ArgumentError("Continuous callbacks are unsupported with paired explicit Runge-Kutta methods."))
+        end
+        for cb in callback.discrete_callbacks
+            cb.initialize(cb, integrator.u, integrator.t, integrator)
+        end
+    end
+end
+
 function solve!(integrator::AbstractPairedExplicitRKIntegrator)
     @unpack prob = integrator.sol
 

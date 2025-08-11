@@ -101,15 +101,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Split;
                                                   false, true, false,
                                                   k1, du_para, k1_para)
 
-    # initialize callbacks
-    if callback isa CallbackSet
-        for cb in callback.continuous_callbacks
-            throw(ArgumentError("Continuous callbacks are unsupported with paired explicit Runge-Kutta methods."))
-        end
-        for cb in callback.discrete_callbacks
-            cb.initialize(cb, integrator.u, integrator.t, integrator)
-        end
-    end
+    initialize_callbacks!(callback, integrator)
 
     return integrator
 end
