@@ -56,7 +56,7 @@ function initialize_callbacks!(callback::Union{CallbackSet, Nothing},
     return nothing
 end
 
-function handle_callbacks!(callback::Union{CallbackSet, Nothing},
+function handle_callbacks!(callbacks::Union{CallbackSet, Nothing},
                            integrator::AbstractTimeIntegrator)
     # handle callbacks
     if callbacks isa CallbackSet
