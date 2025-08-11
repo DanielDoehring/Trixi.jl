@@ -1,5 +1,7 @@
 using Trixi
 
+using LinearSolve
+#using Sparspak
 using LineSearch, NonlinearSolve
 
 # Functionality for automatic sparsity detection
@@ -163,12 +165,32 @@ ode_alg = Trixi.IMEX_Midpoint_Midpoint()
 
 dt = 2.0 / (2^0) # Time step size
 
+### Linesearch ###
+# See https://docs.sciml.ai/LineSearch/dev/api/native/
+
 #linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
 #linesearch = LiFukushimaLineSearch()
 linesearch = nothing
 
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), linesearch = linesearch)
-#nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES())
+### Linear Solver ###
+# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+
+linsolve = KLUFactorization()
+#linsolve = UMFPACKFactorization()
+
+#linsolve = SimpleGMRES()
+#linsolve = KrylovJL_GMRES()
+#linsolve = KrylovJL()
+
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit
+
+#linsolve = SparspakFactorization() # requires Sparspak.jl
+
+#linsolve = nothing
+
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
+                              linesearch = linesearch, linsolve = linsolve)
+
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff())
 
 

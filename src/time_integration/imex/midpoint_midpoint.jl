@@ -189,10 +189,10 @@ function step!(integrator::MidpointMidpointIntegrator)
             #SciMLBase.set_u!(integrator.nonlin_cache, integrator.u)
             
             # TODO: At some point use Polyester for copying data
-            #@trixi_timeit timer() "solve!" sol = SciMLBase.solve!(integrator.nonlin_cache)
+            #sol = SciMLBase.solve!(integrator.nonlin_cache)
             #copyto!(integrator.k_nonlin, sol.u)
 
-            @trixi_timeit timer() "solve! no return" SciMLBase.solve!(integrator.nonlin_cache)
+            SciMLBase.solve!(integrator.nonlin_cache)
             copyto!(integrator.k_nonlin, NonlinearSolveBase.get_u(integrator.nonlin_cache))
         end
 
