@@ -185,7 +185,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{4}
 
     #modify_dt_for_tstops!(integrator)
 
-    limit_dt!(integrator)
+    limit_dt!(integrator, t_end)
 
     @trixi_timeit timer() "Paired Explicit Relaxation RK ODE integration step" begin
         PERK_k1!(integrator, prob.p)

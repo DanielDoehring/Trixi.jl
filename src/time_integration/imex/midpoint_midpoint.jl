@@ -156,7 +156,7 @@ function step!(integrator::MidpointMidpointIntegrator)
         error("time step size `dt` is NaN")
     end
 
-    limit_dt!(integrator)
+    limit_dt!(integrator, t_end)
 
     @trixi_timeit timer() "MidpointMidpointIntegrator ODE integration step" begin
         ### First stage ###

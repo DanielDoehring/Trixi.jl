@@ -137,7 +137,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
 
     #modify_dt_for_tstops!(integrator)
 
-    limit_dt!(integrator)
+    limit_dt!(integrator, t_end)
 
     mesh, equations, dg, cache = mesh_equations_solver_cache(prob.p)
 

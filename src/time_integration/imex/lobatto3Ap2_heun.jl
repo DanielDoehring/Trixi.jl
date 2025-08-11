@@ -123,7 +123,7 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
         error("time step size `dt` is NaN")
     end
 
-    limit_dt!(integrator)
+    limit_dt!(integrator, t_end)
 
     @trixi_timeit timer() "LobattoIII3Ap2HeunIntegrator ODE integration step" begin
         ### First stage ###

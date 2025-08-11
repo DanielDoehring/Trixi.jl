@@ -41,7 +41,7 @@ end
     return integrator.dt
 end
 
-@inline function limit_dt!(integrator::AbstractTimeIntegrator)
+@inline function limit_dt!(integrator::AbstractTimeIntegrator, t_end)
     # if the next iteration would push the simulation beyond the end time, set dt accordingly
     if integrator.t + integrator.dt > t_end ||
        isapprox(integrator.t + integrator.dt, t_end)
