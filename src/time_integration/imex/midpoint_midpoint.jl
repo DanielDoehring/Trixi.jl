@@ -40,7 +40,7 @@ end
 # which are used in Trixi.jl.
 mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, Alg,
                                           SimpleIntegratorOptions,
-                                          NonlinProb, NonlinCache} <:
+                                          NonlinCache} <:
                AbstractIMEXTimeIntegrator
     u::uType
     du::uType # In-place output of `f`
@@ -69,7 +69,6 @@ mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, 
     du_para::uType # Stores the parabolic part of the overall rhs!
     u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
 
-    nonlin_prob::NonlinProb
     nonlin_cache::NonlinCache
 end
 
@@ -103,16 +102,15 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
 
     nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
 
-    #=
-    nonlin_cache = SciMLBase.init(nonlin_prob,
-                                  NewtonRaphson(autodiff = AutoFiniteDiff());
+    nonlin_solver = get(kwargs, :nonlin_solver, NewtonRaphson(autodiff = AutoFiniteDiff()))
+
+    abstol = get(kwargs, :abstol, nothing)
+    reltol = get(kwargs, :reltol, nothing)
+
+    nonlin_cache = SciMLBase.init(nonlin_prob, nonlin_solver;
                                   alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
-                                  show_trace = Val(true), trace_level = TraceAll())
-    =#
-    nonlin_cache = SciMLBase.init(nonlin_prob,
-                                  NewtonRaphson(autodiff = AutoFiniteDiff());
-                                  #NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES());
-                                  alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+                                  abstol = abstol, reltol = reltol)
+                                  #show_trace = Val(true), trace_level = TraceAll())
 
     integrator = MidpointMidpointIntegrator(u, du, u_tmp,
                                             t, dt, zero(dt), iter,
@@ -121,7 +119,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
                                                                     ode.tspan;
                                                                     kwargs...), false,
                                             k_nonlin, du_para, u_nonlin,
-                                            nonlin_prob, nonlin_cache)
+                                            nonlin_cache)
 
     initialize_callbacks!(callback, integrator)
 
@@ -177,13 +175,25 @@ function step!(integrator::MidpointMidpointIntegrator)
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
-            SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin)
-            sol = SciMLBase.solve!(integrator.nonlin_cache)
-            copyto!(integrator.k_nonlin, sol.u)
+            
+            SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
+                              # Does not seem to have an effect
+                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+            
+            #println("inplace: ", SciMLBase.isinplace(integrator.nonlin_cache)) # true
+            #println("atol: ", NonlinearSolveBase.get_abstol(integrator.nonlin_cache))
+            #println("rtol: ", NonlinearSolveBase.get_reltol(integrator.nonlin_cache))
 
-            # Works only if `alias_u0 = true` remains despite `reinit!`
-            #SciMLBase.solve!(integrator.nonlin_cache)
-            #println(integrator.nonlin_cache.alias_u0)
+            # These seem unfortunately not to work
+            #SciMLBase.set_u!(integrator.nonlin_cache, integrator.k_nonlin)
+            #SciMLBase.set_u!(integrator.nonlin_cache, integrator.u)
+            
+            # TODO: At some point use Polyester for copying data
+            #@trixi_timeit timer() "solve!" sol = SciMLBase.solve!(integrator.nonlin_cache)
+            #copyto!(integrator.k_nonlin, sol.u)
+
+            @trixi_timeit timer() "solve! no return" SciMLBase.solve!(integrator.nonlin_cache)
+            copyto!(integrator.k_nonlin, NonlinearSolveBase.get_u(integrator.nonlin_cache))
         end
 
         # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
