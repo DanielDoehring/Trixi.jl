@@ -134,12 +134,13 @@ function init(ode::ODEProblem, alg::SimpleAlgorithmSSP;
     resize!(integrator.p, integrator.p.solver.volume_integral,
             nelements(integrator.p.solver, integrator.p.cache))
 
+    # Standard callbacks
     initialize_callbacks!(callback, integrator)
 
+    # Addition for `SimpleAlgorithmSSP` which may have stage callbacks
     for stage_callback in alg.stage_callbacks
         init_callback(stage_callback, integrator.p)
     end
-
     return integrator
 end
 
