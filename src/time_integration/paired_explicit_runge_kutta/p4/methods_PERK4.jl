@@ -332,6 +332,8 @@ end
         # Try optimize for `@muladd`: avoid `+=`
         integrator.u[i] = integrator.u[i] + b_dt * (integrator.k1[i] + integrator.du[i])
     end
+
+    return nothing
 end
 
 function step!(integrator::AbstractPairedExplicitRKIntegrator{4})
@@ -385,6 +387,8 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{4})
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 
 # Multirate/partitioned method

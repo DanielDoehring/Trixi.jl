@@ -229,5 +229,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 end # @muladd

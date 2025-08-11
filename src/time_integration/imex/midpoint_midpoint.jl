@@ -228,6 +228,8 @@ function step!(integrator::MidpointMidpointIntegrator)
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 
 # get a cache where the RHS can be stored
@@ -240,6 +242,8 @@ u_modified!(integrator::MidpointMidpointIntegrator, ::Bool) = false
 function terminate!(integrator::MidpointMidpointIntegrator)
     integrator.finalstep = true
     empty!(integrator.opts.tstops)
+
+    return nothing
 end
 
 # used for AMR
@@ -252,5 +256,7 @@ function Base.resize!(integrator::MidpointMidpointIntegrator, new_size)
     # For split problems
     resize!(integrator.du_para, new_size)
     resize!(integrator.u_nonlin, new_size)
+
+    return nothing
 end
 end # @muladd

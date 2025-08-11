@@ -369,5 +369,7 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrat
     resize!(integrator.kS1, new_size)
     # Addition for multirate PERK methods for parabolic problems
     resize!(integrator.du_para, new_size)
+
+    return nothing
 end
 end # @muladd

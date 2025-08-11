@@ -175,6 +175,8 @@ end
         # Try optimize for `@muladd`: avoid `+=`
         integrator.u[i] = integrator.u[i] + integrator.gamma * integrator.du[i]
     end
+
+    return nothing
 end
 
 function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{4},

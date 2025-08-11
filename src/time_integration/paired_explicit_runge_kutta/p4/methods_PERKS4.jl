@@ -174,6 +174,8 @@ end
                           (integrator.k1[i] +
                            integrator.du[i] + integrator.du_para[i])
     end
+
+    return nothing
 end
 
 function step!(integrator::AbstractPairedExplicitRKSplitIntegrator{4})
@@ -234,5 +236,7 @@ function step!(integrator::AbstractPairedExplicitRKSplitIntegrator{4})
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 end # @muladd

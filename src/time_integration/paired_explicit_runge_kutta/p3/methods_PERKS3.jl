@@ -190,6 +190,8 @@ function step!(integrator::AbstractPairedExplicitRKSplitIntegrator{3})
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 
 function Base.resize!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{3},
@@ -203,5 +205,7 @@ function Base.resize!(integrator::AbstractPairedExplicitRKSplitSingleIntegrator{
 
     resize!(integrator.du_para, new_size)
     resize!(integrator.k1_para, new_size)
+
+    return nothing
 end
 end # @muladd

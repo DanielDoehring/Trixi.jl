@@ -321,6 +321,8 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{3})
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 
 function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator{3}, new_size)
@@ -330,6 +332,8 @@ function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator{3}, new_siz
 
     resize!(integrator.k1, new_size)
     resize!(integrator.kS1, new_size)
+
+    return nothing
 end
 
 # Multirate/partitioned method

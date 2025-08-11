@@ -315,6 +315,8 @@ function step!(integrator::AbstractPairedExplicitRKIntegrator{2})
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 
 # Multirate/partitioned method

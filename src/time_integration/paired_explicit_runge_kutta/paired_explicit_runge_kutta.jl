@@ -857,6 +857,8 @@ function Base.resize!(integrator::AbstractPairedExplicitRKIntegrator,
     resize!(integrator.u_tmp, new_size)
     # PERK stage
     resize!(integrator.k1, new_size)
+
+    return nothing
 end
 
 function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
@@ -868,6 +870,8 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiParabolicIntegrat
     resize!(integrator.k1, new_size)
     # Addition for multirate PERK methods for parabolic problems
     resize!(integrator.du_para, new_size)
+
+    return nothing
 end
 
 function Base.resize!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleIntegrator,
@@ -884,6 +888,8 @@ function Base.resize!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSin
     end
     # Previous time step (required for Euler-Acoustic)
     resize!(integrator.u_prev, new_size)
+
+    return nothing
 end
 
 # This `resize!` targets the Euler-Gravity case where 
@@ -903,6 +909,8 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
     if :semi_gravity in fieldnames(typeof(integrator.p))
         partition_u_gravity!(integrator)
     end
+
+    return nothing
 end
 
 function Base.resize!(integrator::AbstractPairedExplicitRKSplitIntegrator,
@@ -915,6 +923,8 @@ function Base.resize!(integrator::AbstractPairedExplicitRKSplitIntegrator,
     # Parabolic/split-approach additions
     resize!(integrator.du_para, new_size)
     resize!(integrator.k1_para, new_size)
+
+    return nothing
 end
 
 # get a cache where the RHS can be stored
@@ -926,6 +936,8 @@ u_modified!(integrator::AbstractPairedExplicitRKIntegrator, ::Bool) = false
 # stop the time integration
 function terminate!(integrator::AbstractPairedExplicitRKIntegrator)
     integrator.finalstep = true
+
+    return nothing
 end
 
 # Needed for Euler-Acoustic coupling
@@ -974,6 +986,8 @@ function solve_a_butcher_coeffs_unknown! end
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
+
+    return nothing
 end
 
 # Required for split methods
@@ -986,6 +1000,8 @@ end
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
+
+    return nothing
 end
 
 # Version with SAME stage distribution for hyperbolic and parabolic part
@@ -999,6 +1015,8 @@ end
                    integrator.level_info_interfaces_acc[max_level],
                    integrator.level_info_boundaries_acc[max_level],
                    integrator.level_info_mortars_acc[max_level])
+
+    return nothing
 end
 =#
 
@@ -1013,6 +1031,8 @@ end
                    integrator.level_info_interfaces_para_acc[max_level],
                    integrator.level_info_boundaries_para_acc[max_level],
                    integrator.level_info_mortars_para_acc[max_level])
+
+    return nothing
 end
 
 @inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,
@@ -1028,6 +1048,8 @@ end
                               integrator.level_info_boundaries_acc[max_level],
                               integrator.level_info_mortars_acc[max_level],
                               integrator.level_u_indices_elements)
+
+    return nothing
 end
 
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerAcoustics, t,
@@ -1039,6 +1061,8 @@ end
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
+
+    return nothing
 end
 
 # Dummy argument `integrator` for same signature as `rhs_hyperbolic_parabolic!` for
@@ -1047,10 +1071,14 @@ end
 @inline function rhs!(du_ode, u_ode, semi::AbstractSemidiscretization, t,
                       integrator)
     rhs!(du_ode, u_ode, semi, t)
+
+    return nothing
 end
 @inline function (f::SplitFunction)(du_ode, u_ode, semi::AbstractSemidiscretization, t,
                                     integrator)
     f(du_ode, u_ode, semi, t)
+
+    return nothing
 end
 
 # Multirate/partitioned helpers

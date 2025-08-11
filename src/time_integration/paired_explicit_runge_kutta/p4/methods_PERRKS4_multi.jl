@@ -367,6 +367,8 @@ end
         # Try optimize for `@muladd`: avoid `+=`
         integrator.u[i] = integrator.u[i] + integrator.gamma * integrator.du[i]
     end
+
+    return nothing
 end
 
 function step!(integrator::AbstractPairedExplicitRelaxationRKSplitIntegrator{4})
@@ -424,5 +426,7 @@ function step!(integrator::AbstractPairedExplicitRelaxationRKSplitIntegrator{4})
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 end # @muladd

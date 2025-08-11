@@ -210,6 +210,8 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 
 # get a cache where the RHS can be stored
@@ -222,6 +224,8 @@ u_modified!(integrator::LobattoIII3Ap2HeunIntegrator, ::Bool) = false
 function terminate!(integrator::LobattoIII3Ap2HeunIntegrator)
     integrator.finalstep = true
     empty!(integrator.opts.tstops)
+
+    return nothing
 end
 
 # used for AMR
@@ -236,5 +240,7 @@ function Base.resize!(integrator::LobattoIII3Ap2HeunIntegrator, new_size)
     resize!(integrator.u_nonlin, new_size)
     # For the k1 register
     resize!(integrator.k1, new_size)
+
+    return nothing
 end
 end # @muladd
