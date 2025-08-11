@@ -105,7 +105,7 @@ function init(ode::ODEProblem, alg::IMEX_LobattoIIIAp2_Heun;
 end
 
 function stage_residual_Lobatto3Ap2Heun!(residual, implicit_stage, p)
-    @unpack alg, dt, t, u_tmp, u_nonlin, u, du_para, semi, f1 = p
+    @unpack alg, dt, t, u_tmp, u_nonlin, du_para, semi, f1 = p
 
     a_dt = alg.A_im[1, 2] * dt
     @threaded for i in eachindex(u_tmp)
@@ -158,7 +158,7 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
                  u_tmp = integrator.u_tmp, u_nonlin = integrator.u_nonlin,
-                 u = integrator.u, du_para = integrator.du_para,
+                 du_para = integrator.du_para,
                  semi = prob.p, f1 = integrator.f.f1)
 
             nonlinear_eq = NonlinearProblem{true}(stage_residual_Lobatto3Ap2Heun!,

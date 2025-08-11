@@ -89,7 +89,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     # This creates references to the parameters
     p = (alg = alg, dt = dt, t = t,
          u_tmp = u_tmp, u_nonlin = u_nonlin,
-         u = u, du_para = du_para,
+         du_para = du_para,
          semi = ode.p, f1 = ode.f.f1)
 
     nonlin_prob = NonlinearProblem{true}(stage_residual_midpoint!,
@@ -129,7 +129,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
 end
 
 function stage_residual_midpoint!(residual, implicit_stage, p)
-    @unpack alg, dt, t, u_tmp, u_nonlin, u, du_para, semi, f1 = p
+    @unpack alg, dt, t, u_tmp, u_nonlin, du_para, semi, f1 = p
 
     a_dt = alg.A_im[1, 2] * dt
     @threaded for i in eachindex(u_tmp)
