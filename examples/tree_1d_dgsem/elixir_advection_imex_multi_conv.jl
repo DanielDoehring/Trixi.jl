@@ -93,7 +93,7 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         jac_prototype = nothing, colorvec = nothing,
                         nonlin_solver = nonlin_solver,
-                        abstol = 1e-5, reltol = 1e-5);
+                        abstol = 1e-4, reltol = 1e-4);
 
 sol = Trixi.solve!(integrator);
 
