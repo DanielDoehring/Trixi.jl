@@ -77,6 +77,8 @@ end
         @warn "Interrupted. Larger maxiters is needed."
         terminate!(integrator)
     end
+
+    return nothing
 end
 
 """
