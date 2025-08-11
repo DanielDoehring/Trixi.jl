@@ -186,6 +186,8 @@ linsolve = KLUFactorization()
 
 #linsolve = SparspakFactorization() # requires Sparspak.jl
 
+# HYPRE & MKL do not work with sparsity structure of the Jacobian
+
 #linsolve = nothing
 
 nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),

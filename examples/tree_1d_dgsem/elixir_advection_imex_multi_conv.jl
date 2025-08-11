@@ -1,5 +1,9 @@
 using Trixi
 
+using LinearSolve
+#using Sparspak
+using LineSearch, NonlinearSolve
+
 ###############################################################################
 # semidiscretization of the linear advection equation
 
@@ -53,8 +57,43 @@ ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([8], path, [1])
 
-dt = 0.05 / (2^3) # 0.05 for explicit 8-16 pair
+dt = 0.05 / (2^0) # 0.05 for explicit 8-16 pair
 
-sol = Trixi.solve(ode, ode_alg,
-                  dt = dt,
-                  save_everystep = false, callback = callbacks);
+### Linesearch ###
+# See https://docs.sciml.ai/LineSearch/dev/api/native/
+
+#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
+linesearch = LiFukushimaLineSearch()
+#linesearch = nothing
+
+### Linear Solver ###
+# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+
+#linsolve = KLUFactorization()
+#linsolve = UMFPACKFactorization()
+
+#linsolve = SimpleGMRES()
+linsolve = KrylovJL_GMRES()
+#linsolve = KrylovJL()
+
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit
+
+#linsolve = SparspakFactorization() # requires Sparspak.jl
+
+# HYPRE & MKL do not work with sparsity structure of the Jacobian
+
+#linsolve = nothing
+
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
+                              linesearch = linesearch, linsolve = linsolve)
+
+#nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
+
+
+integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
+                        jac_prototype = nothing, colorvec = nothing,
+                        nonlin_solver = nonlin_solver,
+                        abstol = 1e-5, reltol = 1e-5);
+
+sol = Trixi.solve!(integrator);
+

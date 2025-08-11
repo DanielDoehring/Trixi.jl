@@ -58,18 +58,10 @@ mutable struct MidpointMidpointIntegrator{RealT <: Real, uType, Params, Sol, F, 
 
     # For nonlinear solve
     k_nonlin::uType
-
-    # TODO: Try using NonlinearFunction as integrator field with iip & specialize, see 
-    # https://docs.sciml.ai/NonlinearSolve/stable/basics/nonlinear_functions/#SciMLBase.NonlinearFunction
-    #
-    # then, one can also supply sparsity structure and coloring vector of the Jacobian
-    # or try to get the sparsity detector from "SparseConnectivityTracer.jl" to work
-
     # For split problems solved with IMEX methods
     du_para::uType # Stores the parabolic part of the overall rhs!
     u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
-
-    nonlin_cache::NonlinCache
+    nonlin_cache::NonlinCache # Contains Problem & Solver
 end
 
 function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;

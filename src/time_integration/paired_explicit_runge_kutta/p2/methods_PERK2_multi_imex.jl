@@ -176,23 +176,22 @@ end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
               dt, callback = nothing, kwargs...)
-    u0 = copy(ode.u0)
-    du = zero(u0)
-    u_tmp = zero(u0)
+    u = copy(ode.u0)
+    du = zero(u)
+    u_tmp = zero(u)
 
-    k1 = zero(u0) # Additional PERK register
+    k1 = zero(u) # Additional PERK register
 
-    k_nonlin = zero(u0)
-    u_nonlin = zero(u0)
+    k_nonlin = zero(u)
+    u_nonlin = zero(u)
 
-    t0 = first(ode.tspan)
+    t = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
     ### Set datastructures for handling of level-dependent integration ###
     semi = ode.p
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
-    n_dims = ndims(mesh) # Spatial dimension
 
     n_levels = get_n_levels(mesh, alg)
 
@@ -210,7 +209,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels, n_dims, mesh, dg, cache, alg.dt_ratios)
+                              n_levels, mesh, dg, cache, alg.dt_ratios)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -226,7 +225,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     # Set (initial) distribution of DG nodal values
     level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
     partition_u!(level_u_indices_elements, level_info_elements,
-                 n_levels, u0, mesh, equations, dg, cache)
+                 n_levels, u, mesh, equations, dg, cache)
 
     println("level_u_indices_elements: ", level_u_indices_elements)
 
@@ -236,7 +235,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     p = (alg = alg, dt = dt, t = t,
          u_tmp = u_tmp, u_nonlin = u_nonlin,
          u = u, du = du,
-         semi = prob.p, f = ode.f,
+         semi = ode.p, f = ode.f,
          # PERK-Multi additions
          element_indices = level_info_elements_acc[alg.num_methods],
          interface_indices = level_info_interfaces_acc[alg.num_methods],
@@ -268,8 +267,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     #show_trace = Val(true), trace_level = TraceAll())
 
     ### Done with setting up for handling of level-dependent integration ###
-    integrator = PairedExplicitRK2IMEXMultiIntegrator(u0, du, u_tmp,
-                                                      t0, tdir,
+    integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
+                                                      t, tdir,
                                                       dt, zero(dt),
                                                       iter, semi,
                                                       (prob = ode,),
