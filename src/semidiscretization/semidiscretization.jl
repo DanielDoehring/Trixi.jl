@@ -253,7 +253,7 @@ function jacobian_fd(semi::AbstractSemidiscretization;
     # use second order finite difference to estimate Jacobian matrix
     for idx in eachindex(u0_ode)
         # determine size of fluctuation
-        epsilon = sqrt(eps(u0_ode[idx]))
+        epsilon = sqrt(eps(typeof(u0_ode[idx])))
 
         # plus fluctuation
         u_ode[idx] = u0_ode[idx] + epsilon
@@ -263,7 +263,7 @@ function jacobian_fd(semi::AbstractSemidiscretization;
         u_ode[idx] = u0_ode[idx] - epsilon
         rhs!(dum_ode, u_ode, semi, t0)
 
-        # restore linearisation state
+        # restore linearization state
         u_ode[idx] = u0_ode[idx]
 
         # central second order finite difference
@@ -301,7 +301,7 @@ end
 function _jacobian_ad_forward(semi, t0, u0_ode, du_ode, config)
     new_semi = remake(semi, uEltype = eltype(config))
     # Create anonymous function passed as first argument to `ForwardDiff.jacobian` to match
-    # `ForwardDiff.jacobian(f!, y::AbstractArray, x::AbstractArray, 
+    # `ForwardDiff.jacobian(f!, y::AbstractArray, x::AbstractArray,
     #                       cfg::JacobianConfig = JacobianConfig(f!, y, x), check=Val{true}())`
     J = ForwardDiff.jacobian(du_ode, u0_ode, config) do du_ode, u_ode
         Trixi.rhs!(du_ode, u_ode, new_semi, t0)
@@ -335,7 +335,7 @@ end
 function _jacobian_ad_forward_structarrays(semi, t0, u0_ode_plain, du_ode_plain, config)
     new_semi = remake(semi, uEltype = eltype(config))
     # Create anonymous function passed as first argument to `ForwardDiff.jacobian` to match
-    # `ForwardDiff.jacobian(f!, y::AbstractArray, x::AbstractArray, 
+    # `ForwardDiff.jacobian(f!, y::AbstractArray, x::AbstractArray,
     #                       cfg::JacobianConfig = JacobianConfig(f!, y, x), check=Val{true}())`
     J = ForwardDiff.jacobian(du_ode_plain, u0_ode_plain,
                              config) do du_ode_plain, u_ode_plain

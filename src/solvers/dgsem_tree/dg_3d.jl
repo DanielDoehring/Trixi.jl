@@ -304,6 +304,8 @@ function calc_volume_integral!(du, u,
                                   nonconservative_terms, equations,
                                   volume_integral.volume_flux, dg, cache)
     end
+
+    return nothing
 end
 
 @inline function flux_differencing_kernel!(du, u,
@@ -353,6 +355,8 @@ end
                                        equations, dg, i, j, kk, element)
         end
     end
+
+    return nothing
 end
 
 @inline function flux_differencing_kernel!(du, u,
@@ -404,6 +408,8 @@ end
         multiply_add_to_node_vars!(du, alpha * 0.5f0, integral_contribution, equations,
                                    dg, i, j, k, element)
     end
+
+    return nothing
 end
 
 # TODO: Taal dimension agnostic
@@ -711,6 +717,8 @@ function calc_interface_flux!(surface_flux_values,
             end
         end
     end
+
+    return nothing
 end
 
 function calc_interface_flux!(surface_flux_values,
@@ -818,6 +826,7 @@ end
 function calc_boundary_flux!(cache, t, boundary_condition::BoundaryConditionPeriodic,
                              mesh::TreeMesh{3}, equations, surface_integral, dg::DG)
     @assert isempty(eachboundary(dg, cache))
+    return nothing
 end
 
 function calc_boundary_flux!(cache, t, boundary_conditions::NamedTuple,
@@ -848,6 +857,8 @@ function calc_boundary_flux!(cache, t, boundary_conditions::NamedTuple,
     calc_boundary_flux_by_direction!(surface_flux_values, t, boundary_conditions[6],
                                      equations, surface_integral, dg, cache,
                                      6, firsts[6], lasts[6])
+
+    return nothing
 end
 
 function calc_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:Any, 5},

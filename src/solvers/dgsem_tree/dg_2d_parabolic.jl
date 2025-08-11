@@ -147,6 +147,8 @@ function transform_variables!(u_transformed, u, mesh::Union{TreeMesh{2}, P4estMe
                            i, j, element)
         end
     end
+
+    return nothing
 end
 
 # This is the version used when calculating the divergence of the viscous fluxes
@@ -348,6 +350,8 @@ function calc_viscous_fluxes!(flux_viscous,
                            i, j, element)
         end
     end
+
+    return nothing
 end
 
 # TODO: parabolic; decide if we should keep this, and if so, extend to 3D.
@@ -411,7 +415,10 @@ function calc_boundary_flux_gradients!(cache, t,
                                               equations_parabolic, surface_integral, dg,
                                               cache,
                                               4, firsts[4], lasts[4])
+
+    return nothing
 end
+
 function calc_boundary_flux_by_direction_gradient!(surface_flux_values::AbstractArray{<:Any,
                                                                                       4},
                                                    t,
@@ -489,6 +496,8 @@ function calc_boundary_flux_divergence!(cache, t,
                                                 equations_parabolic, surface_integral,
                                                 dg, cache,
                                                 4, firsts[4], lasts[4])
+
+    return nothing
 end
 function calc_boundary_flux_by_direction_divergence!(surface_flux_values::AbstractArray{<:Any,
                                                                                         4},
@@ -808,6 +817,8 @@ function calc_gradient_interface_flux!(surface_flux_values,
             end
         end
     end
+
+    return nothing
 end
 
 # Calculate the gradient of the transformed variables

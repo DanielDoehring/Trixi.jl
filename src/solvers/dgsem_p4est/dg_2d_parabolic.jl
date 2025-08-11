@@ -488,6 +488,8 @@ end
         surface_flux_values[v, primary_node_index, primary_direction_index, primary_element_index] = flux_[v]
         surface_flux_values[v, secondary_node_index, secondary_direction_index, secondary_element_index] = flux_[v]
     end
+
+    return nothing
 end
 
 # This is the version used when calculating the divergence of the viscous fluxes
@@ -853,6 +855,8 @@ end
     # Copy flux to buffer
     set_node_vars!(fstar_primary[position_index], flux_, equations, dg, node_index)
     set_node_vars!(fstar_secondary[position_index], flux_, equations, dg, node_index)
+
+    return nothing
 end
 
 # TODO: parabolic, finish implementing `calc_boundary_flux_gradients!` and `calc_boundary_flux_divergence!`
@@ -955,7 +959,7 @@ end
 function calc_boundary_flux_by_type!(cache, t, BCs::Tuple{}, BC_indices::Tuple{},
                                      operator_type, mesh::P4estMesh, equations,
                                      surface_integral, dg::DG)
-    nothing
+    return nothing
 end
 
 function calc_boundary_flux!(cache, t,
@@ -1017,6 +1021,8 @@ function calc_boundary_flux!(cache, t,
             j_node += j_node_step
         end
     end
+
+    return nothing
 end
 
 function apply_jacobian_parabolic!(du, mesh::P4estMesh{2},
