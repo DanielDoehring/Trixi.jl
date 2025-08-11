@@ -337,7 +337,7 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             #integrator.k_nonlin[i] = integrator.u[i]
             integrator.k_nonlin[i] = integrator.du[i]
         end
-        
+
         @trixi_timeit timer() "nonlinear solve" begin
             p = (alg = alg, dt = integrator.dt, t = integrator.t,
                  u_tmp = integrator.u_tmp, u_nonlin = integrator.u_nonlin,
@@ -355,7 +355,8 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
             SciMLBase.solve(nonlinear_eq,
                             #NewtonRaphson(autodiff = AutoFiniteDiff()), # Does not converge
-                            NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
+                            NewtonRaphson(autodiff = AutoFiniteDiff(),
+                                          linsolve = KrylovJL_GMRES()),
                             alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
 
