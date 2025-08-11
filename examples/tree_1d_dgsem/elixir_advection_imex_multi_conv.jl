@@ -30,6 +30,8 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_convergence_test,
                                     solver)
 
+# TODO: Sparsity detection for partitioned RHS
+
 ###############################################################################
 # ODE solvers, callbacks etc.
 
