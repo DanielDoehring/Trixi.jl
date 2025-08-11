@@ -187,7 +187,7 @@ function step!(integrator::MidpointMidpointIntegrator)
             #copyto!(integrator.k_nonlin, sol.u)
             
             SciMLBase.solve!(integrator.nonlin_cache)
-            println(integrator.nonlin_cache.alias_u0)
+            #println(integrator.nonlin_cache.alias_u0)
         end
 
         # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
