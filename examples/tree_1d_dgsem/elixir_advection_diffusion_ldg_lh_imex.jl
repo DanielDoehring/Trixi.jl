@@ -54,7 +54,6 @@ import .RealMatMulOverload
 
 ###############################################################################################
 
-###############################################################################
 # semidiscretization of the linear advection diffusion equation
 
 advection_velocity = 0.05
@@ -116,7 +115,6 @@ semi_float = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_p
 
 const t0 = 0.0
 const t_end = 10.0
-
 const t_span = (t0, t_end)
 
 ode = semidiscretize(semi_float, t_span)
