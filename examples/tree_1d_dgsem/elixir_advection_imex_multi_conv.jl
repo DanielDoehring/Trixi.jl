@@ -132,40 +132,7 @@ ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
 
 dt = 0.05 / (2^0) # 0.05 for explicit 8-16 pair
 
-### Linesearch ###
-# See https://docs.sciml.ai/LineSearch/dev/api/native/
-
-#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
-linesearch = LiFukushimaLineSearch()
-#linesearch = nothing
-
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
-
-#linsolve = KLUFactorization()
-#linsolve = UMFPACKFactorization()
-
-#linsolve = SimpleGMRES()
-linsolve = KrylovJL_GMRES()
-
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit
-
-#linsolve = SparspakFactorization() # requires Sparspak.jl
-
-# HYPRE & MKL do not work with sparsity structure of the Jacobian
-
-#linsolve = nothing
-
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
-                              linesearch = linesearch, linsolve = linsolve)
-
-#nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
-# Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
-
-integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
-                        jac_prototype = nothing, colorvec = nothing,
-                        nonlin_solver = nonlin_solver,
-                        abstol = 1e-4, reltol = 1e-4);
+integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks);
 
 element_indices = integrator.level_info_elements_acc[ode_alg.num_methods]
 interface_indices = integrator.level_info_interfaces_acc[ode_alg.num_methods]
@@ -187,11 +154,54 @@ rhs_im = (du_ode, u0_ode) -> Trixi.rhs!(du_ode, u0_ode, semi_real, t0,
 
 sparse_cache = sparse_jacobian_cache(sparse_adtype, sd, rhs_im, du_ode, u0_ode)
 
+# Full-dimensional sparsity information
 jac_prototype = sparse_cache.jac_prototype
 colorvec = sparse_cache.coloring.colorvec
 
+# Truncate to relevant entries
+# CARE: Not sure if this works for non-continuous `u_indices`!
+# I am especially worried about the columns
+subset_jac = jac_prototype[u_indices, u_indices]
+subset_colorvec = colorvec[u_indices] # This should be safe
+
 ###############################################################################
 # run the simulation
+
+### Linesearch ###
+# See https://docs.sciml.ai/LineSearch/dev/api/native/
+
+linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
+#linesearch = LiFukushimaLineSearch()
+#linesearch = nothing
+
+### Linear Solver ###
+# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+
+#linsolve = KLUFactorization()
+linsolve = UMFPACKFactorization()
+
+#linsolve = SimpleGMRES()
+#linsolve = KrylovJL_GMRES()
+
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit
+
+#linsolve = SparspakFactorization() # requires Sparspak.jl
+
+# HYPRE & MKL do not work with sparsity structure of the Jacobian
+
+#linsolve = nothing
+
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
+                              linesearch = linesearch, linsolve = linsolve)
+
+#nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
+# Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
+
+
+integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
+                        jac_prototype = subset_jac, colorvec = subset_colorvec,
+                        nonlin_solver = nonlin_solver,
+                        abstol = 1e-4, reltol = 1e-4);
 
 sol = Trixi.solve!(integrator);
 

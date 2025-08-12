@@ -134,7 +134,7 @@ end
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
-                                                    NonlinCache} <:
+                                                    uImType, NonlinCache} <:
                AbstractPairedExplicitRKIMEXMultiIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -172,8 +172,8 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     n_levels::Int64
 
     # For nonlinear solve
-    k_nonlin::uType
     u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
+    k_nonlin::uImType
     nonlin_cache::NonlinCache # Contains Problem & Solver
 end
 
@@ -184,9 +184,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     u_tmp = zero(u)
 
     k1 = zero(u) # Additional PERK register
-
-    k_nonlin = zero(u)
-    u_nonlin = zero(u)
 
     t = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
@@ -219,9 +216,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                 length(level_info_elements[i]))
     end
 
-    println("level_info_elements: ", level_info_elements)
-    println("level_info_elements_acc: ", level_info_elements_acc)
-    println("level_info_interfaces_acc: ", level_info_interfaces_acc)
+    #println("level_info_elements: ", level_info_elements)
+    #println("level_info_elements_acc: ", level_info_elements_acc)
+    #println("level_info_interfaces_acc: ", level_info_interfaces_acc)
     #println("level_info_boundaries_acc: ", level_info_boundaries_acc)
     #println("level_info_mortars_acc: ", level_info_mortars_acc)
 
@@ -230,9 +227,14 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     partition_u!(level_u_indices_elements, level_info_elements,
                  n_levels, u, mesh, equations, dg, cache)
 
-    println("level_u_indices_elements: ", level_u_indices_elements)
+    #println("level_u_indices_elements: ", level_u_indices_elements)
 
     ### Nonlinear Solver ###
+
+    # Full-size, argument to `rhs!`
+    u_nonlin = zero(u)
+    # Allocate only required storage
+    k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
     # This creates references to the parameters
     p = (dt = dt, t = t,
@@ -288,7 +290,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                       level_info_mortars_acc,
                                                       level_u_indices_elements,
                                                       -1, n_levels,
-                                                      k_nonlin, u_nonlin,
+                                                      u_nonlin, k_nonlin,
                                                       nonlin_cache)
 
     initialize_callbacks!(callback, integrator)
@@ -304,8 +306,9 @@ function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
 
     # Add implicit contribution
-    @threaded for i in u_indices
-        u_nonlin[i] = u[i] + a_dt * implicit_stage[i]
+    @threaded for i in 1:length(u_indices)
+        u_idx = u_indices[i] # Ensure thread safety
+        u_nonlin[u_idx] = u[u_idx] + a_dt * implicit_stage[i]
     end
 
     # Evaluate implicit stage
@@ -315,8 +318,8 @@ function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
       element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
-    @threaded for i in u_indices
-        residual[i] = implicit_stage[i] - du[i]
+    @threaded for i in 1:length(u_indices)
+        residual[i] = implicit_stage[i] - du[u_indices[i]]
     end
 
     return nothing
@@ -364,19 +367,22 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             integrator.u_nonlin[i] = integrator.u_tmp[i]
         end
 
+        u_indices_implicit = integrator.level_u_indices_elements[alg.num_methods]
         # Set initial guess for nonlinear solve
-        @threaded for i in integrator.level_u_indices_elements[alg.num_methods]
+        @threaded for i in 1:length(u_indices_implicit)
             # Trivial choices
-            #integrator.k_nonlin[i] = integrator.u[i]
-            integrator.k_nonlin[i] = integrator.du[i]
+            #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
+            integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
             # Try some extrapolation choices
-            #integrator.k_nonlin[i] = integrator.u[i] + 0.5 * integrator.dt * integrator.du[i]
+            #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]] + 
+            # 0.5 * integrator.dt * integrator.du[u_indices_implicit[i]]
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
-                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
+                              preserve_cache = true)
 
             #println("inplace: ", SciMLBase.isinplace(integrator.nonlin_cache)) # true
             #println("atol: ", NonlinearSolveBase.get_abstol(integrator.nonlin_cache))
@@ -397,8 +403,9 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
         # Compute the intermediate approximation for the final explicit step: Take the implicit solution into account
         a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
-        @threaded for i in integrator.level_u_indices_elements[alg.num_methods]
-            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.k_nonlin[i]
+        @threaded for i in 1:length(u_indices_implicit)
+            u_idx = u_indices_implicit[i]
+            integrator.u_tmp[u_idx] = integrator.u[u_idx] + a_dt * integrator.k_nonlin[i]
         end
 
         ### Final update ###
