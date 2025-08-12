@@ -94,8 +94,6 @@ semi_real = SemidiscretizationHyperbolic(mesh, equations, initial_condition_conv
 semi_float = SemidiscretizationHyperbolic(mesh, equations, initial_condition_convergence_test,
                                           solver_float)
 
-# TODO: Sparsity detection for partitioned RHS
-
 ###############################################################################
 # ODE & callbacks
 
