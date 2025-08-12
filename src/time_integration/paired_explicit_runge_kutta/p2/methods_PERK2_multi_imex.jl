@@ -366,8 +366,11 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
         # Set initial guess for nonlinear solve
         @threaded for i in integrator.level_u_indices_elements[alg.num_methods]
+            # Trivial choices
             #integrator.k_nonlin[i] = integrator.u[i]
             integrator.k_nonlin[i] = integrator.du[i]
+            # Try some extrapolation choices
+            #integrator.k_nonlin[i] = integrator.u[i] + 0.5 * integrator.dt * integrator.du[i]
         end
 
         @trixi_timeit timer() "nonlinear solve" begin

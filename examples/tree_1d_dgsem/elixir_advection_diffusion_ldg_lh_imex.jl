@@ -180,7 +180,7 @@ linsolve = KLUFactorization()
 
 #linsolve = SimpleGMRES()
 #linsolve = KrylovJL_GMRES()
-#linsolve = KrylovJL()
+#linsolve = KrylovJL_BICGSTAB()
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit
 

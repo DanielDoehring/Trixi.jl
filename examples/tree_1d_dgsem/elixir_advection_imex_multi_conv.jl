@@ -76,7 +76,6 @@ linesearch = LiFukushimaLineSearch()
 
 #linsolve = SimpleGMRES()
 linsolve = KrylovJL_GMRES()
-#linsolve = KrylovJL()
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit
 
@@ -90,7 +89,7 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               linesearch = linesearch, linsolve = linsolve)
 
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
-
+# Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         jac_prototype = nothing, colorvec = nothing,
