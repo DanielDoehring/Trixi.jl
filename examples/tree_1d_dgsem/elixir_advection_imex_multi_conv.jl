@@ -18,9 +18,16 @@ solver = DGSEM(polydeg = 3, surface_flux = num_flux)
 coordinates_min = -1.0
 coordinates_max = 1.0
 
-# One refinement only
+# One refinement
 refinement_patches = ((type = "box", coordinates_min = (-0.5,),
                        coordinates_max = (0.5,)),)
+
+# Two refinements
+
+refinement_patches = ((type = "box", coordinates_min = (-0.5,),
+                       coordinates_max = (0.5,)),
+                       (type = "box", coordinates_min = (-0.25,),
+                       coordinates_max = (0.25,)))
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
@@ -55,9 +62,12 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
 dtRatios = [1, 0.5]
 Stages = [16, 8]
 
+# One refinement
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([8], path, [1])
+
+# Two refinements
+ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
 
 dt = 0.05 / (2^0) # 0.05 for explicit 8-16 pair
 

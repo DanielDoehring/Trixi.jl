@@ -74,7 +74,7 @@ function partition_variables!(level_info_elements,
         #level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
         #element_id_level[element_id] = level_id
 
-        # TODO: For case with locally changing mean speed of sound (Lin. Euler)
+        # CARE: For case with locally changing mean speed of sound (Lin. Euler)
         #=
         c_max_el = 0.0
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
@@ -316,15 +316,20 @@ function partition_variables_imex!(level_info_elements,
         level_id = min(level_1, level_2)
         =#
 
-        if level_id == 1
+        # For interfaces, we need a slightly different logic for the IMEX case.
+        # This is due to the fact that the smaller element has actually less stage evaluations, but
+        # is used for the finest cells.
+        # As a consequence, we do not want to add every fine interface integrated with the
+        # few-stage evaluation implicit method to the other, coarser levels.
+        # Interfaces at partition borders, however, need to be added also to the next finest, i.e., 
+        # second finest level and so.
+        if level_id == 1 # On finest level
             push!(level_info_interfaces_acc[1], interface_id)
-            # TODO: Do I need to revisit this logic for the IMEX case when
-            # the smaller element has actually less stage evaluations (due to implicit logic) ?
-            # For more than 2 levels: check if one level_id is = 1, if that is the case use 2
 
-            # IDEA: Add to both levels?
             if level1 != level2 # At interface between differently sized cells
-                push!(level_info_interfaces_acc[2], interface_id)
+                for l in 2:n_levels # Add to all other levels
+                    push!(level_info_interfaces_acc[l], interface_id)
+                end
             end
         else
             for l in level_id:n_levels
