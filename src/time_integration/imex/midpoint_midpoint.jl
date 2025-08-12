@@ -94,7 +94,9 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
 
     nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
 
-    nonlin_solver = get(kwargs, :nonlin_solver, NewtonRaphson(autodiff = AutoFiniteDiff()))
+    nonlin_solver = get(kwargs, :nonlin_solver,
+                        # Fallback is plain Newton-Raphson
+                        NewtonRaphson(autodiff = AutoFiniteDiff()))
 
     abstol = get(kwargs, :abstol, nothing)
     reltol = get(kwargs, :reltol, nothing)
@@ -167,11 +169,10 @@ function step!(integrator::MidpointMidpointIntegrator)
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
-            
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
                               alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
-            
+
             #println("inplace: ", SciMLBase.isinplace(integrator.nonlin_cache)) # true
             #println("atol: ", NonlinearSolveBase.get_abstol(integrator.nonlin_cache))
             #println("rtol: ", NonlinearSolveBase.get_reltol(integrator.nonlin_cache))
@@ -179,13 +180,14 @@ function step!(integrator::MidpointMidpointIntegrator)
             # These seem unfortunately not to work
             #SciMLBase.set_u!(integrator.nonlin_cache, integrator.k_nonlin)
             #SciMLBase.set_u!(integrator.nonlin_cache, integrator.u)
-            
+
             # TODO: At some point use Polyester for copying data
             #sol = SciMLBase.solve!(integrator.nonlin_cache)
             #copyto!(integrator.k_nonlin, sol.u)
 
             SciMLBase.solve!(integrator.nonlin_cache)
-            copyto!(integrator.k_nonlin, NonlinearSolveBase.get_u(integrator.nonlin_cache))
+            copyto!(integrator.k_nonlin,
+                    NonlinearSolveBase.get_u(integrator.nonlin_cache))
         end
 
         # Compute the intermediate approximation for the second explicit step: Take the implicit solution into account
