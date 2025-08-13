@@ -29,8 +29,9 @@ refinement_patches = ((type = "box", coordinates_min = (-2.0,), coordinates_max 
 
 #refinement_patches = ((type = "box", coordinates_min = (-2.0,), coordinates_max = (2.0,)),)
 
+initial_ref = 5
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 4,
+                initial_refinement_level = initial_ref,
                 refinement_patches = refinement_patches,
                 n_cells_max = 30_000)
 
@@ -49,29 +50,10 @@ du_ode = similar(u0_ode)
 
 summary_callback = SummaryCallback()
 
-analysis_callback = AnalysisCallback(semi, interval = 1,
+analysis_callback = AnalysisCallback(semi, interval = 100,
                                      extra_analysis_errors = (:conservation_error,))
 
-# 2-Levels
-#=
-amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = first),
-                                      base_level = 4,
-                                      med_level = 4, med_threshold = 0.05,
-                                      max_level = 5, max_threshold = 0.1)
-=#
-# 3-Levels
-amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = first),
-                                      base_level = 4,
-                                      med_level = 5, med_threshold = 0.2,
-                                      max_level = 6, max_threshold = 0.3)
-
-amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 1,
-                           adapt_initial_condition = true,
-                           adapt_initial_condition_only_refine = true)
-
 callbacks = CallbackSet(summary_callback,
-                        amr_callback,
                         analysis_callback)
 
 ###############################################################################
@@ -130,8 +112,8 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
 # Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
-n_conv = 0
-dt = 0.2/2^n_conv
+n_conv = 3
+dt = 0.2/(2^(n_conv + (initial_ref - 4)))
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-4, reltol = 1e-4);
