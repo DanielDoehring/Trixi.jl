@@ -77,7 +77,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     k_nonlin = zero(u)
     u_nonlin = zero(u)
 
-    # This creates references to the parameters
+    # TODO: These are unfortunately not references!
     p = (alg = alg, dt = dt, t = t,
          u_tmp = u_tmp, u_nonlin = u_nonlin,
          du_para = du_para,

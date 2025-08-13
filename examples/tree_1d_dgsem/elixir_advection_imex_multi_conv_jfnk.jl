@@ -39,7 +39,7 @@ du_ode = similar(u0_ode)
 
 summary_callback = SummaryCallback()
 
-analysis_callback = AnalysisCallback(semi, interval = 1,
+analysis_callback = AnalysisCallback(semi, interval = 10_000,
                                      extra_analysis_errors = (:conservation_error,))
 
 callbacks = CallbackSet(summary_callback,

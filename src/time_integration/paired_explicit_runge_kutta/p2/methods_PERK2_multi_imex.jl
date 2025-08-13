@@ -236,7 +236,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
-    # This creates references to the parameters
+    # TODO: These are unfortunately not references!
     p = (dt = dt, t = t,
          u_nonlin = u_nonlin, u = u, du = du,
          semi = ode.p, f = ode.f,
@@ -264,10 +264,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     abstol = get(kwargs, :abstol, nothing)
     reltol = get(kwargs, :reltol, nothing)
+    maxiters = get(kwargs, :maxiters, nothing)
 
     nonlin_cache = SciMLBase.init(nonlin_prob, nonlin_solver;
                                   alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
-                                  abstol = abstol, reltol = reltol)
+                                  abstol = abstol, reltol = reltol,
+                                  maxiters = maxiters)
     #show_trace = Val(true), trace_level = TraceAll())
 
     ### Done with setting up for handling of level-dependent integration ###
@@ -379,10 +381,10 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
+            #=
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
-                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
-                              preserve_cache = true)
+                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
 
             #println("inplace: ", SciMLBase.isinplace(integrator.nonlin_cache)) # true
             #println("atol: ", NonlinearSolveBase.get_abstol(integrator.nonlin_cache))
@@ -399,6 +401,24 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             SciMLBase.solve!(integrator.nonlin_cache)
             copyto!(integrator.k_nonlin,
                     NonlinearSolveBase.get_u(integrator.nonlin_cache))
+            =#
+
+            p = (dt = integrator.dt, t = integrator.t,
+                 u_nonlin = integrator.u_nonlin, u = integrator.u, du = integrator.du,
+                 semi = prob.p, f = integrator.f,
+                 # PERK-Multi additions
+                 element_indices = integrator.level_info_elements_acc[alg.num_methods],
+                 interface_indices = integrator.level_info_interfaces_acc[alg.num_methods],
+                 boundary_indices = integrator.level_info_boundaries_acc[alg.num_methods],
+                 mortar_indices = integrator.level_info_mortars_acc[alg.num_methods],
+                 u_indices = integrator.level_u_indices_elements[alg.num_methods])
+
+            nonlinear_eq = NonlinearProblem{true}(stage_residual_PERK2IMEXMulti!,
+                                                  integrator.k_nonlin, p)
+
+            SciMLBase.solve(nonlinear_eq,
+                            NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
+                            alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
 
         # Compute the intermediate approximation for the final explicit step: Take the implicit solution into account
