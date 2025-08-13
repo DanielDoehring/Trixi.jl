@@ -6,6 +6,7 @@
 #! format: noindent
 
 # Custom implementation for PERK integrator
+# TODO: Revisit for split methods, need to dispatch on integrator type
 function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
                                                        AbstractPairedExplicitRelaxationRKMultiIntegrator};
                                      kwargs...)
