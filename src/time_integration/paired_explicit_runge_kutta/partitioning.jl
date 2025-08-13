@@ -20,8 +20,7 @@ end
     n_levels = get_n_levels(mesh)
 
     # CARE: This is for testcase with special assignment
-    #n_levels = alg.num_methods
-    #println("CARE: This is for testcase with special (random/round-robin) assignment!")
+    n_levels = alg.num_methods
 
     return n_levels
 end
@@ -210,7 +209,7 @@ function partition_variables!(level_info_elements,
     n_elements = length(elements.cell_ids)
 
     # CARE: This is for testcase with special assignment
-    #element_id_level = Dict{Int, Int}()
+    element_id_level = Dict{Int, Int}()
 
     # Determine level for each element
     for element_id in 1:n_elements
@@ -219,12 +218,12 @@ function partition_variables!(level_info_elements,
         level = mesh.tree.levels[elements.cell_ids[element_id]]
 
         # Convert to level id
-        level_id = max_level + 1 - level
+        #level_id = max_level + 1 - level
 
         # CARE: This is for testcase with special assignment
-        #level_id = rand(1:n_levels)
-        #level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
-        #element_id_level[element_id] = level_id
+        level_id = rand(1:n_levels)
+        level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
+        element_id_level[element_id] = level_id
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
         #=
@@ -290,7 +289,9 @@ function partition_variables!(level_info_elements,
         level_id = max_level + 1 - max(level1, level2)
 
         # CARE: This is for testcase with special assignment
-        #level_id = element_id_level[element_id]
+        element_level1 = element_id_level[element_id1]
+        element_level2 = element_id_level[element_id2]
+        level_id = min(element_level1, element_level2)
 
         # NOTE: For case with varying characteristic speeds
         #=

@@ -15,32 +15,22 @@ num_flux = flux_godunov
 
 solver = DGSEM(polydeg = 3, surface_flux = num_flux)
 
-coordinates_min = -4.0
-coordinates_max = 4.0
+coordinates_min = -1.0
+coordinates_max = 1.0
 length = coordinates_max - coordinates_min
 
-function ic_gauss(x, t, equation::LinearScalarAdvectionEquation1D)
-    scalar = exp(-(x[1]^2) * 5)
-    return SVector(scalar)
-end
-
-refinement_patches = ((type = "box", coordinates_min = (-2.0,), coordinates_max = (2.0,)),
-                      (type = "box", coordinates_min = (-1.0,), coordinates_max = (1.0,)))
-
-#refinement_patches = ((type = "box", coordinates_min = (-2.0,), coordinates_max = (2.0,)),)
-
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 4,
-                refinement_patches = refinement_patches,
+                initial_refinement_level = 5,
                 n_cells_max = 30_000)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, ic_gauss, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_convergence_test,
+                                    solver)
 
 ###############################################################################
 # ODE & callbacks
 
 t0 = 0.0
-t_end = length
+t_end = 2.0
 t_span = (t0, t_end)
 
 ode = semidiscretize(semi, t_span)
@@ -59,24 +49,6 @@ callbacks = CallbackSet(summary_callback,
 # Set up integrator
 
 path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
-
-dtRatios = [1, 0.5]
-Stages = [16, 8]
-
-# One refinement
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-#ode_alg = Trixi.PairedExplicitRK2IMEXMulti([8], path, [1])
-
-#=
-n_conv = 2
-dt = 0.2/2^n_conv
-sol = Trixi.solve(ode, ode_alg;
-                  dt = dt,
-                  ode_default_options()..., callback = callbacks);
-=#
-
-###############################################################################
-# run the simulation
 
 # Two refinements
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
@@ -111,10 +83,10 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
 # Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
-n_conv = 0
-dt = 0.2/2^n_conv
+n_conv = 2
+dt = 0.0125/2^n_conv
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         nonlin_solver = nonlin_solver,
-                        abstol = 1e-4, reltol = 1e-4);
+                        abstol = 1e-8, reltol = 1e-8);
 
 sol = Trixi.solve!(integrator);
