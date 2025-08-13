@@ -916,7 +916,7 @@ function partition_variables!(level_info_elements,
 
         # This approach is "method-based" in the sense that
         # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
