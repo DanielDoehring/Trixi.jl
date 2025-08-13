@@ -233,11 +233,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     # Full-size, argument to `rhs!`
     u_nonlin = zero(u)
-
     # For fixed meshes/no re-partitioning: Allocate only required storage
-    #k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
-    # For AMR/Testing: use full size
-    k_nonlin = zero(u)
+    k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
     # This creates references to the parameters
     p = (dt = dt, t = t,
@@ -309,14 +306,9 @@ function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
 
     # Add implicit contribution
-    #=
     @threaded for i in 1:length(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
         u_nonlin[u_idx] = u[u_idx] + a_dt * implicit_stage[i]
-    end
-    =#
-    @threaded for i in u_indices
-        u_nonlin[i] = u[i] + a_dt * implicit_stage[i]
     end
 
     # Evaluate implicit stage
@@ -326,13 +318,8 @@ function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
       element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
-    #=
     @threaded for i in 1:length(u_indices)
         residual[i] = implicit_stage[i] - du[u_indices[i]]
-    end
-    =#
-    @threaded for i in u_indices
-        residual[i] = implicit_stage[i] - du[i]
     end
 
     return nothing
@@ -382,7 +369,6 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
         u_indices_implicit = integrator.level_u_indices_elements[alg.num_methods]
         # Set initial guess for nonlinear solve
-        #=
         @threaded for i in 1:length(u_indices_implicit)
             # Trivial choices
             #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
@@ -391,33 +377,8 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]] + 
             # 0.5 * integrator.dt * integrator.du[u_indices_implicit[i]]
         end
-        =#
-        @threaded for i in u_indices_implicit
-            integrator.k_nonlin[i] = integrator.du[i]
-        end
 
         @trixi_timeit timer() "nonlinear solve" begin
-            # For quick & dirty conv. study with AMR
-            p = (dt = integrator.dt, t = integrator.t,
-                u_nonlin = integrator.u_nonlin, u = integrator.u, du = integrator.du,
-                semi = prob.p, f = integrator.f,
-                # PERK-Multi additions
-                element_indices = integrator.level_info_elements_acc[alg.num_methods],
-                interface_indices = integrator.level_info_interfaces_acc[alg.num_methods],
-                boundary_indices = integrator.level_info_boundaries_acc[alg.num_methods],
-                mortar_indices = integrator.level_info_mortars_acc[alg.num_methods],
-                u_indices = u_indices_implicit)
-
-            nonlinear_eq = NonlinearProblem{true}(stage_residual_PERK2IMEXMulti!,
-                                                  integrator.k_nonlin, p)
-
-            sol = SciMLBase.solve(nonlinear_eq,
-                                 NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
-                                 #DFSane(),
-                                 alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
-                                 abstol = 1e-8, reltol = 1e-8)
-
-            #=
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
                               alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
@@ -438,20 +399,14 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             SciMLBase.solve!(integrator.nonlin_cache)
             copyto!(integrator.k_nonlin,
                     NonlinearSolveBase.get_u(integrator.nonlin_cache))
-            =#
         end
 
         # Compute the intermediate approximation for the final explicit step: Take the implicit solution into account
         a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
-        #=
         @threaded for i in 1:length(u_indices_implicit)
             u_idx = u_indices_implicit[i]
             integrator.u_tmp[u_idx] = integrator.u[u_idx] +
                                       a_dt * integrator.k_nonlin[i]
-        end
-        =#
-        @threaded for i in u_indices_implicit
-            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.k_nonlin[i]
         end
 
         ### Final update ###
@@ -472,21 +427,6 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
     @trixi_timeit timer() "Step-Callbacks" handle_callbacks!(callbacks, integrator)
 
     check_max_iter!(integrator)
-
-    return nothing
-end
-
-# used for AMR
-function Base.resize!(integrator::PairedExplicitRK2IMEXMultiIntegrator, new_size)
-    resize!(integrator.u, new_size)
-    resize!(integrator.du, new_size)
-    resize!(integrator.u_tmp, new_size)
-
-    resize!(integrator.k1, new_size)
-
-    # For nonlinear solve
-    resize!(integrator.u_nonlin, new_size)
-    resize!(integrator.k_nonlin, new_size)
 
     return nothing
 end
