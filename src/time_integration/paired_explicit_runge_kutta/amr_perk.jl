@@ -72,7 +72,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          integrator.level_info_boundaries_acc,
                                          integrator.level_info_mortars_acc,
                                          integrator.n_levels, mesh, dg,
-                                         cache, integrator.alg.dt_ratios)
+                                         cache, integrator.alg)
                 else
                     partition_variables!(integrator.level_info_elements,
                                          integrator.level_info_elements_acc,
@@ -83,7 +83,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          integrator.level_info_mpi_interfaces_acc,
                                          integrator.level_info_mpi_mortars_acc,
                                          integrator.n_levels, mesh, dg,
-                                         cache, integrator.alg.dt_ratios)
+                                         cache, integrator.alg)
                 end
 
                 partition_u!(integrator.level_u_indices_elements,

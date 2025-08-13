@@ -94,7 +94,7 @@ tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 31 * t_c) # For testing only
 
 ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
 
 summary_callback = SummaryCallback()
@@ -133,7 +133,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
 #cfl = 6.5 # PERK 4 Single 12
 
-cfl = 7.4 # PEERRK_4 Multi E = 5, ..., 14
+cfl = 7.4 # PERRK_4 Multi E = 5, ..., 14
 #cfl = 7.6 # Single PERK 14
 
 #cfl = 1.9 # R-RK44

@@ -204,12 +204,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    partition_variables_imex!(level_info_elements,
-                              level_info_elements_acc,
-                              level_info_interfaces_acc,
-                              level_info_boundaries_acc,
-                              level_info_mortars_acc,
-                              n_levels, mesh, dg, cache, alg.dt_ratios)
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
+                         n_levels, mesh, dg, cache, alg)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -405,7 +405,8 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
         a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
         @threaded for i in 1:length(u_indices_implicit)
             u_idx = u_indices_implicit[i]
-            integrator.u_tmp[u_idx] = integrator.u[u_idx] + a_dt * integrator.k_nonlin[i]
+            integrator.u_tmp[u_idx] = integrator.u[u_idx] +
+                                      a_dt * integrator.k_nonlin[i]
         end
 
         ### Final update ###

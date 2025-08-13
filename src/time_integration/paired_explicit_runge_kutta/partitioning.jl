@@ -50,7 +50,7 @@ function partition_variables!(level_info_elements,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
                               n_levels, mesh::TreeMesh, dg, cache,
-                              dt_ratios)
+                              alg)
     @unpack elements, interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)
@@ -86,7 +86,7 @@ function partition_variables!(level_info_elements,
             end
         end
         # Similar to procedure for P4est
-        level_id = findfirst(x -> x < c_max_el, dt_ratios)
+        level_id = findfirst(x -> x < c_max_el, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level_id === nothing
             level_id = n_levels
@@ -196,13 +196,13 @@ function partition_variables!(level_info_elements,
     return nothing
 end
 
-function partition_variables_imex!(level_info_elements,
-                                   level_info_elements_acc,
-                                   level_info_interfaces_acc,
-                                   level_info_boundaries_acc,
-                                   level_info_mortars_acc,
-                                   n_levels, mesh::TreeMesh, dg, cache,
-                                   dt_ratios)
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
+                              n_levels, mesh::TreeMesh, dg, cache,
+                              alg::AbstractPairedExplicitRKIMEXMulti)
     @unpack elements, interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)
@@ -238,7 +238,7 @@ function partition_variables_imex!(level_info_elements,
             end
         end
         # Similar to procedure for P4est
-        level_id = findfirst(x -> x < c_max_el, dt_ratios)
+        level_id = findfirst(x -> x < c_max_el, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level_id === nothing
             level_id = n_levels
@@ -433,7 +433,7 @@ function partition_variables!(level_info_elements,
                               level_info_mpi_interfaces_acc,
                               level_info_mpi_mortars_acc,
                               n_levels, mesh::ParallelTreeMesh{2}, dg, cache,
-                              dt_ratios)
+                              alg)
     @unpack elements, interfaces, mpi_interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)
@@ -562,10 +562,17 @@ function partition_variables!(level_info_elements,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
                               n_levels, mesh::P4estMesh, dg, cache,
-                              dt_ratios;
-                              dt_scaling_order = 1, # 1 for hyperbolic, 2 for parabolic 
-                              imex_alg = false) # Flip first list of indices to the end
+                              alg;
+                              parabolic = false)
     @unpack elements, interfaces, boundaries, mortars = cache
+
+    if parabolic
+        dt_scaling_order = 2
+        dt_ratios = alg.dt_ratios_para
+    else
+        dt_scaling_order = 1
+        dt_ratios = alg.dt_ratios
+    end
 
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
@@ -676,7 +683,7 @@ end
 # Assign number of stage evaluations to elements for stage-evaluations weighted MPI load balancing.
 function partition_variables!(level_info_elements, n_levels,
                               mesh::ParallelP4estMesh, dg, cache,
-                              dt_ratios)
+                              alg)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
 
@@ -698,7 +705,7 @@ function partition_variables!(level_info_elements, n_levels,
         h = h_min_per_element[element_id]
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -721,7 +728,7 @@ function partition_variables!(level_info_elements,
                               level_info_mpi_interfaces_acc,
                               level_info_mpi_mortars_acc,
                               n_levels, mesh::ParallelP4estMesh, dg, cache,
-                              dt_ratios)
+                              alg)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
 
@@ -745,7 +752,7 @@ function partition_variables!(level_info_elements,
         h = h_min_per_element[element_id]
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -771,7 +778,7 @@ function partition_variables!(level_info_elements,
         h = min(h1, h2)
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -795,7 +802,7 @@ function partition_variables!(level_info_elements,
         h = min(h1, h2)
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -816,7 +823,7 @@ function partition_variables!(level_info_elements,
         h = h_min_per_element[element_id]
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, dt_ratios)
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -843,7 +850,7 @@ function partition_variables!(level_info_elements,
         h = min(h_lower, h_higher)
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -869,7 +876,7 @@ function partition_variables!(level_info_elements,
         h = min(h_lower, h_higher)
 
         # Beyond linear scaling of timestep
-        level = findfirst(x -> x < h_min / h, dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -892,7 +899,7 @@ function partition_variables!(level_info_elements,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
                               n_levels, mesh::StructuredMesh, dg, cache,
-                              dt_ratios)
+                              alg)
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
@@ -909,7 +916,7 @@ function partition_variables!(level_info_elements,
 
         # This approach is "method-based" in the sense that
         # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
-        level = findfirst(x -> x < h_min / h, dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
