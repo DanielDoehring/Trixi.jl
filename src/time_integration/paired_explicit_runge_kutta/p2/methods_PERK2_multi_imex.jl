@@ -403,10 +403,6 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
             integrator.nonlin_cache.p.t = integrator.t
             integrator.nonlin_cache.p.dt = integrator.dt
-            # Not sure if these statements are needed
-            #integrator.nonlin_cache.p.u = integrator.u
-            #integrator.nonlin_cache.p.du = integrator.du
-            #integrator.nonlin_cache.p.u_nonlin = integrator.u_nonlin
 
             # These seem unfortunately not to work
             #SciMLBase.set_u!(integrator.nonlin_cache, integrator.k_nonlin)
