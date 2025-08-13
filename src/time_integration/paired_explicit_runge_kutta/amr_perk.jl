@@ -107,5 +107,4 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
 
     return has_changed
 end
-
 end # @muladd

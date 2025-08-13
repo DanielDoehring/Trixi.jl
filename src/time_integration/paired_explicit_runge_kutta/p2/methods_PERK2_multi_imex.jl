@@ -177,6 +177,24 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     nonlin_cache::NonlinCache # Contains Problem & Solver
 end
 
+# mutable struct to store references to data
+mutable struct NonlinParams{RealT <: Real, uType,
+                            Semi, F}
+    t::RealT
+    dt::RealT
+    u::uType
+    du::uType
+    u_nonlin::uType
+    semi::Semi
+    const f::F
+    # Do not support AMR for this: Keep indices constant
+    const element_indices::Vector{Int64}
+    const interface_indices::Vector{Int64}
+    const boundary_indices::Vector{Int64}
+    const mortar_indices::Vector{Int64}
+    const u_indices::Vector{Int64}
+end
+
 function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
               dt, callback = nothing, kwargs...)
     u = copy(ode.u0)
@@ -236,16 +254,14 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
-    # TODO: These are unfortunately not references!
-    p = (dt = dt, t = t,
-         u_nonlin = u_nonlin, u = u, du = du,
-         semi = ode.p, f = ode.f,
-         # PERK-Multi additions
-         element_indices = level_info_elements_acc[alg.num_methods],
-         interface_indices = level_info_interfaces_acc[alg.num_methods],
-         boundary_indices = level_info_boundaries_acc[alg.num_methods],
-         mortar_indices = level_info_mortars_acc[alg.num_methods],
-         u_indices = level_u_indices_elements[alg.num_methods])
+    p = NonlinParams(t, dt,
+                     u, du, u_nonlin,
+                     semi, ode.f,
+                     level_info_elements_acc[alg.num_methods],
+                     level_info_interfaces_acc[alg.num_methods],
+                     level_info_boundaries_acc[alg.num_methods],
+                     level_info_mortars_acc[alg.num_methods],
+                     level_u_indices_elements[alg.num_methods])
 
     # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
     jac_prototype = get(kwargs, :jac_prototype, nothing)
@@ -301,7 +317,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 end
 
 function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
-    @unpack dt, t, u_nonlin, u, du, semi, f,
+    @unpack t, dt, u, du, u_nonlin, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
@@ -381,14 +397,16 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
         end
 
         @trixi_timeit timer() "nonlinear solve" begin
-            #=
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
                               alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
 
-            #println("inplace: ", SciMLBase.isinplace(integrator.nonlin_cache)) # true
-            #println("atol: ", NonlinearSolveBase.get_abstol(integrator.nonlin_cache))
-            #println("rtol: ", NonlinearSolveBase.get_reltol(integrator.nonlin_cache))
+            integrator.nonlin_cache.p.t = integrator.t
+            integrator.nonlin_cache.p.dt = integrator.dt
+            # Not sure if these statements are needed
+            #integrator.nonlin_cache.p.u = integrator.u
+            #integrator.nonlin_cache.p.du = integrator.du
+            #integrator.nonlin_cache.p.u_nonlin = integrator.u_nonlin
 
             # These seem unfortunately not to work
             #SciMLBase.set_u!(integrator.nonlin_cache, integrator.k_nonlin)
@@ -401,24 +419,6 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
             SciMLBase.solve!(integrator.nonlin_cache)
             copyto!(integrator.k_nonlin,
                     NonlinearSolveBase.get_u(integrator.nonlin_cache))
-            =#
-
-            p = (dt = integrator.dt, t = integrator.t,
-                 u_nonlin = integrator.u_nonlin, u = integrator.u, du = integrator.du,
-                 semi = prob.p, f = integrator.f,
-                 # PERK-Multi additions
-                 element_indices = integrator.level_info_elements_acc[alg.num_methods],
-                 interface_indices = integrator.level_info_interfaces_acc[alg.num_methods],
-                 boundary_indices = integrator.level_info_boundaries_acc[alg.num_methods],
-                 mortar_indices = integrator.level_info_mortars_acc[alg.num_methods],
-                 u_indices = integrator.level_u_indices_elements[alg.num_methods])
-
-            nonlinear_eq = NonlinearProblem{true}(stage_residual_PERK2IMEXMulti!,
-                                                  integrator.k_nonlin, p)
-
-            SciMLBase.solve(nonlinear_eq,
-                            NewtonRaphson(autodiff = AutoFiniteDiff(), linsolve = KrylovJL_GMRES()),
-                            alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
         end
 
         # Compute the intermediate approximation for the final explicit step: Take the implicit solution into account

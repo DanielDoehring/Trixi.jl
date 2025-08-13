@@ -91,7 +91,7 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
 # Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
-n_conv = 2
+n_conv = 0
 dt = (2e-3)/2^n_conv
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         nonlin_solver = nonlin_solver,
