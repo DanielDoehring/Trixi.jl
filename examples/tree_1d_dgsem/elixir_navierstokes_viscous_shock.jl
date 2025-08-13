@@ -164,8 +164,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span `tspan`
-#tspan = (0.0, 0.5)
-tspan = (0.0, 0.0) # For plotting of IC
+tspan = (0.0, 0.5)
+#tspan = (0.0, 0.0) # For plotting of IC
 
 ode = semidiscretize(semi, tspan; split_problem = false)
 
