@@ -940,6 +940,59 @@ function partition_variables!(level_info_elements,
     return nothing
 end
 
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
+                              n_levels, mesh::StructuredMesh, dg, cache,
+                              alg::AbstractPairedExplicitRKIMEXMulti)
+    nnodes = length(dg.basis.nodes)
+    n_elements = nelements(dg, cache)
+
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
+
+    println("h_min: ", h_min, " h_max: ", h_max)
+    println("h_max/h_min: ", h_max / h_min, "\n")
+
+    for element_id in 1:n_elements
+        h = h_min_per_element[element_id]
+
+        # This approach is "method-based" in the sense that
+        # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
+        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        # CARE: This is for testcase with special assignment
+        #level = rand(1:n_levels)
+        #level = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
+
+        append!(level_info_elements[level], element_id)
+
+        # Add to accumulated container
+        # Exclude pushes to first level with is integrated implicitly
+        if level == 1
+            push!(level_info_elements_acc[1], element_id)
+        else
+            for l in level:n_levels
+                push!(level_info_elements_acc[l], element_id)
+            end
+        end
+    end
+
+    # No interfaces, boundaries, mortars for structured meshes
+
+    return nothing
+end
+
 function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nnodes,
                               RealT)
     h_min = floatmax(RealT)
