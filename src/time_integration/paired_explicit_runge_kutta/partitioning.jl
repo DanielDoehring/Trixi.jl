@@ -216,9 +216,8 @@ function partition_variables!(level_info_elements,
         # Determine level
         # NOTE: For really different grid sizes
         level = mesh.tree.levels[elements.cell_ids[element_id]]
-
         # Convert to level id
-        #level_id = max_level + 1 - level
+        level_id = max_level + 1 - level
 
         # CARE: This is for testcase with special assignment
         level_id = rand(1:n_levels)

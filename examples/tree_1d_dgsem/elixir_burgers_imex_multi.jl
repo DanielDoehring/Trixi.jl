@@ -96,6 +96,6 @@ dt = (2e-3)/2^n_conv
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-8, reltol = 1e-8,
-                        maxiters = 10^5);
+                        maxiters_nonlin = 100);
 
 sol = Trixi.solve!(integrator);

@@ -280,12 +280,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     abstol = get(kwargs, :abstol, nothing)
     reltol = get(kwargs, :reltol, nothing)
-    maxiters = get(kwargs, :maxiters, nothing)
+    maxiters_nonlin = get(kwargs, :maxiters_nonlin, typemax(Int64))
 
     nonlin_cache = SciMLBase.init(nonlin_prob, nonlin_solver;
                                   alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
                                   abstol = abstol, reltol = reltol,
-                                  maxiters = maxiters)
+                                  maxiters = maxiters_nonlin)
     #show_trace = Val(true), trace_level = TraceAll())
 
     ### Done with setting up for handling of level-dependent integration ###
