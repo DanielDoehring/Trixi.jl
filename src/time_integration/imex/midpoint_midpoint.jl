@@ -122,12 +122,14 @@ end
 function stage_residual_midpoint!(residual, implicit_stage, p)
     @unpack alg, dt, t, u_tmp, u_nonlin, du_para, semi, f1 = p
 
-    a_dt = alg.A_im[1, 2] * dt
+    #a_dt = alg.A_im[1, 2] * dt
+    a_dt = alg.A_im[1, 2] * dt[] # `[]` for references
     @threaded for i in eachindex(u_tmp)
         # Hard-coded for IMEX midpoint method
         u_nonlin[i] = u_tmp[i] + a_dt * implicit_stage[i]
     end
-    f1(du_para, u_nonlin, semi, t + alg.c[2] * dt)
+    #f1(du_para, u_nonlin, semi, t + alg.c[2] * dt)
+    f1(du_para, u_nonlin, semi, t[] + alg.c[2] * dt[]) # `[]` for references
 
     @threaded for i in eachindex(residual)
         residual[i] = implicit_stage[i] - du_para[i]
@@ -171,6 +173,8 @@ function step!(integrator::MidpointMidpointIntegrator)
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
                               alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+
+            # CARE: Not sure if I need to update dt and t manually here!
 
             #println("inplace: ", SciMLBase.isinplace(integrator.nonlin_cache)) # true
             #println("atol: ", NonlinearSolveBase.get_abstol(integrator.nonlin_cache))

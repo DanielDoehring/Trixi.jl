@@ -253,7 +253,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     u_nonlin = zero(u)
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
-
+    
     p = NonlinParams(t, dt,
                      u, du, u_nonlin,
                      semi, ode.f,
@@ -262,7 +262,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                      level_info_boundaries_acc[alg.num_methods],
                      level_info_mortars_acc[alg.num_methods],
                      level_u_indices_elements[alg.num_methods])
-
+    
     # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
     jac_prototype = get(kwargs, :jac_prototype, nothing)
     colorvec = get(kwargs, :colorvec, nothing)

@@ -161,8 +161,6 @@ callbacks = CallbackSet(summary_callback, analysis_callback)
 
 ode_alg = Trixi.IMEX_Midpoint_Midpoint()
 
-dt = 2.0 / (2^0) # Time step size
-
 ### Linesearch ###
 # See https://docs.sciml.ai/LineSearch/dev/api/native/
 
@@ -193,13 +191,10 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff())
 
-
+dt = 2.0 / (2^3) # Time step size
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         jac_prototype = jac_prototype, colorvec = colorvec,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-8, reltol = 1e-8);
 
 sol = Trixi.solve!(integrator);
-
-sol = Trixi.solve(ode, ode_alg, dt = dt,
-                  save_everystep = false, callback = callbacks);
