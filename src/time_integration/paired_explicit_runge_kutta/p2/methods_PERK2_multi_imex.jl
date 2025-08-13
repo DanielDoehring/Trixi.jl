@@ -253,6 +253,11 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     u_nonlin = zero(u)
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
+
+    # Initialize `k_nonlin` here with values from `u`, such that in the simulation we use the same value for init
+    @threaded for i in 1:length(level_u_indices_elements[alg.num_methods])
+        k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
+    end
     
     p = NonlinParams(t, dt,
                      u, du, u_nonlin,
@@ -387,14 +392,18 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
 
         u_indices_implicit = integrator.level_u_indices_elements[alg.num_methods]
         # Set initial guess for nonlinear solve
+        #=
         @threaded for i in 1:length(u_indices_implicit)
             # Trivial choices
-            #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
-            integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
+            integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
+            #integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
             # Try some extrapolation choices
-            #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]] + 
-            # 0.5 * integrator.dt * integrator.du[u_indices_implicit[i]]
+            #=
+            integrator.k_nonlin[i] = 0.5 * (integrator.u[u_indices_implicit[i]] + 
+                                            integrator.du[u_indices_implicit[i]])
+            =#
         end
+        =#
 
         @trixi_timeit timer() "nonlinear solve" begin
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
