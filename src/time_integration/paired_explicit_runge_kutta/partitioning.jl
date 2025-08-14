@@ -384,6 +384,7 @@ function partition_variables!(level_info_elements,
     level_info_boundaries_acc[n_levels] = first_entry
 
     if ndims(mesh) > 1
+        # TODO: Mortars are not taken care of for IMEX!
         @unpack mortars = cache
         n_mortars = length(mortars.orientations)
 
@@ -650,6 +651,202 @@ function partition_variables!(level_info_elements,
         end
     end
 
+    # p4est is always dimension 2 or 3
+    n_mortars = last(size(mortars.u))
+    for mortar_id in 1:n_mortars
+        # Get element ids
+        element_id_lower = mortars.neighbor_ids[1, mortar_id]
+        h_lower = h_min_per_element[element_id_lower]
+
+        element_id_higher = mortars.neighbor_ids[2, mortar_id]
+        h_higher = h_min_per_element[element_id_higher]
+
+        h = min(h_lower, h_higher)
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        # Add to accumulated container
+        for l in level:n_levels
+            push!(level_info_mortars_acc[l], mortar_id)
+        end
+    end
+
+    return nothing
+end
+
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
+                              n_levels, mesh::P4estMesh, dg, cache,
+                              alg::AbstractPairedExplicitRKIMEXMulti;
+                              parabolic = false)
+    @unpack elements, interfaces, boundaries, mortars = cache
+
+    if parabolic
+        dt_scaling_order = 2
+        dt_ratios = alg.dt_ratios_para
+    else
+        dt_scaling_order = 1
+        dt_ratios = alg.dt_ratios
+    end
+
+    nnodes = length(dg.basis.nodes)
+    n_elements = nelements(dg, cache)
+
+    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
+                                                           n_elements,
+                                                           nnodes,
+                                                           eltype(dg.basis.nodes))
+
+    #println("h_min: ", h_min, " h_max: ", h_max)
+    #println("h_max/h_min: ", h_max / h_min, "\n")
+
+    for element_id in 1:n_elements
+        h = h_min_per_element[element_id]
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        append!(level_info_elements[level], element_id)
+
+        # Add to accumulated container
+        # Exclude pushes to first level with is integrated implicitly
+        if level == 1
+            push!(level_info_elements_acc[1], element_id)
+        else
+            for l in level:n_levels
+                push!(level_info_elements_acc[l], element_id)
+            end
+        end
+    end
+
+    # These are the finest cells, which should be integrated with the IMEX method,
+    # which is due to historical reasons of the implementation the *LAST* method 
+    # in the time integration algorithm.
+    # Thus, we need to move it to the end and everything else to the front.
+    first_entry = level_info_elements[1]
+    for l in 1:(n_levels - 1)
+        level_info_elements[l] = level_info_elements[l + 1]
+    end
+    level_info_elements[n_levels] = first_entry
+
+    first_entry = level_info_elements_acc[1]
+    for l in 1:(n_levels - 1)
+        level_info_elements_acc[l] = level_info_elements_acc[l + 1]
+    end
+    level_info_elements_acc[n_levels] = first_entry
+
+    n_interfaces = last(size(interfaces.u))
+    # Determine level for each interface
+    for interface_id in 1:n_interfaces
+        # For p4est: Cells on same level do not necessarily have same size
+        element_id1 = interfaces.neighbor_ids[1, interface_id]
+        element_id2 = interfaces.neighbor_ids[2, interface_id]
+        h1 = h_min_per_element[element_id1]
+        h2 = h_min_per_element[element_id2]
+
+        # Beyond linear scaling of timestep
+        level1 = findfirst(x -> x < (h_min / h1)^dt_scaling_order, dt_ratios)
+        level2 = findfirst(x -> x < (h_min / h2)^dt_scaling_order, dt_ratios)
+
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level1 === nothing
+            level1 = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level1 = level1 - 1
+        end
+        if level2 === nothing
+            level2 = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level2 = level2 - 1
+        end
+
+        level_id = min(level1, level2)
+
+        # For interfaces, we need a slightly different logic for the IMEX case.
+        # This is due to the fact that the smaller element has actually less stage evaluations, but
+        # is used for the finest cells.
+        # As a consequence, we do not want to add every fine interface integrated with the
+        # few-stage evaluation implicit method to the other, coarser levels.
+        # Interfaces at partition borders, however, need to be added also to the next finest, i.e., 
+        # second finest level and so.
+        if level_id == 1 # On finest level
+            push!(level_info_interfaces_acc[1], interface_id)
+
+            if level1 != level2 # At interface between differently sized cells
+                for l in 2:n_levels # Add to all other levels
+                    push!(level_info_interfaces_acc[l], interface_id)
+                end
+            end
+        else
+            for l in level_id:n_levels
+                push!(level_info_interfaces_acc[l], interface_id)
+            end
+        end
+    end
+
+    # These are the finest interfaces, which should be integrated with the IMEX method,
+    # which is due to historical reasons of the implementation the *LAST* method 
+    # in the time integration algorithm.
+    # Thus, we need to move it to the end and everything else to the front.
+    first_entry = level_info_interfaces_acc[1]
+    for l in 1:(n_levels - 1)
+        level_info_interfaces_acc[l] = level_info_interfaces_acc[l + 1]
+    end
+    level_info_interfaces_acc[n_levels] = first_entry
+
+    n_boundaries = last(size(boundaries.u))
+    # Determine level for each boundary
+    for boundary_id in 1:n_boundaries
+        # Get element id (boundaries have only one unique associated element)
+        element_id = boundaries.neighbor_ids[boundary_id]
+        h = h_min_per_element[element_id]
+
+        # Beyond linear scaling of timestep
+        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        # Catch case that cell is "too coarse" for method with fewest stage evals
+        if level === nothing
+            level = n_levels
+        else # Avoid reduction in timestep: Use next higher level
+            level = level - 1
+        end
+
+        # Add to accumulated container
+        if level == 1
+            push!(level_info_boundaries_acc[1], boundary_id)
+        else
+            for l in level:n_levels
+                push!(level_info_boundaries_acc[l], boundary_id)
+            end
+        end
+    end
+
+    # These are the finest boundaries, which should be integrated with the IMEX method,
+    # which is due to historical reasons of the implementation the *LAST* method 
+    # in the time integration algorithm.
+    # Thus, we need to move it to the end and everything else to the front.
+    first_entry = level_info_boundaries_acc[1]
+    for l in 1:(n_levels - 1)
+        level_info_boundaries_acc[l] = level_info_boundaries_acc[l + 1]
+    end
+    level_info_boundaries_acc[n_levels] = first_entry
+
+    # TODO: Mortars are not taken care of for IMEX!
     # p4est is always dimension 2 or 3
     n_mortars = last(size(mortars.u))
     for mortar_id in 1:n_mortars
