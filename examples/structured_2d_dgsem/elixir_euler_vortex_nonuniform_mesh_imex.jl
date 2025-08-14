@@ -58,7 +58,6 @@ initial_condition = initial_condition_isentropic_vortex
 N_passes = 1
 T_end = EdgeLength() * N_passes
 tspan = (0.0, T_end)
-#tspan = (0.0, 4.0)
 
 function mapping(xi_, eta_)
     exponent = 1.4
@@ -110,7 +109,8 @@ path = basepath * "p2/"
 
 Stages = [16, 12, 10, 8, 6, 4]
 
-#=
+timestep_explicit = 0.631627607345581
+
 dtRatios = [
     0.631627607345581,
     0.485828685760498,
@@ -120,23 +120,28 @@ dtRatios = [
     0.124999046325684
 ] ./ 0.631627607345581
 
+dt_explicit = 5e-3
+
+#=
 ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 5e-3,
+                  dt = dt_explicit,
                   save_everystep = false, callback = callbacks);
 =#
 ###############################################################################
 
+timestep_implicit = 0.8
+
 dtRatios = [
-    0.8, # Implicit
+    timestep_implicit, # Implicit
     0.631627607345581,
     0.485828685760498,
     0.366690540313721,
     0.282330989837646,
     0.197234153747559,
     0.124999046325684
-] ./ 0.8
+] ./ timestep_implicit
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path, dtRatios)
 
@@ -144,12 +149,15 @@ ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path, dtRatios)
 # See https://docs.sciml.ai/LineSearch/dev/api/native/
 
 #linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
-linesearch = LiFukushimaLineSearch()
-#linesearch = nothing
+#linesearch = LiFukushimaLineSearch()
+linesearch = nothing
 
 ### Linear Solver ###
 # See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
+#linsolve = SimpleLUFactorization()
+
+# Require sparse matrix
 #linsolve = KLUFactorization()
 #linsolve = UMFPACKFactorization()
 
@@ -160,9 +168,7 @@ linsolve = KrylovJL_GMRES()
 
 #linsolve = SparspakFactorization() # requires Sparspak.jl
 
-# HYPRE & MKL do not work with sparsity structure of the Jacobian
-
-#linsolve = nothing
+# HYPRE & MKL require matrix in sparse format
 
 nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               linesearch = linesearch, linsolve = linsolve)
@@ -171,9 +177,11 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 #nonlin_solver = DFSane()
 # Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
-dt = 3.0e-3
 
+dt_implicit = dt_explicit * timestep_implicit / timestep_explicit
+dt_implicit = 8e-3
 
+#=
 t_ramp_up() = 5.0
 
 cfl_0() = 1.0
@@ -184,13 +192,14 @@ cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        #stepsize_callback,
+                        stepsize_callback,
                         analysis_callback,
                         alive_callback)
+=#
 
-integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
+integrator = Trixi.init(ode, ode_alg; dt = dt_implicit, callback = callbacks,
                         nonlin_solver = nonlin_solver,
-                        abstol = 1e-8, reltol = 1e-8,
+                        abstol = 1e-6, reltol = 1e-6,
                         maxiters_nonlin = 1000);
 
 sol = Trixi.solve!(integrator);
