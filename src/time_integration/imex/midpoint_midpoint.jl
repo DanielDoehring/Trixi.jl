@@ -103,7 +103,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     nonlin_cache = SciMLBase.init(nonlin_prob, nonlin_solver;
                                   alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
                                   abstol = abstol, reltol = reltol)
-                                  #show_trace = Val(true), trace_level = TraceAll())
+    #show_trace = Val(true), trace_level = TraceAll())
 
     integrator = MidpointMidpointIntegrator(u, du, u_tmp,
                                             t, dt, zero(dt), iter,
