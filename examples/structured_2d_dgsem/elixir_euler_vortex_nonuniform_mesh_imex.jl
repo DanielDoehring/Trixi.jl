@@ -164,12 +164,6 @@ linesearch = nothing
 #linsolve = SimpleGMRES()
 linsolve = KrylovJL_GMRES()
 
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit
-
-#linsolve = SparspakFactorization() # requires Sparspak.jl
-
-# HYPRE & MKL require matrix in sparse format
-
 nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               linesearch = linesearch, linsolve = linsolve)
 
@@ -199,7 +193,7 @@ callbacks = CallbackSet(summary_callback,
 
 integrator = Trixi.init(ode, ode_alg; dt = dt_implicit, callback = callbacks,
                         nonlin_solver = nonlin_solver,
-                        abstol = 1e-6, reltol = 1e-6,
-                        maxiters_nonlin = 1000);
+                        abstol = 1e-5, reltol = 1e-3,
+                        maxiters_nonlin = 20); # Maxiters should be on the order of the number of stages of the highest explicit method
 
 sol = Trixi.solve!(integrator);
