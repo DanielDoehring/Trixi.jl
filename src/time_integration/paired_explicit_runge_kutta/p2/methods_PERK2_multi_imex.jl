@@ -391,13 +391,18 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
         end
 
         u_indices_implicit = integrator.level_u_indices_elements[alg.num_methods]
+
         # Set initial guess for nonlinear solve
         #=
         @threaded for i in 1:length(u_indices_implicit)
             # Trivial choices
+            
             integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
             #integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
+            
             # Try some extrapolation choices
+            
+            #integrator.k_nonlin[i] = 0.5 * integrator.du[u_indices_implicit[i]]
             #=
             integrator.k_nonlin[i] = 0.5 * (integrator.u[u_indices_implicit[i]] + 
                                             integrator.du[u_indices_implicit[i]])
