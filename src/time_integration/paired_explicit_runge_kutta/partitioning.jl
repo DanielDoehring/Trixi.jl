@@ -988,6 +988,22 @@ function partition_variables!(level_info_elements,
         end
     end
 
+    # These are the finest cells, which should be integrated with the IMEX method,
+    # which is due to historical reasons of the implementation the *LAST* method 
+    # in the time integration algorithm.
+    # Thus, we need to move it to the end and everything else to the front.
+    first_entry = level_info_elements[1]
+    for l in 1:(n_levels - 1)
+        level_info_elements[l] = level_info_elements[l + 1]
+    end
+    level_info_elements[n_levels] = first_entry
+
+    first_entry = level_info_elements_acc[1]
+    for l in 1:(n_levels - 1)
+        level_info_elements_acc[l] = level_info_elements_acc[l + 1]
+    end
+    level_info_elements_acc[n_levels] = first_entry
+
     # No interfaces, boundaries, mortars for structured meshes
 
     return nothing
