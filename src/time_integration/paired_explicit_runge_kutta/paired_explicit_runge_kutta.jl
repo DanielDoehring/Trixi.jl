@@ -110,6 +110,9 @@ abstract type AbstractPairedExplicitRKIMEXSingleIntegrator{ORDER} <:
 
 abstract type AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRKIMEXIntegrator{ORDER} end
+# parabolic additions
+abstract type AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{ORDER} <:
+              AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} end
 
 # Euler-Acoustic integrators
 abstract type AbstractPairedExplicitRKEulerAcousticSingleIntegrator{ORDER} <:
@@ -1038,7 +1041,8 @@ end
 @inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                            semi::SemidiscretizationHyperbolicParabolic,
                                            t,
-                                           integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
+                                           integrator::Union{AbstractPairedExplicitRKMultiParabolicIntegrator,
+                                                             AbstractPairedExplicitRKIMEXMultiParabolicIntegrator},
                                            max_level)
     rhs_hyperbolic_parabolic!(du_ode, u_ode, semi, t,
                               integrator.du_para,

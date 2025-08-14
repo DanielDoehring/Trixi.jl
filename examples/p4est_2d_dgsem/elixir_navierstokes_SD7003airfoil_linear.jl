@@ -1,5 +1,8 @@
 using Trixi
 
+using LinearSolve
+using LineSearch, NonlinearSolve
+
 ###############################################################################
 # semidiscretization of the compressible Euler equations
 
@@ -93,8 +96,8 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 31 * t_c) # For testing only
 
-ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
-#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
+#ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
 
 summary_callback = SummaryCallback()
@@ -140,7 +143,7 @@ cfl = 7.4 # PERRK_4 Multi E = 5, ..., 14
 #cfl = 2.5 # R-TS64
 #cfl = 2.6 # R-CKL54
 
-#cfl = 7.6 # PERK2 unsplit/standard multi
+cfl = 7.6 # PERK2 unsplit/standard multi
 cfl = 8.7 # PERK2 split multi with same stages & distribution
 cfl = 7.9 # PERK2 split multi with different stages (14, 10) & distribution
 
@@ -160,12 +163,12 @@ save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      solution_variables = cons2prim,
                                      output_directory = "out")
 
-alive_callback = AliveCallback(alive_interval = 500)
+alive_callback = AliveCallback(alive_interval = 10) # 500
 
 save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
                                    save_final_restart = true)
 
-callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
+callbacks = CallbackSet(#stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
                         #save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
@@ -238,7 +241,8 @@ dtRatios_para = [842.7395049162385,  # 10
 
 path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/para_rhs/"
 
-#ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
+ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
+
 #=
 # Version with SAME number of stages for hyperbolic and parabolic part
 ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages,
@@ -306,7 +310,49 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para,
 
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
-
+#=
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
+=#
+###############################################################################
+# IMEX
+
+dtRatios = [0.26, # Implicit
+    0.253144726232790162612, # 14
+    0.214041846963368698198,  # 12
+    0.177173703567632401246,  # 10
+    0.138494092598762108537,  #  8
+    0.121607896165869533434,  #  7
+    0.0975166462040988335502, #  6
+    0.0818171376613463507965, #  5
+    0.0656503721211265656166, #  4
+    0.0419871921542380732717, #  3
+    0.0209738927526359475451] / 0.26 #= 2 =#
+
+ode_algorithm = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
+
+### Linesearch ###
+# See https://docs.sciml.ai/LineSearch/dev/api/native/
+
+#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
+#linesearch = LiFukushimaLineSearch()
+linesearch = nothing
+
+### Linear Solver ###
+# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+
+#linsolve = SimpleGMRES()
+linsolve = KrylovJL_GMRES()
+
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
+                              linesearch = linesearch, linsolve = linsolve)
+
+integrator = Trixi.init(ode, ode_algorithm; 
+                        dt = 7e-4, # Use very small timestep for init
+                        callback = callbacks,
+                        nonlin_solver = nonlin_solver,
+                        abstol = 1e-5, reltol = 1e-3,
+                        maxiters_nonlin = 10); # Maxiters should be on the order of the number of stages of the highest explicit method
+
+sol = Trixi.solve!(integrator);

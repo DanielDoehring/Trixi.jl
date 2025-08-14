@@ -177,6 +177,57 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     nonlin_cache::NonlinCache # Contains Problem & Solver
 end
 
+mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType,
+                                                             Params, Sol, F,
+                                                             PairedExplicitRKOptions,
+                                                             uImType, NonlinCache} <:
+               AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{2}
+    u::uType
+    du::uType # In-place output of `f`
+    u_tmp::uType # Used for building the argument to `f`
+    t::RealT
+    tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
+    dt::RealT # current time step
+    dtcache::RealT # Used for euler-acoustic coupling
+    iter::Int # current number of time steps (iteration)
+    p::Params # will be the semidiscretization from Trixi
+    sol::Sol # faked
+    f::F # `rhs!` of the semidiscretization
+    alg::PairedExplicitRK2IMEXMulti
+    opts::PairedExplicitRKOptions
+    finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
+    # Additional PERK register
+    k1::uType
+
+    # Variables managing level-dependent integration
+    level_info_elements::Vector{Vector{Int64}}
+    level_info_elements_acc::Vector{Vector{Int64}}
+
+    level_info_interfaces_acc::Vector{Vector{Int64}}
+
+    level_info_boundaries_acc::Vector{Vector{Int64}}
+
+    level_info_mortars_acc::Vector{Vector{Int64}}
+
+    level_u_indices_elements::Vector{Vector{Int64}}
+    # TODO: Store explicit indices in one datastructure for better threaded access?
+
+    coarsest_lvl::Int64
+    n_levels::Int64
+
+    # For nonlinear solve
+    u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
+    k_nonlin::uImType
+    nonlin_cache::NonlinCache # Contains Problem & Solver
+
+    # Addition for hyperbolic-parabolic problems:
+    # We need another register to temporarily store the changes due to the parabolic part only.
+    # The changes due to the hyperbolic part are stored in the usual `du` register.
+    du_para::uType
+end
+
 # mutable struct to store references to data
 mutable struct NonlinParams{RealT <: Real, uType,
                             Semi, F}
@@ -185,6 +236,24 @@ mutable struct NonlinParams{RealT <: Real, uType,
     u::uType
     du::uType
     u_nonlin::uType
+    semi::Semi
+    const f::F
+    # Do not support AMR for this: Keep indices constant
+    const element_indices::Vector{Int64}
+    const interface_indices::Vector{Int64}
+    const boundary_indices::Vector{Int64}
+    const mortar_indices::Vector{Int64}
+    const u_indices::Vector{Int64}
+end
+
+mutable struct NonlinParamsParabolic{RealT <: Real, uType,
+                                     Semi, F}
+    t::RealT
+    dt::RealT
+    u::uType
+    du::uType
+    u_nonlin::uType
+    du_para::uType
     semi::Semi
     const f::F
     # Do not support AMR for this: Keep indices constant
@@ -250,32 +319,49 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     ### Nonlinear Solver ###
 
     # Full-size, argument to `rhs!`
-    u_nonlin = zero(u)
+    u_nonlin = copy(u)
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
+    #=
     # Initialize `k_nonlin` here with values from `u`, such that in the simulation we use the same value for init
     @threaded for i in 1:length(level_u_indices_elements[alg.num_methods])
-        k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
+        #k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
     end
-    
-    p = NonlinParams(t, dt,
-                     u, du, u_nonlin,
-                     semi, ode.f,
-                     level_info_elements_acc[alg.num_methods],
-                     level_info_interfaces_acc[alg.num_methods],
-                     level_info_boundaries_acc[alg.num_methods],
-                     level_info_mortars_acc[alg.num_methods],
-                     level_u_indices_elements[alg.num_methods])
-    
+    =#
+
     # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
     jac_prototype = get(kwargs, :jac_prototype, nothing)
     colorvec = get(kwargs, :colorvec, nothing)
 
     specialize = SciMLBase.FullSpecialize
-    nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMulti!;
-                                                      jac_prototype = jac_prototype,
-                                                      colorvec = colorvec)
+    if isa(semi, SemidiscretizationHyperbolicParabolic)
+        nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMultiParabolic!;
+                                                          jac_prototype = jac_prototype,
+                                                          colorvec = colorvec)
+        du_para = zero(u)
+        p = NonlinParamsParabolic(t, dt,
+                                  u, du, u_nonlin, du_para,
+                                  semi, ode.f,
+                                  level_info_elements_acc[alg.num_methods],
+                                  level_info_interfaces_acc[alg.num_methods],
+                                  level_info_boundaries_acc[alg.num_methods],
+                                  level_info_mortars_acc[alg.num_methods],
+                                  level_u_indices_elements[alg.num_methods])
+    else
+        nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMulti!;
+                                                          jac_prototype = jac_prototype,
+                                                          colorvec = colorvec)
+
+        p = NonlinParams(t, dt,
+                         u, du, u_nonlin,
+                         semi, ode.f,
+                         level_info_elements_acc[alg.num_methods],
+                         level_info_interfaces_acc[alg.num_methods],
+                         level_info_boundaries_acc[alg.num_methods],
+                         level_info_mortars_acc[alg.num_methods],
+                         level_u_indices_elements[alg.num_methods])
+    end
 
     nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
 
@@ -294,27 +380,52 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     #show_trace = Val(true), trace_level = TraceAll())
 
     ### Done with setting up for handling of level-dependent integration ###
-    integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
-                                                      t, tdir,
-                                                      dt, zero(dt),
-                                                      iter, semi,
-                                                      (prob = ode,),
-                                                      ode.f,
-                                                      alg,
-                                                      PairedExplicitRKOptions(callback,
-                                                                              ode.tspan;
-                                                                              kwargs...),
-                                                      false, true, false,
-                                                      k1,
-                                                      level_info_elements,
-                                                      level_info_elements_acc,
-                                                      level_info_interfaces_acc,
-                                                      level_info_boundaries_acc,
-                                                      level_info_mortars_acc,
-                                                      level_u_indices_elements,
-                                                      -1, n_levels,
-                                                      u_nonlin, k_nonlin,
-                                                      nonlin_cache)
+    if isa(semi, SemidiscretizationHyperbolicParabolic)
+        integrator = PairedExplicitRK2IMEXMultiParabolicIntegrator(u, du, u_tmp,
+                                                                   t, tdir,
+                                                                   dt, zero(dt),
+                                                                   iter, semi,
+                                                                   (prob = ode,),
+                                                                   ode.f,
+                                                                   alg,
+                                                                   PairedExplicitRKOptions(callback,
+                                                                                           ode.tspan;
+                                                                                           kwargs...),
+                                                                   false, true, false,
+                                                                   k1,
+                                                                   level_info_elements,
+                                                                   level_info_elements_acc,
+                                                                   level_info_interfaces_acc,
+                                                                   level_info_boundaries_acc,
+                                                                   level_info_mortars_acc,
+                                                                   level_u_indices_elements,
+                                                                   -1, n_levels,
+                                                                   u_nonlin, k_nonlin,
+                                                                   nonlin_cache,
+                                                                   du_para)
+    else
+        integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
+                                                          t, tdir,
+                                                          dt, zero(dt),
+                                                          iter, semi,
+                                                          (prob = ode,),
+                                                          ode.f,
+                                                          alg,
+                                                          PairedExplicitRKOptions(callback,
+                                                                                  ode.tspan;
+                                                                                  kwargs...),
+                                                          false, true, false,
+                                                          k1,
+                                                          level_info_elements,
+                                                          level_info_elements_acc,
+                                                          level_info_interfaces_acc,
+                                                          level_info_boundaries_acc,
+                                                          level_info_mortars_acc,
+                                                          level_u_indices_elements,
+                                                          -1, n_levels,
+                                                          u_nonlin, k_nonlin,
+                                                          nonlin_cache)
+    end
 
     initialize_callbacks!(callback, integrator)
 
@@ -348,7 +459,35 @@ function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
     return nothing
 end
 
-function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe generalize the integrator
+function stage_residual_PERK2IMEXMultiParabolic!(residual, implicit_stage, p)
+    @unpack t, dt, u, du, u_nonlin, du_para, semi, f,
+    element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
+
+    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
+    a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
+
+    # Add implicit contribution
+    @threaded for i in 1:length(u_indices)
+        u_idx = u_indices[i] # Ensure thread safety
+        u_nonlin[u_idx] = u[u_idx] + a_dt * implicit_stage[i]
+    end
+
+    # Evaluate implicit stage
+    f(du, u_nonlin, semi,
+      #t + alg.c[alg.num_stages] * dt,
+      t + 0.5 * dt, # Hard-coded for IMEX midpoint method
+      du_para,
+      element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
+
+    # Compute residual
+    @threaded for i in 1:length(u_indices)
+        residual[i] = implicit_stage[i] - du[u_indices[i]]
+    end
+
+    return nothing
+end
+
+function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: Can we generalize this to non-multi?
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -396,12 +535,12 @@ function step!(integrator::PairedExplicitRK2IMEXMultiIntegrator) # TODO: Maybe g
         #=
         @threaded for i in 1:length(u_indices_implicit)
             # Trivial choices
-            
+
             integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
             #integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
-            
+
             # Try some extrapolation choices
-            
+
             #integrator.k_nonlin[i] = 0.5 * integrator.du[u_indices_implicit[i]]
             #=
             integrator.k_nonlin[i] = 0.5 * (integrator.u[u_indices_implicit[i]] + 

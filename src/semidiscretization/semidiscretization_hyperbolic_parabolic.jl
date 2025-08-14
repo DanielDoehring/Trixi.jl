@@ -503,6 +503,29 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
     end
 end
 
+# `rhs_hyperbolic_parabolic!` for non-split IMEX methods
+function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                   semi::SemidiscretizationHyperbolicParabolic, t,
+                                   du_para, # This argument is passed in for non-split integrators
+                                   element_indices, interface_indices,
+                                   boundary_indices, mortar_indices,
+                                   u_indices)
+    @trixi_timeit timer() "rhs_hyperbolic_parabolic! (part.)" begin
+        rhs!(du_ode, u_ode, semi, t,
+             element_indices, interface_indices,
+             boundary_indices, mortar_indices)
+        rhs_parabolic!(du_para, u_ode, semi, t,
+                       element_indices, interface_indices,
+                       boundary_indices, mortar_indices)
+
+        @threaded for i in u_indices
+            # Try to enable optimizations due to `muladd` by avoiding `+=`
+            # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
+            du_ode[i] = du_ode[i] + du_para[i]
+        end
+    end
+end
+
 function _jacobian_ad_forward(semi::SemidiscretizationHyperbolicParabolic, t0, u0_ode,
                               du_ode, config)
     new_semi = remake(semi, uEltype = eltype(config))
