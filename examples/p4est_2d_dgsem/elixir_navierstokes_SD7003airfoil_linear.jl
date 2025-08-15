@@ -318,6 +318,7 @@ sol = Trixi.solve(ode, ode_algorithm,
 ###############################################################################
 # IMEX
 
+Stages = [14, 12, 10, 8, 7, 6, 5, 4, 2]
 dtRatios = [0.26, # Implicit
     0.253144726232790162612, # 14
     0.214041846963368698198,  # 12
@@ -327,7 +328,6 @@ dtRatios = [0.26, # Implicit
     0.0975166462040988335502, #  6
     0.0818171376613463507965, #  5
     0.0656503721211265656166, #  4
-    0.0419871921542380732717, #  3
     0.0209738927526359475451] / 0.26 #= 2 =#
 
 ode_algorithm = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
@@ -346,7 +346,8 @@ linesearch = nothing
 linsolve = KrylovJL_GMRES()
 
 nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
-                              linesearch = linesearch, linsolve = linsolve)
+                              linesearch = linesearch, linsolve = linsolve,
+                              concrete_jac = false)
 
 integrator = Trixi.init(ode, ode_algorithm; 
                         dt = 7e-4, # Use very small timestep for init
