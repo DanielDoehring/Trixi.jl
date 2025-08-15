@@ -384,11 +384,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     if isa(semi, SemidiscretizationHyperbolicParabolic)
         integrator = PairedExplicitRK2IMEXMultiParabolicIntegrator(u, du, u_tmp,
                                                                    t, tdir,
-                                                                   dt, zero(dt),
-                                                                   iter, semi,
-                                                                   (prob = ode,),
-                                                                   ode.f,
-                                                                   alg,
+                                                                   dt, zero(dt), iter,
+                                                                   semi, (prob = ode,),
+                                                                   ode.f, alg,
                                                                    PairedExplicitRKOptions(callback,
                                                                                            ode.tspan;
                                                                                            kwargs...),
@@ -407,11 +405,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     else
         integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
                                                           t, tdir,
-                                                          dt, zero(dt),
-                                                          iter, semi,
-                                                          (prob = ode,),
-                                                          ode.f,
-                                                          alg,
+                                                          dt, zero(dt), iter,
+                                                          semi, (prob = ode,),
+                                                          ode.f, alg,
                                                           PairedExplicitRKOptions(callback,
                                                                                   ode.tspan;
                                                                                   kwargs...),
