@@ -1,8 +1,9 @@
 using Trixi
 
-using LinearSolve
-#using Sparspak
+using LinearAlgebra, LinearSolve
 using LineSearch, NonlinearSolve
+#using Sparspak
+#using Pardiso
 
 # Functionality for automatic sparsity detection
 using SparseDiffTools, Symbolics
@@ -70,8 +71,12 @@ solver_float = DGSEM(polydeg = 3, surface_flux = num_flux)
 coordinates_min = -1.0
 coordinates_max = 1.0
 
+refinement_patches = ((type = "box", coordinates_min = (-0.5,), coordinates_max = (0.5,)),
+                      (type = "box", coordinates_min = (-0.25,), coordinates_max = (0.25,)))
+
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 5,
+                initial_refinement_level = 4, # 5 for convergence test
+                refinement_patches = refinement_patches,
                 n_cells_max = 30_000)
 
 # `semi_real` is used for computing the Jacobian sparsity pattern
@@ -113,21 +118,21 @@ dt = 0.0125 / (2^0) # 0.0125 for explicit 8-16 pair
 
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks);
 
+###############################################################################################
+### Compute the Jacobian with SparseDiffTools ###
+
+sd = SymbolicsSparsityDetection()
+ad_type = AutoFiniteDiff()
+#ad_type = AutoForwardDiff() # Does not work for `stage_residual_PERK2IMEXMulti!`
+sparse_adtype = AutoSparse(ad_type)
+
 element_indices = integrator.level_info_elements_acc[ode_alg.num_methods]
 interface_indices = integrator.level_info_interfaces_acc[ode_alg.num_methods]
 boundary_indices = integrator.level_info_boundaries_acc[ode_alg.num_methods]
 mortar_indices = integrator.level_info_mortars_acc[ode_alg.num_methods]
 u_indices = integrator.level_u_indices_elements[ode_alg.num_methods]
 
-###############################################################################################
-### Compute the Jacobian with SparseDiffTools ###
-
-sd = SymbolicsSparsityDetection()
-ad_type = AutoFiniteDiff()
-sparse_adtype = AutoSparse(ad_type)
-
-# For the operator split employed here, the implicit equation is the parabolic part only
-# The sparsity pattern of the residual function is identical with the one from the rhs
+#=
 rhs_im = (du_ode, u0_ode) -> Trixi.rhs!(du_ode, u0_ode, semi_real, t0,
                                         element_indices, interface_indices, boundary_indices, mortar_indices)
 
@@ -142,6 +147,55 @@ colorvec = sparse_cache.coloring.colorvec
 # I am especially worried about the columns
 subset_jac = jac_prototype[u_indices, u_indices]
 subset_colorvec = colorvec[u_indices] # This should be safe
+=#
+
+n_conv = 1
+t = 0
+dt = 0.0125/2^n_conv
+
+ode_real = semidiscretize(semi_real, t_span)
+u_ode = ode_real.u0
+du_ode = zeros(Real, length(u_ode))
+u_nonlin = zeros(Real, length(u_ode))
+residual = zeros(Real, length(u_indices))
+implicit_stage = zeros(Real, length(u_indices))
+
+function stage_residual_PERK2IMEXMulti!(residual, implicit_stage)
+    a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
+
+    # Add implicit contribution
+    for i in 1:length(u_indices)
+        u_idx = u_indices[i] # Ensure thread safety
+        u_nonlin[u_idx] = u_ode[u_idx] + a_dt * implicit_stage[i]
+    end
+
+    # Evaluate implicit stage
+    Trixi.rhs!(du_ode, u_nonlin, semi_real,
+                t + 0.5 * dt, # Hard-coded for IMEX midpoint method
+                element_indices, interface_indices, boundary_indices, mortar_indices)
+
+    # Compute residual
+    for i in 1:length(u_indices)
+        residual[i] = implicit_stage[i] - du_ode[u_indices[i]]
+    end
+
+    return nothing
+end
+
+sparse_cache = sparse_jacobian_cache(sparse_adtype, sd, stage_residual_PERK2IMEXMulti!, residual, implicit_stage)
+
+# Full-dimensional sparsity information
+jac_prototype = sparse_cache.jac_prototype
+colorvec = sparse_cache.coloring.colorvec
+
+#=
+residual_float = zeros(Float64, length(u_indices))
+implicit_stage_float = zeros(Float64, length(u_indices))
+J = sparse_jacobian(sparse_adtype, sparse_cache, stage_residual_PERK2IMEXMulti!, residual_float, implicit_stage_float)
+=#
+
+#det(subset_J)
+#cond(Matrix(subset_J))
 
 ###############################################################################
 # run the simulation
@@ -150,36 +204,37 @@ subset_colorvec = colorvec[u_indices] # This should be safe
 # See https://docs.sciml.ai/LineSearch/dev/api/native/
 
 #linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
-linesearch = LiFukushimaLineSearch()
-#linesearch = nothing
+#linesearch = LiFukushimaLineSearch()
+linesearch = nothing
 
 ### Linear Solver ###
 # See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
-#linsolve = KLUFactorization()
+linsolve = KLUFactorization()
 #linsolve = UMFPACKFactorization()
 
-linsolve = SimpleGMRES()
+#linsolve = SimpleGMRES()
+#linsolve = KrylovJL_GMRES(precs = (A, p) -> (LinearAlgebra.Diagonal(A), LinearAlgebra.I))
 #linsolve = KrylovJL_GMRES()
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit
 
 #linsolve = SparspakFactorization() # requires Sparspak.jl
-
-# HYPRE & MKL do not work with sparsity structure of the Jacobian
-
-#linsolve = nothing
+#linsolve = MKLPardisoFactorize(nprocs = Threads.nthreads())
 
 nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
+                              #autodiff = AutoForwardDiff(),
                               linesearch = linesearch, linsolve = linsolve)
+                              #concrete_jac = true) # For preconditioners etc
 
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
 # Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
 n_conv = 1
 dt = 0.0125/2^n_conv
+
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
-                        jac_prototype = subset_jac, colorvec = subset_colorvec,
+                        jac_prototype = jac_prototype, colorvec = colorvec,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-8, reltol = 1e-8);
 

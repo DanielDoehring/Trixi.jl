@@ -320,6 +320,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     # Full-size, argument to `rhs!`
     u_nonlin = copy(u)
+
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
