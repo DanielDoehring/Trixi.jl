@@ -1167,6 +1167,16 @@ function calc_surface_integral!(du, u,
     @unpack boundary_interpolation = dg.basis
     @unpack surface_flux_values = cache.elements
 
+    # During sparsity detection
+    #=
+    # Check if any entry in surface_flux_values is undef, and fill with zeros if so
+    for i in eachindex(surface_flux_values)
+        if !isassigned(surface_flux_values, i)
+            surface_flux_values[i] = zero(eltype(du))
+        end
+    end
+    =#
+
     # Note that all fluxes have been computed with outward-pointing normal vectors.
     # Access the factors only once before beginning the loop to increase performance.
     # We also use explicit assignments instead of `+=` to let `@muladd` turn these
