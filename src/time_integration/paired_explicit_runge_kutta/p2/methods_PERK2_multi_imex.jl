@@ -172,7 +172,6 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     n_levels::Int64
 
     # For nonlinear solve
-    u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
     k_nonlin::uImType
     nonlin_cache::NonlinCache # Contains Problem & Solver
 end
@@ -218,7 +217,6 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
     n_levels::Int64
 
     # For nonlinear solve
-    u_nonlin::uType # Stores the intermediate u approximation in nonlinear solver
     k_nonlin::uImType
     nonlin_cache::NonlinCache # Contains Problem & Solver
 
@@ -235,7 +233,7 @@ mutable struct NonlinParams{RealT <: Real, uType,
     dt::RealT
     u::uType
     du::uType
-    u_nonlin::uType
+    u_tmp::uType
     semi::Semi
     const f::F
     # Do not support AMR for this: Keep indices constant
@@ -252,7 +250,7 @@ mutable struct NonlinParamsParabolic{RealT <: Real, uType,
     dt::RealT
     u::uType
     du::uType
-    u_nonlin::uType
+    u_tmp::uType
     du_para::uType
     semi::Semi
     const f::F
@@ -318,18 +316,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     ### Nonlinear Solver ###
 
-    # Full-size, argument to `rhs!`
-    u_nonlin = copy(u)
-
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
-    #=
-    # Initialize `k_nonlin` here with values from `u`, such that in the simulation we use the same value for init
-    @threaded for i in 1:length(level_u_indices_elements[alg.num_methods])
-        #k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
+    # Initialize `k_nonlin` here with values from `u`, such that in the simulation we can use the old solution for init
+    @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
+        k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
     end
-    =#
 
     # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
     jac_prototype = get(kwargs, :jac_prototype, nothing)
@@ -342,7 +335,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           colorvec = colorvec)
         du_para = zero(u)
         p = NonlinParamsParabolic(t, dt,
-                                  u, du, u_nonlin, du_para,
+                                  u, du, u_tmp, du_para,
                                   semi, ode.f,
                                   level_info_elements_acc[alg.num_methods],
                                   level_info_interfaces_acc[alg.num_methods],
@@ -355,7 +348,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           colorvec = colorvec)
 
         p = NonlinParams(t, dt,
-                         u, du, u_nonlin,
+                         u, du, u_tmp,
                          semi, ode.f,
                          level_info_elements_acc[alg.num_methods],
                          level_info_interfaces_acc[alg.num_methods],
@@ -380,6 +373,14 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                   maxiters = maxiters_nonlin)
     #show_trace = Val(true), trace_level = TraceAll())
 
+    #=
+    # Set `du` and `u_tmp` to zero again, polluted after `init`
+    @threaded for i in eachindex(du)
+        du[i] = 0
+        u_tmp[i] = 0
+    end
+    =#
+
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
         integrator = PairedExplicitRK2IMEXMultiParabolicIntegrator(u, du, u_tmp,
@@ -399,7 +400,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                    level_info_mortars_acc,
                                                                    level_u_indices_elements,
                                                                    -1, n_levels,
-                                                                   u_nonlin, k_nonlin,
+                                                                   k_nonlin,
                                                                    nonlin_cache,
                                                                    du_para)
     else
@@ -420,7 +421,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           level_info_mortars_acc,
                                                           level_u_indices_elements,
                                                           -1, n_levels,
-                                                          u_nonlin, k_nonlin,
+                                                          k_nonlin,
                                                           nonlin_cache)
     end
 
@@ -429,56 +430,56 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     return integrator
 end
 
-function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
-    @unpack t, dt, u, du, u_nonlin, semi, f,
+function stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
+    @unpack t, dt, u, du, u_tmp, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
 
     # Add implicit contribution
-    @threaded for i in 1:length(u_indices)
+    @threaded for i in eachindex(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
-        u_nonlin[u_idx] = u[u_idx] + a_dt * implicit_stage[i]
+        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
     end
 
     # Evaluate implicit stage
-    f(du, u_nonlin, semi,
+    f(du, u_tmp, semi,
       #t + alg.c[alg.num_stages] * dt,
       t + 0.5 * dt, # Hard-coded for IMEX midpoint method
       element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
-    @threaded for i in 1:length(u_indices)
-        residual[i] = implicit_stage[i] - du[u_indices[i]]
+    @threaded for i in eachindex(u_indices)
+        residual[i] = k_nonlin[i] - du[u_indices[i]]
     end
 
     return nothing
 end
 
-function stage_residual_PERK2IMEXMultiParabolic!(residual, implicit_stage, p)
-    @unpack t, dt, u, du, u_nonlin, du_para, semi, f,
+function stage_residual_PERK2IMEXMultiParabolic!(residual, k_nonlin, p)
+    @unpack t, dt, u, du, u_tmp, du_para, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
 
     # Add implicit contribution
-    @threaded for i in 1:length(u_indices)
+    @threaded for i in eachindex(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
-        u_nonlin[u_idx] = u[u_idx] + a_dt * implicit_stage[i]
+        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
     end
 
     # Evaluate implicit stage
-    f(du, u_nonlin, semi,
+    f(du, u_tmp, semi,
       #t + alg.c[alg.num_stages] * dt,
       t + 0.5 * dt, # Hard-coded for IMEX midpoint method
       du_para,
       element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
 
     # Compute residual
-    @threaded for i in 1:length(u_indices)
-        residual[i] = implicit_stage[i] - du[u_indices[i]]
+    @threaded for i in eachindex(u_indices)
+        residual[i] = k_nonlin[i] - du[u_indices[i]]
     end
 
     return nothing
@@ -521,20 +522,14 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
             end
         end
 
-        # Copy data to `u_nonlin` before nonlinear solve
-        @threaded for i in eachindex(integrator.u_tmp) # TODO: Could only use the explicit indices here
-            integrator.u_nonlin[i] = integrator.u_tmp[i]
-        end
-
-        u_indices_implicit = integrator.level_u_indices_elements[alg.num_methods]
-
         # Set initial guess for nonlinear solve
         #=
-        @threaded for i in 1:length(u_indices_implicit)
+        @threaded for i in eachindex(integrator.level_u_indices_elements[alg.num_methods])
             # Trivial choices
 
-            integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
+            #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
             #integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
+            integrator.k_nonlin[i] = 0.0
 
             # Try some extrapolation choices
 
@@ -550,6 +545,8 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
                               alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+            # TODO: Could also try `remake`:
+            # https://docs.sciml.ai/SciMLBase/stable/interfaces/Problems/#SciMLBase.remake
 
             integrator.nonlin_cache.p.t = integrator.t
             integrator.nonlin_cache.p.dt = integrator.dt
@@ -567,19 +564,12 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
                     NonlinearSolveBase.get_u(integrator.nonlin_cache))
         end
 
-        # Compute the intermediate approximation for the final explicit step: Take the implicit solution into account
-        a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
-        @threaded for i in 1:length(u_indices_implicit)
-            u_idx = u_indices_implicit[i]
-            integrator.u_tmp[u_idx] = integrator.u[u_idx] +
-                                      a_dt * integrator.k_nonlin[i]
-        end
-
         ### Final update ###
         # Joint (with explicit part) re-evaluation of implicit stage
         # => Makes conservation much simpler
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
-                     integrator.t + alg.c[alg.num_stages] * integrator.dt)
+                     integrator.t + alg.c[alg.num_stages] * integrator.dt,
+                     integrator)
 
         b_dt = integrator.dt # Hard-coded for PERK2 IMEX midpoint method with bS = 1
         @threaded for i in eachindex(integrator.u)
