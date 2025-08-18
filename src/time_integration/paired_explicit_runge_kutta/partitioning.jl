@@ -20,7 +20,7 @@ end
     n_levels = get_n_levels(mesh)
 
     # CARE: This is for testcases with special (random/round robin) assignment
-    #n_levels = alg.num_methods
+    n_levels = alg.num_methods
 
     return n_levels
 end
@@ -57,7 +57,7 @@ function partition_variables!(level_info_elements,
     n_elements = length(elements.cell_ids)
 
     # CARE: This is for testcase with special assignment
-    #element_id_level = Dict{Int, Int}()
+    element_id_level = Dict{Int, Int}()
 
     # Determine level for each element
     for element_id in 1:n_elements
@@ -70,8 +70,8 @@ function partition_variables!(level_info_elements,
 
         # CARE: This is for testcase with special assignment
         #level_id = rand(1:n_levels)
-        #level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
-        #element_id_level[element_id] = level_id
+        level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
+        element_id_level[element_id] = level_id
 
         # CARE: For case with locally changing mean speed of sound (Lin. Euler)
         #=
@@ -116,7 +116,9 @@ function partition_variables!(level_info_elements,
         level_id = max_level + 1 - max(level1, level2)
 
         # CARE: This is for testcase with special assignment
-        #level_id = element_id_level[element_id]
+        element_level1 = element_id_level[element_id1]
+        element_level2 = element_id_level[element_id2]
+        level_id = min(element_level1, element_level2)
 
         # NOTE: For case with varying characteristic speeds
         #=
@@ -209,7 +211,7 @@ function partition_variables!(level_info_elements,
     n_elements = length(elements.cell_ids)
 
     # CARE: This is for testcase with special assignment
-    #element_id_level = Dict{Int, Int}()
+    element_id_level = Dict{Int, Int}()
 
     # Determine level for each element
     for element_id in 1:n_elements
@@ -220,9 +222,13 @@ function partition_variables!(level_info_elements,
         level_id = max_level + 1 - level
 
         # CARE: This is for testcase with special assignment
-        #level_id = rand(1:n_levels)
-        #level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
-        #element_id_level[element_id] = level_id
+        level_id = rand(1:n_levels)
+
+        level_id = mod(element_id - 1, n_levels) + 1 # Assign elements in round-robin fashion
+        #level_id = mod(element_id - 1, n_levels - 1) + 2 # Assign elements in round-robin fashion
+        #level_id = 1
+
+        element_id_level[element_id] = level_id
 
         # TODO: For case with locally changing mean speed of sound (Lin. Euler)
         #=
@@ -288,9 +294,9 @@ function partition_variables!(level_info_elements,
         level_id = max_level + 1 - max(level1, level2)
 
         # CARE: This is for testcase with special assignment
-        #element_level1 = element_id_level[element_id1]
-        #element_level2 = element_id_level[element_id2]
-        #level_id = min(element_level1, element_level2)
+        element_level1 = element_id_level[element_id1]
+        element_level2 = element_id_level[element_id2]
+        level_id = min(element_level1, element_level2)
 
         # NOTE: For case with varying characteristic speeds
         #=
@@ -326,7 +332,9 @@ function partition_variables!(level_info_elements,
         if level_id == 1 # On finest level
             push!(level_info_interfaces_acc[1], interface_id)
 
-            if level1 != level2 # At interface between differently sized cells
+            #if level1 != level2
+            # CARE: This is for testcase with special assignment
+            if element_level1 != element_level2 # At interface between differently sized cells
                 for l in 2:n_levels # Add to all other levels
                     push!(level_info_interfaces_acc[l], interface_id)
                 end
@@ -361,7 +369,7 @@ function partition_variables!(level_info_elements,
         level_id = max_level + 1 - level
 
         # CARE: This is for testcase with special assignment
-        #level_id = element_id_level[element_id]
+        level_id = element_id_level[element_id]
 
         # Add to accumulated container
         if level_id == 1
@@ -399,7 +407,7 @@ function partition_variables!(level_info_elements,
             level_id = max_level + 1 - level
 
             # CARE: This is for testcase with special assignment
-            #level_id = element_id_level[element_id]
+            level_id = element_id_level[element_id]
 
             # Add to accumulated container
             if level_id == 1
