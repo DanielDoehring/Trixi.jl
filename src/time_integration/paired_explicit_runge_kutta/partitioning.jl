@@ -332,7 +332,7 @@ function partition_variables!(level_info_elements,
         if level_id == 1 # On finest level
             push!(level_info_interfaces_acc[1], interface_id)
 
-            #if level1 != level2
+            #if level1 != level2 # At interface between differently sized cells
             # CARE: This is for testcase with special assignment
             if element_level1 != element_level2 # At interface between differently sized cells
                 for l in 2:n_levels # Add to all other levels
