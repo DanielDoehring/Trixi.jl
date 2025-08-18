@@ -319,12 +319,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
-    #=
-    # Initialize `k_nonlin` here with values from `u`, such that in the simulation we use the same value for init
+    # Initialize `k_nonlin` here with values from `u`, such that in the simulation we can use the old solution for init
     @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
-        #k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
+        k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
     end
-    =#
 
     # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
     jac_prototype = get(kwargs, :jac_prototype, nothing)
@@ -369,24 +367,27 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     reltol = get(kwargs, :reltol, nothing)
     maxiters_nonlin = get(kwargs, :maxiters_nonlin, typemax(Int64))
 
-    
     nonlin_cache = SciMLBase.init(nonlin_prob, nonlin_solver;
                                   alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
                                   abstol = abstol, reltol = reltol,
                                   maxiters = maxiters_nonlin)
-    
-    #nonlin_cache = nothing
     #show_trace = Val(true), trace_level = TraceAll())
+
+    #=
+    # Set `du` and `u_tmp` to zero again, polluted after `init`
+    @threaded for i in eachindex(du)
+        du[i] = 0
+        u_tmp[i] = 0
+    end
+    =#
 
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
         integrator = PairedExplicitRK2IMEXMultiParabolicIntegrator(u, du, u_tmp,
                                                                    t, tdir,
-                                                                   dt, zero(dt),
-                                                                   iter, semi,
-                                                                   (prob = ode,),
-                                                                   ode.f,
-                                                                   alg,
+                                                                   dt, zero(dt), iter,
+                                                                   semi, (prob = ode,),
+                                                                   ode.f, alg,
                                                                    PairedExplicitRKOptions(callback,
                                                                                            ode.tspan;
                                                                                            kwargs...),
@@ -405,11 +406,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     else
         integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
                                                           t, tdir,
-                                                          dt, zero(dt),
-                                                          iter, semi,
-                                                          (prob = ode,),
-                                                          ode.f,
-                                                          alg,
+                                                          dt, zero(dt), iter,
+                                                          semi, (prob = ode,),
+                                                          ode.f, alg,
                                                           PairedExplicitRKOptions(callback,
                                                                                   ode.tspan;
                                                                                   kwargs...),
@@ -431,7 +430,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     return integrator
 end
 
-function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
+function stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
     @unpack t, dt, u, du, u_tmp, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
@@ -441,7 +440,7 @@ function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
     # Add implicit contribution
     @threaded for i in eachindex(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
-        u_tmp[u_idx] = u[u_idx] + a_dt * implicit_stage[i]
+        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
     end
 
     # Evaluate implicit stage
@@ -452,13 +451,13 @@ function stage_residual_PERK2IMEXMulti!(residual, implicit_stage, p)
 
     # Compute residual
     @threaded for i in eachindex(u_indices)
-        residual[i] = implicit_stage[i] - du[u_indices[i]]
+        residual[i] = k_nonlin[i] - du[u_indices[i]]
     end
 
     return nothing
 end
 
-function stage_residual_PERK2IMEXMultiParabolic!(residual, implicit_stage, p)
+function stage_residual_PERK2IMEXMultiParabolic!(residual, k_nonlin, p)
     @unpack t, dt, u, du, u_tmp, du_para, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
@@ -468,47 +467,19 @@ function stage_residual_PERK2IMEXMultiParabolic!(residual, implicit_stage, p)
     # Add implicit contribution
     @threaded for i in eachindex(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
-        u_tmp[u_idx] = u[u_idx] + a_dt * implicit_stage[i]
+        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
     end
 
-    
     # Evaluate implicit stage
     f(du, u_tmp, semi,
       #t + alg.c[alg.num_stages] * dt,
       t + 0.5 * dt, # Hard-coded for IMEX midpoint method
       du_para,
       element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
-    
-
-    #=
-    rhs!(du, u_tmp, semi, t,
-        element_indices, interface_indices,
-        boundary_indices, mortar_indices)
-    rhs_parabolic!(du_para, u_tmp, semi, t,
-                    element_indices, interface_indices,
-                    boundary_indices, mortar_indices)
-
-    @threaded for i in u_indices
-        # Try to enable optimizations due to `muladd` by avoiding `+=`
-        # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
-        du[i] = du[i] + du_para[i]
-    end
-    =#
-
-    #=
-    rhs!(du, u_tmp, semi, t)
-    rhs_parabolic!(du_para, u_tmp, semi, t)
-
-    @threaded for i in u_indices
-        # Try to enable optimizations due to `muladd` by avoiding `+=`
-        # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
-        du[i] = du[i] + du_para[i]
-    end
-    =#
 
     # Compute residual
     @threaded for i in eachindex(u_indices)
-        residual[i] = implicit_stage[i] - du[u_indices[i]]
+        residual[i] = k_nonlin[i] - du[u_indices[i]]
     end
 
     return nothing
@@ -551,15 +522,14 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
             end
         end
 
-        u_indices_implicit = integrator.level_u_indices_elements[alg.num_methods]
-
         # Set initial guess for nonlinear solve
-        
-        @threaded for i in eachindex(u_indices_implicit)
+        #=
+        @threaded for i in eachindex(integrator.level_u_indices_elements[alg.num_methods])
             # Trivial choices
 
             #integrator.k_nonlin[i] = integrator.u[u_indices_implicit[i]]
-            integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
+            #integrator.k_nonlin[i] = integrator.du[u_indices_implicit[i]]
+            integrator.k_nonlin[i] = 0.0
 
             # Try some extrapolation choices
 
@@ -569,12 +539,14 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
                                             integrator.du[u_indices_implicit[i]])
             =#
         end
-        
+        =#
 
         @trixi_timeit timer() "nonlinear solve" begin
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect
                               alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+            # TODO: Could also try `remake`:
+            # https://docs.sciml.ai/SciMLBase/stable/interfaces/Problems/#SciMLBase.remake
 
             integrator.nonlin_cache.p.t = integrator.t
             integrator.nonlin_cache.p.dt = integrator.dt
@@ -591,43 +563,13 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
             copyto!(integrator.k_nonlin,
                     NonlinearSolveBase.get_u(integrator.nonlin_cache))
         end
-        
-        println("Residual: ", norm(integrator.nonlin_cache.fu))
-        println("norm pre recompute: ", norm(integrator.k_nonlin))
 
-        #=
-        rhs!(integrator.du, integrator.u_tmp, prob.p, integrator.t + alg.c[alg.num_stages] * integrator.dt,
-            integrator.nonlin_cache.p.element_indices, integrator.nonlin_cache.p.interface_indices,
-            integrator.nonlin_cache.p.boundary_indices, integrator.nonlin_cache.p.mortar_indices)
-        println("norm du pre recompute: ", norm(integrator.du[u_indices_implicit]))
-        rhs_parabolic!(integrator.du_para, integrator.u_tmp, prob.p, integrator.t + alg.c[alg.num_stages] * integrator.dt,
-                        integrator.nonlin_cache.p.element_indices, integrator.nonlin_cache.p.interface_indices,
-                        integrator.nonlin_cache.p.boundary_indices, integrator.nonlin_cache.p.mortar_indices)
-        println("norm du_para pre recompute: ", norm(integrator.du_para[u_indices_implicit]))
-        =#
-
-        
         ### Final update ###
         # Joint (with explicit part) re-evaluation of implicit stage
         # => Makes conservation much simpler
         integrator.f(integrator.du, integrator.u_tmp, prob.p,
                      integrator.t + alg.c[alg.num_stages] * integrator.dt,
                      integrator)
-        println("norm du post recompute: ", norm(integrator.du[u_indices_implicit]))
-
-        #=
-        rhs!(integrator.du, integrator.u_tmp, prob.p, integrator.t + alg.c[alg.num_stages] * integrator.dt)
-        rhs_parabolic!(integrator.du_para, integrator.u_tmp, prob.p, integrator.t + alg.c[alg.num_stages] * integrator.dt)
-
-        println("norm du post recompute: ", norm(integrator.du[u_indices_implicit]))
-        println("norm du_para post recompute: ", norm(integrator.du_para[u_indices_implicit]), "\n")
-
-        @threaded for i in eachindex(integrator.du)
-            # Try to enable optimizations due to `muladd` by avoiding `+=`
-            # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
-            integrator.du[i] = integrator.du[i] + integrator.du_para[i]
-        end
-        =#
 
         b_dt = integrator.dt # Hard-coded for PERK2 IMEX midpoint method with bS = 1
         @threaded for i in eachindex(integrator.u)

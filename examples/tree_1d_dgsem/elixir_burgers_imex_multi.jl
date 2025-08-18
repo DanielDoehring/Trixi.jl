@@ -32,8 +32,6 @@ t_end = 2.0
 t_span = (t0, t_end)
 
 ode = semidiscretize(semi, t_span)
-u0_ode = ode.u0
-du_ode = similar(u0_ode)
 
 summary_callback = SummaryCallback()
 
@@ -47,7 +45,8 @@ callbacks = CallbackSet(summary_callback,
 # Set up integrator
 
 # TODO: Burgers has (potentially) different spectrum
-path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
+#path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
+path = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
 
 #=
 ode_alg = Trixi.PairedExplicitRK2Multi([16, 8], path, [1, 1])
@@ -58,8 +57,9 @@ sol = Trixi.solve(ode, ode_alg, dt = dt,
                   save_everystep = false, callback = callbacks);
 =#
 
-ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16], path, [1])
+#ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16], path, [1])
 #ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
+ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
 
 ### Linesearch ###
 # See https://docs.sciml.ai/LineSearch/dev/api/native/
@@ -91,8 +91,8 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
 # Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
-n_conv = 0
-dt = (2e-3)/2^n_conv
+n_conv = 3
+dt = (8e-3)/2^n_conv
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-8, reltol = 1e-8,
