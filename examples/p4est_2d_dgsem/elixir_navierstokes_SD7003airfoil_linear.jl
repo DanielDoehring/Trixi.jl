@@ -96,7 +96,7 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 31 * t_c) # For testing only
 
-#ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
+ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
 
@@ -310,11 +310,11 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para,
 
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
-#=
+
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
-=#
+
 ###############################################################################
 # IMEX
 
@@ -350,7 +350,7 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               concrete_jac = false)
 
 integrator = Trixi.init(ode, ode_algorithm; 
-                        dt = 7e-4, # Use very small timestep for init
+                        dt = 8e-4, # Use very small timestep for init
                         callback = callbacks,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-5, reltol = 1e-3,
