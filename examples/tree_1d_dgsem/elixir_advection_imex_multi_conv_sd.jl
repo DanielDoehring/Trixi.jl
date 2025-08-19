@@ -122,8 +122,8 @@ integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks);
 ### Compute the Jacobian with SparseDiffTools ###
 
 sd = SymbolicsSparsityDetection()
-ad_type = AutoFiniteDiff()
-#ad_type = AutoForwardDiff() # Does not work for `stage_residual_PERK2IMEXMulti!`
+#ad_type = AutoFiniteDiff()
+ad_type = AutoForwardDiff()
 sparse_adtype = AutoSparse(ad_type)
 
 element_indices = integrator.level_info_elements_acc[ode_alg.num_methods]
@@ -132,95 +132,41 @@ boundary_indices = integrator.level_info_boundaries_acc[ode_alg.num_methods]
 mortar_indices = integrator.level_info_mortars_acc[ode_alg.num_methods]
 u_indices = integrator.level_u_indices_elements[ode_alg.num_methods]
 
+# As for rhs! Jacobian computation: Start with plain float,
+# which are (hopefully) automatically promoted
+residual = zeros(Float64, length(u_indices))
+k_nonlin = zeros(Float64, length(u_indices))
 
-rhs_im = (du_ode, u0_ode) -> Trixi.rhs!(du_ode, u0_ode, semi_real, t0,
-                                        element_indices, interface_indices, boundary_indices, mortar_indices)
+u_ode = Num.(u0_ode)
+u_tmp = copy(u_ode) # Would normally carry the explicit update, here for now simply set to IC
+#du_ode = zeros(Num, length(u_ode))
+du_ode = similar(u_ode)
 
-sparse_cache = sparse_jacobian_cache(sparse_adtype, sd, rhs_im, du_ode, u0_ode)
-
-J = sparse_jacobian(sparse_adtype, sparse_cache, rhs_im, du_ode, u0_ode)
-
-# Full-dimensional sparsity information
-jac_prototype = sparse_cache.jac_prototype
-colorvec = sparse_cache.coloring.colorvec
-
-# Truncate to relevant entries
-# CARE: Not sure if this works for non-continuous `u_indices`!
-# I am especially worried about the columns
-subset_jac = jac_prototype[u_indices, u_indices]
-# Ensure the sparsity pattern has trues on the diagonal (emulate `stage_residual_PERK2IMEXMulti!`)
-for i in 1:min(size(subset_jac)...)
-    subset_jac[i, i] = true
-end
-subset_colorvec = colorvec[u_indices] # This should be safe
-
-ode_real = semidiscretize(semi_real, t_span)
-u_ode = ode_real.u0
-du_ode = zeros(Real, length(u_ode))
-u_nonlin = zeros(Real, length(u_ode))
-residual = zeros(Real, length(u_indices))
-implicit_stage = zeros(Real, length(u_indices))
-
-function stage_residual_PERK2IMEXMulti!(residual, implicit_stage)
+function stage_residual_PERK2IMEXMulti!(residual, k_nonlin)
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
 
     # Add implicit contribution
-    for i in 1:length(u_indices)
+    for i in eachindex(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
-        u_nonlin[u_idx] = u_ode[u_idx] + a_dt * implicit_stage[i]
+        u_tmp[u_idx] = u_ode[u_idx] + a_dt * k_nonlin[i]
     end
 
     # Evaluate implicit stage
-    Trixi.rhs!(du_ode, u_nonlin, semi_real,
+    Trixi.rhs!(du_ode, u_tmp, semi_real,
                t0 + 0.5 * dt, # Hard-coded for IMEX midpoint method
                element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
-    for i in 1:length(u_indices)
-        residual[i] = implicit_stage[i] - du_ode[u_indices[i]]
+    for i in eachindex(u_indices)
+        residual[i] = k_nonlin[i] - du_ode[u_indices[i]]
     end
 
     return nothing
 end
 
-sparse_cache = sparse_jacobian_cache(sparse_adtype, sd, stage_residual_PERK2IMEXMulti!, residual, implicit_stage)
+sparse_cache = sparse_jacobian_cache(sparse_adtype, sd, stage_residual_PERK2IMEXMulti!, residual, k_nonlin)
 jac_prototype = sparse_cache.jac_prototype
 colorvec = sparse_cache.coloring.colorvec
-
-#=
-u_ode = ode.u0
-du_ode = zeros(Float64, length(u_ode))
-u_nonlin = zeros(Float64, length(u_ode))
-residual = zeros(Float64, length(u_indices))
-implicit_stage = zeros(Float64, length(u_indices))
-
-function stage_residual_PERK2IMEXMulti!(residual, implicit_stage)
-    a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
-
-    # Add implicit contribution
-    for i in 1:length(u_indices)
-        u_idx = u_indices[i] # Ensure thread safety
-        u_nonlin[u_idx] = u_ode[u_idx] + a_dt * implicit_stage[i]
-    end
-
-    # Evaluate implicit stage
-    Trixi.rhs!(du_ode, u_nonlin, semi_float,
-                t0 + 0.5 * dt, # Hard-coded for IMEX midpoint method
-                element_indices, interface_indices, boundary_indices, mortar_indices)
-
-    # Compute residual
-    for i in 1:length(u_indices)
-        residual[i] = implicit_stage[i] - du_ode[u_indices[i]]
-    end
-
-    return nothing
-end
-
-J = sparse_jacobian(sparse_adtype, sparse_cache, stage_residual_PERK2IMEXMulti!, residual, implicit_stage)
-=#
-
-#det(subset_J)
-#cond(Matrix(subset_J))
 
 ###############################################################################
 # run the simulation
@@ -249,18 +195,18 @@ linsolve = KLUFactorization()
 
 nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               #autodiff = AutoForwardDiff(),
-                              linesearch = linesearch, linsolve = linsolve)
-                              #concrete_jac = true) # For preconditioners etc
+                              linesearch = linesearch, linsolve = linsolve,
+                              concrete_jac = true) # For preconditioners etc
 
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
 # Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
 
-n_conv = 1
+n_conv = 2
 dt = 0.0125/2^n_conv
 
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
-                        #jac_prototype = jac_prototype, colorvec = colorvec,
-                        jac_prototype = subset_jac, colorvec = subset_colorvec,
+                        jac_prototype = jac_prototype, colorvec = colorvec,
+                        #jac_prototype = subset_jac, colorvec = subset_colorvec,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-8, reltol = 1e-8);
 
