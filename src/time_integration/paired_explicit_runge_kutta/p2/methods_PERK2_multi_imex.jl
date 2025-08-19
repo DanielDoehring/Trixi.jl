@@ -319,10 +319,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
 
+    #=
     # Initialize `k_nonlin` here with values from `u`, such that in the simulation we can use the old solution for init
     @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
         k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
     end
+    =#
 
     # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
     jac_prototype = get(kwargs, :jac_prototype, nothing)
@@ -373,11 +375,20 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                   maxiters = maxiters_nonlin)
     #show_trace = Val(true), trace_level = TraceAll())
 
+    # TODO: Foster initial value for `k_nonlin` by doing one RK step already here?
+
+    println("Residual init: ", NonlinearSolveBase.get_fu(nonlin_cache))
+    println("steps taken: ", nonlin_cache.nsteps)
+    println("k_nonlin: ", k_nonlin)
+    println("norm du: ", norm(du))
+    println("norm u_tmp: ", norm(u_tmp))
+
     #=
     # Set `du` and `u_tmp` to zero again, polluted after `init`
     @threaded for i in eachindex(du)
         du[i] = 0
         u_tmp[i] = 0
+        # TODO: For parabolic: also du_para
     end
     =#
 
