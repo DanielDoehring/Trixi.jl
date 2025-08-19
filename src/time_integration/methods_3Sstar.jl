@@ -209,11 +209,13 @@ function step!(integrator::SimpleIntegrator3Sstar)
     @trixi_timeit timer() "Step-Callbacks" handle_callbacks!(callbacks, integrator)
 
     check_max_iter!(integrator)
+
+    return nothing
 end
 
 # get a cache where the RHS can be stored
 function get_tmp_cache(integrator::SimpleIntegrator3Sstar)
-    (integrator.u_tmp1, integrator.u_tmp2)
+    return (integrator.u_tmp1, integrator.u_tmp2)
 end
 
 # some algorithms from DiffEq like FSAL-ones need to be informed when a callback has modified u
@@ -223,6 +225,8 @@ u_modified!(integrator::SimpleIntegrator3Sstar, ::Bool) = false
 function terminate!(integrator::SimpleIntegrator3Sstar)
     integrator.finalstep = true
     empty!(integrator.opts.tstops)
+
+    return nothing
 end
 
 # used for AMR
@@ -231,5 +235,7 @@ function Base.resize!(integrator::SimpleIntegrator3Sstar, new_size)
     resize!(integrator.du, new_size)
     resize!(integrator.u_tmp1, new_size)
     resize!(integrator.u_tmp2, new_size)
+
+    return nothing
 end
 end # @muladd

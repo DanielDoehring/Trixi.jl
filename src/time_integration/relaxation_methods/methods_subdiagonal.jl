@@ -323,6 +323,8 @@ function step!(integrator::SubDiagonalRelaxationIntegrator)
     @trixi_timeit timer() "Step-Callbacks" handle_callbacks!(callbacks, integrator)
 
     check_max_iter!(integrator)
+
+    return nothing
 end
 
 # used for AMR
@@ -332,5 +334,7 @@ function Base.resize!(integrator::SubDiagonalRelaxationIntegrator, new_size)
     resize!(integrator.u_tmp, new_size)
     # Relaxation addition
     resize!(integrator.direction, new_size)
+
+    return nothing
 end
 end # @muladd

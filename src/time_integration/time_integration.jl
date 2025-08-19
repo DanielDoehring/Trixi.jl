@@ -34,6 +34,8 @@ end
 # used by adaptive timestepping algorithms in DiffEq
 @inline function set_proposed_dt!(integrator::AbstractTimeIntegrator, dt)
     (integrator.dt = dt; integrator.dtcache = dt)
+
+    return nothing
 end
 
 # Required e.g. for `glm_speed_callback`
@@ -143,6 +145,8 @@ function finalize_callbacks(integrator::AbstractTimeIntegrator)
             cb.finalize(cb, integrator.u, integrator.t, integrator)
         end
     end
+
+    return nothing
 end
 
 include("methods_2N.jl")

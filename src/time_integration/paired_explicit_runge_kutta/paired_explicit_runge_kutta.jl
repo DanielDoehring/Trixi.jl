@@ -188,6 +188,8 @@ function add_tstop!(integrator::AbstractPairedExplicitRKIntegrator, t)
         pop!(integrator.opts.tstops)
     end
     push!(integrator.opts.tstops, integrator.tdir * t)
+
+    return nothing
 end
 
 has_tstop(integrator::AbstractPairedExplicitRKIntegrator) = !isempty(integrator.opts.tstops)
@@ -971,6 +973,8 @@ function modify_dt_for_tstops!(integrator::AbstractPairedExplicitRKIntegrator)
                             min(abs(integrator.dtcache), abs(tdir_tstop - tdir_t)) # step! to the end
         end
     end
+
+    return nothing
 end
 
 # Add definitions of functions related to polynomial optimization by NLsolve here
