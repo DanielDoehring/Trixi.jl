@@ -494,6 +494,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                        boundary_indices, mortar_indices)
 
         for level in 1:max_level
+            # TODO: `u_indices_acc` could improve (parallel) performance
             @threaded for i in u_indices[level]
                 # Try to enable optimizations due to `muladd` by avoiding `+=`
                 # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
