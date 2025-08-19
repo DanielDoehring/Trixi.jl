@@ -375,23 +375,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                   maxiters = maxiters_nonlin)
     #show_trace = Val(true), trace_level = TraceAll())
 
-    # TODO: Foster initial value for `k_nonlin` by doing one RK step already here?
-
-    println("Residual init: ", NonlinearSolveBase.get_fu(nonlin_cache))
-    println("steps taken: ", nonlin_cache.nsteps)
-    println("k_nonlin: ", k_nonlin)
-    println("norm du: ", norm(du))
-    println("norm u_tmp: ", norm(u_tmp))
-
-    #=
-    # Set `du` and `u_tmp` to zero again, polluted after `init`
-    @threaded for i in eachindex(du)
-        du[i] = 0
-        u_tmp[i] = 0
-        # TODO: For parabolic: also du_para
-    end
-    =#
-
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
         integrator = PairedExplicitRK2IMEXMultiParabolicIntegrator(u, du, u_tmp,
@@ -435,6 +418,38 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           k_nonlin,
                                                           nonlin_cache)
     end
+
+    # Improve initial value for `k_nonlin`: Do one explicit/implicit midpoint step with small dt
+    dt_init = get(kwargs, :dt_init, 1e-12)
+    PERK_k1!(integrator, semi)
+    a_dt = 0.5 * dt_init
+    for level in 1:(alg.num_methods - 1)
+        # TODO: `u_indices_acc` could improve (parallel) performance
+        @threaded for i in integrator.level_u_indices_elements[level]
+            integrator.u_tmp[i] = integrator.u[i] + a_dt * integrator.k1[i]
+        end
+    end
+
+    integrator.nonlin_cache.p.dt = dt_init
+    SciMLBase.solve!(integrator.nonlin_cache)
+    # This is required here
+    copyto!(integrator.k_nonlin, NonlinearSolveBase.get_u(integrator.nonlin_cache))
+
+    println("Residual init: ", norm(NonlinearSolveBase.get_fu(integrator.nonlin_cache)))
+    println("steps taken: ", integrator.nonlin_cache.nsteps)
+
+    println("norm k_nonlin: ", norm(integrator.k_nonlin))
+    println("norm du: ", norm(integrator.du))
+    println("norm u_tmp: ", norm(integrator.u_tmp))
+
+    #=
+    # Set `du` and `u_tmp` to zero again, polluted after `init` and `solve!`
+    @threaded for i in eachindex(du)
+        du[i] = 0
+        u_tmp[i] = 0
+        # TODO: For parabolic: also du_para
+    end
+    =#
 
     initialize_callbacks!(callback, integrator)
 
@@ -526,6 +541,7 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
         for level in 1:(alg.num_methods - 1)
             a1_dt = alg.a_matrices[level, 1, alg.num_stages - 2] * integrator.dt
             a2_dt = alg.a_matrices[level, 2, alg.num_stages - 2] * integrator.dt
+            # TODO: `u_indices_acc` could improve (parallel) performance
             @threaded for i in integrator.level_u_indices_elements[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
@@ -553,27 +569,23 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
         =#
 
         @trixi_timeit timer() "nonlinear solve" begin
-            SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
-                              # Does not seem to have an effect
-                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+            # Update initial guess
+            SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin)
+
             # TODO: Could also try `remake`:
             # https://docs.sciml.ai/SciMLBase/stable/interfaces/Problems/#SciMLBase.remake
 
+            # Update scalar fields, which are not automatically constructed as references
             integrator.nonlin_cache.p.t = integrator.t
             integrator.nonlin_cache.p.dt = integrator.dt
 
-            # These seem unfortunately not to work
-            #SciMLBase.set_u!(integrator.nonlin_cache, integrator.k_nonlin)
-            #SciMLBase.set_u!(integrator.nonlin_cache, integrator.u)
-
-            # TODO: At some point use Polyester for copying data
-            #sol = SciMLBase.solve!(integrator.nonlin_cache)
-            #copyto!(integrator.k_nonlin, sol.u)
-
             SciMLBase.solve!(integrator.nonlin_cache)
-            copyto!(integrator.k_nonlin,
-                    NonlinearSolveBase.get_u(integrator.nonlin_cache))
+            # Not required, but somehow reduces allocations, very strange
+            # TODO: At some point use Polyester for copying data
+            copyto!(integrator.k_nonlin, NonlinearSolveBase.get_u(integrator.nonlin_cache))
         end
+
+        println("norm k_nonlin: ", norm(integrator.k_nonlin))
 
         ### Final update ###
         # Joint (with explicit part) re-evaluation of implicit stage
