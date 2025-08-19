@@ -120,11 +120,12 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 #nonlin_solver = Broyden(autodiff = AutoFiniteDiff())
 
 #dt = 2.0 / (2^3) # Operator-split RHS IMEX algorithms
-dt = 0.01 / (2^2) # PERK IMEX test algorithms
+dt = 0.01 / (2^1) # PERK IMEX test algorithms
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         #jac_prototype = jac_prototype, colorvec = colorvec,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-6, reltol = 1e-6,
-                        maxiters_nonlin = 20);
+                        maxiters_nonlin = 20,
+                        dt_init = dt);
 
 sol = Trixi.solve!(integrator);
