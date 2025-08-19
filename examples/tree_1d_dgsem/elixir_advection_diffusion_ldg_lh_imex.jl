@@ -79,9 +79,10 @@ callbacks = CallbackSet(summary_callback, analysis_callback)
 #ode_alg = Trixi.IMEX_LobattoIIIAp2_Heun()
 #ode_alg = Trixi.IMEX_Midpoint_Midpoint()
 
-path = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
+#path = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
+path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
 
-ode_alg = Trixi.PairedExplicitRK2Multi([12, 6, 2], path, [1, 1, 1])
+#ode_alg = Trixi.PairedExplicitRK2Multi([12, 6, 2], path, [1, 1, 1])
 
 #ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
