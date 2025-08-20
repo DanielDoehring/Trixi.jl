@@ -2,6 +2,8 @@ using Trixi
 using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using LinearAlgebra: norm
 
+using LineSearch, NonlinearSolve
+
 ###############################################################################
 # semidiscretization of the compressible Euler equations
 
@@ -104,7 +106,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.05) # 6.05
+tspan = (load_time(restart_filename), 6.0491) # 6.05
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -150,7 +152,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      #analysis_pointwise = (pressure_coefficient,)
                                      )
 
-alive_callback = AliveCallback(alive_interval = 1) # 200
+alive_callback = AliveCallback(alive_interval = 50)
 
 save_sol_interval = analysis_interval
 
@@ -166,10 +168,41 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 
 ## k = 2 ##
 
-base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
-#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k2/p3/"
+base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
+#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
 
-stepsize_callback = StepsizeCallback(cfl = 10.0, interval = 2) # PERRK p3 15 standalone
+path = base_path * "k1/p2/"
+
+dtRatios_complete_p2 = [ 
+    0.753155136853456,
+    0.695487338849343,
+    0.641318947672844,
+    0.574993145465851,
+    0.503288297653198,
+    0.442298481464386,
+    0.391183462142944,
+    0.346144811809063,
+    0.293439486026764,
+    0.243663728386164,
+    0.184185989908628,
+    0.15320873260498,
+    0.123865127563477,
+    0.0781898498535156,
+    0.0436210632324219
+                      ] ./ 0.753155136853456
+Stages_complete_p2 = reverse(collect(range(2, 16)))
+
+## 6.049 -> 6.05 ##
+
+# Only Flux-Differencing #
+cfl_interval = 2
+
+stepsize_callback = StepsizeCallback(cfl = 13.3, interval = cfl_interval) # PERK p2 2-16
+
+#path = base_path * "k2/p3/"
+
+#=
+stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PERRK p3 15 standalone
 
 dtRatios_complete_p3 = [ 
     0.309904923439026,
@@ -197,6 +230,7 @@ stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(
 #stepsize_callback = StepsizeCallback(cfl = 10.7, interval = cfl_interval) # PER(R)K p3 15
 #stepsize_callback = StepsizeCallback(cfl = 2.7, interval = cfl_interval) # (R-)CKL43
 #stepsize_callback = StepsizeCallback(cfl = 2.8, interval = cfl_interval) # (R-)RK33
+=#
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
@@ -209,17 +243,75 @@ callbacks = CallbackSet(summary_callback,
 # Run the simulation
 ###############################################################################
 
-newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
+## k = 2, p = 2 ##
+ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
+
+dtRatios_imex_p2 = [
+    0.8,
+    0.753155136853456,
+    0.695487338849343,
+    0.641318947672844,
+    0.574993145465851,
+    0.503288297653198,
+    0.442298481464386,
+    0.391183462142944,
+    0.346144811809063,
+    0.293439486026764,
+    0.243663728386164,
+    0.184185989908628,
+    0.15320873260498,
+    0.123865127563477,
+    0.0781898498535156,
+    0.0436210632324219
+] ./ 0.8
+
+ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages_complete_p2, path, dtRatios_imex_p2)
+
+### Linesearch ###
+# See https://docs.sciml.ai/LineSearch/dev/api/native/
+
+#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
+#linesearch = LiFukushimaLineSearch()
+linesearch = nothing
+
+### Linear Solver ###
+# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+
+#linsolve = SimpleLUFactorization()
+
+# Require sparse matrix
+#linsolve = KLUFactorization()
+#linsolve = UMFPACKFactorization()
+
+#linsolve = SimpleGMRES()
+linsolve = KrylovJL_GMRES()
+
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
+                              linesearch = linesearch, linsolve = linsolve)
+
+#nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
+#nonlin_solver = DFSane()
+# Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
+
+dt_init = 0.0
+integrator = Trixi.init(ode, ode_alg; dt = dt_init, callback = callbacks,
+                        nonlin_solver = nonlin_solver,
+                        abstol = 1e-5, reltol = 1e-4,
+                        maxiters_nonlin = 20) # Maxiters should be on the order of the number of stages of the highest explicit method)
+
+sol = Trixi.solve!(integrator);
 
 ## k = 2, p = 3 ##
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3)
-#ode_alg = Trixi.PairedExplicitRK3(15, base_path)
+newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
+
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
+#ode_alg = Trixi.PairedExplicitRK3(15, path)
 #=
-ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, base_path, dtRatios_complete_p3;
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3;
                                                  relaxation_solver = newton)
 =#
-#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path; relaxation_solver = newton)                                                 
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, path; relaxation_solver = newton)                                                 
 
 #ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
 #ode_alg = Trixi.CKL43()

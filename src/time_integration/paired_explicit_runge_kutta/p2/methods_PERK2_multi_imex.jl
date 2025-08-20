@@ -568,6 +568,7 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
         end
         =#
 
+        # TODO: Try to compute Jacobian once per timestep, then keep frozen
         @trixi_timeit timer() "nonlinear solve" begin
             # Update initial guess
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin)
