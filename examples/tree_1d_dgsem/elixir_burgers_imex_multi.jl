@@ -45,8 +45,8 @@ callbacks = CallbackSet(summary_callback,
 # Set up integrator
 
 # TODO: Burgers has (potentially) different spectrum
-#path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
-path = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
+path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
+#path = "/storage/home/daniel/PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
 
 #=
 ode_alg = Trixi.PairedExplicitRK2Multi([16, 8], path, [1, 1])
@@ -58,8 +58,8 @@ sol = Trixi.solve(ode, ode_alg, dt = dt,
 =#
 
 #ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16], path, [1])
-#ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
-ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
+ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
+#ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
 
 ### Linesearch ###
 # See https://docs.sciml.ai/LineSearch/dev/api/native/

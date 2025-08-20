@@ -1,3 +1,7 @@
+using FiniteDiff
+using SparseDiffTools, SparseArrays
+#using SparsityDetection # Gives compat errors
+
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -332,10 +336,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     specialize = SciMLBase.FullSpecialize
     if isa(semi, SemidiscretizationHyperbolicParabolic)
-        nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMultiParabolic!;
-                                                          jac_prototype = jac_prototype,
-                                                          colorvec = colorvec)
-        du_para = zero(u)
         p = NonlinParamsParabolic(t, dt,
                                   u, du, u_tmp, du_para,
                                   semi, ode.f,
@@ -344,11 +344,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                   level_info_boundaries_acc[alg.num_methods],
                                   level_info_mortars_acc[alg.num_methods],
                                   level_u_indices_elements[alg.num_methods])
-    else
-        nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMulti!;
+
+        nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMultiParabolic!;
                                                           jac_prototype = jac_prototype,
                                                           colorvec = colorvec)
-
+        du_para = zero(u)
+    else
         p = NonlinParams(t, dt,
                          u, du, u_tmp,
                          semi, ode.f,
@@ -357,6 +358,25 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_info_boundaries_acc[alg.num_methods],
                          level_info_mortars_acc[alg.num_methods],
                          level_u_indices_elements[alg.num_methods])
+
+        jac_cache = FiniteDiff.JacobianCache(k_nonlin)
+        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin))
+        jac_function!(residual, k_nonlin) = stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
+        FiniteDiff.finite_difference_jacobian!(jac_dense, jac_function!, k_nonlin, jac_cache)
+
+        # Need to do check before conversion to sparse to get
+        # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
+        jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
+        colorvec = SparseDiffTools.matrix_colors(jac_sparse_prototype)
+
+        # Check sparse comp.
+        FiniteDiff.finite_difference_jacobian(jac_function!, k_nonlin, jac_cache,
+                                              colorvec = colorvec, jac_prototype = jac_sparse_prototype,
+                                              sparsity = nothing)
+
+        nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMulti!;
+                                                          jac_prototype = jac_prototype,
+                                                          colorvec = colorvec)
     end
 
     nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
