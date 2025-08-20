@@ -266,7 +266,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
               dt, callback = nothing, kwargs...)
     u = copy(ode.u0)
     du = zero(u)
-    u_tmp = zero(u)
+    u_tmp = copy(u) # `init!` already calls the solver, crashes in general for zero `u_tmp`
 
     k1 = zero(u) # Additional PERK register
 
