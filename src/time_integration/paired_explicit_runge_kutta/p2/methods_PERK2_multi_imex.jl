@@ -369,7 +369,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
         jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
         colorvec = SparseDiffTools.matrix_colors(jac_sparse_prototype)
 
-        # Check sparse comp.
+        # TODO: Sparse compuation with jac_prototype does only work for out-of-place funcs
         FiniteDiff.finite_difference_jacobian(jac_function!, k_nonlin, jac_cache,
                                               colorvec = colorvec, jac_prototype = jac_sparse_prototype,
                                               sparsity = nothing)
