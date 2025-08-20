@@ -90,14 +90,6 @@ semi_float = SemidiscretizationHyperbolic(mesh, equations, initial_condition_con
 ###############################################################################
 # ODE & callbacks
 
-t0 = 0.0
-t_end = 2.0
-t_span = (t0, t_end)
-
-ode = semidiscretize(semi_float, t_span)
-u0_ode = ode.u0
-du_ode = similar(u0_ode)
-
 summary_callback = SummaryCallback()
 
 analysis_callback = AnalysisCallback(semi_float, interval = 100,
@@ -115,6 +107,12 @@ path = "/home/daniel/git/MA/EigenspectraGeneration/1D_Adv/"
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
 
 dt = 0.0125 / (2^0) # 0.0125 for explicit 8-16 pair
+
+t0 = 0.0
+t_end = 2.0
+t_span = (t0, t_end)
+
+ode = semidiscretize(semi_float, t_span)
 
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks);
 
@@ -137,7 +135,7 @@ u_indices = integrator.level_u_indices_elements[ode_alg.num_methods]
 residual = zeros(Float64, length(u_indices))
 k_nonlin = zeros(Float64, length(u_indices))
 
-u_ode = Num.(u0_ode)
+u_ode = Num.(ode.u0)
 u_tmp = copy(u_ode) # Would normally carry the explicit update, here for now simply set to IC
 #du_ode = zeros(Num, length(u_ode))
 du_ode = similar(u_ode)
