@@ -1,6 +1,5 @@
 using FiniteDiff
 using SparseDiffTools, SparseArrays
-#using SparsityDetection # Gives compat errors
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -359,20 +358,23 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_info_mortars_acc[alg.num_methods],
                          level_u_indices_elements[alg.num_methods])
 
-        jac_cache = FiniteDiff.JacobianCache(k_nonlin)
-        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin))
+        # TODO: Find out if changes in p propagate accordingly!
         jac_function!(residual, k_nonlin) = stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
-        FiniteDiff.finite_difference_jacobian!(jac_dense, jac_function!, k_nonlin, jac_cache)
+
+        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
+        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
+        FiniteDiff.finite_difference_jacobian!(jac_dense, jac_function!, k_nonlin)
 
         # Need to do check before conversion to sparse to get
         # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
         jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
         colorvec = SparseDiffTools.matrix_colors(jac_sparse_prototype)
 
-        # TODO: Sparse compuation with jac_prototype does only work for out-of-place funcs
-        FiniteDiff.finite_difference_jacobian(jac_function!, k_nonlin, jac_cache,
-                                              colorvec = colorvec, jac_prototype = jac_sparse_prototype,
-                                              sparsity = nothing)
+        jac_sparse_cache = FiniteDiff.JacobianCache(k_nonlin, colorvec = colorvec, sparsity = jac_sparse_prototype)
+        jac_sparse = sparse(jac_dense) # Allocate memory
+        FiniteDiff.finite_difference_jacobian!(jac_sparse, jac_function!, k_nonlin, jac_sparse_cache)
+
+        # TODO: Try linear solve with frozen Jacobian => factorize matrix per timestep
 
         nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMulti!;
                                                           jac_prototype = jac_prototype,
