@@ -131,13 +131,12 @@ mortar_indices = integrator.level_info_mortars_acc[ode_alg.num_methods]
 u_indices = integrator.level_u_indices_elements[ode_alg.num_methods]
 
 # As for rhs! Jacobian computation: Start with plain float,
-# which are (hopefully) automatically promoted
+# which are automatically promoted to `Dual` type
 residual = zeros(Float64, length(u_indices))
 k_nonlin = zeros(Float64, length(u_indices))
 
 u_ode = Num.(ode.u0)
 u_tmp = copy(u_ode) # Would normally carry the explicit update, here for now simply set to IC
-#du_ode = zeros(Num, length(u_ode))
 du_ode = similar(u_ode)
 
 function stage_residual_PERK2IMEXMulti!(residual, k_nonlin)

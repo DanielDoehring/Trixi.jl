@@ -585,8 +585,6 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
             copyto!(integrator.k_nonlin, NonlinearSolveBase.get_u(integrator.nonlin_cache))
         end
 
-        println("norm k_nonlin: ", norm(integrator.k_nonlin))
-
         ### Final update ###
         # Joint (with explicit part) re-evaluation of implicit stage
         # => Makes conservation much simpler
