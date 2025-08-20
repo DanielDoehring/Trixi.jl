@@ -3,6 +3,56 @@ using Trixi
 using LinearSolve
 using LineSearch, NonlinearSolve
 
+# Functionality for automatic sparsity detection
+using SparseDiffTools, Symbolics
+
+###############################################################################################
+### Overloads to construct the `LobattoLegendreBasis` with `Real` type (supertype of `Num`) ###
+
+# Required for setting up the Lobatto-Legendre basis for abstract `Real` type.
+# Constructing the Lobatto-Legendre basis with `Real` instead of `Num` is 
+# significantly easier as we do not have to care about e.g. if-clauses.
+# As a consequence, we need to provide some overloads hinting towards the intended behavior.
+
+const float_type = Float64 # Actual floating point type for the simulation
+
+# Newton tolerance for finding LGL nodes & weights
+Trixi.eps(::Type{Real}) = Base.eps(float_type)
+# There are some places where `one(RealT)` or `zero(uEltype)` is called where `RealT` or `uEltype` is `Real`.
+# This returns an `Int64`, i.e., `1` or `0`, respectively which gives errors when a floating-point alike type is expected.
+Trixi.one(::Type{Real}) = Base.one(float_type)
+Trixi.zero(::Type{Real}) = Base.zero(float_type)
+
+module RealMatMulOverload
+
+# Multiplying two Matrix{Real}s gives a Matrix{Any}.
+# This causes problems when instantiating the Legendre basis, which calls
+# `calc_{forward,reverse}_{upper, lower}` which in turn uses the matrix multiplication
+# which is overloaded here in construction of the interpolation/projection operators 
+# required for mortars.
+function Base.:*(A::Matrix{Real}, B::Matrix{Real})::Matrix{Real}
+    m, n = size(A, 1), size(B, 2)
+    kA = size(A, 2)
+    kB = size(B, 1)
+    @assert kA==kB "Matrix dimensions must match for multiplication"
+
+    C = Matrix{Real}(undef, m, n)
+    for i in 1:m, j in 1:n
+        #acc::Real = zero(promote_type(typeof(A[i,1]), typeof(B[1,j])))
+        acc = zero(Real)
+        for k in 1:kA
+            acc += A[i, k] * B[k, j]
+        end
+        C[i, j] = acc
+    end
+    return C
+end
+end
+
+import .RealMatMulOverload
+
+Trixi.sqrt(x::Num) = Base.sqrt(x)
+
 ###############################################################################
 # semidiscretization of the compressible Euler equations
 
@@ -58,6 +108,9 @@ vol_flux = flux_chandrashekar
 solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
                volume_integral = VolumeIntegralFluxDifferencing(vol_flux))
 
+# For sparsity detection
+solver_real = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs, RealT = Real)
+
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
@@ -79,6 +132,11 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
+
+semi_real = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
+                                                  initial_condition, solver_real;
+                                                  boundary_conditions = (boundary_conditions,
+                                                                         boundary_conditions_parabolic))
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -349,11 +407,64 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               linesearch = linesearch, linsolve = linsolve,
                               concrete_jac = false)
 
-integrator = Trixi.init(ode, ode_algorithm; 
-                        dt = 8e-4, # Use very small timestep for init
+dt_init = 7e-4
+integrator = Trixi.init(ode, ode_algorithm;
+                        dt = 7e-4,
                         callback = callbacks,
                         nonlin_solver = nonlin_solver,
                         abstol = 1e-5, reltol = 1e-3,
-                        maxiters_nonlin = 10); # Maxiters should be on the order of the number of stages of the highest explicit method
+                        maxiters_nonlin = 10, # Maxiters should be on the order of the number of stages of the highest explicit method
+                        dt_init = dt_init);
+
+###############################################################################################
+### Compute the Jacobian with SparseDiffTools ###
+
+sd = SymbolicsSparsityDetection()
+ad_type = AutoFiniteDiff()
+#ad_type = AutoForwardDiff()
+sparse_adtype = AutoSparse(ad_type)
+
+R = ode_algorithm.num_methods
+element_indices = integrator.level_info_elements_acc[R]
+interface_indices = integrator.level_info_interfaces_acc[R]
+boundary_indices = integrator.level_info_boundaries_acc[R]
+mortar_indices = integrator.level_info_mortars_acc[R]
+u_indices = integrator.level_u_indices_elements[R]
+
+# As for rhs! Jacobian computation: Start with plain float,
+# which are automatically promoted to `Dual` type
+residual = zeros(Float64, length(u_indices))
+k_nonlin = zeros(Float64, length(u_indices))
+
+u_ode = Num.(ode.u0)
+u_tmp = copy(u_ode) # Would normally carry the explicit update, here for now simply set to IC
+du_ode = zero(u_ode) # Try to avoid "undef"
+du_para = zero(u_ode)
+
+t0 = tspan[1]
+function stage_residual_PERK2IMEXMultiParabolic!(residual, k_nonlin)
+    a_dt = 0.5 * dt_init # Hard-coded for IMEX midpoint method
+
+    # Add implicit contribution
+    for i in eachindex(u_indices)
+        u_idx = u_indices[i] # Ensure thread safety
+        u_tmp[u_idx] = u_ode[u_idx] + a_dt * k_nonlin[i]
+    end
+
+    # Evaluate implicit stage
+    Trixi.rhs_hyperbolic_parabolic!(du_ode, u_tmp, semi_real,
+                                    t0 + 0.5 * dt_init, # Hard-coded for IMEX midpoint method
+                                    du_para,
+                                    element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
+
+    # Compute residual
+    for i in eachindex(u_indices)
+        residual[i] = k_nonlin[i] - du_ode[u_indices[i]]
+    end
+
+    return nothing
+end
+
+sparse_cache = sparse_jacobian_cache(sparse_adtype, sd, stage_residual_PERK2IMEXMultiParabolic!, residual, k_nonlin)
 
 sol = Trixi.solve!(integrator);
