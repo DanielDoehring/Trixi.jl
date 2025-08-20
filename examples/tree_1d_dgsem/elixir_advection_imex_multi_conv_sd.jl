@@ -137,7 +137,7 @@ k_nonlin = zeros(Float64, length(u_indices))
 
 u_ode = Num.(ode.u0)
 u_tmp = copy(u_ode) # Would normally carry the explicit update, here for now simply set to IC
-du_ode = similar(u_ode)
+du_ode = zero(u_ode)
 
 function stage_residual_PERK2IMEXMulti!(residual, k_nonlin)
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
