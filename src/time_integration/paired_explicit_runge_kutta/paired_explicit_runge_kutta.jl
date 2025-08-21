@@ -105,9 +105,8 @@ abstract type AbstractPairedExplicitRelaxationRKSplitMultiIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRKIMEXIntegrator{ORDER} <:
               AbstractPairedExplicitRKIntegrator{ORDER} end
 
-abstract type AbstractPairedExplicitRKIMEXSingleIntegrator{ORDER} <:
-              AbstractPairedExplicitRKIMEXIntegrator{ORDER} end
-
+# Single IMEX does not make sense, as we have always at least two methods:
+# The explicit method and the implicit method (implicit midpoint for p = 2)
 abstract type AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRKIMEXIntegrator{ORDER} end
 # parabolic additions

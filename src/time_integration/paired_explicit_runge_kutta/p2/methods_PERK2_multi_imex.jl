@@ -135,7 +135,7 @@ end
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
-                                                    uImType, NonlinCache} <:
+                                                    uImplicitType, NonlinCache} <:
                AbstractPairedExplicitRKIMEXMultiIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -173,7 +173,7 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     n_levels::Int64
 
     # For nonlinear solve
-    k_nonlin::uImType
+    k_nonlin::uImplicitType
     nonlin_cache::NonlinCache # Contains Problem & Solver
 end
 =#
@@ -181,8 +181,8 @@ end
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
-                                                    uImType,
-                                                    JacFunction, JacCache} <:
+                                                    uImplicitType,
+                                                    SparseMat, JacCache, LinCache} <:
                AbstractPairedExplicitRKIMEXMultiIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -220,16 +220,19 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     n_levels::Int64
 
     # For nonlinear solve
-    k_nonlin::uImType
+    k_nonlin::uImplicitType
+    residual::uImplicitType
 
-    jac_sparse::SparseMatrixCSC
-    jac_sparse_cache::JacCache
+    jac_sparse::SparseMat # using `SparseMatrixCSC` leads to slightly more allocations
+    jac_sparse_cache::JacCache # using `JacobianCache` leads to many more allocations
+
+    linear_cache::LinCache # using `LinearCache` leads to many more allocations
 end
 
 mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType,
                                                              Params, Sol, F,
                                                              PairedExplicitRKOptions,
-                                                             uImType, NonlinCache} <:
+                                                             uImplicitType, NonlinCache} <:
                AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -267,7 +270,7 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
     n_levels::Int64
 
     # For nonlinear solve
-    k_nonlin::uImType
+    k_nonlin::uImplicitType
     nonlin_cache::NonlinCache # Contains Problem & Solver
 
     # Addition for hyperbolic-parabolic problems:
@@ -367,8 +370,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     ### Nonlinear Solver ###
 
     # For fixed meshes/no re-partitioning: Allocate only required storage
+    # TODO: Revisit initialization - since we freeze the Jacobian, we can easily diverge if we init with zero.
+    # See init for 
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
-    # TODO: Allocate residual?
+    residual = copy(k_nonlin)
 
     #=
     # Initialize `k_nonlin` here with values from `u`, such that in the simulation we can use the old solution for init
@@ -397,6 +402,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           colorvec = colorvec)
         du_para = zero(u)
     else
+        # required here since `integrator` is not constructed yet
         p = NonlinParams(t, dt,
                          u, du, u_tmp,
                          semi, ode.f,
@@ -406,7 +412,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_info_mortars_acc[alg.num_methods],
                          level_u_indices_elements[alg.num_methods])
 
-        # TODO: Find out if changes in p propagate accordingly!
         stage_res_PERK2IMEXMulti!(residual, k_nonlin) = stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
 
         # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
@@ -420,9 +425,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec, sparsity = jac_sparse_prototype)
         jac_sparse = sparse(jac_dense) # Allocate memory
-        #finite_difference_jacobian!(jac_sparse, stage_res_PERK2IMEXMulti!, k_nonlin, jac_sparse_cache) # Call this in loop
 
-        # TODO: Try linear solve with frozen Jacobian => factorize matrix per timestep
         linear_prob = LinearSolve.LinearProblem(jac_sparse, k_nonlin)
         linear_solver = KLUFactorization() # TODO: Get from kwargs
         linear_cache = init(linear_prob, linear_solver)
@@ -510,10 +513,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           level_info_mortars_acc,
                                                           level_u_indices_elements,
                                                           -1, n_levels,
-                                                          k_nonlin,
-                                                          jac_sparse, jac_sparse_cache)
+                                                          k_nonlin, residual,
+                                                          jac_sparse, jac_sparse_cache,
+                                                          linear_cache)
     end
 
+    #=
     # Improve initial value for `k_nonlin`: Do one explicit/implicit midpoint step with small dt
     dt_init = get(kwargs, :dt_init, 1e-12)
     PERK_k1!(integrator, semi)
@@ -525,6 +530,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
         end
     end
 
+    
     integrator.nonlin_cache.p.dt = dt_init
     SciMLBase.solve!(integrator.nonlin_cache)
     # This is required here
@@ -536,6 +542,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     println("norm k_nonlin: ", norm(integrator.k_nonlin))
     println("norm du: ", norm(integrator.du))
     println("norm u_tmp: ", norm(integrator.u_tmp))
+    =#
 
     #=
     # Set `du` and `u_tmp` to zero again, polluted after `init` and `solve!`
@@ -578,6 +585,36 @@ function stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
     return nothing
 end
 
+function stage_residual_PERK2IMEXMulti!(residual, k_nonlin, integrator::PairedExplicitRK2IMEXMultiIntegrator)
+    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
+    a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
+
+    R = integrator.alg.num_methods
+    u_indicies_implict = integrator.level_u_indices_elements[R]
+
+    # Add implicit contribution
+    @threaded for i in eachindex(u_indicies_implict)
+        u_idx = u_indicies_implict[i] # Ensure thread safety
+        integrator.u_tmp[u_idx] = integrator.u[u_idx] + a_dt * k_nonlin[i]
+    end
+
+    # Evaluate implicit stage
+    integrator.f(integrator.du, integrator.u_tmp, integrator.sol.prob.p,
+                 #t + alg.c[alg.num_stages] * dt,
+                 integrator.t + 0.5 * integrator.dt, # Hard-coded for IMEX midpoint method
+                 integrator.level_info_elements_acc[R],
+                 integrator.level_info_interfaces_acc[R],
+                 integrator.level_info_boundaries_acc[R],
+                 integrator.level_info_mortars_acc[R])
+
+    # Compute residual
+    @threaded for i in eachindex(u_indicies_implict)
+        residual[i] = k_nonlin[i] - integrator.du[u_indicies_implict[i]]
+    end
+
+    return nothing
+end
+
 function stage_residual_PERK2IMEXMultiParabolic!(residual, k_nonlin, p)
     @unpack t, dt, u, du, u_tmp, du_para, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
@@ -606,7 +643,28 @@ function stage_residual_PERK2IMEXMultiParabolic!(residual, k_nonlin, p)
     return nothing
 end
 
-function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: Can we generalize this to non-multi?
+function newton_frozen_jac!(integrator::PairedExplicitRK2IMEXMultiIntegrator)
+    # Compute residual
+    stage_residual_PERK2IMEXMulti!(integrator.residual, integrator.k_nonlin, integrator)
+
+    while norm(integrator.residual, Inf) > 1e-6
+        # Update RHS
+        integrator.linear_cache.b = integrator.residual
+        # Newton step
+        LinearSolve.solve!(integrator.linear_cache) # Solve linear system for new RHS
+        # Update unknown
+        @threaded for i in eachindex(integrator.k_nonlin)
+            integrator.k_nonlin[i] -= integrator.linear_cache.u[i]
+        end
+
+        # Compute residual
+        stage_residual_PERK2IMEXMulti!(integrator.residual, integrator.k_nonlin, integrator)
+    end
+
+    return nothing
+end
+
+function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
     @unpack prob = integrator.sol
     @unpack alg = integrator
     t_end = last(prob.tspan)
@@ -665,6 +723,7 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
 
         # TODO: Try to compute Jacobian once per timestep, then keep frozen
         @trixi_timeit timer() "nonlinear solve" begin
+            #=
             # Update initial guess
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin)
 
@@ -679,6 +738,12 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator) # TODO: 
             # Not required, but somehow reduces allocations, very strange
             # TODO: At some point use Polyester for copying data
             copyto!(integrator.k_nonlin, NonlinearSolveBase.get_u(integrator.nonlin_cache))
+            =#
+
+            # Compute Jacobian
+            @trixi_timeit timer() "f def" stage_res_PERK2IMEXMulti!(residual, k_nonlin) = stage_residual_PERK2IMEXMulti!(residual, k_nonlin, integrator)
+            @trixi_timeit timer() "FD Jac" finite_difference_jacobian!(integrator.jac_sparse, stage_res_PERK2IMEXMulti!, integrator.k_nonlin, integrator.jac_sparse_cache)
+            @trixi_timeit timer() "newton" newton_frozen_jac!(integrator)
         end
 
         ### Final update ###
