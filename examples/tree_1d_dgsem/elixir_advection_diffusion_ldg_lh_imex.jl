@@ -1,7 +1,6 @@
 using Trixi
 
 using LinearSolve
-using HYPRE
 
 # semidiscretization of the linear advection diffusion equation
 
@@ -94,8 +93,7 @@ ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
 linear_solver = KLUFactorization()
 #linear_solver = UMFPACKFactorization()
 
-#linear_solver = MKLLUFactorization() # Does not work; requires MKL.jl
-#linear_solver = MKLPardisoFactorize() # Does not work; requires Pardiso.jl
+#linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
 
 #linear_solver = SparspakFactorization() # requires Sparspak.jl
 
@@ -107,13 +105,13 @@ linear_solver = KLUFactorization()
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
 
-# HYPRE does not work with sparsity structure of the Jacobian
+# HYPRE & MKL do not work with sparsity structure of the Jacobian
 
 #dt = 2.0 / (2^3) # Operator-split RHS IMEX algorithms
 dt = 0.01 / (2^1) # PERK IMEX test algorithms
 
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         linear_solver = linear_solver,
-                        atol_newton = 1e-7, maxits_newton = 100);
+                        atol_newton = 1e-8, maxits_newton = 100);
 
 sol = Trixi.solve!(integrator);
