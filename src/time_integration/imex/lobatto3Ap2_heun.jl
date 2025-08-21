@@ -96,7 +96,7 @@ function init(ode::ODEProblem, alg::IMEX_LobattoIIIAp2_Heun;
     return integrator
 end
 
-function stage_residual_Lobatto3Ap2Heun!(residual, implicit_stage, p)
+function residual_S_Lobatto3Ap2Heun!(residual, implicit_stage, p)
     @unpack alg, dt, t, u_tmp, u_nonlin, du_para, semi, f1 = p
 
     a_dt = alg.A_im[1, 2] * dt
@@ -148,7 +148,7 @@ function step!(integrator::LobattoIII3Ap2HeunIntegrator)
                  du_para = integrator.du_para,
                  semi = prob.p, f1 = integrator.f.f1)
 
-            nonlinear_eq = NonlinearProblem{true}(stage_residual_Lobatto3Ap2Heun!,
+            nonlinear_eq = NonlinearProblem{true}(residual_S_Lobatto3Ap2Heun!,
                                                   integrator.k_nonlin, p)
 
             SciMLBase.solve(nonlinear_eq,

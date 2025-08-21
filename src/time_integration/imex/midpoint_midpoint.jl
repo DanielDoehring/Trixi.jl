@@ -87,7 +87,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     colorvec = get(kwargs, :colorvec, nothing)
 
     specialize = SciMLBase.FullSpecialize
-    nonlin_func = NonlinearFunction{true, specialize}(stage_residual_midpoint!;
+    nonlin_func = NonlinearFunction{true, specialize}(residual_S_midpoint!;
                                                       jac_prototype = jac_prototype,
                                                       colorvec = colorvec)
 
@@ -119,7 +119,7 @@ function init(ode::ODEProblem, alg::IMEX_Midpoint_Midpoint;
     return integrator
 end
 
-function stage_residual_midpoint!(residual, implicit_stage, p)
+function residual_S_midpoint!(residual, implicit_stage, p)
     @unpack alg, dt, t, u_tmp, u_nonlin, du_para, semi, f1 = p
 
     #a_dt = alg.A_im[1, 2] * dt
