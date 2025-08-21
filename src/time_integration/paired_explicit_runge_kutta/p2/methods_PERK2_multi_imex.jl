@@ -363,6 +363,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
     jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
     colorvec = matrix_colors(jac_sparse_prototype) # Obtained from SparseDiffTools
+    println("\nNumber of RHS evaluations to fill Jacobian is: ", maximum(colorvec))
 
     jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec,
                                      sparsity = jac_sparse_prototype)
