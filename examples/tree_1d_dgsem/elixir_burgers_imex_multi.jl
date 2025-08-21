@@ -74,7 +74,7 @@ linear_solver = KLUFactorization()
 #linear_solver = SparspakFactorization() # requires Sparspak.jl
 
 
-n_conv = 4
+n_conv = 0
 dt = (8e-3)/2^n_conv
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
                         linear_solver = linear_solver,
