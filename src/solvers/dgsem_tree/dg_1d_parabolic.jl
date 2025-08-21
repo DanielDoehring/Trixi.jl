@@ -88,7 +88,6 @@ function rhs_parabolic!(du, u, t, mesh::TreeMesh{1},
                             dg.surface_integral, dg, cache, boundary_indices)
     end
 
-    # TODO: Boundary Orientations?
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
         calc_boundary_flux_divergence!(cache_parabolic, t,

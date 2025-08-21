@@ -138,7 +138,6 @@ function calc_gradient!(gradients, u_transformed, t,
                             boundary_indices)
     end
 
-    # TODO: Boundary Orientations?
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
         calc_boundary_flux_gradients!(cache_parabolic, t, boundary_conditions_parabolic,

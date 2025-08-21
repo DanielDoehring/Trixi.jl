@@ -30,7 +30,6 @@ function rhs!(du, u, t,
                              dg.surface_integral, dg, element_indices)
     end
 
-    # TODO: Boundary Orientations?
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
         calc_boundary_flux!(cache, u, t, boundary_conditions, mesh, equations,
