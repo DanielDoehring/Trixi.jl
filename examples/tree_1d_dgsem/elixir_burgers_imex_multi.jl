@@ -2,7 +2,6 @@ using Trixi
 
 using LinearSolve
 #using Sparspak
-using LineSearch, NonlinearSolve
 
 ###############################################################################
 # semidiscretization of the linear advection equation
@@ -61,41 +60,24 @@ sol = Trixi.solve(ode, ode_alg, dt = dt,
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
 #ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
 
-### Linesearch ###
-# See https://docs.sciml.ai/LineSearch/dev/api/native/
-
-#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
-linesearch = LiFukushimaLineSearch()
-#linesearch = nothing
-
 ### Linear Solver ###
 # See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
-#linsolve = KLUFactorization()
-#linsolve = UMFPACKFactorization()
+linear_solver = KLUFactorization()
+#linear_solver = UMFPACKFactorization()
 
-#linsolve = SimpleGMRES()
-linsolve = KrylovJL_GMRES()
+#linear_solver = SimpleGMRES()
+#linear_solver = KrylovJL_GMRES()
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit
 
-#linsolve = SparspakFactorization() # requires Sparspak.jl
+#linear_solver = SparspakFactorization() # requires Sparspak.jl
 
-# HYPRE & MKL do not work with sparsity structure of the Jacobian
 
-#linsolve = nothing
-
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
-                              linesearch = linesearch, linsolve = linsolve)
-
-#nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
-# Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
-
-n_conv = 3
+n_conv = 4
 dt = (8e-3)/2^n_conv
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
-                        nonlin_solver = nonlin_solver,
-                        abstol = 1e-8, reltol = 1e-8,
-                        maxiters_nonlin = 100);
+                        linear_solver = linear_solver,
+                        atol_newton = 1e-8, maxits_newton = 100);
 
 sol = Trixi.solve!(integrator);
