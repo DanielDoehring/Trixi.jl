@@ -1,8 +1,7 @@
 using Trixi
 
 using LinearSolve
-#using Sparspak
-using LineSearch, NonlinearSolve
+using HYPRE
 
 # semidiscretization of the linear advection diffusion equation
 
@@ -87,45 +86,34 @@ path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p
 #ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
 
-### Linesearch ###
-# See https://docs.sciml.ai/LineSearch/dev/api/native/
-
-#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
-#linesearch = LiFukushimaLineSearch()
-linesearch = nothing
-
 ### Linear Solver ###
 # See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
-#linsolve = SimpleLUFactorization()
+# Factorization-based methods
 
-#linsolve = KLUFactorization()
-#linsolve = UMFPACKFactorization()
+linear_solver = KLUFactorization()
+#linear_solver = UMFPACKFactorization()
 
-#linsolve = SimpleGMRES()
-linsolve = KrylovJL_GMRES()
-#linsolve = KrylovJL_BICGSTAB()
+#linear_solver = MKLLUFactorization() # Does not work; requires MKL.jl
+#linear_solver = MKLPardisoFactorize() # Does not work; requires Pardiso.jl
 
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit
+#linear_solver = SparspakFactorization() # requires Sparspak.jl
 
-#linsolve = SparspakFactorization() # requires Sparspak.jl
+# Iterative methods
 
-# HYPRE & MKL do not work with sparsity structure of the Jacobian
+#linear_solver = SimpleGMRES()
+#linear_solver = KrylovJL_GMRES()
+#linear_solver = KrylovJL_BICGSTAB()
 
-#linsolve = nothing
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
 
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
-                              linesearch = linesearch, linsolve = linsolve)
-
-#nonlin_solver = Broyden(autodiff = AutoFiniteDiff())
+# HYPRE does not work with sparsity structure of the Jacobian
 
 #dt = 2.0 / (2^3) # Operator-split RHS IMEX algorithms
 dt = 0.01 / (2^1) # PERK IMEX test algorithms
+
 integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
-                        #jac_prototype = jac_prototype, colorvec = colorvec,
-                        nonlin_solver = nonlin_solver,
-                        abstol = 1e-6, reltol = 1e-6,
-                        maxiters_nonlin = 20,
-                        dt_init = dt);
+                        linear_solver = linear_solver,
+                        atol_newton = 1e-7, maxits_newton = 100);
 
 sol = Trixi.solve!(integrator);

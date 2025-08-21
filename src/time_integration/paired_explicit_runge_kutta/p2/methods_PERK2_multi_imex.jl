@@ -189,7 +189,8 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
                                                              Params, Sol, F,
                                                              PairedExplicitRKOptions,
                                                              uImplicitType,
-                                                             NonlinCache} <:
+                                                             SparseMat, JacCache,
+                                                             LinCache} <:
                AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -221,14 +222,22 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
     level_info_mortars_acc::Vector{Vector{Int64}}
 
     level_u_indices_elements::Vector{Vector{Int64}}
-    # TODO: Store explicit indices in one datastructure for better threaded access?
+    # TODO: Store explicit indices in one datastructure for better threaded access
 
     coarsest_lvl::Int64
     n_levels::Int64
 
     # For nonlinear solve
     k_nonlin::uImplicitType
-    nonlin_cache::NonlinCache # Contains Problem & Solver
+    residual::uImplicitType
+
+    jac_sparse::SparseMat # using `SparseMatrixCSC` leads to slightly more allocations
+    jac_sparse_cache::JacCache # using `JacobianCache` leads to many more allocations
+
+    atol_newton::RealT
+    maxits_newton::Int
+
+    linear_cache::LinCache # using `LinearCache` leads to many more allocations
 
     # Addition for hyperbolic-parabolic problems:
     # We need another register to temporarily store the changes due to the parabolic part only.
@@ -283,34 +292,57 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     ### Nonlinear Solver ###
 
     # For fixed meshes/no re-partitioning: Allocate only required storage
-    k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
+    u_implicit = level_u_indices_elements[alg.num_methods]
+    k_nonlin = zeros(eltype(u), length(u_implicit))
     residual = copy(k_nonlin)
+
+    # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
+    jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
 
     if isa(semi, SemidiscretizationHyperbolicParabolic)
         du_para = zero(u)
 
-        p = NonlinParamsParabolic(t, dt,
-                                  u, du, u_tmp, du_para,
-                                  semi, ode.f,
-                                  level_info_elements_acc[alg.num_methods],
-                                  level_info_interfaces_acc[alg.num_methods],
-                                  level_info_boundaries_acc[alg.num_methods],
-                                  level_info_mortars_acc[alg.num_methods],
-                                  level_u_indices_elements[alg.num_methods])
-
-        # TODO: Adaptations for custom frozen Newton
-
+        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
         ode.f(du, u_tmp, semi, t, du_para,
+              level_info_elements_acc[alg.num_methods],
+              level_info_interfaces_acc[alg.num_methods],
+              level_info_boundaries_acc[alg.num_methods],
+              level_info_mortars_acc[alg.num_methods],
+              u_implicit)
+
+        @threaded for i in eachindex(u_implicit)
+            k_nonlin[i] = du[u_implicit[i]]
+        end
+
+        para_res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
+                                                                                    k_nonlin,
+                                                                                    t,
+                                                                                    dt,
+                                                                                    u,
+                                                                                    du,
+                                                                                    u_tmp,
+                                                                                    du_para,
+                                                                                    semi,
+                                                                                    ode.f,
+                                                                                    level_info_elements_acc[alg.num_methods],
+                                                                                    level_info_interfaces_acc[alg.num_methods],
+                                                                                    level_info_boundaries_acc[alg.num_methods],
+                                                                                    level_info_mortars_acc[alg.num_methods],
+                                                                                    u_implicit)
+
+        finite_difference_jacobian!(jac_dense, para_res_S_PERK2IMEXMulti!, k_nonlin)
+    else
+        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
+        ode.f(du, u_tmp, semi, t,
               level_info_elements_acc[alg.num_methods],
               level_info_interfaces_acc[alg.num_methods],
               level_info_boundaries_acc[alg.num_methods],
               level_info_mortars_acc[alg.num_methods])
 
-        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
-        @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
-            k_nonlin[i] = du[level_u_indices_elements[alg.num_methods][i]]
+        @threaded for i in eachindex(u_implicit)
+            k_nonlin[i] = du[u_implicit[i]]
         end
-    else
+
         res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
                                                                                k_nonlin,
                                                                                t, dt,
@@ -322,36 +354,23 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                                level_info_interfaces_acc[alg.num_methods],
                                                                                level_info_boundaries_acc[alg.num_methods],
                                                                                level_info_mortars_acc[alg.num_methods],
-                                                                               level_u_indices_elements[alg.num_methods])
+                                                                               u_implicit)
 
-        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
-        ode.f(du, u_tmp, semi, t,
-              level_info_elements_acc[alg.num_methods],
-              level_info_interfaces_acc[alg.num_methods],
-              level_info_boundaries_acc[alg.num_methods],
-              level_info_mortars_acc[alg.num_methods])
-
-        @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
-            k_nonlin[i] = du[level_u_indices_elements[alg.num_methods][i]]
-        end
-
-        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
         finite_difference_jacobian!(jac_dense, res_S_PERK2IMEXMulti!, k_nonlin)
-
-        # Need to do nonzero check before conversion to sparse to get
-        # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
-        jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
-        colorvec = matrix_colors(jac_sparse_prototype) # Obtained from SparseDiffTools
-
-        jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec,
-                                         sparsity = jac_sparse_prototype)
-        jac_sparse = sparse(jac_dense) # Allocate memory
-
-        linear_prob = LinearSolve.LinearProblem(jac_sparse, k_nonlin)
-        linear_solver = get(kwargs, :linear_solver, KLUFactorization())
-        linear_cache = init(linear_prob, linear_solver)
     end
+
+    # Need to do nonzero check before conversion to sparse to get
+    # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
+    jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
+    colorvec = matrix_colors(jac_sparse_prototype) # Obtained from SparseDiffTools
+
+    jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec,
+                                     sparsity = jac_sparse_prototype)
+    jac_sparse = sparse(jac_dense) # Allocate memory
+
+    linear_prob = LinearSolve.LinearProblem(jac_sparse, k_nonlin)
+    linear_solver = get(kwargs, :linear_solver, KLUFactorization())
+    linear_cache = init(linear_prob, linear_solver)
 
     atol_newton = get(kwargs, :atol_newton, 1e-6)
     maxits_newton = get(kwargs, :maxits_newton, 100)
@@ -375,8 +394,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                    level_info_mortars_acc,
                                                                    level_u_indices_elements,
                                                                    -1, n_levels,
-                                                                   k_nonlin,
-                                                                   nonlin_cache,
+                                                                   k_nonlin, residual,
+                                                                   jac_sparse,
+                                                                   jac_sparse_cache,
+                                                                   atol_newton,
+                                                                   maxits_newton,
+                                                                   linear_cache,
                                                                    du_para)
     else
         integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
@@ -466,7 +489,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     return nothing
 end
 
-# Version for hyperbolic-parabolic problems
+# Version for hyperbolic-parabolic problems and not yet constructed `integrator`
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                                     t, dt, u, du, u_tmp, du_para, semi, f,
                                     element_indices, interface_indices,
@@ -518,7 +541,8 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                  integrator.level_info_elements_acc[R],
                  integrator.level_info_interfaces_acc[R],
                  integrator.level_info_boundaries_acc[R],
-                 integrator.level_info_mortars_acc[R])
+                 integrator.level_info_mortars_acc[R],
+                 u_indicies_implict)
 
     # Compute residual
     @threaded for i in eachindex(u_indicies_implict)
@@ -528,7 +552,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     return nothing
 end
 
-function newton_frozen_jac!(integrator::PairedExplicitRK2IMEXMultiIntegrator)
+function newton_frozen_jac!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator{2})
     # Compute residual
     residual_S_PERK2IMEXMulti!(integrator.residual, integrator.k_nonlin, integrator)
 
@@ -590,17 +614,15 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
             end
         end
 
-        @trixi_timeit timer() "nonlinear solve" begin
-            res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
-                                                                                   k_nonlin,
-                                                                                   integrator)
+        res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
+                                                                               k_nonlin,
+                                                                               integrator)
+        @trixi_timeit timer() "Jacobian computation" finite_difference_jacobian!(integrator.jac_sparse,
+                                                                                 res_S_PERK2IMEXMulti!,
+                                                                                 integrator.k_nonlin,
+                                                                                 integrator.jac_sparse_cache)
 
-            @trixi_timeit timer() "Jacobian computation" finite_difference_jacobian!(integrator.jac_sparse,
-                                                                                     res_S_PERK2IMEXMulti!,
-                                                                                     integrator.k_nonlin,
-                                                                                     integrator.jac_sparse_cache)
-            @trixi_timeit timer() "Newton-Raphson" newton_frozen_jac!(integrator)
-        end
+        @trixi_timeit timer() "Newton-Raphson" newton_frozen_jac!(integrator)
 
         ### Final update ###
         # Joint (with explicit part) re-evaluation of implicit stage
