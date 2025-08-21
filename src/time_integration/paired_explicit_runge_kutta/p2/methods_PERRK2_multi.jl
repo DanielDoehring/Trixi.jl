@@ -64,7 +64,7 @@ mutable struct PairedExplicitRelaxationRK2MultiIntegrator{RealT <: Real, uType,
     level_info_mortars_acc::Vector{Vector{Int64}}
     level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
-    level_u_indices_elements::Vector{Vector{Int64}}
+    level_info_u::Vector{Vector{Int64}}
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -111,7 +111,7 @@ mutable struct PairedExplicitRelaxationRK2MultiParabolicIntegrator{RealT <: Real
     level_info_mortars_acc::Vector{Vector{Int64}}
     level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
-    level_u_indices_elements::Vector{Vector{Int64}}
+    level_info_u::Vector{Vector{Int64}}
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -177,8 +177,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
     end
 
     # Set (initial) distribution of DG nodal values
-    level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partition_u!(level_u_indices_elements, level_info_elements,
+    level_info_u = [Vector{Int64}() for _ in 1:n_levels]
+    partition_u!(level_info_u, level_info_elements,
                  n_levels, u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
@@ -207,7 +207,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                                                          level_info_boundaries_acc,
                                                                          level_info_mortars_acc,
                                                                          level_info_mpi_mortars_acc,
-                                                                         level_u_indices_elements,
+                                                                         level_info_u,
                                                                          -1, n_levels,
                                                                          gamma, S_old,
                                                                          alg.relaxation_solver,
@@ -235,7 +235,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                                                 level_info_boundaries_acc,
                                                                 level_info_mortars_acc,
                                                                 level_info_mpi_mortars_acc,
-                                                                level_u_indices_elements,
+                                                                level_info_u,
                                                                 -1, n_levels,
                                                                 gamma, S_old,
                                                                 alg.relaxationsolver)

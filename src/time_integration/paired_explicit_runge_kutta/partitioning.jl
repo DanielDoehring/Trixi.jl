@@ -1365,22 +1365,22 @@ function get_hmin_per_element(mesh::P4estMesh{3}, elements,
 end
 
 # Partitioning function for approach: Each level stores its indices
-@inline function partition_u!(level_u_indices_elements, level_info_elements,
+@inline function partition_u!(level_info_u, level_info_elements,
                               n_levels, u_ode, mesh, equations, dg, cache)
     u = wrap_array(u_ode, mesh, equations, dg, cache)
 
     for level in 1:n_levels
         @views indices = collect(Iterators.flatten(LinearIndices(u)[..,
                                                                     level_info_elements[level]]))
-        level_u_indices_elements[level] = indices
-        sort!(level_u_indices_elements[level])
+        level_info_u[level] = indices
+        sort!(level_info_u[level])
     end
 
     return nothing
 end
 
 # Partitioning function for approach: Each index stores its level
-@inline function partition_u!(level_u_indices_elements, level_info_elements,
+@inline function partition_u!(level_info_u, level_info_elements,
                               u_to_level,
                               n_levels, u_ode, mesh, equations, dg, cache)
     u = wrap_array(u_ode, mesh, equations, dg, cache)
@@ -1388,8 +1388,8 @@ end
     for level in 1:n_levels
         @views indices = collect(Iterators.flatten(LinearIndices(u)[..,
                                                                     level_info_elements[level]]))
-        level_u_indices_elements[level] = indices
-        sort!(level_u_indices_elements[level])
+        level_info_u[level] = indices
+        sort!(level_info_u[level])
 
         @views u_to_level[indices] .= level
     end
@@ -1404,20 +1404,20 @@ end
 
     u_gravity = wrap_array(cache.u_ode, semi_gravity)
 
-    resize!(cache.level_u_gravity_indices_elements, n_levels)
+    resize!(cache.level_info_u_gravity, n_levels)
     for level in 1:n_levels
-        if isassigned(cache.level_u_gravity_indices_elements, level)
-            empty!(cache.level_u_gravity_indices_elements[level])
+        if isassigned(cache.level_info_u_gravity, level)
+            empty!(cache.level_info_u_gravity[level])
         else
-            cache.level_u_gravity_indices_elements[level] = []
+            cache.level_info_u_gravity[level] = []
         end
     end
 
     for level in 1:n_levels
         @views indices = collect(Iterators.flatten(LinearIndices(u_gravity)[..,
                                                                             level_info_elements[level]]))
-        append!(cache.level_u_gravity_indices_elements[level], indices)
-        sort!(cache.level_u_gravity_indices_elements[level])
+        append!(cache.level_info_u_gravity[level], indices)
+        sort!(cache.level_info_u_gravity[level])
     end
 
     return nothing

@@ -166,7 +166,7 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
 
     level_info_mortars_acc::Vector{Vector{Int64}}
 
-    level_u_indices_elements::Vector{Vector{Int64}}
+    level_info_u::Vector{Vector{Int64}}
     # TODO: Store explicit indices in one datastructure for better threaded access
 
     coarsest_lvl::Int64
@@ -221,7 +221,7 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
 
     level_info_mortars_acc::Vector{Vector{Int64}}
 
-    level_u_indices_elements::Vector{Vector{Int64}}
+    level_info_u::Vector{Vector{Int64}}
     # TODO: Store explicit indices in one datastructure for better threaded access
 
     coarsest_lvl::Int64
@@ -285,14 +285,14 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     end
 
     # Set (initial) distribution of DG nodal values
-    level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partition_u!(level_u_indices_elements, level_info_elements,
+    level_info_u = [Vector{Int64}() for _ in 1:n_levels]
+    partition_u!(level_info_u, level_info_elements,
                  n_levels, u, mesh, equations, dg, cache)
 
     ### Nonlinear Solver ###
 
     # For fixed meshes/no re-partitioning: Allocate only required storage
-    u_implicit = level_u_indices_elements[alg.num_methods]
+    u_implicit = level_info_u[alg.num_methods]
     k_nonlin = zeros(eltype(u), length(u_implicit))
     residual = copy(k_nonlin)
 
@@ -393,7 +393,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                    level_info_interfaces_acc,
                                                                    level_info_boundaries_acc,
                                                                    level_info_mortars_acc,
-                                                                   level_u_indices_elements,
+                                                                   level_info_u,
                                                                    -1, n_levels,
                                                                    k_nonlin, residual,
                                                                    jac_sparse,
@@ -418,7 +418,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           level_info_interfaces_acc,
                                                           level_info_boundaries_acc,
                                                           level_info_mortars_acc,
-                                                          level_u_indices_elements,
+                                                          level_info_u,
                                                           -1, n_levels,
                                                           k_nonlin, residual,
                                                           jac_sparse, jac_sparse_cache,
@@ -465,7 +465,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
 
     R = integrator.alg.num_methods
-    u_indicies_implict = integrator.level_u_indices_elements[R]
+    u_indicies_implict = integrator.level_info_u[R]
 
     # Add implicit contribution
     @threaded for i in eachindex(u_indicies_implict)
@@ -526,7 +526,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
 
     R = integrator.alg.num_methods
-    u_indicies_implict = integrator.level_u_indices_elements[R]
+    u_indicies_implict = integrator.level_info_u[R]
 
     # Add implicit contribution
     @threaded for i in eachindex(u_indicies_implict)
@@ -608,7 +608,7 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
             a1_dt = alg.a_matrices[level, 1, alg.num_stages - 2] * integrator.dt
             a2_dt = alg.a_matrices[level, 2, alg.num_stages - 2] * integrator.dt
             # TODO: `u_indices_acc` could improve (parallel) performance
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
                                       a2_dt * integrator.du[i]

@@ -385,7 +385,7 @@ end
         #=
         # "indices to u" style
         for level in 1:(integrator.n_levels)
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       integrator.dt *
                                       alg.a_matrices[level, 1, stage - 2] *
@@ -394,7 +394,7 @@ end
         end
 
         for level in 1:alg.max_add_levels[stage]
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] += integrator.dt *
                                        alg.a_matrices[level, 2, stage - 2] *
                                        integrator.du[i]
@@ -416,7 +416,7 @@ end
                                   integrator.k1[i]
         end
 
-        @threaded for i in integrator.level_u_indices_elements_acc[alg.max_add_levels[stage]]
+        @threaded for i in integrator.level_info_u_acc[alg.max_add_levels[stage]]
             integrator.u_tmp[i] += integrator.dt *
                                    alg.a_matrices[integrator.u_to_level[i], 2,
                                                   stage - 2] *
@@ -428,7 +428,7 @@ end
         for level in 1:alg.max_add_levels[stage]
             a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
                                       a2_dt * integrator.du[i]
@@ -438,7 +438,7 @@ end
         c_dt = alg.c[stage] * integrator.dt
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             # TODO: `u_indices_acc` could improve (parallel) performance
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       c_dt * integrator.k1[i]
             end
@@ -449,14 +449,14 @@ end
         # Loop over different methods with own associated level
         for level in 1:min(alg.num_methods, integrator.n_levels)
             a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i]
             end
         end
         for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
             a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                 # Try optimize for `@muladd`: avoid `+=`
                 integrator.u_tmp[i] = integrator.u_tmp[i] + a2_dt * integrator.du[i]
@@ -467,7 +467,7 @@ end
         for level in (alg.num_methods + 1):(integrator.n_levels)
             a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
             # TODO: `u_indices_acc` could improve (parallel) performance
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i]
             end
@@ -476,7 +476,7 @@ end
             for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
                 a2_dt = alg.a_matrices[alg.num_methods, 2, stage - 2] * integrator.dt
                 # TODO: `u_indices_acc` could improve (parallel) performance
-                @threaded for i in integrator.level_u_indices_elements[level]
+                @threaded for i in integrator.level_info_u[level]
                     #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                     # Try optimize for `@muladd`: avoid `+=`
                     integrator.u_tmp[i] = integrator.u_tmp[i] + a2_dt * integrator.du[i]
@@ -502,7 +502,7 @@ end
     for level in 1:alg.max_add_levels[stage]
         a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
         a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
-        @threaded for i in integrator.level_u_indices_elements[level]
+        @threaded for i in integrator.level_info_u[level]
             integrator.u_tmp[i] = integrator.u[i] +
                                   a1_dt * integrator.k1[i] +
                                   a2_dt * integrator.du[i]
@@ -512,7 +512,7 @@ end
     c_dt = alg.c[stage] * integrator.dt
     for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
         # TODO: `u_indices_acc` could improve (parallel) performance
-        @threaded for i in integrator.level_u_indices_elements[level]
+        @threaded for i in integrator.level_info_u[level]
             integrator.u_tmp[i] = integrator.u[i] +
                                   c_dt * integrator.k1[i]
         end
@@ -535,7 +535,7 @@ end
             a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
             a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] * integrator.dt
             a2_para_dt = alg.a_matrices_para[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
                                       a2_dt * integrator.du[i] +
@@ -548,7 +548,7 @@ end
             a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
             a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] *
                          integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
                                       a1_para_dt * integrator.k1_para[i]
@@ -561,7 +561,7 @@ end
         for level in 1:min(alg.num_methods, integrator.n_levels)
             a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
                                       a1_para_dt * integrator.k1_para[i]
@@ -570,7 +570,7 @@ end
         for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
             a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
             a2_para_dt = alg.a_matrices_para[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                 # Try optimize for `@muladd`: avoid `+=`
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
@@ -585,7 +585,7 @@ end
             a1_para_dt = alg.a_matrices_para[alg.num_methods, 1, stage - 2] *
                          integrator.dt
             # TODO: `u_indices_acc` could improve (parallel) performance
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
                                       a1_para_dt * integrator.k1_para[i]
@@ -597,7 +597,7 @@ end
                 a2_para_dt = alg.a_matrices_para[alg.num_methods, 2, stage - 2] *
                              integrator.dt
                 # TODO: `u_indices_acc` could improve (parallel) performance
-                @threaded for i in integrator.level_u_indices_elements[level]
+                @threaded for i in integrator.level_info_u[level]
                     #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                     # Try optimize for `@muladd`: avoid `+=`
                     integrator.u_tmp[i] = integrator.u_tmp[i] +
@@ -628,7 +628,7 @@ end
         for level in 1:alg.max_add_levels[stage]
             a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
             a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +
                                       a2_dt * integrator.du[i]
@@ -638,7 +638,7 @@ end
         c_dt = alg.c[stage] * integrator.dt
         for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
             # TODO: `u_indices_acc` could improve (parallel) performance
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       c_dt * integrator.k1[i]
             end
@@ -649,14 +649,14 @@ end
         # Loop over different methods with own associated level
         for level in 1:min(alg.num_methods, integrator.n_levels)
             a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i]
             end
         end
         for level in 1:min(alg.max_add_levels[stage], integrator.n_levels)
             a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                 # Try optimize for `@muladd`: avoid `+=`
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
@@ -668,7 +668,7 @@ end
         for level in (alg.num_methods + 1):(integrator.n_levels)
             a1_dt = alg.a_matrices[alg.num_methods, 1, stage - 2] * integrator.dt
             # TODO: `u_indices_acc` could improve (parallel) performance
-            @threaded for i in integrator.level_u_indices_elements[level]
+            @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i]
             end
@@ -677,7 +677,7 @@ end
             for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
                 a2_dt = alg.a_matrices[alg.num_methods, 2, stage - 2] * integrator.dt
                 # TODO: `u_indices_acc` could improve (parallel) performance
-                @threaded for i in integrator.level_u_indices_elements[level]
+                @threaded for i in integrator.level_info_u[level]
                     #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                     # Try optimize for `@muladd`: avoid `+=`
                     integrator.u_tmp[i] = integrator.u_tmp[i] +
@@ -700,7 +700,7 @@ end
         for level in 1:alg.max_add_levels_para[stage]
             a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] * integrator.dt
             a2_para_dt = alg.a_matrices_para[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements_para[level]
+            @threaded for i in integrator.level_info_u_para[level]
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
                                       a1_para_dt * integrator.k1_para[i] +
                                       a2_para_dt * integrator.du_para[i]
@@ -709,7 +709,7 @@ end
 
         c_dt = alg.c[stage] * integrator.dt
         for level in (alg.max_add_levels_para[stage] + 1):(integrator.n_levels_para)
-            @threaded for i in integrator.level_u_indices_elements_para[level]
+            @threaded for i in integrator.level_info_u_para[level]
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
                                       c_dt * integrator.k1_para[i]
             end
@@ -720,14 +720,14 @@ end
         # Loop over different methods with own associated level
         for level in 1:min(alg.num_methods_para, integrator.n_levels_para)
             a1_para_dt = alg.a_matrices_para[level, 1, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements_para[level]
+            @threaded for i in integrator.level_info_u_para[level]
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
                                       a1_para_dt * integrator.k1_para[i]
             end
         end
         for level in 1:min(alg.max_add_levels_para[stage], integrator.n_levels_para)
             a2_para_dt = alg.a_matrices_para[level, 2, stage - 2] * integrator.dt
-            @threaded for i in integrator.level_u_indices_elements_para[level]
+            @threaded for i in integrator.level_info_u_para[level]
                 #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                 # Try optimize for `@muladd`: avoid `+=`
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
@@ -739,7 +739,7 @@ end
         for level in (alg.num_methods_para + 1):(integrator.n_levels_para)
             a1_para_dt = alg.a_matrices_para[alg.num_methods_para, 1, stage - 2] *
                          integrator.dt
-            @threaded for i in integrator.level_u_indices_elements_para[level]
+            @threaded for i in integrator.level_info_u_para[level]
                 integrator.u_tmp[i] = integrator.u_tmp[i] +
                                       a1_para_dt * integrator.k1_para[i]
             end
@@ -748,7 +748,7 @@ end
             for level in (alg.max_add_levels_para[stage] + 1):(integrator.n_levels_para)
                 a2_para_dt = alg.a_matrices_para[alg.num_methods, 2, stage - 2] *
                              integrator.dt
-                @threaded for i in integrator.level_u_indices_elements_para[level]
+                @threaded for i in integrator.level_info_u_para[level]
                     #integrator.u_tmp[i] += a2_dt * integrator.du[i]
                     # Try optimize for `@muladd`: avoid `+=`
                     integrator.u_tmp[i] = integrator.u_tmp[i] +
@@ -1063,7 +1063,7 @@ end
                               integrator.level_info_interfaces_acc[max_level],
                               integrator.level_info_boundaries_acc[max_level],
                               integrator.level_info_mortars_acc[max_level],
-                              integrator.level_u_indices_elements)
+                              integrator.level_info_u)
 
     return nothing
 end

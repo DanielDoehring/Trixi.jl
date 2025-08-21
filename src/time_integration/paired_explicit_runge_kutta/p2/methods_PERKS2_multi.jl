@@ -96,7 +96,7 @@ mutable struct PairedExplicitRK2SplitMultiIntegrator{RealT <: Real, uType,
     level_info_mortars_acc::Vector{Vector{Int64}}
     level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
-    level_u_indices_elements::Vector{Vector{Int64}}
+    level_info_u::Vector{Vector{Int64}}
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -188,8 +188,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
     end
 
     # Set (initial) distribution of DG nodal values
-    level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partition_u!(level_u_indices_elements, level_info_elements,
+    level_info_u = [Vector{Int64}() for _ in 1:n_levels]
+    partition_u!(level_info_u, level_info_elements,
                  n_levels, u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
@@ -213,7 +213,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
                                                        level_info_boundaries_acc,
                                                        level_info_mortars_acc,
                                                        level_info_mpi_mortars_acc,
-                                                       level_u_indices_elements,
+                                                       level_info_u,
                                                        -1, n_levels)
 
 initialize_callbacks!(callback, integrator)
@@ -328,7 +328,7 @@ mutable struct PairedExplicitRK2SplitMultiIntegrator{RealT <: Real, uType,
     level_info_mortars_acc::Vector{Vector{Int64}}
     level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
-    level_u_indices_elements::Vector{Vector{Int64}}
+    level_info_u::Vector{Vector{Int64}}
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -345,7 +345,7 @@ mutable struct PairedExplicitRK2SplitMultiIntegrator{RealT <: Real, uType,
     level_info_mortars_para_acc::Vector{Vector{Int64}}
     level_info_mpi_mortars_para_acc::Vector{Vector{Int64}}
 
-    level_u_indices_elements_para::Vector{Vector{Int64}}
+    level_info_u_para::Vector{Vector{Int64}}
 
     coarsest_lvl_para::Int64
     n_levels_para::Int64
@@ -463,13 +463,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
     end
 
     # Set (initial) distribution of DG nodal values
-    level_u_indices_elements = [Vector{Int64}() for _ in 1:n_levels]
-    partition_u!(level_u_indices_elements, level_info_elements,
+    level_info_u = [Vector{Int64}() for _ in 1:n_levels]
+    partition_u!(level_info_u, level_info_elements,
                  n_levels, u0, mesh, equations, dg, cache)
 
     # For parabolic part
-    level_u_indices_elements_para = [Vector{Int64}() for _ in 1:n_levels_para]
-    partition_u!(level_u_indices_elements_para, level_info_elements_para,
+    level_info_u_para = [Vector{Int64}() for _ in 1:n_levels_para]
+    partition_u!(level_info_u_para, level_info_elements_para,
                  n_levels_para, u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
@@ -493,7 +493,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
                                                        level_info_boundaries_acc,
                                                        level_info_mortars_acc,
                                                        level_info_mpi_mortars_acc,
-                                                       level_u_indices_elements,
+                                                       level_info_u,
                                                        -1, n_levels,
                                                        level_info_elements_para,
                                                        level_info_elements_para_acc,
@@ -502,7 +502,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
                                                        level_info_boundaries_para_acc,
                                                        level_info_mortars_acc,
                                                        level_info_mpi_mortars_para_acc,
-                                                       level_u_indices_elements_para,
+                                                       level_info_u_para,
                                                        -1, n_levels_para)
 
     initialize_callbacks!(callback, integrator)

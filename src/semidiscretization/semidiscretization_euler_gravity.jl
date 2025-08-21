@@ -170,11 +170,11 @@ function SemidiscretizationEulerGravity(semi_euler::SemiEuler,
     k1 = similar(u_ode)
 
     # Association of unknowns of the gravity solver to levels
-    level_u_gravity_indices_elements = [Vector{Int64}()
-                                        for _ in 1:get_n_levels(semi_euler.mesh)]
+    level_info_u_gravity = [Vector{Int64}()
+                            for _ in 1:get_n_levels(semi_euler.mesh)]
 
     cache = (; alg, u_ode, du_ode, u_ode_tmp, k1,
-             level_u_gravity_indices_elements)
+             level_info_u_gravity)
 
     SemidiscretizationEulerGravity{typeof(semi_euler), typeof(semi_gravity),
                                    typeof(parameters), typeof(cache)}(semi_euler,
@@ -444,7 +444,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                                                    level_info_interfaces_acc,
                                                                    level_info_boundaries_acc,
                                                                    level_info_mortars_acc,
-                                                                   cache.level_u_gravity_indices_elements,
+                                                                   cache.level_info_u_gravity,
                                                                    n_levels)
 
     # add gravitational source source_terms to the Euler part
@@ -536,7 +536,7 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
-                         level_u_gravity_indices_elements,
+                         level_info_u_gravity,
                          n_levels)
     @unpack semi_euler, semi_gravity, parameters, gravity_counter, cache = semi
 
@@ -565,7 +565,7 @@ function update_gravity!(semi::SemidiscretizationEulerGravity, u_ode,
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
-                         level_u_gravity_indices_elements,
+                         level_info_u_gravity,
                          n_levels)
 
         runtime = time_ns() - time_start
@@ -862,32 +862,32 @@ end
 end
 
 @inline function PERKMulti_intermediate_stage!(du, u_tmp, u, k1, dtau, alg, stage,
-                                               level_u_indices_elements, n_levels)
+                                               level_info_u, n_levels)
     ### General implementation: Not own method for each grid level ###
     # Loop over different methods with own associated level
 
     for level in 1:min(alg.num_methods, n_levels)
-        @threaded for i in level_u_indices_elements[level]
+        @threaded for i in level_info_u[level]
             u_tmp[i] = u[i] +
                        dtau * alg.a_matrices[level, 1, stage - 2] * k1[i]
         end
     end
     for level in 1:min(alg.max_add_levels[stage], n_levels)
-        @threaded for i in level_u_indices_elements[level]
+        @threaded for i in level_info_u[level]
             u_tmp[i] += dtau * alg.a_matrices[level, 2, stage - 2] * du[i]
         end
     end
 
     # "Remainder": Non-efficiently integrated
     for level in (alg.num_methods + 1):(n_levels)
-        @threaded for i in level_u_indices_elements[level]
+        @threaded for i in level_info_u[level]
             u_tmp[i] = u[i] +
                        dtau * alg.a_matrices[alg.num_methods, 1, stage - 2] * k1[i]
         end
     end
     if alg.max_add_levels[stage] == alg.num_methods
         for level in (alg.max_add_levels[stage] + 1):n_levels
-            @threaded for i in level_u_indices_elements[level]
+            @threaded for i in level_info_u[level]
                 u_tmp[i] += dtau * alg.a_matrices[alg.num_methods, 2, stage - 2] * du[i]
             end
         end
@@ -896,12 +896,12 @@ end
     ### Simplified implementation: Own method for each level ###
     #=
     for level in 1:n_levels
-        @threaded for i in level_u_indices_elements[level]
+        @threaded for i in level_info_u[level]
             u_tmp[i] = u[i] + dtau * alg.a_matrices[level, 1, stage - 2] * k1[i]
         end
     end
     for level in 1:alg.max_add_levels[stage]
-        @threaded for i in level_u_indices_elements[level]
+        @threaded for i in level_info_u[level]
             u_tmp[i] += dtau * alg.a_matrices[level, 2, stage - 2] * du[i]
         end
     end
@@ -921,11 +921,11 @@ end
                           level_info_interfaces_acc,
                           level_info_boundaries_acc,
                           level_info_mortars_acc,
-                          level_u_indices_elements,
+                          level_info_u,
                           n_levels,
                           n_elements, grav_scale, rho0, u_euler)
     coarsest_lvl = PERKMulti_intermediate_stage!(du, u_tmp, u, k1, dtau, alg, stage,
-                                                 level_u_indices_elements, n_levels)
+                                                 level_info_u, n_levels)
 
     du_wrap = wrap_array(du, semi_gravity)
 
@@ -1042,7 +1042,7 @@ end
                                          level_info_interfaces_acc,
                                          level_info_boundaries_acc,
                                          level_info_mortars_acc,
-                                         level_u_gravity_indices_elements,
+                                         level_info_u_gravity,
                                          n_levels)
     timestep_gravity_PERK2!(cache, u_euler, tau, dtau, gravity_parameters, semi_gravity)
 end
@@ -1059,7 +1059,7 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
                                        level_info_interfaces_acc,
                                        level_info_boundaries_acc,
                                        level_info_mortars_acc,
-                                       level_u_gravity_indices_elements,
+                                       level_info_u_gravity,
                                        n_levels)
     G = gravity_parameters.gravitational_constant
     rho0 = gravity_parameters.background_density
@@ -1093,7 +1093,7 @@ function timestep_gravity_PERK2_Multi!(cache, u_euler, tau, dtau,
                  level_info_interfaces_acc,
                  level_info_boundaries_acc,
                  level_info_mortars_acc,
-                 level_u_gravity_indices_elements,
+                 level_info_u_gravity,
                  n_levels,
                  n_elements, grav_scale, rho0, u_euler)
     end
@@ -1148,7 +1148,7 @@ end
                                          level_info_interfaces_acc,
                                          level_info_boundaries_acc,
                                          level_info_mortars_acc,
-                                         level_u_gravity_indices_elements,
+                                         level_info_u_gravity,
                                          n_levels)
     timestep_gravity_PERK4!(cache, u_euler, tau, dtau, gravity_parameters, semi_gravity)
 end
@@ -1165,7 +1165,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
                                        level_info_interfaces_acc,
                                        level_info_boundaries_acc,
                                        level_info_mortars_acc,
-                                       level_u_gravity_indices_elements,
+                                       level_info_u_gravity,
                                        n_levels)
     G = gravity_parameters.gravitational_constant
     rho0 = gravity_parameters.background_density
@@ -1199,7 +1199,7 @@ function timestep_gravity_PERK4_Multi!(cache, u_euler, tau, dtau,
                  level_info_interfaces_acc,
                  level_info_boundaries_acc,
                  level_info_mortars_acc,
-                 level_u_gravity_indices_elements,
+                 level_info_u_gravity,
                  n_levels,
                  n_elements, grav_scale, rho0, u_euler)
     end

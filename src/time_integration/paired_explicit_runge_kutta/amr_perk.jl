@@ -47,8 +47,8 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                     integrator.level_info_mpi_mortars_acc = [Vector{Int64}()
                                                              for _ in 1:(integrator.n_levels)]
 
-                    integrator.level_u_indices_elements = [Vector{Int64}()
-                                                           for _ in 1:(integrator.n_levels)]
+                    integrator.level_info_u = [Vector{Int64}()
+                                               for _ in 1:(integrator.n_levels)]
                 else # Just empty datastructures
                     for level in 1:(integrator.n_levels)
                         empty!(integrator.level_info_elements[level])
@@ -62,7 +62,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                         empty!(integrator.level_info_mortars_acc[level])
                         empty!(integrator.level_info_mpi_mortars_acc[level])
 
-                        empty!(integrator.level_u_indices_elements[level])
+                        empty!(integrator.level_info_u[level])
                     end
                 end
 
@@ -87,7 +87,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          cache, integrator.alg)
                 end
 
-                partition_u!(integrator.level_u_indices_elements,
+                partition_u!(integrator.level_info_u,
                              integrator.level_info_elements,
                              integrator.n_levels,
                              u_ode, mesh, equations, dg, cache)
