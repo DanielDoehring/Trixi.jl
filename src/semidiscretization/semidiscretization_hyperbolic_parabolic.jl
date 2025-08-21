@@ -382,13 +382,16 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "rhs! (part.)" rhs!(du, u, t, mesh, equations,
-                                              boundary_conditions,
-                                              source_terms, solver, cache,
-                                              element_indices,
-                                              interface_indices,
-                                              boundary_indices,
-                                              mortar_indices)
+
+    #@trixi_timeit timer() "rhs! (part.)"
+    rhs!(du, u, t, mesh, equations,
+         boundary_conditions,
+         source_terms, solver, cache,
+         element_indices,
+         interface_indices,
+         boundary_indices,
+         mortar_indices)
+
     runtime = time_ns() - time_start
     put!(semi.performance_counter.counters[1], runtime)
 
@@ -425,18 +428,19 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
     du = wrap_array(du_ode, mesh, equations_parabolic, solver, cache_parabolic)
 
     time_start = time_ns()
-    @trixi_timeit timer() "rhs_parabolic! (part.)" rhs_parabolic!(du, u, t, mesh,
-                                                                  equations_parabolic,
-                                                                  boundary_conditions_parabolic,
-                                                                  source_terms,
-                                                                  solver,
-                                                                  solver_parabolic,
-                                                                  cache,
-                                                                  cache_parabolic,
-                                                                  element_indices,
-                                                                  interface_indices,
-                                                                  boundary_indices,
-                                                                  mortar_indices)
+
+    #@trixi_timeit timer() "rhs_parabolic! (part.)"
+    rhs_parabolic!(du, u, t, mesh,
+                   equations_parabolic,
+                   boundary_conditions_parabolic,
+                   source_terms,
+                   solver, solver_parabolic,
+                   cache, cache_parabolic,
+                   element_indices,
+                   interface_indices,
+                   boundary_indices,
+                   mortar_indices)
+
     runtime = time_ns() - time_start
     put!(semi.performance_counter.counters[2], runtime)
 
