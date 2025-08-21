@@ -150,7 +150,7 @@ ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path, dtRatios)
 
 # Factorization-based methods
 
-linear_solver = KLUFactorization()
+#linear_solver = KLUFactorization() # Does not converge for this example
 #linear_solver = UMFPACKFactorization()
 
 #linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
@@ -160,7 +160,7 @@ linear_solver = KLUFactorization()
 # Iterative methods
 
 #linear_solver = SimpleGMRES()
-#linear_solver = KrylovJL_GMRES()
+linear_solver = KrylovJL_GMRES()
 #linear_solver = KrylovJL_BICGSTAB()
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
@@ -170,6 +170,6 @@ dt_implicit = 8e-3
 
 integrator = Trixi.init(ode, ode_alg; dt = dt_implicit, callback = callbacks,
                         linear_solver = linear_solver,
-                        atol_newton = 1e-8, maxits_newton = 100);
+                        atol_newton = 1e-6, maxits_newton = 10);
 
 sol = Trixi.solve!(integrator);
