@@ -29,7 +29,8 @@ using LinearAlgebra: LinearAlgebra, Diagonal, diag, dot, eigvals, mul!, norm, cr
                      normalize, I,
                      UniformScaling, det
 using Printf: @printf, @sprintf, println
-using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, sparse, droptol!,
+using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, SparseMatrixCSC,
+                    sparse, droptol!,
                     rowvals, nzrange, nonzeros
 
 # import @reexport now to make it available for further imports/exports
@@ -57,10 +58,12 @@ using DiffEqBase: DiffEqBase, get_tstops, get_tstops_array
 using DiffEqCallbacks: PeriodicCallback, PeriodicCallbackAffect
 @reexport using EllipsisNotation # ..
 using FillArrays: Ones, Zeros
+using FiniteDiff: finite_difference_jacobian!, JacobianCache
 using ForwardDiff: ForwardDiff
 using HDF5: HDF5, h5open, attributes, create_dataset, datatype, dataspace
 using KernelAbstractions: KernelAbstractions, @index, @kernel, get_backend, Backend
 using LinearMaps: LinearMap
+using LinearSolve
 if _PREFERENCE_LOOPVECTORIZATION
     using LoopVectorization: LoopVectorization, @turbo, indices
 else
@@ -92,6 +95,7 @@ using TriplotRecipes: DGTriPseudocolor
 using TrixiBase: TrixiBase, @trixi_timeit, timer
 @reexport using SimpleUnPack: @unpack
 using SimpleUnPack: @pack!
+using SparseDiffTools: matrix_colors
 using DataStructures: BinaryHeap, FasterForward, extract_all!
 
 using UUIDs: UUID

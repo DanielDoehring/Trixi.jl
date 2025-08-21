@@ -1,6 +1,3 @@
-using FiniteDiff
-using SparseDiffTools, SparseArrays
-
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -134,11 +131,11 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
+#=
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
-                                                    uImType, NonlinCache,
-                                                    JacFunction, JacCache} <:
+                                                    uImType, NonlinCache} <:
                AbstractPairedExplicitRKIMEXMultiIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -178,9 +175,54 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     # For nonlinear solve
     k_nonlin::uImType
     nonlin_cache::NonlinCache # Contains Problem & Solver
+end
+=#
+
+mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
+                                                    Params, Sol, F,
+                                                    PairedExplicitRKOptions,
+                                                    uImType,
+                                                    JacFunction, JacCache} <:
+               AbstractPairedExplicitRKIMEXMultiIntegrator{2}
+    u::uType
+    du::uType # In-place output of `f`
+    u_tmp::uType # Used for building the argument to `f`
+    t::RealT
+    tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
+    dt::RealT # current time step
+    dtcache::RealT # Used for euler-acoustic coupling
+    iter::Int # current number of time steps (iteration)
+    p::Params # will be the semidiscretization from Trixi
+    sol::Sol # faked
+    f::F # `rhs!` of the semidiscretization
+    alg::PairedExplicitRK2IMEXMulti
+    opts::PairedExplicitRKOptions
+    finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
+    # Additional PERK register
+    k1::uType
+
+    # Variables managing level-dependent integration
+    level_info_elements::Vector{Vector{Int64}}
+    level_info_elements_acc::Vector{Vector{Int64}}
+
+    level_info_interfaces_acc::Vector{Vector{Int64}}
+
+    level_info_boundaries_acc::Vector{Vector{Int64}}
+
+    level_info_mortars_acc::Vector{Vector{Int64}}
+
+    level_u_indices_elements::Vector{Vector{Int64}}
+    # TODO: Store explicit indices in one datastructure for better threaded access?
+
+    coarsest_lvl::Int64
+    n_levels::Int64
+
+    # For nonlinear solve
+    k_nonlin::uImType
 
     jac_sparse::SparseMatrixCSC
-    jac_function!::JacFunction
     jac_sparse_cache::JacCache
 end
 
@@ -326,6 +368,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     # For fixed meshes/no re-partitioning: Allocate only required storage
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
+    # TODO: Allocate residual?
 
     #=
     # Initialize `k_nonlin` here with values from `u`, such that in the simulation we can use the old solution for init
@@ -368,27 +411,26 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
         jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
-        FiniteDiff.finite_difference_jacobian!(jac_dense, stage_res_PERK2IMEXMulti!, k_nonlin)
+        finite_difference_jacobian!(jac_dense, stage_res_PERK2IMEXMulti!, k_nonlin)
 
-        # Need to do check before conversion to sparse to get
+        # Need to do nonzero check before conversion to sparse to get
         # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
         jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
-        colorvec = SparseDiffTools.matrix_colors(jac_sparse_prototype)
+        colorvec = matrix_colors(jac_sparse_prototype) # Obtained from SparseDiffTools
 
-        jac_sparse_cache = FiniteDiff.JacobianCache(k_nonlin, colorvec = colorvec, sparsity = jac_sparse_prototype)
+        jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec, sparsity = jac_sparse_prototype)
         jac_sparse = sparse(jac_dense) # Allocate memory
-        #FiniteDiff.finite_difference_jacobian!(jac_sparse, stage_res_PERK2IMEXMulti!, k_nonlin, jac_sparse_cache)
-        jac_function!(jac_sparse, k_nonlin, jac_sparse_cache) =
-            FiniteDiff.finite_difference_jacobian!(jac_sparse, stage_res_PERK2IMEXMulti!,
-                                                   k_nonlin, jac_sparse_cache)
+        #finite_difference_jacobian!(jac_sparse, stage_res_PERK2IMEXMulti!, k_nonlin, jac_sparse_cache) # Call this in loop
 
         # TODO: Try linear solve with frozen Jacobian => factorize matrix per timestep
+        linear_prob = LinearSolve.LinearProblem(jac_sparse, k_nonlin)
+        linear_solver = KLUFactorization() # TODO: Get from kwargs
+        linear_cache = init(linear_prob, linear_solver)
 
         nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMulti!;
-                                                          #jac_prototype = jac_prototype,
-                                                          jac_prototype = jac_sparse_prototype,
-                                                          colorvec = colorvec,
-                                                          jac = jac_function!)
+                                                          jac_prototype = jac_prototype,
+                                                          #jac_prototype = jac_sparse_prototype,
+                                                          colorvec = colorvec)
     end
 
     nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
@@ -430,6 +472,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                    nonlin_cache,
                                                                    du_para)
     else
+        #=
         integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
                                                           t, tdir,
                                                           dt, zero(dt), iter,
@@ -448,8 +491,27 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           level_u_indices_elements,
                                                           -1, n_levels,
                                                           k_nonlin,
-                                                          nonlin_cache,
-                                                          jac_sparse, jac_function!, jac_sparse_cache)
+                                                          nonlin_cache)
+        =#
+        integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
+                                                          t, tdir,
+                                                          dt, zero(dt), iter,
+                                                          semi, (prob = ode,),
+                                                          ode.f, alg,
+                                                          PairedExplicitRKOptions(callback,
+                                                                                  ode.tspan;
+                                                                                  kwargs...),
+                                                          false, true, false,
+                                                          k1,
+                                                          level_info_elements,
+                                                          level_info_elements_acc,
+                                                          level_info_interfaces_acc,
+                                                          level_info_boundaries_acc,
+                                                          level_info_mortars_acc,
+                                                          level_u_indices_elements,
+                                                          -1, n_levels,
+                                                          k_nonlin,
+                                                          jac_sparse, jac_sparse_cache)
     end
 
     # Improve initial value for `k_nonlin`: Do one explicit/implicit midpoint step with small dt
