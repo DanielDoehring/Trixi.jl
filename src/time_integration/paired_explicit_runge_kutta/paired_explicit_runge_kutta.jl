@@ -1054,7 +1054,7 @@ end
                               integrator.level_info_interfaces_acc[max_level],
                               integrator.level_info_boundaries_acc[max_level],
                               integrator.level_info_mortars_acc[max_level],
-                              integrator.level_info_u) # TODO: Could use `level_info_u_acc` here!
+                              integrator.level_info_u) # TODO: Optimized version with accumulated indices
 
     return nothing
 end
