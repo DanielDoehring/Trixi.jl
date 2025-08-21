@@ -167,7 +167,6 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     level_info_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
-    # TODO: Store explicit indices in one datastructure for better threaded access
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -222,7 +221,7 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
     level_info_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
-    # TODO: Store explicit indices in one datastructure for better threaded access
+    # TODO: Optimized version with accumulated indices
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -607,7 +606,6 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
         for level in 1:(alg.num_methods - 1)
             a1_dt = alg.a_matrices[level, 1, alg.num_stages - 2] * integrator.dt
             a2_dt = alg.a_matrices[level, 2, alg.num_stages - 2] * integrator.dt
-            # TODO: `u_indices_acc` could improve (parallel) performance
             @threaded for i in integrator.level_info_u[level]
                 integrator.u_tmp[i] = integrator.u[i] +
                                       a1_dt * integrator.k1[i] +

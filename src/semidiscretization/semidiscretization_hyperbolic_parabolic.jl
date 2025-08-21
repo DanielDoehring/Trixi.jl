@@ -488,7 +488,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    max_level,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,
-                                   u_indices)
+                                   u_indices) # u_indices_acc
     @trixi_timeit timer() "rhs_hyperbolic_parabolic! (part.)" begin
         rhs!(du_ode, u_ode, semi, t,
              element_indices, interface_indices,
@@ -498,13 +498,21 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                        boundary_indices, mortar_indices)
 
         for level in 1:max_level
-            # TODO: `u_indices_acc` could improve (parallel) performance
             @threaded for i in u_indices[level]
                 # Try to enable optimizations due to `muladd` by avoiding `+=`
                 # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
                 du_ode[i] = du_ode[i] + du_para[i]
             end
         end
+
+        #=
+        # TODO: Optimized version with accumulated indices
+        @threaded for i in u_indices_acc[max_level]
+            # Try to enable optimizations due to `muladd` by avoiding `+=`
+            # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
+            du_ode[i] = du_ode[i] + du_para[i]
+        end
+        =#
     end
 end
 

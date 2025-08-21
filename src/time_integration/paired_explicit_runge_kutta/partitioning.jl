@@ -1365,8 +1365,9 @@ function get_hmin_per_element(mesh::P4estMesh{3}, elements,
 end
 
 # Partitioning function for approach: Each level stores its indices
-@inline function partition_u!(level_info_u, level_info_elements,
-                              n_levels, u_ode, mesh, equations, dg, cache)
+@inline function partition_u!(level_info_u,
+                              level_info_elements, n_levels,
+                              u_ode, mesh, equations, dg, cache)
     u = wrap_array(u_ode, mesh, equations, dg, cache)
 
     for level in 1:n_levels
@@ -1379,6 +1380,29 @@ end
     return nothing
 end
 
+# Version with accumulated indices, could give performance for parabolic semis
+@inline function partition_u!(level_info_u, level_info_u_acc,
+                              level_info_elements, n_levels,
+                              u_ode, mesh, equations, dg, cache)
+    u = wrap_array(u_ode, mesh, equations, dg, cache)
+
+    for level in 1:n_levels
+        @views indices = collect(Iterators.flatten(LinearIndices(u)[..,
+                                                                    level_info_elements[level]]))
+        level_info_u[level] = indices
+        sort!(level_info_u[level])
+
+        # Add to accumulated container
+        for l in 1:level
+            append!(level_info_u_acc[level], level_info_u[l])
+        end
+        sort!(level_info_u_acc[level])
+    end
+
+    return nothing
+end
+
+#=
 # Partitioning function for approach: Each index stores its level
 @inline function partition_u!(level_info_u, level_info_elements,
                               u_to_level,
@@ -1396,6 +1420,7 @@ end
 
     return nothing
 end
+=#
 
 # Repartitioning of the DoF array of the gravity solver
 @inline function partition_u_gravity!(integrator::AbstractPairedExplicitRKMultiIntegrator)
