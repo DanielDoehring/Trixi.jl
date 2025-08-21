@@ -370,17 +370,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     ### Nonlinear Solver ###
 
     # For fixed meshes/no re-partitioning: Allocate only required storage
-    # TODO: Revisit initialization - since we freeze the Jacobian, we can easily diverge if we init with zero.
-    # See init for 
     k_nonlin = zeros(eltype(u), length(level_u_indices_elements[alg.num_methods]))
     residual = copy(k_nonlin)
-
-    #=
-    # Initialize `k_nonlin` here with values from `u`, such that in the simulation we can use the old solution for init
-    @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
-        k_nonlin[i] = u[level_u_indices_elements[alg.num_methods][i]]
-    end
-    =#
 
     # Retrieve jac_prototype and colorvec from kwargs, fallback to nothing
     jac_prototype = get(kwargs, :jac_prototype, nothing)
@@ -388,6 +379,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     specialize = SciMLBase.FullSpecialize
     if isa(semi, SemidiscretizationHyperbolicParabolic)
+        du_para = zero(u)
+
         p = NonlinParamsParabolic(t, dt,
                                   u, du, u_tmp, du_para,
                                   semi, ode.f,
@@ -400,7 +393,17 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
         nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMultiParabolic!;
                                                           jac_prototype = jac_prototype,
                                                           colorvec = colorvec)
-        du_para = zero(u)
+        
+        ode.f(du, u_tmp, semi, t, du_para,
+              level_info_elements_acc[alg.num_methods],
+              level_info_interfaces_acc[alg.num_methods],
+              level_info_boundaries_acc[alg.num_methods],
+              level_info_mortars_acc[alg.num_methods])
+
+        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
+        @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
+            k_nonlin[i] = du[level_u_indices_elements[alg.num_methods][i]]
+        end                                                          
     else
         # required here since `integrator` is not constructed yet
         p = NonlinParams(t, dt,
@@ -413,6 +416,17 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_u_indices_elements[alg.num_methods])
 
         stage_res_PERK2IMEXMulti!(residual, k_nonlin) = stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
+
+        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
+        ode.f(du, u_tmp, semi, t,
+              level_info_elements_acc[alg.num_methods],
+              level_info_interfaces_acc[alg.num_methods],
+              level_info_boundaries_acc[alg.num_methods],
+              level_info_mortars_acc[alg.num_methods])
+
+        @threaded for i in eachindex(level_u_indices_elements[alg.num_methods])
+            k_nonlin[i] = du[level_u_indices_elements[alg.num_methods][i]]
+        end
 
         # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
         jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
@@ -442,6 +456,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                         # Fallback is plain Newton-Raphson
                         NewtonRaphson(autodiff = AutoFiniteDiff()))
 
+    # TODO: Store for custom Newton
     abstol = get(kwargs, :abstol, nothing)
     reltol = get(kwargs, :reltol, nothing)
     maxiters_nonlin = get(kwargs, :maxiters_nonlin, typemax(Int64))
