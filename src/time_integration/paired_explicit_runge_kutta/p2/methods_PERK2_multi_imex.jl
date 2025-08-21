@@ -137,7 +137,8 @@ end
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
-                                                    uImType, NonlinCache} <:
+                                                    uImType, NonlinCache,
+                                                    JacFunction, JacCache} <:
                AbstractPairedExplicitRKIMEXMultiIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -177,6 +178,10 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     # For nonlinear solve
     k_nonlin::uImType
     nonlin_cache::NonlinCache # Contains Problem & Solver
+
+    jac_sparse::SparseMatrixCSC
+    jac_function!::JacFunction
+    jac_sparse_cache::JacCache
 end
 
 mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType,
@@ -359,11 +364,11 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_u_indices_elements[alg.num_methods])
 
         # TODO: Find out if changes in p propagate accordingly!
-        jac_function!(residual, k_nonlin) = stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
+        stage_res_PERK2IMEXMulti!(residual, k_nonlin) = stage_residual_PERK2IMEXMulti!(residual, k_nonlin, p)
 
         # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
         jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
-        FiniteDiff.finite_difference_jacobian!(jac_dense, jac_function!, k_nonlin)
+        FiniteDiff.finite_difference_jacobian!(jac_dense, stage_res_PERK2IMEXMulti!, k_nonlin)
 
         # Need to do check before conversion to sparse to get
         # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
@@ -372,13 +377,18 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         jac_sparse_cache = FiniteDiff.JacobianCache(k_nonlin, colorvec = colorvec, sparsity = jac_sparse_prototype)
         jac_sparse = sparse(jac_dense) # Allocate memory
-        FiniteDiff.finite_difference_jacobian!(jac_sparse, jac_function!, k_nonlin, jac_sparse_cache)
+        #FiniteDiff.finite_difference_jacobian!(jac_sparse, stage_res_PERK2IMEXMulti!, k_nonlin, jac_sparse_cache)
+        jac_function!(jac_sparse, k_nonlin, jac_sparse_cache) =
+            FiniteDiff.finite_difference_jacobian!(jac_sparse, stage_res_PERK2IMEXMulti!,
+                                                   k_nonlin, jac_sparse_cache)
 
         # TODO: Try linear solve with frozen Jacobian => factorize matrix per timestep
 
         nonlin_func = NonlinearFunction{true, specialize}(stage_residual_PERK2IMEXMulti!;
-                                                          jac_prototype = jac_prototype,
-                                                          colorvec = colorvec)
+                                                          #jac_prototype = jac_prototype,
+                                                          jac_prototype = jac_sparse_prototype,
+                                                          colorvec = colorvec,
+                                                          jac = jac_function!)
     end
 
     nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
@@ -438,7 +448,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           level_u_indices_elements,
                                                           -1, n_levels,
                                                           k_nonlin,
-                                                          nonlin_cache)
+                                                          nonlin_cache,
+                                                          jac_sparse, jac_function!, jac_sparse_cache)
     end
 
     # Improve initial value for `k_nonlin`: Do one explicit/implicit midpoint step with small dt
