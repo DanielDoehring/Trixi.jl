@@ -267,37 +267,22 @@ dtRatios_imex_p2 = [
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages_complete_p2, path, dtRatios_imex_p2)
 
-### Linesearch ###
-# See https://docs.sciml.ai/LineSearch/dev/api/native/
-
-#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
-#linesearch = LiFukushimaLineSearch()
-linesearch = nothing
-
 ### Linear Solver ###
 # See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
-#linsolve = SimpleLUFactorization()
+#linear_solver = KLUFactorization()
+linear_solver = UMFPACKFactorization()
 
-# Require sparse matrix
-#linsolve = KLUFactorization()
-#linsolve = UMFPACKFactorization()
+#linear_solver = SimpleGMRES()
+#linear_solver = KrylovJL_GMRES()
 
-#linsolve = SimpleGMRES()
-linsolve = KrylovJL_GMRES()
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit
 
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
-                              linesearch = linesearch, linsolve = linsolve)
+#linear_solver = SparspakFactorization() # requires Sparspak.jl
 
-#nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
-#nonlin_solver = DFSane()
-# Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
-
-dt_init = 0.0
-integrator = Trixi.init(ode, ode_alg; dt = dt_init, callback = callbacks,
-                        nonlin_solver = nonlin_solver,
-                        abstol = 1e-5, reltol = 1e-4,
-                        maxiters_nonlin = 20) # Maxiters should be on the order of the number of stages of the highest explicit method)
+integrator = Trixi.init(ode, ode_alg; dt = 1e-6, callback = callbacks,
+                        linear_solver = linear_solver,
+                        atol_newton = 1e-6, maxits_newton = 10);
 
 sol = Trixi.solve!(integrator);
 

@@ -310,7 +310,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
               u_implicit)
 
         @threaded for i in eachindex(u_implicit)
-            k_nonlin[i] = du[u_implicit[i]]
+            k_nonlin[i] = du[u_implicit[i]] # TODO: Scale by some `dt_init` ?
         end
 
         para_res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
@@ -339,7 +339,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
               level_info_mortars_acc[alg.num_methods])
 
         @threaded for i in eachindex(u_implicit)
-            k_nonlin[i] = du[u_implicit[i]]
+            k_nonlin[i] = du[u_implicit[i]] # TODO: Scale by some `dt_init` ?
         end
 
         res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
