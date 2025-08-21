@@ -1,7 +1,6 @@
 using Trixi
 
 using LinearSolve
-using LineSearch, NonlinearSolve
 
 # Ratio of specific heats
 gamma = 1.4
@@ -146,39 +145,31 @@ dtRatios = [
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path, dtRatios)
 
-### Linesearch ###
-# See https://docs.sciml.ai/LineSearch/dev/api/native/
-
-#linesearch = BackTracking(autodiff = AutoFiniteDiff(), order = 3, maxstep = 10)
-#linesearch = LiFukushimaLineSearch()
-linesearch = nothing
-
 ### Linear Solver ###
 # See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
-#linsolve = SimpleLUFactorization()
+# Factorization-based methods
 
-# Require sparse matrix
-#linsolve = KLUFactorization()
-#linsolve = UMFPACKFactorization()
+linear_solver = KLUFactorization()
+#linear_solver = UMFPACKFactorization()
 
-#linsolve = SimpleGMRES()
-linsolve = KrylovJL_GMRES()
+#linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
 
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
-                              linesearch = linesearch, linsolve = linsolve)
+#linear_solver = SparspakFactorization() # requires Sparspak.jl
 
-#nonlin_solver = Broyden(autodiff = AutoFiniteDiff(), linesearch = linesearch)
-#nonlin_solver = DFSane()
-# Could also check the advanced solvers: https://docs.sciml.ai/NonlinearSolve/stable/native/solvers/#Advanced-Solvers
+# Iterative methods
 
+#linear_solver = SimpleGMRES()
+#linear_solver = KrylovJL_GMRES()
+#linear_solver = KrylovJL_BICGSTAB()
+
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
 
 dt_implicit = dt_explicit * timestep_implicit / timestep_explicit
 dt_implicit = 8e-3
 
 integrator = Trixi.init(ode, ode_alg; dt = dt_implicit, callback = callbacks,
-                        nonlin_solver = nonlin_solver,
-                        abstol = 1e-5, reltol = 1e-3,
-                        maxiters_nonlin = 20); # Maxiters should be on the order of the number of stages of the highest explicit method
+                        linear_solver = linear_solver,
+                        atol_newton = 1e-8, maxits_newton = 100);
 
 sol = Trixi.solve!(integrator);

@@ -1,9 +1,4 @@
 using NonlinearSolve
-#using PreallocationTools
-
-# Advanced packages
-#using SparseConnectivityTracer
-#using LinearSolve # for KrylovJL_GMRES
 
 abstract type AbstractIMEXAlgorithm <: AbstractTimeIntegrationAlgorithm end
 
