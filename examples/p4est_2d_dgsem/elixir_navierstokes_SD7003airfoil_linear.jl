@@ -94,7 +94,7 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 30.5 * t_c) # For testing only
 
-#ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
+ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
 summary_callback = SummaryCallback()
@@ -160,7 +160,7 @@ save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      solution_variables = cons2prim,
                                      output_directory = "out")
 
-alive_callback = AliveCallback(alive_interval = 10) # 500
+alive_callback = AliveCallback(alive_interval = 50) # 500
 
 save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
                                    save_final_restart = true)
@@ -314,6 +314,7 @@ sol = Trixi.solve(ode, ode_algorithm,
 
 ###############################################################################
 # IMEX
+path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/full_rhs/"
 
 Stages = [14, 12, 10, 8, 7, 6, 5, 4, 2]
 dtRatios = [0.26, # Implicit
