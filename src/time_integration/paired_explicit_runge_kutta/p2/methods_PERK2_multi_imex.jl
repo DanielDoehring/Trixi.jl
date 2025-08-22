@@ -292,7 +292,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
         level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
         partition_u!(level_info_u, level_info_u_acc,
                      level_info_elements, n_levels,
-                     u0, mesh, equations, dg, cache)
+                     u, mesh, equations, dg, cache)
 
         # For fixed meshes/no re-partitioning: Allocate only required storage
         u_implicit = level_info_u[alg.num_methods]
