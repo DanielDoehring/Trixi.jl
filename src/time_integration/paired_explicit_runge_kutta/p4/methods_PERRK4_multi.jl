@@ -106,14 +106,15 @@ mutable struct PairedExplicitRelaxationRK4MultiParabolicIntegrator{RealT <: Real
     level_info_elements_acc::Vector{Vector{Int64}}
 
     level_info_interfaces_acc::Vector{Vector{Int64}}
-    level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
+    # Parabolic currently not MPI-parallelized
 
     level_info_boundaries_acc::Vector{Vector{Int64}}
 
     level_info_mortars_acc::Vector{Vector{Int64}}
-    level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
+    # For efficient addition of `du` to `du_ode` in `rhs_hyperbolic_parabolic`
+    level_info_u_acc::Vector{Vector{Int64}}
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -157,22 +158,61 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    # MPI additions
-    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
-    level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
-
     # For entropy relaxation
     gamma = one(eltype(u0))
     u_wrap = wrap_array(u0, semi)
     S_old = integrate(entropy, u_wrap, mesh, equations, dg, cache)
 
-    # TODO: Call different function for mpi_isparallel() == true
-    partition_variables!(level_info_elements,
-                         level_info_elements_acc,
-                         level_info_interfaces_acc,
-                         level_info_boundaries_acc,
-                         level_info_mortars_acc,
-                         n_levels, mesh, dg, cache, alg.PERK4Multi)
+    if !mpi_isparallel()
+        partition_variables!(level_info_elements,
+                             level_info_elements_acc,
+                             level_info_interfaces_acc,
+                             level_info_boundaries_acc,
+                             level_info_mortars_acc,
+                             n_levels, mesh, dg, cache, alg.PERK4Multi)
+    else # NOTE: Never tested
+        if mesh isa ParallelP4estMesh
+            # Get cell distribution for standard partitioning
+            global_first_quadrant = unsafe_wrap(Array,
+                                                unsafe_load(mesh.p4est).global_first_quadrant,
+                                                mpi_nranks() + 1)
+            # Need to copy `global_first_quadrant` to different variable as the former will change 
+            # due to the call to `partition!`
+            old_global_first_quadrant = copy(global_first_quadrant)
+
+            # Get (global) element distribution to accordingly balance the solver
+            partition_variables!(level_info_elements, n_levels,
+                                 mesh, dg, cache, alg)
+
+            # Balance such that each rank has the same number of RHS calls                                    
+            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
+            # Actual move of elements across ranks
+            rebalance_solver!(u0, mesh, equations, dg, cache, old_global_first_quadrant)
+            reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
+
+            # Reset `level_info_elements` after rebalancing
+            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
+
+            # Resize ODE vectors
+            n_new = length(u0)
+            resize!(du, n_new)
+            resize!(u_tmp, n_new)
+            resize!(k1, n_new)
+        end
+        # MPI additions
+        level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+        partition_variables!(level_info_elements,
+                             level_info_elements_acc,
+                             level_info_interfaces_acc,
+                             level_info_boundaries_acc,
+                             level_info_mortars_acc,
+                             # MPI additions
+                             level_info_mpi_interfaces_acc,
+                             level_info_mpi_mortars_acc,
+                             n_levels, mesh, dg, cache, alg.PERK4Multi)
+    end
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -187,6 +227,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
     ### Done with setting up for handling of level-dependent integration ###
 
     if isa(semi, SemidiscretizationHyperbolicParabolic)
+        # For efficient addition of `du` to `du_ode` in `rhs_hyperbolic_parabolic`
+        level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
+        partition_u!(level_info_u, level_info_u_acc,
+                     level_info_elements, n_levels,
+                     u0, mesh, equations, dg, cache)
+
         du_para = zero(u0)
         integrator = PairedExplicitRelaxationRK4MultiParabolicIntegrator(u0, du, u_tmp,
                                                                          t0, tdir,
@@ -206,16 +252,19 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4Multi;
                                                                          level_info_elements,
                                                                          level_info_elements_acc,
                                                                          level_info_interfaces_acc,
-                                                                         level_info_mpi_interfaces_acc,
                                                                          level_info_boundaries_acc,
                                                                          level_info_mortars_acc,
-                                                                         level_info_mpi_mortars_acc,
                                                                          level_info_u,
+                                                                         level_info_u_acc,
                                                                          -1, n_levels,
                                                                          gamma, S_old,
                                                                          alg.relaxation_solver,
                                                                          du_para)
     else # Hyperbolic case
+        partition_u!(level_info_u,
+                     level_info_elements, n_levels,
+                     u0, mesh, equations, dg, cache)
+
         integrator = PairedExplicitRelaxationRK4MultiIntegrator(u0, du, u_tmp,
                                                                 t0, tdir,
                                                                 dt, zero(dt),

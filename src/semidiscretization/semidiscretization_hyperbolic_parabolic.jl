@@ -462,6 +462,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
             du_ode[i] = du_ode[i] + integrator.du_para[i]
         end
     end
+
+    return nothing
 end
 
 # Required for analysis_callback
@@ -479,6 +481,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
             du_ode[i] = du_ode[i] + du_para[i]
         end
     end
+
+    return nothing
 end
 
 # `rhs_hyperbolic_parabolic!` for partitioned Runge-Kutta methods, such as the Paired Explicit Runge-Kutta (PERK) methods
@@ -488,7 +492,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    max_level,
                                    element_indices, interface_indices,
                                    boundary_indices, mortar_indices,
-                                   u_indices) # u_indices_acc
+                                   u_indices)
     @trixi_timeit timer() "rhs_hyperbolic_parabolic! (part.)" begin
         rhs!(du_ode, u_ode, semi, t,
              element_indices, interface_indices,
@@ -496,24 +500,15 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
         rhs_parabolic!(du_para, u_ode, semi, t,
                        element_indices, interface_indices,
                        boundary_indices, mortar_indices)
-
-        for level in 1:max_level
-            @threaded for i in u_indices[level]
-                # Try to enable optimizations due to `muladd` by avoiding `+=`
-                # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
-                du_ode[i] = du_ode[i] + du_para[i]
-            end
-        end
-
-        #=
-        # TODO: Optimized version with accumulated indices
-        @threaded for i in u_indices_acc[max_level]
+        
+        @threaded for i in u_indices # Optimized version with accumulated indices
             # Try to enable optimizations due to `muladd` by avoiding `+=`
             # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
             du_ode[i] = du_ode[i] + du_para[i]
         end
-        =#
     end
+
+    return nothing
 end
 
 # `rhs_hyperbolic_parabolic!` for non-split IMEX methods
@@ -537,6 +532,8 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
             du_ode[i] = du_ode[i] + du_para[i]
         end
     end
+
+    return nothing
 end
 
 function _jacobian_ad_forward(semi::SemidiscretizationHyperbolicParabolic, t0, u0_ode,

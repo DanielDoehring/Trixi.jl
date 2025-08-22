@@ -1380,7 +1380,7 @@ end
     return nothing
 end
 
-# Version with accumulated indices, could give performance for parabolic semis
+# TODO: Optimized version with accumulated indices for hyperbolic-parabolic problems
 @inline function partition_u!(level_info_u, level_info_u_acc,
                               level_info_elements, n_levels,
                               u_ode, mesh, equations, dg, cache)

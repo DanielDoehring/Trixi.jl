@@ -200,14 +200,15 @@ mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType,
     level_info_elements_acc::Vector{Vector{Int64}}
 
     level_info_interfaces_acc::Vector{Vector{Int64}}
-    level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
+    # Parabolic currently not MPI-parallelized
 
     level_info_boundaries_acc::Vector{Vector{Int64}}
 
     level_info_mortars_acc::Vector{Vector{Int64}}
-    level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
+    # For efficient addition of `du` to `du_ode` in `rhs_hyperbolic_parabolic`
+    level_info_u_acc::Vector{Vector{Int64}}
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -245,10 +246,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    # MPI additions
-    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
-    level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
-
     if !mpi_isparallel()
         partition_variables!(level_info_elements,
                              level_info_elements_acc,
@@ -285,6 +282,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
             resize!(u_tmp, n_new)
             resize!(k1, n_new)
         end
+        # MPI additions
+        level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+        level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+
         partition_variables!(level_info_elements,
                              level_info_elements_acc,
                              level_info_interfaces_acc,
@@ -303,11 +304,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
 
     # Set (initial) distribution of DG nodal values
     level_info_u = [Vector{Int64}() for _ in 1:n_levels]
-    partition_u!(level_info_u, level_info_elements,
-                 n_levels, u0, mesh, equations, dg, cache)
 
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
+        # For efficient addition of `du` to `du_ode` in `rhs_hyperbolic_parabolic`
+        level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
+        partition_u!(level_info_u, level_info_u_acc,
+                     level_info_elements, n_levels,
+                     u0, mesh, equations, dg, cache)
+
         du_para = zero(u0)
         integrator = PairedExplicitRK2MultiParabolicIntegrator(u0, du, u_tmp,
                                                                t0, tdir,
@@ -324,14 +329,17 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                                                                level_info_elements,
                                                                level_info_elements_acc,
                                                                level_info_interfaces_acc,
-                                                               level_info_mpi_interfaces_acc,
                                                                level_info_boundaries_acc,
                                                                level_info_mortars_acc,
-                                                               level_info_mpi_mortars_acc,
                                                                level_info_u,
+                                                               level_info_u_acc,
                                                                -1, n_levels,
                                                                du_para)
     else # Purely hyperbolic, Euler-Gravity, ...
+        partition_u!(level_info_u,
+                     level_info_elements, n_levels,
+                     u0, mesh, equations, dg, cache)
+
         integrator = PairedExplicitRK2MultiIntegrator(u0, du, u_tmp,
                                                       t0, tdir,
                                                       dt, zero(dt),

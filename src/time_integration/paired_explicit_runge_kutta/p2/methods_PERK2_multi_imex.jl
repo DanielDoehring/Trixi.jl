@@ -221,7 +221,8 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
     level_info_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
-    # TODO: Optimized version with accumulated indices
+    # For efficient addition of `du` to `du_ode` in `rhs_hyperbolic_parabolic`
+    level_info_u_acc::Vector{Vector{Int64}}
 
     coarsest_lvl::Int64
     n_levels::Int64
@@ -285,20 +286,22 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     # Set (initial) distribution of DG nodal values
     level_info_u = [Vector{Int64}() for _ in 1:n_levels]
-    partition_u!(level_info_u, level_info_elements,
-                 n_levels, u, mesh, equations, dg, cache)
-
-    ### Nonlinear Solver ###
-
-    # For fixed meshes/no re-partitioning: Allocate only required storage
-    u_implicit = level_info_u[alg.num_methods]
-    k_nonlin = zeros(eltype(u), length(u_implicit))
-    residual = copy(k_nonlin)
-
-    # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-    jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
 
     if isa(semi, SemidiscretizationHyperbolicParabolic)
+        # For efficient addition of `du` to `du_ode` in `rhs_hyperbolic_parabolic`
+        level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
+        partition_u!(level_info_u, level_info_u_acc,
+                     level_info_elements, n_levels,
+                     u0, mesh, equations, dg, cache)
+
+        # For fixed meshes/no re-partitioning: Allocate only required storage
+        u_implicit = level_info_u[alg.num_methods]
+        k_nonlin = zeros(eltype(u), length(u_implicit))
+        residual = copy(k_nonlin)
+
+        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
+        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
+
         du_para = zero(u)
 
         # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
@@ -331,6 +334,18 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         finite_difference_jacobian!(jac_dense, para_res_S_PERK2IMEXMulti!, k_nonlin)
     else
+        partition_u!(level_info_u,
+                     level_info_elements, n_levels,
+                     u, mesh, equations, dg, cache)
+
+        # For fixed meshes/no re-partitioning: Allocate only required storage
+        u_implicit = level_info_u[alg.num_methods]
+        k_nonlin = zeros(eltype(u), length(u_implicit))
+        residual = copy(k_nonlin)
+
+        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
+        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
+
         # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
         ode.f(du, u_tmp, semi, t,
               level_info_elements_acc[alg.num_methods],
@@ -393,6 +408,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                    level_info_boundaries_acc,
                                                                    level_info_mortars_acc,
                                                                    level_info_u,
+                                                                   level_info_u_acc,
                                                                    -1, n_levels,
                                                                    k_nonlin, residual,
                                                                    jac_sparse,
