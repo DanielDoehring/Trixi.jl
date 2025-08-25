@@ -500,7 +500,7 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
         rhs_parabolic!(du_para, u_ode, semi, t,
                        element_indices, interface_indices,
                        boundary_indices, mortar_indices)
-        
+
         @threaded for i in u_indices # Optimized version with accumulated indices
             # Try to enable optimizations due to `muladd` by avoiding `+=`
             # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
