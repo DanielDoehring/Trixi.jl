@@ -466,6 +466,25 @@ function rhs_hyperbolic_parabolic!(du_ode, u_ode,
     return nothing
 end
 
+# `rhs_hyperbolic_parabolic!` for non-split ODE problems with outer allocated vector `du_para`
+function rhs_hyperbolic_parabolic!(du_ode, u_ode,
+                                   semi::SemidiscretizationHyperbolicParabolic, t,
+                                   du_para::AbstractVector)
+    @trixi_timeit timer() "rhs_hyperbolic_parabolic!" begin
+        # Implementation of split ODE problem in OrdinaryDiffEq
+        rhs!(du_ode, u_ode, semi, t)
+        rhs_parabolic!(du_para, u_ode, semi, t)
+
+        @threaded for i in eachindex(du_ode)
+            # Try to enable optimizations due to `muladd` by avoiding `+=`
+            # https://github.com/trixi-framework/Trixi.jl/pull/2480#discussion_r2224531702
+            du_ode[i] = du_ode[i] + du_para[i]
+        end
+    end
+
+    return nothing
+end
+
 # Required for analysis_callback
 function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                    semi::SemidiscretizationHyperbolicParabolic, t)

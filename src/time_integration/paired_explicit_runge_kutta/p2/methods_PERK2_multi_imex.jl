@@ -302,18 +302,19 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         println("\nSize of the nonlinear system: ", N_nonlin, " x ", N_nonlin)
 
-        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
-
         du_para = zero(u)
 
-        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
+        ## Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation ##
+        # Running only the partitioned part crashes occasionally
+        #=
         ode.f(du, u, semi, t, du_para,
               level_info_elements_acc[alg.num_methods],
               level_info_interfaces_acc[alg.num_methods],
               level_info_boundaries_acc[alg.num_methods],
               level_info_mortars_acc[alg.num_methods],
               u_implicit)
+        =#
+        ode.f(du, u, semi, t) # Full system
 
         @threaded for i in eachindex(u_implicit)
             k_nonlin[i] = du[u_implicit[i]]
@@ -335,6 +336,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                                     level_info_mortars_acc[alg.num_methods],
                                                                                     u_implicit)
 
+        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
+        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
         finite_difference_jacobian!(jac_dense, para_res_S_PERK2IMEXMulti!, k_nonlin)
     else
         partition_u!(level_info_u,
@@ -349,10 +352,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         println("\nSize of the nonlinear system: ", N_nonlin, " x ", N_nonlin)
 
-        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
-
-        # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
+        ## Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation ##
         ode.f(du, u, semi, t,
               level_info_elements_acc[alg.num_methods],
               level_info_interfaces_acc[alg.num_methods],
@@ -376,6 +376,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                                level_info_mortars_acc[alg.num_methods],
                                                                                u_implicit)
 
+        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
+        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
         finite_difference_jacobian!(jac_dense, res_S_PERK2IMEXMulti!, k_nonlin)
     end
 

@@ -260,7 +260,7 @@ callbacks = CallbackSet(summary_callback,
 # Run the simulation
 ###############################################################################
 
-
+#=
 ## k = 2, p = 2 ##
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
 
@@ -271,7 +271,7 @@ ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_comple
 
 sol = Trixi.solve(ode, ode_alg, dt = 9e-8, # Hyp-Para without stepsize control. 1e-7 already unstable
                   save_everystep = false, callback = callbacks);
-
+=#
 ###############################################################################
 # IMEX
 
@@ -309,7 +309,7 @@ linear_solver = UMFPACKFactorization()
 
 #linear_solver = SparspakFactorization() # requires Sparspak.jl
 
-integrator = Trixi.init(ode, ode_alg; dt = 1e-8, # Hyp-Para without stepsize control
+integrator = Trixi.init(ode, ode_alg; dt = 1e-7, # Hyp-Para without stepsize control
                         callback = callbacks,
                         linear_solver = linear_solver,
                         atol_newton = 1e-4, maxits_newton = 10);
