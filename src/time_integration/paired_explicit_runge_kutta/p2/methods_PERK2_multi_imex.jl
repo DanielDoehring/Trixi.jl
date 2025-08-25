@@ -249,7 +249,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
               dt, callback = nothing, kwargs...)
     u = copy(ode.u0)
     du = zero(u)
-    u_tmp = copy(u) # `init!` already calls the solver, crashes in general for zero `u_tmp`
+    u_tmp = zero(u)
 
     k1 = zero(u) # Additional PERK register
 
@@ -296,16 +296,19 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         # For fixed meshes/no re-partitioning: Allocate only required storage
         u_implicit = level_info_u[alg.num_methods]
-        k_nonlin = zeros(eltype(u), length(u_implicit))
+        N_nonlin = length(u_implicit)
+        k_nonlin = zeros(eltype(u), N_nonlin)
         residual = copy(k_nonlin)
 
+        println("\nSize of the nonlinear system: ", N_nonlin, " x ", N_nonlin)
+
         # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
+        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
 
         du_para = zero(u)
 
         # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
-        ode.f(du, u_tmp, semi, t, du_para,
+        ode.f(du, u, semi, t, du_para,
               level_info_elements_acc[alg.num_methods],
               level_info_interfaces_acc[alg.num_methods],
               level_info_boundaries_acc[alg.num_methods],
@@ -313,7 +316,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
               u_implicit)
 
         @threaded for i in eachindex(u_implicit)
-            k_nonlin[i] = du[u_implicit[i]] # TODO: Scale by some `dt_init` ?
+            k_nonlin[i] = du[u_implicit[i]]
         end
 
         para_res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
@@ -340,21 +343,24 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
         # For fixed meshes/no re-partitioning: Allocate only required storage
         u_implicit = level_info_u[alg.num_methods]
-        k_nonlin = zeros(eltype(u), length(u_implicit))
+        N_nonlin = length(u_implicit)
+        k_nonlin = zeros(eltype(u), N_nonlin)
         residual = copy(k_nonlin)
 
+        println("\nSize of the nonlinear system: ", N_nonlin, " x ", N_nonlin)
+
         # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-        jac_dense = zeros(eltype(u), length(k_nonlin), length(k_nonlin)) # Allocate memory for sparsity-pattern find run
+        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
 
         # Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation
-        ode.f(du, u_tmp, semi, t,
+        ode.f(du, u, semi, t,
               level_info_elements_acc[alg.num_methods],
               level_info_interfaces_acc[alg.num_methods],
               level_info_boundaries_acc[alg.num_methods],
               level_info_mortars_acc[alg.num_methods])
 
         @threaded for i in eachindex(u_implicit)
-            k_nonlin[i] = du[u_implicit[i]] # TODO: Scale by some `dt_init` ?
+            k_nonlin[i] = du[u_implicit[i]]
         end
 
         res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
