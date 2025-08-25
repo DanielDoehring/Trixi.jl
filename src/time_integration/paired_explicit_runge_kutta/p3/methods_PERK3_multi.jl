@@ -231,6 +231,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
+    # MPI additions
+    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+    level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+
     if !mpi_isparallel()
         partition_variables!(level_info_elements,
                              level_info_elements_acc,
@@ -268,9 +272,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3Multi;
             resize!(k1, n_new)
             resize!(kS1, n_new)
         end
-        # MPI additions
-        level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
-        level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
         partition_variables!(level_info_elements,
                              level_info_elements_acc,
