@@ -110,9 +110,9 @@ boundary_conditions_hyp = Dict(:SYMMETRY => bc_symmetry, # Symmetry: bc_symmetry
                                :WING_LO => boundary_condition_slip_wall, # Wing: bc_slip_wall
                                :OUTFLOW => bc_farfield)
 
-velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
+velocity_bc_plane = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
-bc_body = BoundaryConditionNavierStokesWall(velocity_bc_airfoil, heat_bc)
+bc_body = BoundaryConditionNavierStokesWall(velocity_bc_plane, heat_bc)
 
 bc_symmetry_plane_para = BoundaryConditionNavierStokesWall(Slip(), heat_bc)
 

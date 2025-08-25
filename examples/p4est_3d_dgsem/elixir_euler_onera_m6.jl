@@ -1,5 +1,4 @@
 using Trixi
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using LinearAlgebra: norm
 
 using LineSearch, NonlinearSolve
@@ -124,13 +123,13 @@ rho_inf() = 1.4
 u_inf(equations) = 0.84
 # Area calculated from information given at https://www.grc.nasa.gov/www/wind/valid/m6wing/m6wing.html
 
-#height = 1.1963
+height_ref = 1.1963
 height = 1.0 # Mesh we use normalizes wing height to one
 
 g_I = tan(deg2rad(30)) * height
 
 #base = 0.8059
-base = 0.8059 / 1.1963 # Mesh we use normalizes wing height to one
+base = 0.8059 / height_ref # Mesh we use normalizes wing height to one
 
 g_II = base - g_I
 g_III = tan(deg2rad(15.8)) * height
