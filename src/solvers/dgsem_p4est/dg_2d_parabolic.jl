@@ -548,13 +548,6 @@ function prolong2interfaces!(cache_parabolic, flux_viscous,
     index_range = eachnode(dg)
     flux_viscous_x, flux_viscous_y = flux_viscous
 
-    # CARE: For sparsity detection!
-    #=
-    size_fv = size(flux_viscous_x)
-    flux_viscous_x = zeros(eltype(flux_viscous_x), size_fv...)
-    flux_viscous_y = zeros(eltype(flux_viscous_x), size_fv...)
-    =#
-
     @threaded for interface in interface_indices
         # Copy solution data from the primary element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
@@ -977,12 +970,6 @@ function calc_boundary_flux!(cache, t,
     (; node_coordinates, surface_flux_values) = cache.elements
     (; contravariant_vectors) = cache.elements
     index_range = eachnode(dg)
-
-    # CARE: For sparsity detection!
-    #=
-    size_bnds = size(boundaries.u)
-    boundaries.u = zeros(eltype(surface_flux_values), size_bnds...)
-    =#
 
     @threaded for local_index in eachindex(boundary_condition_indices)
         # Use the local index to get the global boundary index from the pre-sorted list

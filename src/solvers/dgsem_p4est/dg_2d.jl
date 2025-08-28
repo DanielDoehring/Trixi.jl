@@ -70,12 +70,6 @@ function prolong2interfaces!(cache, u,
     @unpack interfaces = cache
     index_range = eachnode(dg)
 
-    # CARE: For sparsity detection!
-    #=
-    size_u = size(u)
-    u = fill(zero(eltype(interfaces.u)), size_u...)
-    =#
-
     @threaded for interface in interface_indices
         # Copy solution data from the primary element using "delayed indexing" with
         # a start value and a step size to get the correct face and orientation.
@@ -214,13 +208,6 @@ end
 
     flux_ = surface_flux(u_ll, u_rr, normal_direction, equations)
 
-    #=
-    # CARE: For sparsity detection!
-    if eltype(flux_) == Symbolics.Num
-        surface_flux_values = Symbolics.Num.(surface_flux_values)
-    end
-    =#
-
     for v in eachvariable(equations)
         surface_flux_values[v, primary_node_index, primary_direction_index, primary_element_index] = flux_[v]
         surface_flux_values[v, secondary_node_index, secondary_direction_index, secondary_element_index] = -flux_[v]
@@ -345,12 +332,6 @@ end
     @unpack boundaries = cache
     @unpack node_coordinates, contravariant_vectors = cache.elements
     @unpack surface_flux = surface_integral
-
-    # CARE: For sparsity detection!
-    #=
-    size_bnds = size(boundaries.u)
-    boundaries.u = zeros(eltype(surface_flux_values), size_bnds...)
-    =#
 
     # Extract solution data from boundary container
     u_inner = get_node_vars(boundaries.u, equations, dg, node_index, boundary_index)
