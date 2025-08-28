@@ -2,6 +2,7 @@ using Trixi
 
 using SparseConnectivityTracer # For obtaining the Jacobian sparsity pattern
 using SparseMatrixColorings # For obtaining the coloring vector
+using JLD2 # For loading sparse matrix
 
 import LinearAlgebra:norm
 using LinearSolve
@@ -61,7 +62,7 @@ vol_flux = flux_chandrashekar
 solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
                volume_integral = VolumeIntegralFluxDifferencing(vol_flux))
 
-# for sparsity [pattern] detection (SD)
+# for sparsity [pattern] detection (SD): if-clause free
 solver_SD = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs,
                   volume_integral = VolumeIntegralFluxDifferencing(flux_central))
 
@@ -81,7 +82,8 @@ boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
 
 # For sparsity detection
 @inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
-                             surface_flux_function, equations)
+                             surface_flux_function,
+                             equations::CompressibleEulerEquations2D)
     norm_ = norm(normal_direction)
     normal = normal_direction / norm_
 
@@ -377,26 +379,6 @@ dtRatios = [0.26, # Implicit
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
 
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
-
-# Factorization-based methods
-
-linear_solver = KLUFactorization()
-#linear_solver = UMFPACKFactorization()
-
-#linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
-
-#linear_solver = SparspakFactorization() # requires Sparspak.jl
-
-# Iterative methods
-
-#linear_solver = SimpleGMRES()
-#linear_solver = KrylovJL_GMRES()
-#linear_solver = KrylovJL_BICGSTAB()
-
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
-
 ### Repeat code from integrator init ###
 u = copy(ode_SD.u0)
 du = zero(u)
@@ -435,7 +417,8 @@ Trixi.partition_u!(level_info_u, level_info_u_acc,
 # For fixed meshes/no re-partitioning: Allocate only required storage
 R = ode_alg.num_methods
 u_implicit = level_info_u[R]
-k_nonlin = zeros(eltype(u), length(u_implicit))
+N_nonlin = length(u_implicit)
+k_nonlin = zeros(eltype(u), N_nonlin)
 residual = copy(k_nonlin)
 
 du_para = zero(u)
@@ -450,12 +433,7 @@ res_wrapped! = (residual, k_nonlin) -> Trixi.residual_S_PERK2IMEXMulti!(residual
                                     level_info_boundaries_acc[R], level_info_mortars_acc[R], level_info_u[R])
 
 ode_SD.f(du, u, semi_SD, t0) # Do one step to prevent e.g. undefined BCs
-# TODO: Crashes with Polyester. So I need to find a way to figure out the sparsity pattern serial,
-# store this in file and reload for the parallel simulation!
 jac_prototype = jacobian_sparsity(res_wrapped!, residual, k_nonlin, jac_detector)
-
-#using SparseArrays
-#jac_sparse = SparseMatrixCSC{Float64, Int}(jac_prototype)
 
 coloring_prob = ColoringProblem(; structure = :nonsymmetric, partition = :column)
 coloring_alg = GreedyColoringAlgorithm(; decompression = :direct)
@@ -464,10 +442,44 @@ colorvec = column_colors(coloring_result)
 
 maximum(colorvec) + 1 # Number RHS evaluations to get full Jacobian
 
+# Store the sparsity information
+jldopen("sparsity_info.jld2", "w") do file
+    file["jac_prototype"] = jac_prototype
+    file["colorvec"] = colorvec  # Also store the coloring vector
+end
+
+# Load the sparsity information
+jac_prototype_loaded, colorvec_loaded = jldopen("sparsity_info.jld2", "r") do file
+    return file["jac_prototype"], file["colorvec"]
+end
+
+maximum(colorvec_loaded) + 1
+
+### Linear Solver ###
+# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+
+# Factorization-based methods
+
+linear_solver = KLUFactorization()
+#linear_solver = UMFPACKFactorization()
+
+#linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
+
+#linear_solver = SparspakFactorization() # requires Sparspak.jl
+
+# Iterative methods
+
+#linear_solver = SimpleGMRES()
+#linear_solver = KrylovJL_GMRES()
+#linear_solver = KrylovJL_BICGSTAB()
+
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
+
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt, callback = callbacks,
                         # IMEX-specific kwargs
-                        jac_prototype = jac_prototype, colorvec = colorvec,
+                        #jac_prototype = jac_prototype, colorvec = colorvec,
+                        jac_prototype = jac_prototype_loaded, colorvec = colorvec_loaded,
                         linear_solver = linear_solver,
                         atol_newton = 1e-6, maxits_newton = 10);
 
