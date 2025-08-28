@@ -607,6 +607,8 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
                                                                                  integrator.k_nonlin,
                                                                                  integrator.jac_sparse_cache)
 
+        integrator.linear_cache.A = integrator.jac_sparse # Update system matrix
+
         @trixi_timeit timer() "Newton-Raphson" newton_frozen_jac!(integrator)
 
         ### Final update ###
