@@ -1,5 +1,9 @@
 using Trixi
 
+using SparseConnectivityTracer # For obtaining the Jacobian sparsity pattern
+using SparseMatrixColorings # For obtaining the coloring vector
+
+import LinearAlgebra:norm
 using LinearSolve
 
 ###############################################################################
@@ -57,6 +61,10 @@ vol_flux = flux_chandrashekar
 solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
                volume_integral = VolumeIntegralFluxDifferencing(vol_flux))
 
+# for sparsity [pattern] detection (SD)
+solver_SD = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs,
+                  volume_integral = VolumeIntegralFluxDifferencing(flux_central))
+
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
@@ -71,13 +79,49 @@ mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_sy
 boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
                            :Airfoil => boundary_condition_slip_wall)
 
+# For sparsity detection
+@inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
+                             surface_flux_function, equations)
+    norm_ = norm(normal_direction)
+    normal = normal_direction / norm_
+
+    # compute the primitive variables
+    rho, v1, v2, p = cons2prim(u_inner, equations)
+
+    v_normal = normal[1] * v1 + normal[2] * v2
+
+    u_mirror = prim2cons(SVector(rho,
+                                 v1 - 2 * v_normal * normal[1],
+                                 v2 - 2 * v_normal * normal[2],
+                                 p), equations)
+
+    flux = surface_flux_function(u_inner, u_mirror, normal, equations) * norm_
+
+    return flux
+end
+boundary_conditions_SD = Dict(:FarField => boundary_condition_free_stream,
+                              :Airfoil => bc_symmetry)
+
 boundary_conditions_parabolic = Dict(:FarField => boundary_condition_free_stream,
                                      :Airfoil => boundary_condition_airfoil)
+
+jac_detector = TracerSparsityDetector()
+# We need to construct the semidiscretization with the correct
+# sparsity-detection ready datatype, which is retrieved here
+jac_eltype = jacobian_eltype(real(solver), jac_detector)
+
+Trixi.sqrt(x::SparseConnectivityTracer.AbstractTracer) = Base.sqrt(x)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
+
+semi_SD = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
+                                                initial_condition, solver_SD;
+                                                boundary_conditions = (boundary_conditions_SD,
+                                                                       boundary_conditions_parabolic),
+                                                uEltype = jac_eltype)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -94,8 +138,10 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 30.5 * t_c) # For testing only
 
-ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
+#ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
+
+ode_SD = semidiscretize(semi_SD, tspan, restart_filename; split_problem = false)
 
 summary_callback = SummaryCallback()
 
@@ -187,20 +233,20 @@ dtRatios = [0.208310160790890, # 14
     0.049637258180915, #  6
     0.030629777558366] / 0.208310160790890 #= 5 =#
 
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
-#ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+#ode_alg = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
 =#
 
 ### Split-Multi methods ###
 
 # p = 2
-
+#=
 Stages = [14, 12, 10, 8, 7, 6, 5, 4, 3, 2]
 dtRatios = [0.253144726232790162612, # 14
     0.214041846963368698198,  # 12
@@ -238,18 +284,18 @@ dtRatios_para = [842.7395049162385,  # 10
 
 path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/para_rhs/"
 
-ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
+ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
 
 #=
 # Version with SAME number of stages for hyperbolic and parabolic part
-ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages,
-                                                  path_coeffs, path_coeffs_para,
-                                                  dtRatios)
+ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages,
+                                            path_coeffs, path_coeffs_para,
+                                            dtRatios)
 =#
 # Version with DIFFERENT number of stages for hyperbolic and parabolic part
-ode_algorithm = Trixi.PairedExplicitRK2SplitMulti(Stages, Stages_para,
-                                                  path_coeffs, path_coeffs_para,
-                                                  dtRatios, dtRatios_para)
+ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages, Stages_para,
+                                            path_coeffs, path_coeffs_para,
+                                            dtRatios, dtRatios_para)
 
 # p = 4
 
@@ -282,35 +328,36 @@ dtRatios_para = [312.83020308753, # 10
 
 path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p4/para_rhs/"
 
-ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path_coeffs, dtRatios)
+ode_alg = Trixi.PairedExplicitRK4Multi(Stages, path_coeffs, dtRatios)
 
 #=
-ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages,
-                                                  path_coeffs, path_coeffs_para,
-                                                  dtRatios)
+ode_alg = Trixi.PairedExplicitRK4SplitMulti(Stages,
+                                            path_coeffs, path_coeffs_para,
+                                            dtRatios)
 =#
 
 
-ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages, Stages_para,
-                                                  path_coeffs, path_coeffs_para,
-                                                  dtRatios, dtRatios_para)
+ode_alg = Trixi.PairedExplicitRK4SplitMulti(Stages, Stages_para,
+                                            path_coeffs, path_coeffs_para,
+                                            dtRatios, dtRatios_para)
 
 
 relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13)
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
 
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para, 
-                                                            path_coeffs, path_coeffs_para,
-                                                            dtRatios, dtRatios_para; relaxation_solver = relaxation_solver)
+ode_alg = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para, 
+                                                      path_coeffs, path_coeffs_para,
+                                                      dtRatios, dtRatios_para; relaxation_solver = relaxation_solver)
 
 
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
-sol = Trixi.solve(ode, ode_algorithm,
+sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
+=#
 
 ###############################################################################
 # IMEX
@@ -328,14 +375,14 @@ dtRatios = [0.26, # Implicit
     0.0656503721211265656166, #  4
     0.0209738927526359475451] / 0.26 #= 2 =#
 
-ode_algorithm = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
+ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
 
 ### Linear Solver ###
 # See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
 # Factorization-based methods
 
-#linear_solver = KLUFactorization()
+linear_solver = KLUFactorization()
 #linear_solver = UMFPACKFactorization()
 
 #linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
@@ -345,14 +392,82 @@ ode_algorithm = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
 # Iterative methods
 
 #linear_solver = SimpleGMRES()
-linear_solver = KrylovJL_GMRES()
+#linear_solver = KrylovJL_GMRES()
 #linear_solver = KrylovJL_BICGSTAB()
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
 
+### Repeat code from integrator init ###
+u = copy(ode_SD.u0)
+du = zero(u)
+u_tmp = zero(u)
 
-integrator = Trixi.init(ode, ode_algorithm;
-                        dt = 7e-4, callback = callbacks,
+k1 = zero(u) # Additional PERK register
+
+semi = ode_SD.p
+cache = semi_SD.cache
+
+n_levels = Trixi.get_n_levels(mesh, ode_alg)
+
+level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
+level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+Trixi.partition_variables!(level_info_elements,
+                           level_info_elements_acc,
+                           level_info_interfaces_acc,
+                           level_info_boundaries_acc,
+                           level_info_mortars_acc,
+                           n_levels, mesh, solver, cache, ode_alg)
+
+level_info_u = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
+Trixi.partition_u!(level_info_u, level_info_u_acc,
+                   level_info_elements, n_levels,
+                   u, mesh, equations, solver, cache)
+
+# For fixed meshes/no re-partitioning: Allocate only required storage
+R = ode_alg.num_methods
+u_implicit = level_info_u[R]
+k_nonlin = zeros(eltype(u), length(u_implicit))
+residual = copy(k_nonlin)
+
+du_para = zero(u)
+
+dt = 7e-4
+t0 = tspan[1]
+res_wrapped! = (residual, k_nonlin) -> Trixi.residual_S_PERK2IMEXMulti!(residual, k_nonlin,
+                                    t0, dt,
+                                    u, du, u_tmp, du_para,
+                                    semi, ode.f,
+                                    level_info_elements_acc[R], level_info_interfaces_acc[R],
+                                    level_info_boundaries_acc[R], level_info_mortars_acc[R], level_info_u[R])
+
+ode_SD.f(du, u, semi_SD, t0) # Do one step to prevent e.g. undefined BCs
+# TODO: Crashes with Polyester. So I need to find a way to figure out the sparsity pattern serial,
+# store this in file and reload for the parallel simulation!
+jac_prototype = jacobian_sparsity(res_wrapped!, residual, k_nonlin, jac_detector)
+
+#using SparseArrays
+#jac_sparse = SparseMatrixCSC{Float64, Int}(jac_prototype)
+
+coloring_prob = ColoringProblem(; structure = :nonsymmetric, partition = :column)
+coloring_alg = GreedyColoringAlgorithm(; decompression = :direct)
+coloring_result = coloring(jac_prototype, coloring_prob, coloring_alg)
+colorvec = column_colors(coloring_result)
+
+maximum(colorvec) + 1 # Number RHS evaluations to get full Jacobian
+
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt, callback = callbacks,
+                        # IMEX-specific kwargs
+                        jac_prototype = jac_prototype, colorvec = colorvec,
                         linear_solver = linear_solver,
                         atol_newton = 1e-6, maxits_newton = 10);
 
