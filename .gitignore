@@ -11,6 +11,7 @@
 *.bson
 *.inp
 *.msh
+*.jld2
 **/Manifest.toml
 out*/
 docs/build
