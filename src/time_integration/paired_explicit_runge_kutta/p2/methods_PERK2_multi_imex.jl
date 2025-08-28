@@ -294,31 +294,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                      level_info_elements, n_levels,
                      u, mesh, equations, dg, cache)
 
-        # For fixed meshes/no re-partitioning: Allocate only required storage
-        u_implicit = level_info_u[alg.num_methods]
-        N_nonlin = length(u_implicit)
-        k_nonlin = zeros(eltype(u), N_nonlin)
-        residual = copy(k_nonlin)
-
-        println("\nSize of the nonlinear system: ", N_nonlin, " x ", N_nonlin)
-
         du_para = zero(u)
-
-        ## Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation ##
-        # Running only the partitioned part crashes occasionally
-        #=
-        ode.f(du, u, semi, t, du_para,
-              level_info_elements_acc[alg.num_methods],
-              level_info_interfaces_acc[alg.num_methods],
-              level_info_boundaries_acc[alg.num_methods],
-              level_info_mortars_acc[alg.num_methods],
-              u_implicit)
-        =#
-        ode.f(du, u, semi, t) # Full system
-
-        @threaded for i in eachindex(u_implicit)
-            k_nonlin[i] = du[u_implicit[i]]
-        end
+        # Initialize `k_nonlin` with values from `du`.
+        # Use the full system since the partitioned system occasionally crashes
+        ode.f(du, u, semi, t, du_para)
 
         para_res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
                                                                                     k_nonlin,
@@ -335,33 +314,14 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                                     level_info_boundaries_acc[alg.num_methods],
                                                                                     level_info_mortars_acc[alg.num_methods],
                                                                                     u_implicit)
-
-        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
-        finite_difference_jacobian!(jac_dense, para_res_S_PERK2IMEXMulti!, k_nonlin)
     else
         partition_u!(level_info_u,
                      level_info_elements, n_levels,
                      u, mesh, equations, dg, cache)
 
-        # For fixed meshes/no re-partitioning: Allocate only required storage
-        u_implicit = level_info_u[alg.num_methods]
-        N_nonlin = length(u_implicit)
-        k_nonlin = zeros(eltype(u), N_nonlin)
-        residual = copy(k_nonlin)
-
-        println("\nSize of the nonlinear system: ", N_nonlin, " x ", N_nonlin)
-
-        ## Initialize `k_nonlin` here with values from `du` for more robust initial derivative computation ##
-        ode.f(du, u, semi, t,
-              level_info_elements_acc[alg.num_methods],
-              level_info_interfaces_acc[alg.num_methods],
-              level_info_boundaries_acc[alg.num_methods],
-              level_info_mortars_acc[alg.num_methods])
-
-        @threaded for i in eachindex(u_implicit)
-            k_nonlin[i] = du[u_implicit[i]]
-        end
+        # Initialize `k_nonlin` with values from `du`.
+        # Use the full system since the partitioned system occasionally crashes
+        ode.f(du, u, semi, t)
 
         res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
                                                                                k_nonlin,
@@ -375,21 +335,23 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                                level_info_boundaries_acc[alg.num_methods],
                                                                                level_info_mortars_acc[alg.num_methods],
                                                                                u_implicit)
-
-        # Figure out sparsity pattern the naive way: Do finite Differences on initial condition
-        jac_dense = zeros(eltype(u), N_nonlin, N_nonlin) # Allocate memory for sparsity-pattern find run
-        finite_difference_jacobian!(jac_dense, res_S_PERK2IMEXMulti!, k_nonlin)
     end
 
-    # Need to do nonzero check before conversion to sparse to get
-    # matrix of datatype `SparseMatrixCSC{Bool, Int64}` for some reason
-    jac_sparse_prototype = sparse(Bool.(jac_dense .!= 0))
-    colorvec = matrix_colors(jac_sparse_prototype) # Obtained from SparseDiffTools
-    println("\nNumber of RHS evaluations to fill Jacobian is: ", maximum(colorvec))
+    # For fixed meshes/no re-partitioning: Allocate only required storage
+    u_implicit = level_info_u[alg.num_methods]
+    k_nonlin = zeros(eltype(u), length(u_implicit))
+    residual = copy(k_nonlin)
+
+    @threaded for i in eachindex(u_implicit)
+        k_nonlin[i] = du[u_implicit[i]]
+    end
+
+    jac_prototype = get(kwargs, :jac_prototype, nothing)
+    colorvec = get(kwargs, :colorvec, nothing)
 
     jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec,
-                                     sparsity = jac_sparse_prototype)
-    jac_sparse = sparse(jac_dense) # Allocate memory
+                                     sparsity = jac_prototype)
+    jac_sparse = SparseMatrixCSC{eltype(u), Int}(jac_prototype) # Set up memory for sparse Jacobian
 
     linear_prob = LinearSolve.LinearProblem(jac_sparse, k_nonlin)
     linear_solver = get(kwargs, :linear_solver, KLUFactorization())

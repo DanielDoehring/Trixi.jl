@@ -50,9 +50,6 @@ semi_float = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_p
                                                   initial_condition,
                                                   solver_float; solver_parabolic = ViscousFormulationLocalDG())
 
-###############################################################################################
-### Compute the Jacobian of the stage function with SparseDiffTools ###
-
 t0 = 0.0
 t_end = 10.0
 t_span = (t0, t_end)

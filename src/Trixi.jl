@@ -95,7 +95,6 @@ using TriplotRecipes: DGTriPseudocolor
 using TrixiBase: TrixiBase, @trixi_timeit, timer
 @reexport using SimpleUnPack: @unpack
 using SimpleUnPack: @pack!
-using SparseDiffTools: matrix_colors
 using DataStructures: BinaryHeap, FasterForward, extract_all!
 
 using UUIDs: UUID
