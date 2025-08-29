@@ -197,7 +197,7 @@ Stages_complete_p2 = reverse(collect(range(2, 16)))
 cfl_interval = 2
 
 cfl = 13.3 # PERK p2 2-16
-#cfl = 14.1 # IMEX PERK p2 2-16
+cfl = 14.1 # IMEX PERK p2 2-16
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = cfl_interval)
 
 #path = base_path * "k2/p3/"
@@ -292,8 +292,8 @@ dtRatios_imex_p2 = [
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages_complete_p2, path, dtRatios_imex_p2)
 
-atol_lin = 1e-5
-rtol_lin = 1e-4
+atol_lin = 1e-3
+rtol_lin = 1e-2
 #maxiters_lin = 50
 
 linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
@@ -308,15 +308,14 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
 
 atol_nonlin = atol_lin
 rtol_nonlin = rtol_lin
-maxiters_nonlin = 20
+#maxiters_nonlin = 20
 
-dt_init = 1e-7
+dt_init = 3e-7
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt_init, callback = callbacks,
                         # IMEX-specific kwargs
                         nonlin_solver = nonlin_solver,
-                        abstol = atol_nonlin, reltol = rtol_nonlin,
-                        maxiters_nonlin = maxiters_nonlin);
+                        abstol = atol_nonlin, reltol = rtol_nonlin);
 
 sol = Trixi.solve!(integrator);
 
