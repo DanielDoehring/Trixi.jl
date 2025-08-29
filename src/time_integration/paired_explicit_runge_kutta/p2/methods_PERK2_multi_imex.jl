@@ -131,6 +131,7 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
+#=
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
@@ -178,12 +179,78 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
     jac_sparse::SparseMat # using `SparseMatrixCSC` leads to slightly more allocations
     jac_sparse_cache::JacCache # using `JacobianCache` leads to many more allocations
 
-    atol_newton::RealT
-    maxits_newton::Int
+    abstol::RealT
+    maxiters_nonlin::Int
 
     linear_cache::LinCache # using `LinearCache` leads to many more allocations
 end
+=#
 
+mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
+                                                    Params, Sol, F,
+                                                    PairedExplicitRKOptions,
+                                                    uImplicitType,
+                                                    NonlinCache} <:
+               AbstractPairedExplicitRKIMEXMultiIntegrator{2}
+    u::uType
+    du::uType # In-place output of `f`
+    u_tmp::uType # Used for building the argument to `f`
+    t::RealT
+    tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
+    dt::RealT # current time step
+    dtcache::RealT # Used for euler-acoustic coupling
+    iter::Int # current number of time steps (iteration)
+    p::Params # will be the semidiscretization from Trixi
+    sol::Sol # faked
+    f::F # `rhs!` of the semidiscretization
+    alg::PairedExplicitRK2IMEXMulti
+    opts::PairedExplicitRKOptions
+    finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
+    # Additional PERK register
+    k1::uType
+
+    # Variables managing level-dependent integration
+    level_info_elements::Vector{Vector{Int64}}
+    level_info_elements_acc::Vector{Vector{Int64}}
+
+    level_info_interfaces_acc::Vector{Vector{Int64}}
+
+    level_info_boundaries_acc::Vector{Vector{Int64}}
+
+    level_info_mortars_acc::Vector{Vector{Int64}}
+
+    level_info_u::Vector{Vector{Int64}}
+
+    coarsest_lvl::Int64
+    n_levels::Int64
+
+    # For nonlinear solve
+    k_nonlin::uImplicitType
+    residual::uImplicitType
+
+    nonlin_cache::NonlinCache
+end
+
+mutable struct NonlinParams{RealT <: Real, uType <: AbstractVector,
+                            Semi, F}
+    t::RealT
+    dt::RealT
+    u::uType
+    du::uType
+    u_tmp::uType
+    semi::Semi
+    const f::F
+    # Do not support AMR for this: Keep indices constant
+    const element_indices::Vector{Int64}
+    const interface_indices::Vector{Int64}
+    const boundary_indices::Vector{Int64}
+    const mortar_indices::Vector{Int64}
+    const u_indices::Vector{Int64}
+end
+
+#=
 mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType,
                                                              Params, Sol, F,
                                                              PairedExplicitRKOptions,
@@ -234,8 +301,8 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
     jac_sparse::SparseMat # using `SparseMatrixCSC` leads to slightly more allocations
     jac_sparse_cache::JacCache # using `JacobianCache` leads to many more allocations
 
-    atol_newton::RealT
-    maxits_newton::Int
+    abstol::RealT
+    maxiters_nonlin::Int
 
     linear_cache::LinCache # using `LinearCache` leads to many more allocations
 
@@ -243,6 +310,79 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
     # We need another register to temporarily store the changes due to the parabolic part only.
     # The changes due to the hyperbolic part are stored in the usual `du` register.
     du_para::uType
+end
+=#
+
+mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType,
+                                                             Params, Sol, F,
+                                                             PairedExplicitRKOptions,
+                                                             uImplicitType,
+                                                             NonlinCache} <:
+               AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{2}
+    u::uType
+    du::uType # In-place output of `f`
+    u_tmp::uType # Used for building the argument to `f`
+    t::RealT
+    tdir::RealT # DIRection of time integration, i.e., if one marches forward or backward in time
+    dt::RealT # current time step
+    dtcache::RealT # Used for euler-acoustic coupling
+    iter::Int # current number of time steps (iteration)
+    p::Params # will be the semidiscretization from Trixi
+    sol::Sol # faked
+    f::F # `rhs!` of the semidiscretization
+    alg::PairedExplicitRK2IMEXMulti
+    opts::PairedExplicitRKOptions
+    finalstep::Bool # added for convenience
+    dtchangeable::Bool
+    force_stepfail::Bool
+    # Additional PERK register
+    k1::uType
+
+    # Variables managing level-dependent integration
+    level_info_elements::Vector{Vector{Int64}}
+    level_info_elements_acc::Vector{Vector{Int64}}
+
+    level_info_interfaces_acc::Vector{Vector{Int64}}
+
+    level_info_boundaries_acc::Vector{Vector{Int64}}
+
+    level_info_mortars_acc::Vector{Vector{Int64}}
+
+    level_info_u::Vector{Vector{Int64}}
+    # For efficient addition of `du` to `du_ode` in `rhs_hyperbolic_parabolic`
+    level_info_u_acc::Vector{Vector{Int64}}
+
+    coarsest_lvl::Int64
+    n_levels::Int64
+
+    # For nonlinear solve
+    k_nonlin::uImplicitType
+    residual::uImplicitType
+
+    nonlin_cache::NonlinCache
+
+    # Addition for hyperbolic-parabolic problems:
+    # We need another register to temporarily store the changes due to the parabolic part only.
+    # The changes due to the hyperbolic part are stored in the usual `du` register.
+    du_para::uType
+end
+
+mutable struct NonlinParamsParabolic{RealT <: Real, uType <: AbstractVector,
+                                     Semi, F}
+    t::RealT
+    dt::RealT
+    u::uType
+    du::uType
+    u_tmp::uType
+    du_para::uType
+    semi::Semi
+    const f::F
+    # Do not support AMR for this: Keep indices constant
+    const element_indices::Vector{Int64}
+    const interface_indices::Vector{Int64}
+    const boundary_indices::Vector{Int64}
+    const mortar_indices::Vector{Int64}
+    const u_indices::Vector{Int64}
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
@@ -299,21 +439,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
         # Use the full system since the partitioned system occasionally crashes
         ode.f(du, u, semi, t, du_para)
 
-        para_res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
-                                                                                    k_nonlin,
-                                                                                    t,
-                                                                                    dt,
-                                                                                    u,
-                                                                                    du,
-                                                                                    u_tmp,
-                                                                                    du_para,
-                                                                                    semi,
-                                                                                    ode.f,
-                                                                                    level_info_elements_acc[alg.num_methods],
-                                                                                    level_info_interfaces_acc[alg.num_methods],
-                                                                                    level_info_boundaries_acc[alg.num_methods],
-                                                                                    level_info_mortars_acc[alg.num_methods],
-                                                                                    u_implicit)
+        p = NonlinParamsParabolic{typeof(t), typeof(u),
+                                  typeof(semi), typeof(ode.f)}(t, dt,
+                                                               u, du, u_tmp, du_para,
+                                                               semi, ode.f,
+                                                               level_info_elements_acc[alg.num_methods],
+                                                               level_info_interfaces_acc[alg.num_methods],
+                                                               level_info_boundaries_acc[alg.num_methods],
+                                                               level_info_mortars_acc[alg.num_methods],
+                                                               level_info_u[alg.num_methods])
     else
         partition_u!(level_info_u,
                      level_info_elements, n_levels,
@@ -323,18 +457,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
         # Use the full system since the partitioned system occasionally crashes
         ode.f(du, u, semi, t)
 
-        res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
-                                                                               k_nonlin,
-                                                                               t, dt,
-                                                                               u, du,
-                                                                               u_tmp,
-                                                                               semi,
-                                                                               ode.f,
-                                                                               level_info_elements_acc[alg.num_methods],
-                                                                               level_info_interfaces_acc[alg.num_methods],
-                                                                               level_info_boundaries_acc[alg.num_methods],
-                                                                               level_info_mortars_acc[alg.num_methods],
-                                                                               u_implicit)
+        p = NonlinParams{typeof(t), typeof(u),
+                         typeof(semi), typeof(ode.f)}(t, dt,
+                                                      u, du, u_tmp,
+                                                      semi, ode.f,
+                                                      level_info_elements_acc[alg.num_methods],
+                                                      level_info_interfaces_acc[alg.num_methods],
+                                                      level_info_boundaries_acc[alg.num_methods],
+                                                      level_info_mortars_acc[alg.num_methods],
+                                                      level_info_u[alg.num_methods])
     end
 
     # For fixed meshes/no re-partitioning: Allocate only required storage
@@ -342,13 +473,36 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     k_nonlin = zeros(eltype(u), length(u_implicit))
     residual = copy(k_nonlin)
 
+    # Initialize `k_nonlin` with values from `du`
     @threaded for i in eachindex(u_implicit)
         k_nonlin[i] = du[u_implicit[i]]
     end
 
+    # Not needed for Jacobian-free Newton-Krylov(GMRES)
     jac_prototype = get(kwargs, :jac_prototype, nothing)
     colorvec = get(kwargs, :colorvec, nothing)
 
+    nonlin_func = NonlinearFunction{true, SciMLBase.FullSpecialize}(residual_S_PERK2IMEXMulti!;
+                                                                    jac_prototype = jac_prototype,
+                                                                    colorvec = colorvec)
+
+    nonlin_prob = NonlinearProblem(nonlin_func, k_nonlin, p)
+
+    nonlin_solver = get(kwargs, :nonlin_solver,
+                        # Fallback is plain Newton-Raphson
+                        NewtonRaphson(autodiff = AutoFiniteDiff(),
+                                      linsolve = KrylovJL_GMRES()))
+
+    abstol = get(kwargs, :abstol, nothing)
+    reltol = get(kwargs, :reltol, nothing)
+    maxiters_nonlin = get(kwargs, :maxiters_nonlin, typemax(Int64))
+
+    nonlin_cache = SciMLBase.init(nonlin_prob, nonlin_solver;
+                                  alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
+                                  abstol = abstol, reltol = reltol,
+                                  maxiters = maxiters_nonlin)
+
+    #=
     jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec,
                                      sparsity = jac_prototype)
     jac_sparse = SparseMatrixCSC{eltype(u), Int}(jac_prototype) # Set up memory for sparse Jacobian
@@ -356,9 +510,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     linear_prob = LinearSolve.LinearProblem(jac_sparse, k_nonlin)
     linear_solver = get(kwargs, :linear_solver, KLUFactorization())
     linear_cache = init(linear_prob, linear_solver)
-
-    atol_newton = get(kwargs, :atol_newton, 1e-6)
-    maxits_newton = get(kwargs, :maxits_newton, 100)
+    =#
 
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
@@ -381,11 +533,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                                    level_info_u_acc,
                                                                    -1, n_levels,
                                                                    k_nonlin, residual,
-                                                                   jac_sparse,
-                                                                   jac_sparse_cache,
-                                                                   atol_newton,
-                                                                   maxits_newton,
-                                                                   linear_cache,
+                                                                   #jac_sparse,
+                                                                   #jac_sparse_cache,
+                                                                   #abstol,
+                                                                   #maxiters_nonlin,
+                                                                   #linear_cache,
+                                                                   nonlin_cache,
                                                                    du_para)
     else
         integrator = PairedExplicitRK2IMEXMultiIntegrator(u, du, u_tmp,
@@ -406,9 +559,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           level_info_u,
                                                           -1, n_levels,
                                                           k_nonlin, residual,
-                                                          jac_sparse, jac_sparse_cache,
-                                                          atol_newton, maxits_newton,
-                                                          linear_cache)
+                                                          #jac_sparse, jac_sparse_cache,
+                                                          #abstol, maxiters_nonlin,
+                                                          #linear_cache
+                                                          nonlin_cache)
     end
 
     initialize_callbacks!(callback, integrator)
@@ -416,34 +570,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     return integrator
 end
 
-# Version for not yet constructed `integrator`
-function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
-                                    t, dt, u, du, u_tmp, semi, f,
-                                    element_indices, interface_indices,
-                                    boundary_indices, mortar_indices, u_indices)
-
-    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
-    a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
-
-    # Add implicit contribution
-    @threaded for i in eachindex(u_indices)
-        u_idx = u_indices[i] # Ensure thread safety
-        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
-    end
-
-    # Evaluate implicit stage
-    f(du, u_tmp, semi,
-      #t + alg.c[alg.num_stages] * dt,
-      t + 0.5 * dt, # Hard-coded for IMEX midpoint method
-      element_indices, interface_indices, boundary_indices, mortar_indices)
-
-    # Compute residual
-    @threaded for i in eachindex(u_indices)
-        residual[i] = k_nonlin[i] - du[u_indices[i]]
-    end
-
-    return nothing
-end
+# Version for manual Newton-Raphson, hyperbolic problems
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                                     integrator::PairedExplicitRK2IMEXMultiIntegrator)
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
@@ -475,36 +602,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     return nothing
 end
 
-# Version for hyperbolic-parabolic problems and not yet constructed `integrator`
-function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
-                                    t, dt, u, du, u_tmp, du_para, semi, f,
-                                    element_indices, interface_indices,
-                                    boundary_indices, mortar_indices, u_indices)
-
-    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
-    a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
-
-    # Add implicit contribution
-    @threaded for i in eachindex(u_indices)
-        u_idx = u_indices[i] # Ensure thread safety
-        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
-    end
-
-    # Evaluate implicit stage
-    f(du, u_tmp, semi,
-      #t + alg.c[alg.num_stages] * dt,
-      t + 0.5 * dt, # Hard-coded for IMEX midpoint method
-      du_para,
-      element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
-
-    # Compute residual
-    @threaded for i in eachindex(u_indices)
-        residual[i] = k_nonlin[i] - du[u_indices[i]]
-    end
-
-    return nothing
-end
-# Version for hyperbolic-parabolic problems
+# Version for manual Newton-Raphson, hyperbolic-parabolic problems
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                                     integrator::PairedExplicitRK2IMEXMultiParabolicIntegrator)
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
@@ -538,13 +636,70 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     return nothing
 end
 
+# Version for handed-off nonlinear solve, hyperbolic problems
+function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParams)
+    @unpack t, dt, u, du, u_tmp, semi, f,
+    element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
+
+    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
+    a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
+
+    # Add implicit contribution
+    @threaded for i in eachindex(u_indices)
+        u_idx = u_indices[i] # Ensure thread safety
+        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
+    end
+
+    # Evaluate implicit stage
+    f(du, u_tmp, semi,
+      #t + alg.c[alg.num_stages] * dt,
+      t + 0.5 * dt, # Hard-coded for IMEX midpoint method
+      element_indices, interface_indices, boundary_indices, mortar_indices)
+
+    # Compute residual
+    @threaded for i in eachindex(u_indices)
+        residual[i] = k_nonlin[i] - du[u_indices[i]]
+    end
+
+    return nothing
+end
+
+# Version for handed-off nonlinear solve, hyperbolic-parabolic problems
+function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParamsParabolic)
+    @unpack t, dt, u, du, u_tmp, du_para, semi, f,
+    element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
+
+    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
+    a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
+
+    # Add implicit contribution
+    @threaded for i in eachindex(u_indices)
+        u_idx = u_indices[i] # Ensure thread safety
+        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
+    end
+
+    # Evaluate implicit stage
+    f(du, u_tmp, semi,
+      #t + alg.c[alg.num_stages] * dt,
+      t + 0.5 * dt, # Hard-coded for IMEX midpoint method
+      du_para,
+      element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
+
+    # Compute residual
+    @threaded for i in eachindex(u_indices)
+        residual[i] = k_nonlin[i] - du[u_indices[i]]
+    end
+
+    return nothing
+end
+
 function newton_frozen_jac!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator{2})
     # Compute residual
     residual_S_PERK2IMEXMulti!(integrator.residual, integrator.k_nonlin, integrator)
 
     n = 0
-    while norm(integrator.residual, Inf) > integrator.atol_newton &&
-        n < integrator.maxits_newton
+    while norm(integrator.residual, Inf) > integrator.abstol &&
+        n < integrator.maxiters_nonlin
         # Update RHS
         integrator.linear_cache.b = integrator.residual
         # Newton step
@@ -599,6 +754,7 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
             end
         end
 
+        #=
         res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
                                                                                k_nonlin,
                                                                                integrator)
@@ -609,7 +765,30 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
 
         integrator.linear_cache.A = integrator.jac_sparse # Update system matrix
 
-        @trixi_timeit timer() "Newton-Raphson" newton_frozen_jac!(integrator)
+        @trixi_timeit timer() "Frozen Newton-Raphson" newton_frozen_jac!(integrator)
+        =#
+
+        @trixi_timeit timer() "nonlinear solve" begin
+            SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
+                              # Does not seem to have an effect, need to re-copy data
+                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+
+            # Update scalar fields, which are not automatically constructed as references
+            integrator.nonlin_cache.p.t = integrator.t
+            integrator.nonlin_cache.p.dt = integrator.dt
+
+            sol = SciMLBase.solve!(integrator.nonlin_cache) # Does not allocate more than `SciMLBase.solve!(integrator.nonlin_cache)`, ...
+            # ... but allows to use polyester for copying data back instead of `copyto!`
+            @threaded for i in eachindex(integrator.k_nonlin)
+                integrator.k_nonlin[i] = sol.u[i]
+            end
+
+            #=
+            SciMLBase.solve!(integrator.nonlin_cache)
+            copyto!(integrator.k_nonlin,
+                    NonlinearSolveBase.get_u(integrator.nonlin_cache))
+            =#
+        end
 
         ### Final update ###
         # Joint (with explicit part) re-evaluation of implicit stage

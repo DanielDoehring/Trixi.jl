@@ -5,7 +5,7 @@ using SparseMatrixColorings # For obtaining the coloring vector
 using JLD2 # For loading sparse matrix
 
 import LinearAlgebra:norm
-using LinearSolve
+using NonlinearSolve, LinearSolve, LineSearch, ADTypes
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -138,7 +138,7 @@ restart_file = "restart_000126951.h5"
 restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/restart_data/", restart_file)
 
 tspan = (30 * t_c, 35 * t_c)
-tspan = (30 * t_c, 30.5 * t_c) # For testing only
+tspan = (30 * t_c, 30.25 * t_c) # For testing only
 
 #ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
@@ -380,6 +380,7 @@ dtRatios = [0.26, # Implicit
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
 
 ### Repeat code from integrator init ###
+#=
 u = copy(ode_SD.u0)
 du = zero(u)
 u_tmp = zero(u)
@@ -447,6 +448,7 @@ jldopen("sparsity_info.jld2", "w") do file
     file["jac_prototype"] = jac_prototype
     file["colorvec"] = colorvec  # Also store the coloring vector
 end
+=#
 
 # Load the sparsity information
 jac_prototype_loaded, colorvec_loaded = jldopen("sparsity_info.jld2", "r") do file
@@ -455,9 +457,30 @@ end
 
 maximum(colorvec_loaded) + 1
 
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
 
+# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
+
+dt = 7e-4
+
+atol_lin = 1e-6
+rtol_lin = 1e-4
+#maxiters_lin = 50
+
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
+
+linesearch = LiFukushimaLineSearch()
+linesearch = nothing
+
+# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
+                              linsolve = linsolve,
+                              linesearch = linesearch)
+
+atol_nonlin = 1e-6
+rtol_nonlin = 1e-4
+maxiters_nonlin = 20
+
+#=
 # Factorization-based methods
 
 linear_solver = KLUFactorization()
@@ -467,20 +490,21 @@ linear_solver = KLUFactorization()
 
 #linear_solver = SparspakFactorization() # requires Sparspak.jl
 
-# Iterative methods
-
-#linear_solver = SimpleGMRES()
-#linear_solver = KrylovJL_GMRES()
-#linear_solver = KrylovJL_BICGSTAB()
-
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
-
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt, callback = callbacks,
                         # IMEX-specific kwargs
                         #jac_prototype = jac_prototype, colorvec = colorvec,
                         jac_prototype = jac_prototype_loaded, colorvec = colorvec_loaded,
                         linear_solver = linear_solver,
-                        atol_newton = 1e-6, maxits_newton = 10);
+                        abstol = atol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
+=#
+
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);
