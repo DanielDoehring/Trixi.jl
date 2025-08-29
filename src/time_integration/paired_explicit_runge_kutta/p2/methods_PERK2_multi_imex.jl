@@ -470,7 +470,9 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     # For fixed meshes/no re-partitioning: Allocate only required storage
     u_implicit = level_info_u[alg.num_methods]
-    k_nonlin = zeros(eltype(u), length(u_implicit))
+    n_nonlin = length(u_implicit)
+    println("\nNonlinear system size: ", n_nonlin, " x ", n_nonlin)
+    k_nonlin = zeros(eltype(u), n_nonlin)
     residual = copy(k_nonlin)
 
     # Initialize `k_nonlin` with values from `du`
