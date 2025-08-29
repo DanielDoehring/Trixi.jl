@@ -1,6 +1,6 @@
 using Trixi
 using LinearAlgebra: norm
-using LinearSolve
+using NonlinearSolve, LinearSolve, LineSearch, ADTypes
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -125,7 +125,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.0491) # 6.05
+tspan = (load_time(restart_filename), 6.04901) # 6.05
 
 #ode = semidiscretize(semi, tspan, restart_filename)
 ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false)
@@ -165,7 +165,7 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                                            rho_inf(),
                                                                            u_inf(), A))
 
-analysis_interval = 50 #100_000
+analysis_interval = 5 #100_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,)
@@ -255,7 +255,7 @@ callbacks = CallbackSet(summary_callback,
                         #save_solution,
                         #save_restart,
                         #stepsize_callback
-                        )
+                        );
 
 # Run the simulation
 ###############################################################################
@@ -269,14 +269,17 @@ ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_comple
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, path)
 
-sol = Trixi.solve(ode, ode_alg, dt = 9e-8, # Hyp-Para without stepsize control. 1e-7 already unstable
+sol = Trixi.solve(ode, ode_alg, dt = 9.5e-8, # Hyp-Para without stepsize control. 1e-7 already unstable
                   save_everystep = false, callback = callbacks);
 =#
 ###############################################################################
 # IMEX
 
+dt_implicit = 0.8
+dt_implicit = 0.9
+
 dtRatios_imex_p2 = [
-    0.8,
+    dt_implicit,
     0.753155136853456,
     0.695487338849343,
     0.641318947672844,
@@ -292,26 +295,35 @@ dtRatios_imex_p2 = [
     0.123865127563477,
     0.0781898498535156,
     0.0436210632324219
-] ./ 0.8
+] ./ dt_implicit
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages_complete_p2, path, dtRatios_imex_p2)
 
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+atol_lin = 1e-3
+rtol_lin = 1e-2
+#maxiters_lin = 50
 
-#linear_solver = KLUFactorization()
-linear_solver = UMFPACKFactorization()
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
 
-#linear_solver = SimpleGMRES()
-#linear_solver = KrylovJL_GMRES()
+linesearch = LiFukushimaLineSearch()
+linesearch = nothing
 
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit
+# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
+                              linsolve = linsolve,
+                              linesearch = linesearch)
 
-#linear_solver = SparspakFactorization() # requires Sparspak.jl
+atol_nonlin = atol_lin
+rtol_nonlin = rtol_lin
+#maxiters_nonlin = 20
 
-integrator = Trixi.init(ode, ode_alg; dt = 1e-7, # Hyp-Para without stepsize control
-                        callback = callbacks,
-                        linear_solver = linear_solver,
-                        atol_newton = 1e-4, maxits_newton = 10);
+dt_init = 9.5e-8 # dt_implicit = 0.8
+dt_init = 1.05e-7 # dt_implicit = 0.9
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt_init, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin);
 
 sol = Trixi.solve!(integrator);
+
