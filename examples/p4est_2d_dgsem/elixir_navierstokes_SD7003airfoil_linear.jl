@@ -139,6 +139,7 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 30.25 * t_c) # For testing only
+tspan = (30 * t_c, 30 * t_c) # Plot sol
 
 #ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
@@ -201,12 +202,96 @@ cfl = 6.1 # PERRK 4 Multi Split (14, 10) # Seems to have no benefit of RESTARTED
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-# For plots etc
+### Plot which cells are convection and which are diffusion dominated
+extra_node_variables = (:cfl_diffusion, :cfl_convection)
+
+function Trixi.get_node_variable(::Val{:cfl_diffusion}, u, mesh, equations, dg, cache,
+                                 equations_parabolic, cache_parabolic)
+    n_nodes = nnodes(dg)
+    n_elements = nelements(dg, cache)
+    # By definition, the variable must be provided at every node of every element!
+    # Otherwise, the `SaveSolutionCallback` will crash.
+    cfl_d_array = zeros(eltype(cache.elements),
+                            n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
+                            n_elements)
+
+    @unpack contravariant_vectors, inverse_jacobian = cache.elements
+
+    # We can accelerate the computation by thread-parallelizing the loop over elements
+    # by using the `@threaded` macro.
+    Trixi.@threaded for element in eachelement(dg, cache)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, element)
+
+            # Speeds
+            d = Trixi.max_diffusivity(u_node, equations_parabolic)
+
+            # Mesh data
+            Ja11, Ja12 = Trixi.get_contravariant_vector(1, contravariant_vectors, i, j,
+                                                  element)
+            Ja21, Ja22 = Trixi.get_contravariant_vector(2, contravariant_vectors, i, j,
+                                                  element)
+
+            inv_jacobian = abs(inverse_jacobian[i, j, element])
+
+            # See FLUXO:
+            # https://github.com/project-fluxo/fluxo/blob/c7e0cc9b7fd4569dcab67bbb6e5a25c0a84859f1/src/equation/navierstokes/calctimestep.f90#L130-L137
+            d1_transformed = d * (Ja11^2 + Ja12^2) * inv_jacobian^2
+            d2_transformed = d * (Ja21^2 + Ja22^2) * inv_jacobian^2
+
+            cfl_d_array[i, j, element] = d1_transformed + d2_transformed
+        end
+    end
+
+    return cfl_d_array
+end
+
+function Trixi.get_node_variable(::Val{:cfl_convection}, u, mesh, equations, dg, cache,
+                                 equations_parabolic, cache_parabolic)
+    n_nodes = nnodes(dg)
+    n_elements = nelements(dg, cache)
+    # By definition, the variable must be provided at every node of every element!
+    # Otherwise, the `SaveSolutionCallback` will crash.
+    cfl_a_array = zeros(eltype(cache.elements),
+                            n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
+                            n_elements)
+
+    @unpack contravariant_vectors, inverse_jacobian = cache.elements
+
+    # We can accelerate the computation by thread-parallelizing the loop over elements
+    # by using the `@threaded` macro.
+    Trixi.@threaded for element in eachelement(dg, cache)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, element)
+
+            # Speeds
+            a1, a2 = Trixi.max_abs_speeds(u_node, equations)
+
+            # Mesh data
+            Ja11, Ja12 = Trixi.get_contravariant_vector(1, contravariant_vectors, i, j,
+                                                  element)
+            Ja21, Ja22 = Trixi.get_contravariant_vector(2, contravariant_vectors, i, j,
+                                                  element)
+
+            inv_jacobian = abs(inverse_jacobian[i, j, element])
+
+            # Transform
+            a1_transformed = abs(Ja11 * a1 + Ja12 * a2) * inv_jacobian
+            a2_transformed = abs(Ja21 * a1 + Ja22 * a2) * inv_jacobian
+
+            cfl_a_array[i, j, element] = a1_transformed + a2_transformed
+        end
+    end
+
+    return cfl_a_array
+end
+
 save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
-                                     output_directory = "out")
+                                     output_directory = "out",
+                                     extra_node_variables = extra_node_variables)
 
 alive_callback = AliveCallback(alive_interval = 50) # 500
 
@@ -215,7 +300,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 
 callbacks = CallbackSet(#stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        #save_solution, # For plotting during measurement run
+                        save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
                         analysis_callback,
                         summary_callback);
@@ -248,7 +333,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxat
 ### Split-Multi methods ###
 
 # p = 2
-#=
+
 Stages = [14, 12, 10, 8, 7, 6, 5, 4, 3, 2]
 dtRatios = [0.253144726232790162612, # 14
     0.214041846963368698198,  # 12
@@ -359,7 +444,7 @@ dt = 1e-3 # PERK4, dt_c = 2e-4
 sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
-=#
+
 
 ###############################################################################
 # IMEX
