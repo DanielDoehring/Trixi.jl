@@ -15,7 +15,7 @@ c_inf = 1.0
 
 rho_inf = 1.4 # with gamma = 1.4 => p_inf = 1.0
 
-Re = 10000.0
+Re = 10^4
 airfoil_cord_length = 1.0
 
 t_c = airfoil_cord_length / U_inf

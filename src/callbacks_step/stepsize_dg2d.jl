@@ -115,6 +115,47 @@ function max_dt(u, t,
 end
 
 function max_dt(u, t,
+                mesh::P4estMesh{2}, # Diffusive terms only for `TreeMesh` and `P4estMesh`
+                constant_diffusivity::False, equations,
+                equations_parabolic::AbstractEquationsParabolic,
+                dg::DG, cache)
+    # to avoid a division by zero if the speed vanishes everywhere,
+    # e.g. for steady-state linear advection
+    max_scaled_speed = nextfloat(zero(t))
+
+    @unpack contravariant_vectors, inverse_jacobian = cache.elements
+
+    @batch reduction=(max, max_scaled_speed) for element in eachelement(dg, cache)
+        max_lambda1 = max_lambda2 = zero(max_scaled_speed)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, element)
+            # TODO: Return two (i.e., per direction) or only one speed?
+            # For Navier-Stokes (the only parabolic equation with non-constant diffusivity) 
+            # we have only one diffusivity irrespective of direction
+            lambda1 = max_diffusivity(u_node, equations_parabolic)
+
+            # Local speeds transformed to the reference element
+            Ja11, Ja12 = get_contravariant_vector(1, contravariant_vectors, i, j,
+                                                  element)
+
+            lambda1_transformed = lambda1 * (Ja11^2 + Ja12^2)
+            Ja21, Ja22 = get_contravariant_vector(2, contravariant_vectors, i, j,
+                                                  element)
+            lambda2_transformed = lambda1 * (Ja21^2 + Ja22^2)
+
+            inv_jacobian = abs(inverse_jacobian[i, j, element])
+
+            max_lambda1 = max(max_lambda1, lambda1_transformed * inv_jacobian^2)
+            max_lambda2 = max(max_lambda2, lambda2_transformed * inv_jacobian^2)
+        end
+
+        max_scaled_speed = max(max_scaled_speed, max_lambda1 + max_lambda2)
+    end
+
+    return 2 / (nnodes(dg) * max_scaled_speed)
+end
+
+function max_dt(u, t,
                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2},
                             P4estMeshView{2}, T8codeMesh{2}, StructuredMeshView{2}},
                 constant_speed::True, equations, dg::DG, cache)
