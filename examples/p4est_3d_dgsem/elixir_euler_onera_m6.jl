@@ -1,7 +1,7 @@
 using Trixi
 using LinearAlgebra: norm
 
-using LineSearch, NonlinearSolve
+using NonlinearSolve, LinearSolve, LineSearch, ADTypes
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -196,7 +196,9 @@ Stages_complete_p2 = reverse(collect(range(2, 16)))
 # Only Flux-Differencing #
 cfl_interval = 2
 
-stepsize_callback = StepsizeCallback(cfl = 13.3, interval = cfl_interval) # PERK p2 2-16
+cfl = 13.3 # PERK p2 2-16
+#cfl = 14.1 # IMEX PERK p2 2-16
+stepsize_callback = StepsizeCallback(cfl = cfl, interval = cfl_interval)
 
 #path = base_path * "k2/p3/"
 
@@ -245,6 +247,30 @@ callbacks = CallbackSet(summary_callback,
 ## k = 2, p = 2 ##
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
 
+## k = 2, p = 3 ##
+
+#newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
+
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
+#ode_alg = Trixi.PairedExplicitRK3(15, path)
+#=
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3;
+                                                 relaxation_solver = newton)
+=#
+#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, path; relaxation_solver = newton)                                                 
+
+#ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
+#ode_alg = Trixi.CKL43()
+
+#ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
+#ode_alg = Trixi.RK33()
+
+sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
+                  save_everystep = false, callback = callbacks);
+
+###############################################################################
+# IMEX
+
 dtRatios_imex_p2 = [
     0.8,
     0.753155136853456,
@@ -266,43 +292,31 @@ dtRatios_imex_p2 = [
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages_complete_p2, path, dtRatios_imex_p2)
 
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+atol_lin = 1e-5
+rtol_lin = 1e-4
+#maxiters_lin = 50
 
-#linear_solver = KLUFactorization()
-linear_solver = UMFPACKFactorization()
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
 
-#linear_solver = SimpleGMRES()
-#linear_solver = KrylovJL_GMRES()
+linesearch = LiFukushimaLineSearch()
+linesearch = nothing
 
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit
+# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
+                              linsolve = linsolve,
+                              linesearch = linesearch)
 
-#linear_solver = SparspakFactorization() # requires Sparspak.jl
+atol_nonlin = atol_lin
+rtol_nonlin = rtol_lin
+maxiters_nonlin = 20
 
-integrator = Trixi.init(ode, ode_alg; dt = 1e-6, callback = callbacks,
-                        linear_solver = linear_solver,
-                        atol_newton = 1e-6, maxits_newton = 10);
+dt_init = 1e-7
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt_init, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);
-
-## k = 2, p = 3 ##
-
-newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
-
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
-#ode_alg = Trixi.PairedExplicitRK3(15, path)
-#=
-ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3;
-                                                 relaxation_solver = newton)
-=#
-#ode_alg = Trixi.PairedExplicitRelaxationRK3(15, path; relaxation_solver = newton)                                                 
-
-#ode_alg = Trixi.RelaxationCKL43(; relaxation_solver = newton)
-#ode_alg = Trixi.CKL43()
-
-#ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
-#ode_alg = Trixi.RK33()
-
-sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
-                  save_everystep = false, callback = callbacks);
 
