@@ -1,6 +1,6 @@
 using Trixi
 
-using LinearSolve
+using NonlinearSolve, LinearSolve, ADTypes
 
 # Ratio of specific heats
 gamma = 1.4
@@ -145,31 +145,27 @@ dtRatios = [
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path, dtRatios)
 
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+atol_lin = 1e-5
+rtol_lin = 1e-3
+#maxiters_lin = 50
 
-# Factorization-based methods
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
 
-#linear_solver = KLUFactorization() # Does not converge for this example
-#linear_solver = UMFPACKFactorization()
+# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
+                              linsolve = linsolve)
 
-#linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
-
-#linear_solver = SparspakFactorization() # requires Sparspak.jl
-
-# Iterative methods
-
-#linear_solver = SimpleGMRES()
-linear_solver = KrylovJL_GMRES()
-#linear_solver = KrylovJL_BICGSTAB()
-
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
+atol_nonlin = atol_lin
+rtol_nonlin = rtol_lin
+maxiters_nonlin = 20
 
 dt_implicit = dt_explicit * timestep_implicit / timestep_explicit
 dt_implicit = 8e-3
-
-integrator = Trixi.init(ode, ode_alg; dt = dt_implicit, callback = callbacks,
-                        linear_solver = linear_solver,
-                        atol_newton = 1e-6, maxits_newton = 10);
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt_implicit, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);

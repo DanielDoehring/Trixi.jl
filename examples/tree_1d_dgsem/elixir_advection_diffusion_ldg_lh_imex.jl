@@ -1,6 +1,6 @@
 using Trixi
 
-using LinearSolve
+using NonlinearSolve, LinearSolve, ADTypes
 
 # semidiscretization of the linear advection diffusion equation
 
@@ -82,33 +82,27 @@ path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p
 #ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
 
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+atol_lin = 1e-8
+rtol_lin = 1e-6
+#maxiters_lin = 50
 
-# Factorization-based methods
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
 
-linear_solver = KLUFactorization()
-#linear_solver = UMFPACKFactorization()
+# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
+                              linsolve = linsolve)
 
-#linear_solver = MKLPardisoFactorize() # requires Pardiso.jl; slow
-
-#linear_solver = SparspakFactorization() # requires Sparspak.jl
-
-# Iterative methods
-
-#linear_solver = SimpleGMRES()
-#linear_solver = KrylovJL_GMRES()
-#linear_solver = KrylovJL_BICGSTAB()
-
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
-
-# HYPRE & MKL do not work with sparsity structure of the Jacobian
+atol_nonlin = atol_lin
+rtol_nonlin = rtol_lin
+maxiters_nonlin = 20
 
 #dt = 2.0 / (2^3) # Operator-split RHS IMEX algorithms
-dt = 0.01 / (2^1) # PERK IMEX test algorithms
-
-integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
-                        linear_solver = linear_solver,
-                        atol_newton = 1e-8, maxits_newton = 100);
+dt = 0.01 / (2^3) # PERK IMEX test algorithms
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);

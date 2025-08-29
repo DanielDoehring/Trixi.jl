@@ -1,7 +1,6 @@
 using Trixi
 
-using LinearSolve
-#using Sparspak
+using NonlinearSolve, LinearSolve, ADTypes
 
 ###############################################################################
 # semidiscretization of the linear advection equation
@@ -27,7 +26,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_convergen
 # ODE solvers, callbacks etc.
 
 t0 = 0.0
-t_end = 2.0
+t_end = 0.0
 t_span = (t0, t_end)
 
 ode = semidiscretize(semi, t_span)
@@ -60,24 +59,27 @@ sol = Trixi.solve(ode, ode_alg, dt = dt,
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti([16, 8], path, [1, 1])
 #ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12, 6], path, [1, 1])
 
-### Linear Solver ###
-# See https://docs.sciml.ai/LinearSolve/stable/solvers/solvers/
+atol_lin = 1e-8
+rtol_lin = 1e-6
+#maxiters_lin = 50
 
-linear_solver = KLUFactorization()
-#linear_solver = UMFPACKFactorization()
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
 
-#linear_solver = SimpleGMRES()
-#linear_solver = KrylovJL_GMRES()
+# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
+                              linsolve = linsolve)
 
-# TODO: Could try algorithms from IterativeSolvers, KrylovKit
+atol_nonlin = atol_lin
+rtol_nonlin = rtol_lin
+maxiters_nonlin = 20
 
-#linear_solver = SparspakFactorization() # requires Sparspak.jl
-
-
-n_conv = 0
+n_conv = 3
 dt = (8e-3)/2^n_conv
-integrator = Trixi.init(ode, ode_alg; dt = dt, callback = callbacks,
-                        linear_solver = linear_solver,
-                        atol_newton = 1e-8, maxits_newton = 100);
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);
