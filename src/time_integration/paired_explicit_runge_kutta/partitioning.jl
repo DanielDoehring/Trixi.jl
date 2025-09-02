@@ -597,7 +597,11 @@ function partition_variables!(level_info_elements,
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
-        # Beyond linear scaling of timestep
+        # Partitioning strategy:
+        # Use highest method for smallest elements, cells that are "too coarse" are 
+        # "cut off" and integrated with the lowest method.
+        # Alternatively, one could also start from the coarsest cells and then 
+        # "cut off" the finest cells by using the most expensive method for them.
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -623,7 +627,6 @@ function partition_variables!(level_info_elements,
         h2 = h_min_per_element[element_id2]
         h = min(h1, h2)
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -644,7 +647,6 @@ function partition_variables!(level_info_elements,
         element_id = boundaries.neighbor_ids[boundary_id]
         h = h_min_per_element[element_id]
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -671,7 +673,6 @@ function partition_variables!(level_info_elements,
 
         h = min(h_lower, h_higher)
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -721,7 +722,6 @@ function partition_variables!(level_info_elements,
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -768,7 +768,6 @@ function partition_variables!(level_info_elements,
         h1 = h_min_per_element[element_id1]
         h2 = h_min_per_element[element_id2]
 
-        # Beyond linear scaling of timestep
         level1 = findfirst(x -> x < (h_min / h1)^dt_scaling_order, dt_ratios)
         level2 = findfirst(x -> x < (h_min / h2)^dt_scaling_order, dt_ratios)
 
@@ -825,7 +824,6 @@ function partition_variables!(level_info_elements,
         element_id = boundaries.neighbor_ids[boundary_id]
         h = h_min_per_element[element_id]
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -867,7 +865,6 @@ function partition_variables!(level_info_elements,
 
         h = min(h_lower, h_higher)
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -909,7 +906,6 @@ function partition_variables!(level_info_elements, n_levels,
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -956,7 +952,6 @@ function partition_variables!(level_info_elements,
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -982,7 +977,6 @@ function partition_variables!(level_info_elements,
         h2 = h_min_per_element[element_id2]
         h = min(h1, h2)
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -1006,7 +1000,6 @@ function partition_variables!(level_info_elements,
         h2 = h_min_per_element[element_id2]
         h = min(h1, h2)
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -1027,7 +1020,6 @@ function partition_variables!(level_info_elements,
         element_id = boundaries.neighbor_ids[boundary_id]
         h = h_min_per_element[element_id]
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -1054,7 +1046,6 @@ function partition_variables!(level_info_elements,
 
         h = min(h_lower, h_higher)
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -1080,7 +1071,6 @@ function partition_variables!(level_info_elements,
 
         h = min(h_lower, h_higher)
 
-        # Beyond linear scaling of timestep
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -1119,8 +1109,6 @@ function partition_variables!(level_info_elements,
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
-        # This approach is "method-based" in the sense that
-        # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
@@ -1166,8 +1154,6 @@ function partition_variables!(level_info_elements,
     for element_id in 1:n_elements
         h = h_min_per_element[element_id]
 
-        # This approach is "method-based" in the sense that
-        # the available methods get mapped linearly onto the grid, with cut-off for the too-coarse cells
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
