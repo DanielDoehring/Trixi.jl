@@ -132,7 +132,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
 #=
-mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType <: AbstractVector,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
                                                     uImplicitType,
@@ -186,7 +186,7 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
 end
 =#
 
-mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType <: AbstractVector,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
                                                     uImplicitType,
@@ -251,7 +251,7 @@ mutable struct NonlinParams{RealT <: Real, uType <: AbstractVector,
 end
 
 #=
-mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType <: AbstractVector,
                                                              Params, Sol, F,
                                                              PairedExplicitRKOptions,
                                                              uImplicitType,
@@ -313,7 +313,7 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
 end
 =#
 
-mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType <: AbstractVector,
                                                              Params, Sol, F,
                                                              PairedExplicitRKOptions,
                                                              uImplicitType,

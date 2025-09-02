@@ -67,7 +67,7 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
-mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real, uType <: AbstractVector,
                                                      Params, Sol, F,
                                                      PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSplitMultiIntegrator{4}
@@ -301,7 +301,7 @@ function PairedExplicitRK4SplitMulti(stages::Vector{Int64},
 end
 
 # Version with DIFFERENT number of stages and partitioning(!) for hyperbolic and parabolic part
-mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real, uType <: AbstractVector,
                                                      Params, Sol, F,
                                                      PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSplitMultiIntegrator{4}

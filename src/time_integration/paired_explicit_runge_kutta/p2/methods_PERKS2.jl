@@ -49,7 +49,7 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK2SplitIntegrator{RealT <: Real, uType,
+mutable struct PairedExplicitRK2SplitIntegrator{RealT <: Real, uType <: AbstractVector,
                                                 Params, Sol, F,
                                                 PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSplitSingleIntegrator{2}
