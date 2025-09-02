@@ -598,10 +598,8 @@ function partition_variables!(level_info_elements,
         h = h_min_per_element[element_id]
 
         # Partitioning strategy:
-        # Use highest method for smallest elements, cells that are "too coarse" are 
-        # "cut off" and integrated with the lowest method.
-        # Alternatively, one could also start from the coarsest cells and then 
-        # "cut off" the finest cells by using the most expensive method for them.
+        # Use highest method for smallest elements, since these govern the stable timestep.
+        # Cells that are "too coarse" are "cut off" and integrated with the lowest method.
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing

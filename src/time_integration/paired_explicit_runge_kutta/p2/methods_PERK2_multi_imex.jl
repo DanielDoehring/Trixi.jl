@@ -412,6 +412,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
+    # TODO: Supply solution and check actual timestep restriction!
     partition_variables!(level_info_elements,
                          level_info_elements_acc,
                          level_info_interfaces_acc,
