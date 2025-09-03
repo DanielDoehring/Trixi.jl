@@ -91,7 +91,7 @@ mesh_file = mesh_path * "m6wing_sanitized.inp"
 
 boundary_symbols = [:Symmetry, :FarField, :BottomWing, :TopWing]
 
-mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
+mesh = P4estMesh{3}(mesh_file, boundary_symbols = boundary_symbols)
 
 boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
                            :FarField => bc_farfield, # Farfield: bc_farfield
@@ -341,7 +341,7 @@ stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(
 callbacks = CallbackSet(summary_callback,
                         #alive_callback,
                         analysis_callback,
-                        save_solution,
+                        #save_solution,
                         #save_restart,
                         #stepsize_callback
                         );
