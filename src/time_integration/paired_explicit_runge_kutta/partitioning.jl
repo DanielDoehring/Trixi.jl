@@ -586,16 +586,15 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
+    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes,
+                                                         real(mesh))
 
     #println("h_min: ", h_min, " h_max: ", h_max)
     #println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         # Partitioning strategy:
         # Use highest method for smallest elements, since these govern the stable timestep.
@@ -621,8 +620,8 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element[element_id1]
-        h2 = h_min_per_element[element_id2]
+        h1 = h_min_per_element_[element_id1]
+        h2 = h_min_per_element_[element_id2]
         h = min(h1, h2)
 
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
@@ -643,7 +642,7 @@ function partition_variables!(level_info_elements,
     for boundary_id in 1:n_boundaries
         # Get element id (boundaries have only one unique associated element)
         element_id = boundaries.neighbor_ids[boundary_id]
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -664,10 +663,10 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element[element_id_lower]
+        h_lower = h_min_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element[element_id_higher]
+        h_higher = h_min_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
@@ -709,16 +708,15 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
+    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes,
+                                                         real(mesh))
 
     #println("h_min: ", h_min, " h_max: ", h_max)
     #println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -763,8 +761,8 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element[element_id1]
-        h2 = h_min_per_element[element_id2]
+        h1 = h_min_per_element_[element_id1]
+        h2 = h_min_per_element_[element_id2]
 
         level1 = findfirst(x -> x < (h_min / h1)^dt_scaling_order, dt_ratios)
         level2 = findfirst(x -> x < (h_min / h2)^dt_scaling_order, dt_ratios)
@@ -820,7 +818,7 @@ function partition_variables!(level_info_elements,
     for boundary_id in 1:n_boundaries
         # Get element id (boundaries have only one unique associated element)
         element_id = boundaries.neighbor_ids[boundary_id]
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -856,10 +854,10 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element[element_id_lower]
+        h_lower = h_min_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element[element_id_higher]
+        h_higher = h_min_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
@@ -890,10 +888,9 @@ function partition_variables!(level_info_elements, n_levels,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
+    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes,
+                                                         real(mesh))
     # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
     h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
     h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
@@ -902,7 +899,7 @@ function partition_variables!(level_info_elements, n_levels,
     println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -934,12 +931,11 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    # `h_min_per_element` needs to be recomputed after balancing as 
+    # `h_min_per_element_` needs to be recomputed after balancing as 
     # the number of elements per rank may have changed
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
+    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes,
+                                                         real(mesh))
     # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
     h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
     h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
@@ -948,7 +944,7 @@ function partition_variables!(level_info_elements,
     #println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -971,8 +967,8 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element[element_id1]
-        h2 = h_min_per_element[element_id2]
+        h1 = h_min_per_element_[element_id1]
+        h2 = h_min_per_element_[element_id2]
         h = min(h1, h2)
 
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
@@ -994,8 +990,8 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element[element_id1]
-        h2 = h_min_per_element[element_id2]
+        h1 = h_min_per_element_[element_id1]
+        h2 = h_min_per_element_[element_id2]
         h = min(h1, h2)
 
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
@@ -1016,7 +1012,7 @@ function partition_variables!(level_info_elements,
     for boundary_id in 1:n_boundaries
         # Get element id (boundaries have only one unique associated element)
         element_id = boundaries.neighbor_ids[boundary_id]
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < h_min / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -1037,10 +1033,10 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element[element_id_lower]
+        h_lower = h_min_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element[element_id_higher]
+        h_higher = h_min_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
@@ -1062,10 +1058,10 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mpi_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element[element_id_lower]
+        h_lower = h_min_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element[element_id_higher]
+        h_higher = h_min_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
@@ -1096,16 +1092,15 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
+    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes,
+                                                         real(mesh))
 
     println("h_min: ", h_min, " h_max: ", h_max)
     println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -1141,16 +1136,15 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element, h_min, h_max = get_hmin_per_element(mesh, cache.elements,
-                                                           n_elements,
-                                                           nnodes,
-                                                           eltype(dg.basis.nodes))
+    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes,
+                                                         real(mesh))
 
     println("h_min: ", h_min, " h_max: ", h_max)
     println("h_max/h_min: ", h_max / h_min, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element[element_id]
+        h = h_min_per_element_[element_id]
 
         level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
@@ -1198,19 +1192,19 @@ function partition_variables!(level_info_elements,
     return nothing
 end
 
-function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nnodes,
-                              RealT)
+function h_min_per_element(mesh::StructuredMesh{1}, elements,
+                           n_elements, nnodes, RealT)
     h_min = floatmax(RealT)
     h_max = zero(RealT)
 
-    hmin_per_element = zeros(n_elements)
+    h_min_per_element_ = zeros(n_elements)
 
     for element_id in 1:n_elements
         P0 = elements.node_coordinates[1, 1, element_id]
         P1 = elements.node_coordinates[1, nnodes, element_id]
         h = abs(P1 - P0) # Assumes P1 > P0
 
-        hmin_per_element[element_id] = h
+        h_min_per_element_[element_id] = h
         if h > h_max
             h_max = h
         end
@@ -1219,15 +1213,15 @@ function get_hmin_per_element(mesh::StructuredMesh{1}, elements, n_elements, nno
         end
     end
 
-    return hmin_per_element, h_min, h_max
+    return h_min_per_element_, h_min, h_max
 end
 
-function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements,
-                              n_elements, nnodes, RealT)
+function h_min_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements,
+                           n_elements, nnodes, RealT)
     h_min = floatmax(RealT)
     h_max = zero(RealT)
 
-    hmin_per_element = zeros(n_elements)
+    h_min_per_element_ = zeros(n_elements)
 
     for element_id in 1:n_elements
         # pull the four corners numbered as
@@ -1260,7 +1254,7 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
         # For square elements (RTI)
         #L0 = abs(P1[1] - P0[1])
         #h = L0
-        hmin_per_element[element_id] = h
+        h_min_per_element_[element_id] = h
 
         # Set global `h_min` and `h_max`, i.e., for the entire mesh
         if h > h_max
@@ -1271,15 +1265,15 @@ function get_hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elem
         end
     end
 
-    return hmin_per_element, h_min, h_max
+    return h_min_per_element_, h_min, h_max
 end
 
-function get_hmin_per_element(mesh::P4estMesh{3}, elements,
-                              n_elements, nnodes, RealT)
+function h_min_per_element(mesh::P4estMesh{3}, elements,
+                           n_elements, nnodes, RealT)
     h_min = floatmax(RealT)
     h_max = zero(RealT)
 
-    hmin_per_element = zeros(n_elements)
+    h_min_per_element_ = zeros(n_elements)
 
     for element_id in 1:n_elements
         # pull the eight corners numbered as
@@ -1334,7 +1328,7 @@ function get_hmin_per_element(mesh::P4estMesh{3}, elements,
         L11 = norm(P3 - P7)
 
         h = min(L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11)
-        hmin_per_element[element_id] = h
+        h_min_per_element_[element_id] = h
 
         # Set global `h_min` and `h_max`, i.e., for the entire mesh
         if h > h_max
@@ -1345,7 +1339,10 @@ function get_hmin_per_element(mesh::P4estMesh{3}, elements,
         end
     end
 
-    return hmin_per_element, h_min, h_max
+    return h_min_per_element_, h_min, h_max
+end
+
+function dtmax_per_element()
 end
 
 # Partitioning function for approach: Each level stores its indices
