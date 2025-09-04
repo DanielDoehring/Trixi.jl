@@ -91,7 +91,7 @@ mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_sy
 boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
                            :FarField => bc_farfield, # Farfield: bc_farfield
                            :BottomWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
-                           :TopWing => boundary_condition_slip_wall, # Wing: bc_slip_wall
+                           :TopWing => boundary_condition_slip_wall # Wing: bc_slip_wall
                           )
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
