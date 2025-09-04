@@ -1432,6 +1432,7 @@ function hmin_per_element(mesh::P4estMesh{3}, elements,
     return hmin_per_element_, hmin, hmax
 end
 
+# TODO: 2D version
 function dtmax_per_element(u, mesh::P4estMesh{3}, equations, dg, cache)
     n_nodes = nnodes(dg)
     n_elements = nelements(dg, cache)

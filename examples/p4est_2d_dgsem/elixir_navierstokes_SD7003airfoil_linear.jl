@@ -139,7 +139,7 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 30.25 * t_c) # For testing only
-tspan = (30 * t_c, 30 * t_c) # Plot sol
+#tspan = (30 * t_c, 30 * t_c) # Plot sol
 
 #ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi

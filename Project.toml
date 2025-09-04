@@ -81,7 +81,6 @@ CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Convex = "f65535da-76fb-5f13-bab9-19810c17039a"
 ECOS = "e2685f51-7e38-5353-a97d-a921fd2c8199"
 NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
-SparseConnectivityTracer = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
 
 [extensions]
 TrixiCUDAExt = "CUDA"
