@@ -48,6 +48,70 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
+                              n_levels,
+                              semi::AbstractSemidiscretization,
+                              alg)
+    mesh, _, dg, cache = mesh_equations_solver_cache(semi)
+
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
+                         n_levels, mesh, dg, cache, alg)
+end
+
+
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
+                              n_levels,
+                              semi::SemidiscretizationHyperbolicParabolic,
+                              alg)
+    mesh, _, dg, cache = mesh_equations_solver_cache(semi)
+
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
+                         n_levels, mesh, dg, cache, alg,
+                         parabolic = true)
+end
+
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
+                              # MPI additions
+                              level_info_mpi_interfaces_acc,
+                              level_info_mpi_mortars_acc,
+                              n_levels,
+                              semi::AbstractSemidiscretization,
+                              alg)
+    mesh, _, dg, cache = mesh_equations_solver_cache(semi)
+
+    partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
+                              # MPI additions
+                              level_info_mpi_interfaces_acc,
+                              level_info_mpi_mortars_acc,
+                              n_levels, 
+                              mesh, dg, cache,
+                              alg)
+end
+
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
                               n_levels, mesh::TreeMesh, dg, cache,
                               alg)
     @unpack elements, interfaces, boundaries = cache
@@ -587,8 +651,7 @@ function partition_variables!(level_info_elements,
     n_elements = nelements(dg, cache)
 
     hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes,
-                                                     real(mesh))
+                                                     n_elements, nnodes)
 
     #println("hmin: ", hmin, " hmax: ", hmax)
     #println("hmax/hmin: ", hmax / hmin, "\n")
@@ -709,8 +772,7 @@ function partition_variables!(level_info_elements,
     n_elements = nelements(dg, cache)
 
     hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes,
-                                                     real(mesh))
+                                                     n_elements, nnodes)
 
     #println("hmin: ", hmin, " hmax: ", hmax)
     #println("hmax/hmin: ", hmax / hmin, "\n")
@@ -878,6 +940,16 @@ function partition_variables!(level_info_elements,
     return nothing
 end
 
+function partition_variables!(level_info_elements, n_levels,
+                              semi::AbstractSemidiscretization, alg)
+
+    mesh, _, dg, cache = mesh_equations_solver_cache(semi)
+
+    partition_variables!(level_info_elements, n_levels,
+                         mesh, dg, cache,
+                         alg)
+end
+
 # Assign number of stage evaluations to elements for stage-evaluations weighted MPI load balancing.
 function partition_variables!(level_info_elements, n_levels,
                               mesh::ParallelP4estMesh, dg, cache,
@@ -889,8 +961,8 @@ function partition_variables!(level_info_elements, n_levels,
     n_elements = nelements(dg, cache)
 
     hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes,
-                                                     real(mesh))
+                                                     n_elements, nnodes)
+
     # Synchronize `hmin`, `hmax` to have consistent partitioning across ranks
     hmin = MPI.Allreduce!(Ref(hmin), Base.min, mpi_comm())[]
     hmax = MPI.Allreduce!(Ref(hmax), Base.max, mpi_comm())[]
@@ -934,8 +1006,8 @@ function partition_variables!(level_info_elements,
     # `hmin_per_element_` needs to be recomputed after balancing as 
     # the number of elements per rank may have changed
     hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes,
-                                                     real(mesh))
+                                                     n_elements, nnodes)
+
     # Synchronize `hmin`, `hmax` to have consistent partitioning across ranks
     hmin = MPI.Allreduce!(Ref(hmin), Base.min, mpi_comm())[]
     hmax = MPI.Allreduce!(Ref(hmax), Base.max, mpi_comm())[]
@@ -1093,8 +1165,7 @@ function partition_variables!(level_info_elements,
     n_elements = nelements(dg, cache)
 
     hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes,
-                                                     real(mesh))
+                                                     n_elements, nnodes)
 
     println("hmin: ", hmin, " hmax: ", hmax)
     println("hmax/hmin: ", hmax / hmin, "\n")
@@ -1137,8 +1208,7 @@ function partition_variables!(level_info_elements,
     n_elements = nelements(dg, cache)
 
     hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes,
-                                                     real(mesh))
+                                                     n_elements, nnodes)
 
     println("hmin: ", hmin, " hmax: ", hmax)
     println("hmax/hmin: ", hmax / hmin, "\n")
@@ -1193,7 +1263,8 @@ function partition_variables!(level_info_elements,
 end
 
 function hmin_per_element(mesh::StructuredMesh{1}, elements,
-                          n_elements, nnodes, RealT)
+                          n_elements, nnodes)
+    RealT = real(mesh)
     hmin = floatmax(RealT)
     hmax = zero(RealT)
 
@@ -1217,7 +1288,8 @@ function hmin_per_element(mesh::StructuredMesh{1}, elements,
 end
 
 function hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements,
-                          n_elements, nnodes, RealT)
+                          n_elements, nnodes)
+    RealT = real(mesh)
     hmin = floatmax(RealT)
     hmax = zero(RealT)
 
@@ -1269,7 +1341,8 @@ function hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements
 end
 
 function hmin_per_element(mesh::P4estMesh{3}, elements,
-                          n_elements, nnodes, RealT)
+                          n_elements, nnodes)
+    RealT = real(mesh)
     hmin = floatmax(RealT)
     hmax = zero(RealT)
 
@@ -1342,7 +1415,22 @@ function hmin_per_element(mesh::P4estMesh{3}, elements,
     return hmin_per_element_, hmin, hmax
 end
 
-function dtmax_per_element()
+function dtmax_per_element(u, mesh::P4estMesh{3}, equations, dg, cache)
+    n_nodes = nnodes(dg)
+    n_elements = nelements(dg, cache)
+
+    dtmax_per_element_ = zeros(n_elements)
+
+    @unpack contravariant_vectors, inverse_jacobian = cache.elements
+end
+
+@inline function partition_u!(level_info_u,
+                              level_info_elements, n_levels,
+                              u_ode, semi::AbstractSemidiscretization)
+    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
+    partition_u!(level_info_u,
+                 level_info_elements, n_levels,
+                 u_ode, mesh, equations, dg, cache)
 end
 
 # Partitioning function for approach: Each level stores its indices
@@ -1361,7 +1449,16 @@ end
     return nothing
 end
 
-# TODO: Optimized version with accumulated indices for hyperbolic-parabolic problems
+# Optimized version with accumulated indices
+@inline function partition_u!(level_info_u, level_info_u_acc,
+                              level_info_elements, n_levels,
+                              u_ode, semi::SemidiscretizationHyperbolicParabolic)
+    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
+    partition_u!(level_info_u, level_info_u_acc,
+                 level_info_elements, n_levels,
+                 u_ode, mesh, equations, dg, cache)
+end
+
 @inline function partition_u!(level_info_u, level_info_u_acc,
                               level_info_elements, n_levels,
                               u_ode, mesh, equations, dg, cache)
@@ -1387,7 +1484,8 @@ end
 # Partitioning function for approach: Each index stores its level
 @inline function partition_u!(level_info_u, level_info_elements,
                               u_to_level,
-                              n_levels, u_ode, mesh, equations, dg, cache)
+                              n_levels, u_ode,
+                              mesh, equations, dg, cache)
     u = wrap_array(u_ode, mesh, equations, dg, cache)
 
     for level in 1:n_levels

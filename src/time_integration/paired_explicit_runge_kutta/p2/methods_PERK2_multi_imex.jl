@@ -399,7 +399,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     ### Set datastructures for handling of level-dependent integration ###
     semi = ode.p
-    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
+    mesh = semi.mesh
 
     n_levels = get_n_levels(mesh, alg)
 
@@ -418,7 +418,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
-                         n_levels, mesh, dg, cache, alg)
+                         n_levels, semi, alg)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -433,7 +433,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
         level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
         partition_u!(level_info_u, level_info_u_acc,
                      level_info_elements, n_levels,
-                     u, mesh, equations, dg, cache)
+                     u, semi)
 
         du_para = zero(u)
         # Initialize `k_nonlin` with values from `du`.
@@ -452,7 +452,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     else
         partition_u!(level_info_u,
                      level_info_elements, n_levels,
-                     u, mesh, equations, dg, cache)
+                     u, semi)
 
         # Initialize `k_nonlin` with values from `du`.
         # Use the full system since the partitioned system occasionally crashes

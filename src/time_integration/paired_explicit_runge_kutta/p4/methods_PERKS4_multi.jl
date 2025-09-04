@@ -150,7 +150,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, mesh, dg, cache, alg)
+                             n_levels, semi, alg)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
@@ -163,7 +163,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
 
             # Get (global) element distribution to accordingly balance the solver
             partition_variables!(level_info_elements, n_levels,
-                                 mesh, dg, cache, alg)
+                                 semi, alg)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
@@ -188,7 +188,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
                              # MPI additions
                              level_info_mpi_interfaces_acc,
                              level_info_mpi_mortars_acc,
-                             n_levels, mesh, dg, cache, alg)
+                             n_levels, semi, alg)
     end
 
     for i in 1:n_levels
@@ -199,7 +199,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
     # Set (initial) distribution of DG nodal values
     level_info_u = [Vector{Int64}() for _ in 1:n_levels]
     partition_u!(level_info_u, level_info_elements,
-                 n_levels, u0, mesh, equations, dg, cache)
+                 n_levels, u0, semi)
 
     ### Done with setting up for handling of level-dependent integration ###
     du_para = zero(u0)
@@ -414,7 +414,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, mesh, dg, cache, alg)
+                             n_levels, semi, alg)
 
         # Partition parabolic helper variables
         partition_variables!(level_info_elements_para,
@@ -422,8 +422,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
                              level_info_interfaces_para_acc,
                              level_info_boundaries_para_acc,
                              level_info_mortars_para_acc,
-                             n_levels_para, mesh, dg, cache, alg,
-                             parabolic = true)
+                             n_levels_para, semi, alg)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
@@ -436,7 +435,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
 
             # Get (global) element distribution to accordingly balance the solver
             partition_variables!(level_info_elements, n_levels,
-                                 mesh, dg, cache, alg)
+                                 semi, alg)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
@@ -461,7 +460,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
                              # MPI additions
                              level_info_mpi_interfaces_acc,
                              level_info_mpi_mortars_acc,
-                             n_levels, mesh, dg, cache, alg)
+                             n_levels, semi, alg)
     end
 
     for i in 1:n_levels
@@ -476,12 +475,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
     # Set (initial) distribution of DG nodal values
     level_info_u = [Vector{Int64}() for _ in 1:n_levels]
     partition_u!(level_info_u, level_info_elements,
-                 n_levels, u0, mesh, equations, dg, cache)
+                 n_levels, u0, semi)
 
     # For parabolic part
     level_info_u_para = [Vector{Int64}() for _ in 1:n_levels_para]
     partition_u!(level_info_u_para, level_info_elements_para,
-                 n_levels_para, u0, mesh, equations, dg, cache)
+                 n_levels_para, u0, semi)
 
     ### Done with setting up for handling of level-dependent integration ###
     du_para = zero(u0)

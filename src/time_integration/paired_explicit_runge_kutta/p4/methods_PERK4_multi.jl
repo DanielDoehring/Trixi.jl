@@ -300,7 +300,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, mesh, dg, cache, alg)
+                             n_levels, semi, alg)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
@@ -313,7 +313,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
 
             # Get (global) element distribution to accordingly balance the solver
             partition_variables!(level_info_elements, n_levels,
-                                 mesh, dg, cache, alg)
+                                 semi, alg)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
@@ -339,7 +339,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                              # MPI additions
                              level_info_mpi_interfaces_acc,
                              level_info_mpi_mortars_acc,
-                             n_levels, mesh, dg, cache, alg)
+                             n_levels, semi, alg)
     end
 
     for i in 1:n_levels
@@ -356,7 +356,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
         level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
         partition_u!(level_info_u, level_info_u_acc,
                      level_info_elements, n_levels,
-                     u0, mesh, equations, dg, cache)
+                     u0, semi)
 
         du_para = zero(u0)
         integrator = PairedExplicitRK4MultiParabolicIntegrator(u0, du, u_tmp,
@@ -383,7 +383,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     elseif isa(semi, SemidiscretizationEulerAcoustics)
         partition_u!(level_info_u,
                      level_info_elements, n_levels,
-                     u0, mesh, equations, dg, cache)
+                     u0, semi)
 
         u_prev = copy(u0)
         t_prev = t0
@@ -412,7 +412,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
     else # Purely hyperbolic, Euler-Gravity, ...
         partition_u!(level_info_u,
                      level_info_elements, n_levels,
-                     u0, mesh, equations, dg, cache)
+                     u0, semi)
 
         integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp,
                                                       t0, tdir,

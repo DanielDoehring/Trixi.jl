@@ -72,8 +72,8 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          integrator.level_info_interfaces_acc,
                                          integrator.level_info_boundaries_acc,
                                          integrator.level_info_mortars_acc,
-                                         integrator.n_levels, mesh, dg,
-                                         cache, integrator.alg)
+                                         integrator.n_levels,
+                                         semi, integrator.alg)
                 else
                     partition_variables!(integrator.level_info_elements,
                                          integrator.level_info_elements_acc,
@@ -83,14 +83,14 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                          # MPI additions
                                          integrator.level_info_mpi_interfaces_acc,
                                          integrator.level_info_mpi_mortars_acc,
-                                         integrator.n_levels, mesh, dg,
-                                         cache, integrator.alg)
+                                         integrator.n_levels,
+                                         semi, integrator.alg)
                 end
 
                 partition_u!(integrator.level_info_u,
                              integrator.level_info_elements,
                              integrator.n_levels,
-                             u_ode, mesh, equations, dg, cache)
+                             u_ode, semi)
 
                 # For AMR: Counting RHS evals
                 #=
@@ -124,7 +124,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
 
             ### PERK additions ###
             @trixi_timeit timer() "PERK stage identifiers update" begin
-                mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
+                mesh = semi.mesh
 
                 integrator.n_levels = get_n_levels(mesh, integrator.alg)
 
@@ -172,14 +172,14 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
                                      integrator.level_info_interfaces_acc,
                                      integrator.level_info_boundaries_acc,
                                      integrator.level_info_mortars_acc,
-                                     integrator.n_levels, mesh, dg,
-                                     cache, integrator.alg)
+                                     integrator.n_levels,
+                                     semi, integrator.alg)
 
                 partition_u!(integrator.level_info_u,
                              integrator.level_info_u_acc,
                              integrator.level_info_elements,
                              integrator.n_levels,
-                             u_ode, mesh, equations, dg, cache)
+                             u_ode, semi)
 
                 # For AMR: Counting RHS evals
                 #=

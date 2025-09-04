@@ -173,7 +173,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, mesh, dg, cache, alg.PERK3Multi)
+                             n_levels, semi, alg.PERK3Multi)
     else # NOTE: Never tested
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
@@ -186,7 +186,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
 
             # Get (global) element distribution to accordingly balance the solver
             partition_variables!(level_info_elements, n_levels,
-                                 mesh, dg, cache, alg)
+                                 semi, alg)
 
             # Balance such that each rank has the same number of RHS calls                                    
             balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
@@ -213,7 +213,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
                              # MPI additions
                              level_info_mpi_interfaces_acc,
                              level_info_mpi_mortars_acc,
-                             n_levels, mesh, dg, cache, alg.PERK3Multi)
+                             n_levels, semi, alg.PERK3Multi)
     end
 
     for i in 1:n_levels
@@ -230,7 +230,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
         level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
         partition_u!(level_info_u, level_info_u_acc,
                      level_info_elements, n_levels,
-                     u0, mesh, equations, dg, cache)
+                     u0, semi)
 
         du_para = zero(u0)
         integrator = PairedExplicitRelaxationRK3MultiParabolicIntegrator(u0, du, u_tmp,
@@ -262,7 +262,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK3Multi;
     else # Hyperbolic case
         partition_u!(level_info_u,
                      level_info_elements, n_levels,
-                     u0, mesh, equations, dg, cache)
+                     u0, semi)
 
         integrator = PairedExplicitRelaxationRK3MultiIntegrator(u0, du, u_tmp,
                                                                 t0, tdir,
