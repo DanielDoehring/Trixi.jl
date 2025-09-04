@@ -586,20 +586,20 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
-                                                         n_elements, nnodes,
-                                                         real(mesh))
+    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                     n_elements, nnodes,
+                                                     real(mesh))
 
-    #println("h_min: ", h_min, " h_max: ", h_max)
-    #println("h_max/h_min: ", h_max / h_min, "\n")
+    #println("hmin: ", hmin, " hmax: ", hmax)
+    #println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
         # Partitioning strategy:
         # Use highest method for smallest elements, since these govern the stable timestep.
         # Cells that are "too coarse" are "cut off" and integrated with the lowest method.
-        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -620,11 +620,11 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element_[element_id1]
-        h2 = h_min_per_element_[element_id2]
+        h1 = hmin_per_element_[element_id1]
+        h2 = hmin_per_element_[element_id2]
         h = min(h1, h2)
 
-        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -642,9 +642,9 @@ function partition_variables!(level_info_elements,
     for boundary_id in 1:n_boundaries
         # Get element id (boundaries have only one unique associated element)
         element_id = boundaries.neighbor_ids[boundary_id]
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -663,14 +663,14 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element_[element_id_lower]
+        h_lower = hmin_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element_[element_id_higher]
+        h_higher = hmin_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
-        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -708,17 +708,17 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
-                                                         n_elements, nnodes,
-                                                         real(mesh))
+    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                     n_elements, nnodes,
+                                                     real(mesh))
 
-    #println("h_min: ", h_min, " h_max: ", h_max)
-    #println("h_max/h_min: ", h_max / h_min, "\n")
+    #println("hmin: ", hmin, " hmax: ", hmax)
+    #println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -761,11 +761,11 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element_[element_id1]
-        h2 = h_min_per_element_[element_id2]
+        h1 = hmin_per_element_[element_id1]
+        h2 = hmin_per_element_[element_id2]
 
-        level1 = findfirst(x -> x < (h_min / h1)^dt_scaling_order, dt_ratios)
-        level2 = findfirst(x -> x < (h_min / h2)^dt_scaling_order, dt_ratios)
+        level1 = findfirst(x -> x < (hmin / h1)^dt_scaling_order, dt_ratios)
+        level2 = findfirst(x -> x < (hmin / h2)^dt_scaling_order, dt_ratios)
 
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level1 === nothing
@@ -818,9 +818,9 @@ function partition_variables!(level_info_elements,
     for boundary_id in 1:n_boundaries
         # Get element id (boundaries have only one unique associated element)
         element_id = boundaries.neighbor_ids[boundary_id]
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -854,14 +854,14 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element_[element_id_lower]
+        h_lower = hmin_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element_[element_id_higher]
+        h_higher = hmin_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
-        level = findfirst(x -> x < (h_min / h)^dt_scaling_order, dt_ratios)
+        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -888,20 +888,20 @@ function partition_variables!(level_info_elements, n_levels,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
-                                                         n_elements, nnodes,
-                                                         real(mesh))
-    # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
-    h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
-    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
+    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                     n_elements, nnodes,
+                                                     real(mesh))
+    # Synchronize `hmin`, `hmax` to have consistent partitioning across ranks
+    hmin = MPI.Allreduce!(Ref(hmin), Base.min, mpi_comm())[]
+    hmax = MPI.Allreduce!(Ref(hmax), Base.max, mpi_comm())[]
 
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
+    println("hmin: ", hmin, " hmax: ", hmax)
+    println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # TODO: parabolic: (hmin / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -931,22 +931,22 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    # `h_min_per_element_` needs to be recomputed after balancing as 
+    # `hmin_per_element_` needs to be recomputed after balancing as 
     # the number of elements per rank may have changed
-    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
-                                                         n_elements, nnodes,
-                                                         real(mesh))
-    # Synchronize `h_min`, `h_max` to have consistent partitioning across ranks
-    h_min = MPI.Allreduce!(Ref(h_min), Base.min, mpi_comm())[]
-    h_max = MPI.Allreduce!(Ref(h_max), Base.max, mpi_comm())[]
+    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                     n_elements, nnodes,
+                                                     real(mesh))
+    # Synchronize `hmin`, `hmax` to have consistent partitioning across ranks
+    hmin = MPI.Allreduce!(Ref(hmin), Base.min, mpi_comm())[]
+    hmax = MPI.Allreduce!(Ref(hmax), Base.max, mpi_comm())[]
 
-    #println("h_min: ", h_min, " h_max: ", h_max)
-    #println("h_max/h_min: ", h_max / h_min, "\n")
+    #println("hmin: ", hmin, " hmax: ", hmax)
+    #println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # TODO: parabolic: (hmin / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -967,11 +967,11 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element_[element_id1]
-        h2 = h_min_per_element_[element_id2]
+        h1 = hmin_per_element_[element_id1]
+        h2 = hmin_per_element_[element_id2]
         h = min(h1, h2)
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # TODO: parabolic: (hmin / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -990,11 +990,11 @@ function partition_variables!(level_info_elements,
         # For p4est: Cells on same level do not necessarily have same size
         element_id1 = interfaces.neighbor_ids[1, interface_id]
         element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = h_min_per_element_[element_id1]
-        h2 = h_min_per_element_[element_id2]
+        h1 = hmin_per_element_[element_id1]
+        h2 = hmin_per_element_[element_id2]
         h = min(h1, h2)
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # TODO: parabolic: (hmin / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -1012,9 +1012,9 @@ function partition_variables!(level_info_elements,
     for boundary_id in 1:n_boundaries
         # Get element id (boundaries have only one unique associated element)
         element_id = boundaries.neighbor_ids[boundary_id]
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios)
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios)
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -1033,14 +1033,14 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element_[element_id_lower]
+        h_lower = hmin_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element_[element_id_higher]
+        h_higher = hmin_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # TODO: parabolic: (hmin / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -1058,14 +1058,14 @@ function partition_variables!(level_info_elements,
     for mortar_id in 1:n_mpi_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = h_min_per_element_[element_id_lower]
+        h_lower = hmin_per_element_[element_id_lower]
 
         element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = h_min_per_element_[element_id_higher]
+        h_higher = hmin_per_element_[element_id_higher]
 
         h = min(h_lower, h_higher)
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # TODO: parabolic: (h_min / h)^2
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # TODO: parabolic: (hmin / h)^2
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -1092,17 +1092,17 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
-                                                         n_elements, nnodes,
-                                                         real(mesh))
+    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                     n_elements, nnodes,
+                                                     real(mesh))
 
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
+    println("hmin: ", hmin, " hmax: ", hmax)
+    println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -1136,17 +1136,17 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    h_min_per_element_, h_min, h_max = h_min_per_element(mesh, cache.elements,
-                                                         n_elements, nnodes,
-                                                         real(mesh))
+    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                     n_elements, nnodes,
+                                                     real(mesh))
 
-    println("h_min: ", h_min, " h_max: ", h_max)
-    println("h_max/h_min: ", h_max / h_min, "\n")
+    println("hmin: ", hmin, " hmax: ", hmax)
+    println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
-        h = h_min_per_element_[element_id]
+        h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < h_min / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
+        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels
@@ -1192,36 +1192,36 @@ function partition_variables!(level_info_elements,
     return nothing
 end
 
-function h_min_per_element(mesh::StructuredMesh{1}, elements,
-                           n_elements, nnodes, RealT)
-    h_min = floatmax(RealT)
-    h_max = zero(RealT)
+function hmin_per_element(mesh::StructuredMesh{1}, elements,
+                          n_elements, nnodes, RealT)
+    hmin = floatmax(RealT)
+    hmax = zero(RealT)
 
-    h_min_per_element_ = zeros(n_elements)
+    hmin_per_element_ = zeros(n_elements)
 
     for element_id in 1:n_elements
         P0 = elements.node_coordinates[1, 1, element_id]
         P1 = elements.node_coordinates[1, nnodes, element_id]
         h = abs(P1 - P0) # Assumes P1 > P0
 
-        h_min_per_element_[element_id] = h
-        if h > h_max
-            h_max = h
+        hmin_per_element_[element_id] = h
+        if h > hmax
+            hmax = h
         end
-        if h < h_min
-            h_min = h
+        if h < hmin
+            hmin = h
         end
     end
 
-    return h_min_per_element_, h_min, h_max
+    return hmin_per_element_, hmin, hmax
 end
 
-function h_min_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements,
-                           n_elements, nnodes, RealT)
-    h_min = floatmax(RealT)
-    h_max = zero(RealT)
+function hmin_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, elements,
+                          n_elements, nnodes, RealT)
+    hmin = floatmax(RealT)
+    hmax = zero(RealT)
 
-    h_min_per_element_ = zeros(n_elements)
+    hmin_per_element_ = zeros(n_elements)
 
     for element_id in 1:n_elements
         # pull the four corners numbered as
@@ -1254,26 +1254,26 @@ function h_min_per_element(mesh::Union{P4estMesh{2}, StructuredMesh{2}}, element
         # For square elements (RTI)
         #L0 = abs(P1[1] - P0[1])
         #h = L0
-        h_min_per_element_[element_id] = h
+        hmin_per_element_[element_id] = h
 
-        # Set global `h_min` and `h_max`, i.e., for the entire mesh
-        if h > h_max
-            h_max = h
+        # Set global `hmin` and `hmax`, i.e., for the entire mesh
+        if h > hmax
+            hmax = h
         end
-        if h < h_min
-            h_min = h
+        if h < hmin
+            hmin = h
         end
     end
 
-    return h_min_per_element_, h_min, h_max
+    return hmin_per_element_, hmin, hmax
 end
 
-function h_min_per_element(mesh::P4estMesh{3}, elements,
-                           n_elements, nnodes, RealT)
-    h_min = floatmax(RealT)
-    h_max = zero(RealT)
+function hmin_per_element(mesh::P4estMesh{3}, elements,
+                          n_elements, nnodes, RealT)
+    hmin = floatmax(RealT)
+    hmax = zero(RealT)
 
-    h_min_per_element_ = zeros(n_elements)
+    hmin_per_element_ = zeros(n_elements)
 
     for element_id in 1:n_elements
         # pull the eight corners numbered as
@@ -1328,18 +1328,18 @@ function h_min_per_element(mesh::P4estMesh{3}, elements,
         L11 = norm(P3 - P7)
 
         h = min(L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11)
-        h_min_per_element_[element_id] = h
+        hmin_per_element_[element_id] = h
 
-        # Set global `h_min` and `h_max`, i.e., for the entire mesh
-        if h > h_max
-            h_max = h
+        # Set global `hmin` and `hmax`, i.e., for the entire mesh
+        if h > hmax
+            hmax = h
         end
-        if h < h_min
-            h_min = h
+        if h < hmin
+            hmin = h
         end
     end
 
-    return h_min_per_element_, h_min, h_max
+    return hmin_per_element_, hmin, hmax
 end
 
 function dtmax_per_element()
