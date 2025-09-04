@@ -1059,7 +1059,7 @@ function partition_variables!(level_info_elements,
     end
 
     n_mpi_mortars = last(size(mpi_mortars.u))
-    for mortar_id in 1:n_mortars
+    for mortar_id in 1:n_mpi_mortars
         # Get element ids
         element_id_lower = mortars.neighbor_ids[1, mortar_id]
         h_lower = h_min_per_element[element_id_lower]
