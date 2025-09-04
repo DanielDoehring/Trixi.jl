@@ -183,8 +183,8 @@ function Trixi.get_node_variable(::Val{:cfl_diffusion}, u, mesh, equations, dg, 
     # By definition, the variable must be provided at every node of every element!
     # Otherwise, the `SaveSolutionCallback` will crash.
     cfl_d_array = zeros(eltype(cache.elements),
-                            n_nodes, n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
-                            n_elements)
+                        n_nodes, n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
+                        n_elements)
 
     @unpack contravariant_vectors, inverse_jacobian = cache.elements
 
