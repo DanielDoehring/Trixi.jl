@@ -169,6 +169,7 @@ function semidiscretize(semi::AbstractSemidiscretization, tspan,
                         restart_file::AbstractString;
                         jac_prototype::Union{AbstractMatrix, Nothing} = nothing,
                         colorvec::Union{AbstractVector, Nothing} = nothing,
+                        interpolate_high2low = true,
                         reset_threads = true)
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
