@@ -172,7 +172,8 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType <: Abstract
     n_levels::Int64
 end
 
-mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real,
+                                                         uType <: AbstractVector,
                                                          Params, Sol, F,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{2}
@@ -257,7 +258,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
                              n_levels, semi, alg) # Mesh-only based part.
-                             #n_levels, semi, alg, u0) # Mesh+solution (CFL) based part.
+    #n_levels, semi, alg, u0) # Mesh+solution (CFL) based part.
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning

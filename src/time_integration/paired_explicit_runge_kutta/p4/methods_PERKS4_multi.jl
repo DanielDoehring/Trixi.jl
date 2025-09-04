@@ -301,7 +301,8 @@ function PairedExplicitRK4SplitMulti(stages::Vector{Int64},
 end
 
 # Version with DIFFERENT number of stages and partitioning(!) for hyperbolic and parabolic part
-mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real,
+                                                     uType <: AbstractVector,
                                                      Params, Sol, F,
                                                      PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSplitMultiIntegrator{4}

@@ -154,7 +154,8 @@ mutable struct PairedExplicitRK3MultiIntegrator{RealT <: Real, uType <: Abstract
     n_levels::Int64
 end
 
-mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK3MultiParabolicIntegrator{RealT <: Real,
+                                                         uType <: AbstractVector,
                                                          Params, Sol, F,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{3}

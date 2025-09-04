@@ -212,7 +212,8 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType <: AbstractVecto
     k1::uType
 end
 
-mutable struct PairedExplicitRK4EulerAcousticIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK4EulerAcousticIntegrator{RealT <: Real,
+                                                        uType <: AbstractVector,
                                                         Params, Sol, F,
                                                         PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKEulerAcousticSingleIntegrator{4}

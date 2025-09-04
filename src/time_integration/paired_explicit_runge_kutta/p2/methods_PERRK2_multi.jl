@@ -28,7 +28,8 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRelaxationRK2MultiIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRelaxationRK2MultiIntegrator{RealT <: Real,
+                                                          uType <: AbstractVector,
                                                           Params, Sol, F,
                                                           PairedExplicitRKOptions,
                                                           RelaxationSolver} <:
@@ -75,7 +76,9 @@ mutable struct PairedExplicitRelaxationRK2MultiIntegrator{RealT <: Real, uType <
     relaxation_solver::RelaxationSolver
 end
 
-mutable struct PairedExplicitRelaxationRK2MultiParabolicIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRelaxationRK2MultiParabolicIntegrator{RealT <: Real,
+                                                                   uType <:
+                                                                   AbstractVector,
                                                                    Params, Sol, F,
                                                                    PairedExplicitRKOptions,
                                                                    RelaxationSolver} <:

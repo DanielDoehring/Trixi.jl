@@ -171,7 +171,8 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType <: Abstract
     n_levels::Int64
 end
 
-mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real,
+                                                         uType <: AbstractVector,
                                                          Params, Sol, F,
                                                          PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKMultiParabolicIntegrator{4}
@@ -218,7 +219,8 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real, uType <:
     du_para::uType
 end
 
-mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real,
+                                                             uType <: AbstractVector,
                                                              Params, Sol, F,
                                                              PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKEulerAcousticMultiIntegrator{4}
