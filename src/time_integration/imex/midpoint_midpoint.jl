@@ -39,7 +39,7 @@ end
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.jl.
 mutable struct MidpointMidpointIntegrator{RealT <: Real, uType <: AbstractVector,
-    Params, Sol, F, Alg,
+                                          Params, Sol, F, Alg,
                                           SimpleIntegratorOptions,
                                           NonlinCache} <:
                AbstractIMEXTimeIntegrator
