@@ -1547,9 +1547,11 @@ function dtmax_per_element(u, mesh::P4estMesh{3}, equations, dg, cache)
     dtmax_per_element_ = zeros(n_elements)
 
     @unpack contravariant_vectors, inverse_jacobian = cache.elements
+    @unpack weights = dg.basis
 
     for element in eachelement(dg, cache)
-        max_a1 = max_a2 = max_a3 = zero(eltype(u))
+        #max_a1 = max_a2 = max_a3 = zero(eltype(u))
+        max_a_total = zero(eltype(u))
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             u_node = get_node_vars(u, equations, dg, i, j, k, element)
 
@@ -1571,14 +1573,44 @@ function dtmax_per_element(u, mesh::P4estMesh{3}, equations, dg, cache)
             a2_transformed = abs(Ja21 * a1 + Ja22 * a2 + Ja23 * a3) * inv_jacobian
             a3_transformed = abs(Ja31 * a1 + Ja32 * a2 + Ja33 * a3) * inv_jacobian
 
+            #=
             max_a1 = max(max_a1, a1_transformed)
             max_a2 = max(max_a2, a2_transformed)
             max_a3 = max(max_a3, a3_transformed)
+            =#
+
+            a_total = a1_transformed + a2_transformed + a3_transformed
+            max_a_total = max(max_a_total, a_total)
         end
-        dtmax_per_element_[element] = 1 / (max_a1 + max_a2 + max_a3)
+        #dtmax_per_element_[element] = 1 / (max_a1 + max_a2 + max_a3)
+        dtmax_per_element_[element] = 1 / max_a_total
+
+        # Try integration-alike
+        #=
+        u_mean = compute_u_mean(u, element, mesh, equations, dg, cache)
+        # Speeds
+        a1, a2, a3 = max_abs_speeds(u_mean, equations)
+        a_total = a1 + a2 + a3
+        dtmax_per_element_[element] = 1 / a_total
+        =#
+
+        #=
+        volume = zero(real(mesh))
+        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            # Speeds
+            a1, a2, a3 = max_abs_speeds(u_node, equations)
+            a_total = a1 + a2 + a3
+
+            volume_jacobian = abs(inv(inverse_jacobian[i, j, k, element]))
+            #dtmax_per_element_[element] += volume_jacobian * weights[i] * weights[j] * weights[k] / a_total
+            volume += volume_jacobian * weights[i] * weights[j] * weights[k]
+        end
+        dtmax_per_element_[element] *= volume
+        =#
     end
 
-    dtmax_per_element_ .*= 2 / nnodes(dg)
+    dtmax_per_element_ .*= 2 / nnodes(dg) # Becomes only relevant for both advection/diffusion
 
     dtmin = minimum(dtmax_per_element_)
     dtmax = maximum(dtmax_per_element_)
