@@ -79,8 +79,9 @@ function partition_variables!(level_info_elements,
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
                          n_levels,
-                         mesh, equations, dg, cache,
-                         alg, u)
+                         mesh, dg, cache,
+                         alg,
+                         equations, u)
 end
 
 function partition_variables!(level_info_elements,
@@ -655,8 +656,10 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels, mesh::P4estMesh, dg, cache,
-                              alg;
+                              n_levels,
+                              mesh::P4estMesh, dg, cache,
+                              alg,
+                              equations = nothing, u = nothing;
                               quadratic_scaling = false)
     @unpack elements, interfaces, boundaries, mortars = cache
 
@@ -671,8 +674,12 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes)
+    if u !== nothing
+        hmin_per_element_, hmin, hmax = dtmax_per_element(u, mesh, equations, dg, cache)
+    else
+        hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes)
+    end
 
     println("hmin: ", hmin, " hmax: ", hmax)
     println("hmax/hmin: ", hmax / hmin, "\n")
@@ -777,8 +784,9 @@ function partition_variables!(level_info_elements,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
                               n_levels,
-                              mesh::P4estMesh, equations, dg, cache,
-                              alg, u;
+                              mesh::P4estMesh, dg, cache,
+                              alg::AbstractPairedExplicitRKIMEXMulti,
+                              equations = nothing, u = nothing;
                               quadratic_scaling = false)
     @unpack elements, interfaces, boundaries, mortars = cache
 
@@ -793,128 +801,12 @@ function partition_variables!(level_info_elements,
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
-    hmin_per_element_, hmin, hmax = dtmax_per_element(u, mesh, equations, dg, cache)
-
-    println("hmin: ", hmin, " hmax: ", hmax)
-    println("hmax/hmin: ", hmax / hmin, "\n")
-
-    for element_id in 1:n_elements
-        h = hmin_per_element_[element_id]
-
-        # Partitioning strategy:
-        # Use highest method for smallest elements, since these govern the stable timestep.
-        # Cells that are "too coarse" are "cut off" and integrated with the lowest method.
-        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
-        # Catch case that cell is "too coarse" for method with fewest stage evals
-        if level === nothing
-            level = n_levels
-        else # Avoid reduction in timestep: Use next higher level
-            level = level - 1
-        end
-
-        append!(level_info_elements[level], element_id)
-
-        for l in level:n_levels
-            push!(level_info_elements_acc[l], element_id)
-        end
-    end
-
-    n_interfaces = last(size(interfaces.u))
-    # Determine level for each interface
-    for interface_id in 1:n_interfaces
-        # For p4est: Cells on same level do not necessarily have same size
-        element_id1 = interfaces.neighbor_ids[1, interface_id]
-        element_id2 = interfaces.neighbor_ids[2, interface_id]
-        h1 = hmin_per_element_[element_id1]
-        h2 = hmin_per_element_[element_id2]
-        h = min(h1, h2)
-
-        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
-        # Catch case that cell is "too coarse" for method with fewest stage evals
-        if level === nothing
-            level = n_levels
-        else # Avoid reduction in timestep: Use next higher level
-            level = level - 1
-        end
-
-        for l in level:n_levels
-            push!(level_info_interfaces_acc[l], interface_id)
-        end
-    end
-
-    n_boundaries = last(size(boundaries.u))
-    # Determine level for each boundary
-    for boundary_id in 1:n_boundaries
-        # Get element id (boundaries have only one unique associated element)
-        element_id = boundaries.neighbor_ids[boundary_id]
-        h = hmin_per_element_[element_id]
-
-        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
-        # Catch case that cell is "too coarse" for method with fewest stage evals
-        if level === nothing
-            level = n_levels
-        else # Avoid reduction in timestep: Use next higher level
-            level = level - 1
-        end
-
-        # Add to accumulated container
-        for l in level:n_levels
-            push!(level_info_boundaries_acc[l], boundary_id)
-        end
-    end
-
-    # p4est is always dimension 2 or 3
-    n_mortars = last(size(mortars.u))
-    for mortar_id in 1:n_mortars
-        # Get element ids
-        element_id_lower = mortars.neighbor_ids[1, mortar_id]
-        h_lower = hmin_per_element_[element_id_lower]
-
-        element_id_higher = mortars.neighbor_ids[2, mortar_id]
-        h_higher = hmin_per_element_[element_id_higher]
-
-        h = min(h_lower, h_higher)
-
-        level = findfirst(x -> x < (hmin / h)^dt_scaling_order, dt_ratios)
-        # Catch case that cell is "too coarse" for method with fewest stage evals
-        if level === nothing
-            level = n_levels
-        else # Avoid reduction in timestep: Use next higher level
-            level = level - 1
-        end
-
-        # Add to accumulated container
-        for l in level:n_levels
-            push!(level_info_mortars_acc[l], mortar_id)
-        end
-    end
-
-    return nothing
-end
-
-function partition_variables!(level_info_elements,
-                              level_info_elements_acc,
-                              level_info_interfaces_acc,
-                              level_info_boundaries_acc,
-                              level_info_mortars_acc,
-                              n_levels, mesh::P4estMesh, dg, cache,
-                              alg::AbstractPairedExplicitRKIMEXMulti;
-                              quadratic_scaling = false)
-    @unpack elements, interfaces, boundaries, mortars = cache
-
-    if quadratic_scaling
-        dt_scaling_order = 2
-        dt_ratios = alg.dt_ratios_para
+    if u !== nothing
+        hmin_per_element_, hmin, hmax = dtmax_per_element(u, mesh, equations, dg, cache)
     else
-        dt_scaling_order = 1
-        dt_ratios = alg.dt_ratios
+        hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
+                                                         n_elements, nnodes)
     end
-
-    nnodes = length(dg.basis.nodes)
-    n_elements = nelements(dg, cache)
-
-    hmin_per_element_, hmin, hmax = hmin_per_element(mesh, cache.elements,
-                                                     n_elements, nnodes)
 
     #println("hmin: ", hmin, " hmax: ", hmax)
     #println("hmax/hmin: ", hmax / hmin, "\n")
@@ -1550,8 +1442,8 @@ function dtmax_per_element(u, mesh::P4estMesh{3}, equations, dg, cache)
     @unpack weights = dg.basis
 
     for element in eachelement(dg, cache)
-        #max_a1 = max_a2 = max_a3 = zero(eltype(u))
-        max_a_total = zero(eltype(u))
+        max_a1 = max_a2 = max_a3 = zero(eltype(u))
+        #max_a_total = zero(eltype(u))
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             u_node = get_node_vars(u, equations, dg, i, j, k, element)
 
@@ -1573,17 +1465,15 @@ function dtmax_per_element(u, mesh::P4estMesh{3}, equations, dg, cache)
             a2_transformed = abs(Ja21 * a1 + Ja22 * a2 + Ja23 * a3) * inv_jacobian
             a3_transformed = abs(Ja31 * a1 + Ja32 * a2 + Ja33 * a3) * inv_jacobian
 
-            #=
             max_a1 = max(max_a1, a1_transformed)
             max_a2 = max(max_a2, a2_transformed)
             max_a3 = max(max_a3, a3_transformed)
-            =#
 
-            a_total = a1_transformed + a2_transformed + a3_transformed
-            max_a_total = max(max_a_total, a_total)
+            #a_total = a1_transformed + a2_transformed + a3_transformed
+            #max_a_total = max(max_a_total, a_total)
         end
-        #dtmax_per_element_[element] = 1 / (max_a1 + max_a2 + max_a3)
-        dtmax_per_element_[element] = 1 / max_a_total
+        dtmax_per_element_[element] = 1 / (max_a1 + max_a2 + max_a3)
+        #dtmax_per_element_[element] = 1 / max_a_total
 
         # Try integration-alike
         #=

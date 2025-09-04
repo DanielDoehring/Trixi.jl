@@ -186,7 +186,8 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType <: Abst
 end
 =#
 
-mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real,
+                                                    uType <: AbstractVector,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
                                                     uImplicitType,
@@ -248,6 +249,18 @@ mutable struct NonlinParams{RealT <: Real, uType <: AbstractVector,
     const boundary_indices::Vector{Int64}
     const mortar_indices::Vector{Int64}
     const u_indices::Vector{Int64}
+end
+
+# Somehow needed for NonlinearSolve
+function Base.copy(p::NonlinParams)
+    NonlinParams(p.t, p.dt,
+                 p.u, p.du, p.u_tmp,
+                 p.semi, p.f,
+                 p.element_indices,
+                 p.interface_indices,
+                 p.boundary_indices,
+                 p.mortar_indices,
+                 p.u_indices)
 end
 
 #=
@@ -313,7 +326,8 @@ mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uTyp
 end
 =#
 
-mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real, uType <: AbstractVector,
+mutable struct PairedExplicitRK2IMEXMultiParabolicIntegrator{RealT <: Real,
+                                                             uType <: AbstractVector,
                                                              Params, Sol, F,
                                                              PairedExplicitRKOptions,
                                                              uImplicitType,
@@ -412,13 +426,13 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    # TODO: Supply solution and check actual timestep restriction!
     partition_variables!(level_info_elements,
                          level_info_elements_acc,
                          level_info_interfaces_acc,
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
-                         n_levels, semi, alg)
+                         #n_levels, semi, alg) # Mesh-only based part.
+                         n_levels, semi, alg, u) # Mesh+solution (CFL) based part.
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",

@@ -151,7 +151,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      #analysis_pointwise = (pressure_coefficient,)
                                      )
 
-alive_callback = AliveCallback(alive_interval = 50)
+alive_callback = AliveCallback(alive_interval = 3)
 
 save_sol_interval = analysis_interval
 
@@ -238,12 +238,12 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         #save_solution,
                         #save_restart,
-                        stepsize_callback
-                        )
+                        #stepsize_callback
+                        );
 
 # Run the simulation
 ###############################################################################
-
+#=
 ## k = 2, p = 2 ##
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
 
@@ -267,12 +267,18 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
-
+=#
 ###############################################################################
 # IMEX
 
+# Mesh-based partitioning
+dt_implicit = 0.8
+
+# Solution-based partitioning
+#dt_implicit = 2.0
+
 dtRatios_imex_p2 = [
-    0.8,
+    dt_implicit,
     0.753155136853456,
     0.695487338849343,
     0.641318947672844,
@@ -288,7 +294,7 @@ dtRatios_imex_p2 = [
     0.123865127563477,
     0.0781898498535156,
     0.0436210632324219
-] ./ 0.8
+] ./ dt_implicit
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages_complete_p2, path, dtRatios_imex_p2)
 
