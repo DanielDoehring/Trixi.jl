@@ -256,7 +256,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                              level_info_interfaces_acc,
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
-                             n_levels, semi, alg)
+                             n_levels, semi, alg) # Mesh-only based part.
+                             #n_levels, semi, alg, u0) # Mesh+solution (CFL) based part.
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning

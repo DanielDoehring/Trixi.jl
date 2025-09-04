@@ -164,7 +164,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
                              level_info_boundaries_para_acc,
                              level_info_mortars_para_acc,
                              n_levels_para, semi,
-                             alg.PERK4SplitMulti)
+                             alg.PERK4SplitMulti;
+                             quadratic_scaling = true)
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning
