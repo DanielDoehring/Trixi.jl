@@ -197,7 +197,7 @@ Stages_complete_p2 = reverse(collect(range(2, 16)))
 cfl_interval = 2
 
 cfl = 13.3 # PERK p2 2-16
-cfl = 14.1 # IMEX PERK p2 2-16
+#cfl = 14.1 # IMEX PERK p2 2-16
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = cfl_interval)
 
 #path = base_path * "k2/p3/"
