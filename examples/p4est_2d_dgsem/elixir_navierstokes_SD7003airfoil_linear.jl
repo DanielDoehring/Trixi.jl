@@ -454,7 +454,7 @@ path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/full
 Stages = [14, 12, 10, 8, 7, 6, 5, 4, 2]
 
 dt_implicit = 0.26 # Pure mesh-based part.
-dt_implicit = 0.5 # mesh & Sol. based part.
+#dt_implicit = 0.5 # mesh & Sol. based part.
 
 dtRatios = [dt_implicit,
     0.253144726232790162612, # 14
@@ -540,23 +540,18 @@ jldopen("sparsity_info.jld2", "w") do file
 end
 =#
 
-# Load the sparsity information
-jac_prototype_loaded, colorvec_loaded = jldopen("sparsity_info.jld2", "r") do file
-    return file["jac_prototype"], file["colorvec"]
-end
-
-maximum(colorvec_loaded) + 1
-
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
 
 dt = 7e-4 # For mesh-based part.
+dt = 8e-4
 
 atol_lin = 1e-6
 rtol_lin = 1e-4
-#maxiters_lin = 50
+maxiters_lin = 100
 
-linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin,
+                          itmax = maxiters_lin)
 
 linesearch = LiFukushimaLineSearch()
 linesearch = nothing
@@ -566,11 +561,18 @@ nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               linsolve = linsolve,
                               linesearch = linesearch)
 
-atol_nonlin = 1e-6
-rtol_nonlin = 1e-4
-maxiters_nonlin = 20
+atol_nonlin = 10 * atol_lin
+rtol_nonlin = 10 * rtol_lin
+maxiters_nonlin = 10
 
-#=
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
+
+
 # Factorization-based methods
 
 linear_solver = KLUFactorization()
@@ -580,6 +582,13 @@ linear_solver = KLUFactorization()
 
 #linear_solver = SparspakFactorization() # requires Sparspak.jl
 
+# Load the sparsity information
+jac_prototype_loaded, colorvec_loaded = jldopen("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/sparsity_info.jld2", "r") do file
+    return file["jac_prototype"], file["colorvec"]
+end
+
+maximum(colorvec_loaded) + 1
+
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt, callback = callbacks,
                         # IMEX-specific kwargs
@@ -588,13 +597,6 @@ integrator = Trixi.init(ode, ode_alg;
                         linear_solver = linear_solver,
                         abstol = atol_nonlin,
                         maxiters_nonlin = maxiters_nonlin);
-=#
 
-integrator = Trixi.init(ode, ode_alg;
-                        dt = dt, callback = callbacks,
-                        # IMEX-specific kwargs
-                        nonlin_solver = nonlin_solver,
-                        abstol = atol_nonlin, reltol = rtol_nonlin,
-                        maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);
