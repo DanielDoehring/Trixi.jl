@@ -230,6 +230,10 @@ ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
 
+ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
+                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
+                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+
 sol = Trixi.solve(ode, ode_algorithm;
                   dt = 1.0, # Manual time step value, will be overwritten by the stepsize_callback when it is specified.
                   ode_default_options()..., callback = callbacks);
