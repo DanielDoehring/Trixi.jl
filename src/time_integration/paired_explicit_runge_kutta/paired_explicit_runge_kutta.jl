@@ -324,7 +324,7 @@ end
         integrator.u_tmp[i] = integrator.u[i] + c_dt * integrator.k1[i]
     end
 
-    # k2: Only evaluated at finest (explicit) level: 1
+    # k2: Only evaluated on finest explicit level: 1
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + c_dt, integrator, 1)
 
@@ -341,7 +341,7 @@ end
                               c_dt * (integrator.k1[i] + integrator.k1_para[i])
     end
 
-    # k2: Only evaluated at finest (explicit) level: 1
+    # k2: Only evaluated on finest (explicit) level: 1
     # Hyperbolic part: Always evaluated
     integrator.f.f2(integrator.du, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)
@@ -363,7 +363,7 @@ end
                               c_dt * (integrator.k1[i] + integrator.k1_para[i])
     end
 
-    # k2: Only evaluated at finest (explicit) level: 1
+    # k2: Only evaluated on finest (explicit) level: 1
     # Hyperbolic part: Always evaluated
     integrator.f.f2(integrator.du, integrator.u_tmp, p,
                     integrator.t + c_dt, integrator, 1)

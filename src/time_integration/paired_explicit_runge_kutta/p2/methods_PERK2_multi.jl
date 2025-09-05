@@ -23,7 +23,7 @@ function compute_PairedExplicitRK2Multi_butcher_tableau(stages::Vector{Int64},
 
     # Datastructure indicating at which stage which level is evaluated
     active_levels = [Vector{Int64}() for _ in 1:num_stages]
-    # k1 is evaluated at all levels
+    # k1 is evaluated on all levels
     active_levels[1] = 1:num_methods
 
     # Datastructure indicating at which stage which level contributes to state
