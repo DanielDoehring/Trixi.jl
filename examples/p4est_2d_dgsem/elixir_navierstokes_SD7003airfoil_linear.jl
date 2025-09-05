@@ -150,7 +150,7 @@ summary_callback = SummaryCallback()
 
 # Choose analysis interval such that roughly every dt_c = 0.005 a record is taken
 analysis_interval = 25 # Matches for PERK 4 schemes
-analysis_interval = 1_000_000 # Only at end
+#analysis_interval = 1_000_000 # Only at end
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
@@ -300,7 +300,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 
 callbacks = CallbackSet(#stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        save_solution, # For plotting during measurement run
+                        #save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
                         analysis_callback,
                         summary_callback);
@@ -441,17 +441,22 @@ ode_alg = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para,
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
+#=
 sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
-
+=#
 
 ###############################################################################
 # IMEX
 path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/full_rhs/"
 
 Stages = [14, 12, 10, 8, 7, 6, 5, 4, 2]
-dtRatios = [0.26, # Implicit
+
+dt_implicit = 0.26 # Pure mesh-based part.
+dt_implicit = 0.5 # mesh & Sol. based part.
+
+dtRatios = [dt_implicit,
     0.253144726232790162612, # 14
     0.214041846963368698198,  # 12
     0.177173703567632401246,  # 10
@@ -460,7 +465,7 @@ dtRatios = [0.26, # Implicit
     0.0975166462040988335502, #  6
     0.0818171376613463507965, #  5
     0.0656503721211265656166, #  4
-    0.0209738927526359475451] / 0.26 #= 2 =#
+    0.0209738927526359475451] / dt_implicit #= 2 =#
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
 
@@ -545,7 +550,7 @@ maximum(colorvec_loaded) + 1
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
 
-dt = 7e-4
+dt = 7e-4 # For mesh-based part.
 
 atol_lin = 1e-6
 rtol_lin = 1e-4
