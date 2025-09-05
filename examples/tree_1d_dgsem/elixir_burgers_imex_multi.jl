@@ -26,7 +26,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_convergen
 # ODE solvers, callbacks etc.
 
 t0 = 0.0
-t_end = 0.0
+t_end = 2.0
 t_span = (t0, t_end)
 
 ode = semidiscretize(semi, t_span)
@@ -73,7 +73,7 @@ atol_nonlin = atol_lin
 rtol_nonlin = rtol_lin
 maxiters_nonlin = 20
 
-n_conv = 3
+n_conv = 0
 dt = (8e-3)/2^n_conv
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt, callback = callbacks,
