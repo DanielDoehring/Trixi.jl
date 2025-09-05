@@ -1048,8 +1048,7 @@ end
                                                              AbstractPairedExplicitRKIMEXMultiParabolicIntegrator},
                                            max_level)
     rhs_hyperbolic_parabolic!(du_ode, u_ode, semi, t,
-                              integrator.du_para,
-                              max_level,
+                              integrator.du_para, max_level,
                               integrator.level_info_elements_acc[max_level],
                               integrator.level_info_interfaces_acc[max_level],
                               integrator.level_info_boundaries_acc[max_level],
