@@ -28,7 +28,7 @@ function compute_PairedExplicitRK2IMEXMulti_butcher_tableau(stages::Vector{Int64
 
     # Datastructure indicating at which stage which level is evaluated
     active_levels = [Vector{Int64}() for _ in 1:num_stages]
-    # k1 is evaluated at all levels
+    # k1 is evaluated on all levels
     active_levels[1] = 1:num_methods
 
     # Datastructure indicating at which stage which level contributes to state
@@ -252,7 +252,6 @@ mutable struct NonlinParams{RealT <: Real, uType <: AbstractVector,
 end
 
 # Somehow needed for NonlinearSolve
-# TODO: deepcopy of arrays etc. required?
 function Base.copy(p::NonlinParams)
     NonlinParams(p.t, p.dt,
                  p.u, p.du, p.u_tmp,
@@ -400,7 +399,6 @@ mutable struct NonlinParamsParabolic{RealT <: Real, uType <: AbstractVector,
     const u_indices::Vector{Int64}
 end
 
-# TODO: deepcopy of arrays etc. required?
 function Base.copy(p::NonlinParamsParabolic) 
     return NonlinParamsParabolic(p.t, p.dt,
                                  p.u, p.du, p.u_tmp,
