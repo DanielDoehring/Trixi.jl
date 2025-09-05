@@ -27,31 +27,32 @@ end
 
 # Constructor that reads the coefficients from a file
 function PairedExplicitRK2Coupled(num_stages,
-                                base_path_monomial_coeffs_1::AbstractString,
-                                base_path_monomial_coeffs_2::AbstractString;
-                                dt_opt = nothing,
-                                bS = 1.0, cS = 0.5)
+                                  base_path_monomial_coeffs_1::AbstractString,
+                                  base_path_monomial_coeffs_2::AbstractString;
+                                  dt_opt = nothing,
+                                  bS = 1.0, cS = 0.5)
     @assert num_stages>=2 "PERK2 requires at least two stages"
     # If the user has the monomial coefficients, they also must have the optimal time step
     a_matrix_1, c = compute_PairedExplicitRK2_butcher_tableau(num_stages,
-                                                            base_path_monomial_coeffs_1,
-                                                            bS, cS)
+                                                              base_path_monomial_coeffs_1,
+                                                              bS, cS)
 
     a_matrix_2, _ = compute_PairedExplicitRK2_butcher_tableau(num_stages,
-                                                                 base_path_monomial_coeffs_2,
-                                                                 bS, cS)
+                                                              base_path_monomial_coeffs_2,
+                                                              bS, cS)
 
     return PairedExplicitRK2Coupled(num_stages, a_matrix_1, a_matrix_2, c, 1 - bS, bS,
-                                  cS, dt_opt)
+                                    cS, dt_opt)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-mutable struct PairedExplicitRK2CoupledIntegrator{RealT <: Real, uType <: AbstractVector,
-                                                Params, Sol, F,
-                                                PairedExplicitRKOptions} <:
+mutable struct PairedExplicitRK2CoupledIntegrator{RealT <: Real,
+                                                  uType <: AbstractVector,
+                                                  Params, Sol, F,
+                                                  PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKCoupledSingleIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
@@ -86,15 +87,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Coupled;
     iter = 0
 
     integrator = PairedExplicitRK2CoupledIntegrator(u0, du, u_tmp,
-                                                  t0, tdir, dt, zero(dt),
-                                                  iter, ode.p,
-                                                  (prob = ode,), ode.f,
-                                                  alg,
-                                                  PairedExplicitRKOptions(callback,
-                                                                          ode.tspan;
-                                                                          kwargs...),
-                                                  false, true, false,
-                                                  k1)
+                                                    t0, tdir, dt, zero(dt),
+                                                    iter, ode.p,
+                                                    (prob = ode,), ode.f,
+                                                    alg,
+                                                    PairedExplicitRKOptions(callback,
+                                                                            ode.tspan;
+                                                                            kwargs...),
+                                                    false, true, false,
+                                                    k1)
 
     initialize_callbacks!(callback, integrator)
 

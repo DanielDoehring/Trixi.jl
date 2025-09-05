@@ -399,7 +399,7 @@ mutable struct NonlinParamsParabolic{RealT <: Real, uType <: AbstractVector,
     const u_indices::Vector{Int64}
 end
 
-function Base.copy(p::NonlinParamsParabolic) 
+function Base.copy(p::NonlinParamsParabolic)
     return NonlinParamsParabolic(p.t, p.dt,
                                  p.u, p.du, p.u_tmp,
                                  p.du_para,
