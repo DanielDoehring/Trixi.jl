@@ -303,5 +303,7 @@ include("methods_PERRK2_multi.jl")
 include("methods_PERKS2.jl")
 include("methods_PERKS2_multi.jl")
 
+include("methods_PERKC2.jl")
+
 include("methods_PERK2_multi_imex.jl")
 end # @muladd

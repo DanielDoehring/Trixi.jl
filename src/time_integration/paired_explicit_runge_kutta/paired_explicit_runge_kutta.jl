@@ -28,6 +28,10 @@ abstract type AbstractPairedExplicitRKSplitSingle{ORDER} <:
 abstract type AbstractPairedExplicitRKSplitMulti{ORDER} <:
               AbstractPairedExplicitRKMulti{ORDER} end
 
+# For `SemidiscretizationCoupled` composed of different systems with own stability properties
+abstract type AbstractPairedExplicitRKCoupledSingle{ORDER} <:
+              AbstractPairedExplicitRKSingle{ORDER} end
+
 abstract type AbstractPairedExplicitRKIMEX{ORDER} <: AbstractPairedExplicitRK{ORDER} end
 
 abstract type AbstractPairedExplicitRKIMEXSingle{ORDER} <:
@@ -81,7 +85,12 @@ abstract type AbstractPairedExplicitRKSplitSingleIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRKSplitMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRKSplitIntegrator{ORDER} end
 
-# Relaxation integrators              
+# Coupled Integrators
+# CARE: Not yet defined a `AbstractPairedExplicitRKCoupledIntegrator`, re-use standard hyperbolic for now
+abstract type AbstractPairedExplicitRKCoupledSingleIntegrator{ORDER} <:
+              AbstractPairedExplicitRKSingleIntegrator{ORDER} end
+
+# Relaxation Integrators
 abstract type AbstractPairedExplicitRelaxationRKIntegrator{ORDER} <:
               AbstractPairedExplicitRKIntegrator{ORDER} end
 
@@ -101,7 +110,7 @@ abstract type AbstractPairedExplicitRelaxationRKSplitSingleIntegrator{ORDER} <: 
 abstract type AbstractPairedExplicitRelaxationRKSplitMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRelaxationRKSplitIntegrator{ORDER} end
 
-# IMEX integrators
+# IMEX Integrators
 abstract type AbstractPairedExplicitRKIMEXIntegrator{ORDER} <:
               AbstractPairedExplicitRKIntegrator{ORDER} end
 
@@ -113,7 +122,7 @@ abstract type AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{ORDER} <:
               AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} end
 
-# Euler-Acoustic integrators
+# Euler-Acoustic Integrators
 abstract type AbstractPairedExplicitRKEulerAcousticSingleIntegrator{ORDER} <:
               AbstractPairedExplicitRKSingleIntegrator{ORDER} end
 
@@ -282,6 +291,32 @@ end
     a1_dt = alg.a_matrix[1, stage - 2] * integrator.dt
     a2_dt = alg.a_matrix[2, stage - 2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] +
+                              a1_dt * integrator.k1[i] + a2_dt * integrator.du[i]
+    end
+
+    integrator.f(integrator.du, integrator.u_tmp, p,
+                 integrator.t + alg.c[stage] * integrator.dt)
+
+    return nothing
+end
+
+@inline function PERK_ki!(integrator::AbstractPairedExplicitRKCoupledSingleIntegrator,
+                          p, alg, stage)
+    @unpack u_indices = integrator.p
+
+    # Construct current state
+    # First system
+    a1_dt = alg.a_matrix_1[1, stage - 2] * integrator.dt
+    a2_dt = alg.a_matrix_1[2, stage - 2] * integrator.dt
+    @threaded for i in u_indices[1]
+        integrator.u_tmp[i] = integrator.u[i] +
+                              a1_dt * integrator.k1[i] + a2_dt * integrator.du[i]
+    end
+    # Second system
+    a1_dt = alg.a_matrix_2[1, stage - 2] * integrator.dt
+    a2_dt = alg.a_matrix_2[2, stage - 2] * integrator.dt
+    @threaded for i in u_indices[2]
         integrator.u_tmp[i] = integrator.u[i] +
                               a1_dt * integrator.k1[i] + a2_dt * integrator.du[i]
     end
