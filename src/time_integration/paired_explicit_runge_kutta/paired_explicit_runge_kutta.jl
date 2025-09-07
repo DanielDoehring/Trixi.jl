@@ -90,6 +90,9 @@ abstract type AbstractPairedExplicitRKSplitMultiIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRKCoupledSingleIntegrator{ORDER} <:
               AbstractPairedExplicitRKSingleIntegrator{ORDER} end
 
+abstract type AbstractPairedExplicitRKCoupledMultiIntegrator{ORDER} <:
+              AbstractPairedExplicitRKMultiIntegrator{ORDER} end # TODO: Revisit if this makes sense!
+
 # Relaxation Integrators
 abstract type AbstractPairedExplicitRelaxationRKIntegrator{ORDER} <:
               AbstractPairedExplicitRKIntegrator{ORDER} end
@@ -551,6 +554,53 @@ end
 
     # For statically non-uniform meshes/characteristic speeds
     integrator.coarsest_lvl = alg.max_active_levels[stage]
+
+    return nothing
+end
+
+@inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKCoupledMultiIntegrator,
+                                               alg, stage)
+    # CARE: Currently only implemented for matching number of methods and grid-levels!
+    for level in 1:alg.max_add_levels[stage]
+        a1_dt = alg.a_matrices_1[level, 1, stage - 2] * integrator.dt
+        a2_dt = alg.a_matrices_1[level, 2, stage - 2] * integrator.dt
+        @threaded for i in integrator.level_info_u_1[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                    a1_dt * integrator.k1[i] +
+                                    a2_dt * integrator.du[i]
+        end
+    end
+
+    c_dt = alg.c[stage] * integrator.dt
+    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+        @threaded for i in integrator.level_info_u_1[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                    c_dt * integrator.k1[i]
+        end
+    end
+
+    for level in 1:alg.max_add_levels[stage]
+        a1_dt = alg.a_matrices_2[level, 1, stage - 2] * integrator.dt
+        a2_dt = alg.a_matrices_2[level, 2, stage - 2] * integrator.dt
+        @threaded for i in integrator.level_info_u_2[level]
+            integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                    a1_dt * integrator.k1[i] +
+                                    a2_dt * integrator.du[i]
+        end
+    end
+
+    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+        @threaded for i in integrator.level_info_u_2[level]
+            integrator.u_tmp[i] = integrator.u_tmp[i] +
+                                    c_dt * integrator.k1[i]
+        end
+    end
+
+    # For statically non-uniform meshes/characteristic speeds
+    integrator.coarsest_lvl = alg.max_active_levels[stage]
+
+    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+    #integrator.coarsest_lvl = min(alg.max_active_levels[stage], integrator.n_levels)
 
     return nothing
 end

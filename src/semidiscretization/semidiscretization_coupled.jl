@@ -193,6 +193,40 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationCoupled, t)
     return nothing
 end
 
+# `rhs!` for Paired-Explicit Runge-Kutta methods
+function rhs!(du_ode, u_ode, semi::SemidiscretizationCoupled, t,
+              integrator, max_level)
+    @unpack u_indices, semis = semi
+
+    time_start = time_ns()
+
+    @trixi_timeit timer() "copy to coupled boundaries" begin
+        foreach(semis) do semi_
+            copy_to_coupled_boundary!(semi_.boundary_conditions, u_ode, semi, semi_)
+        end
+    end
+
+    # Call rhs! for each semidiscretization
+    # TODO: Do I need to extract parts of `u_ode` and `du_ode` here?
+    rhs!(du_ode, u_ode, semis[1], t,
+         integrator.level_info_elements_acc_1[max_level],
+         integrator.level_info_interfaces_acc_1[max_level],
+         integrator.level_info_boundaries_acc_1[max_level],
+         integrator.level_info_mortars_acc_1[max_level])
+
+    rhs!(du_ode, u_ode, semis[2], t,
+         integrator.level_info_elements_acc_2[max_level],
+         integrator.level_info_interfaces_acc_2[max_level],
+         integrator.level_info_boundaries_acc_2[max_level],
+         integrator.level_info_mortars_acc_2[max_level])
+
+    runtime = time_ns() - time_start
+    put!(semi.performance_counter, runtime)
+
+    return nothing
+end
+
+
 ################################################################################
 ### AnalysisCallback
 ################################################################################
