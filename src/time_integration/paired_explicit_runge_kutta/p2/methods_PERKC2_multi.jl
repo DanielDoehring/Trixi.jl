@@ -12,7 +12,8 @@ struct PairedExplicitCoupledRK2Multi <:
     stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
     # Δt of the different methods divided by Δt_max
-    dt_ratios::Vector{Float64}
+    dt_ratios_1::Vector{Float64}
+    dt_ratios_2::Vector{Float64}
 
     # Butcher tableau variables
     a_matrices_1::Array{Float64, 3}
@@ -31,7 +32,7 @@ end
 function PairedExplicitCoupledRK2Multi(stages::Vector{Int64},
                                        base_path_mon_coeffs_1::AbstractString,
                                        base_path_mon_coeffs_2::AbstractString,
-                                       dt_ratios;
+                                       dt_ratios_1, dt_ratios_2;
                                        bS = 1.0, cS = 0.5)
     num_stages = maximum(stages)
 
@@ -47,7 +48,7 @@ function PairedExplicitCoupledRK2Multi(stages::Vector{Int64},
                                                           bS, cS)
 
     return PairedExplicitCoupledRK2Multi(length(stages), num_stages, stages,
-                                         dt_ratios,
+                                         dt_ratios_1, dt_ratios_2,
                                          a_matrices_1, a_matrices_2,
                                          c, 1 - bS, bS,
                                          max_active_levels, max_add_levels)
@@ -133,7 +134,7 @@ function init(ode::ODEProblem, alg::PairedExplicitCoupledRK2Multi;
                          level_info_interfaces_acc_1,
                          level_info_boundaries_acc_1,
                          level_info_mortars_acc_1,
-                         n_levels, semi_1, alg)
+                         n_levels, semi_1, alg.dt_ratios_1)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -159,7 +160,7 @@ function init(ode::ODEProblem, alg::PairedExplicitCoupledRK2Multi;
                          level_info_interfaces_acc_2,
                          level_info_boundaries_acc_2,
                          level_info_mortars_acc_2,
-                         n_levels, semi_2, alg)
+                         n_levels, semi_2, alg.dt_ratios_2)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",

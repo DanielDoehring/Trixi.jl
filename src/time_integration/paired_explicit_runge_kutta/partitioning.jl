@@ -1194,6 +1194,22 @@ function partition_variables!(level_info_elements,
                               level_info_mortars_acc,
                               n_levels, mesh::StructuredMesh, dg, cache,
                               alg)
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
+                         n_levels, mesh, dg, cache,
+                         alg.dt_ratios)
+end
+
+function partition_variables!(level_info_elements,
+                              level_info_elements_acc,
+                              level_info_interfaces_acc,
+                              level_info_boundaries_acc,
+                              level_info_mortars_acc,
+                              n_levels, mesh::StructuredMesh, dg, cache,
+                              dt_ratios::AbstractVector)
     nnodes = length(dg.basis.nodes)
     n_elements = nelements(dg, cache)
 
@@ -1206,7 +1222,7 @@ function partition_variables!(level_info_elements,
     for element_id in 1:n_elements
         h = hmin_per_element_[element_id]
 
-        level = findfirst(x -> x < hmin / h, alg.dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
+        level = findfirst(x -> x < hmin / h, dt_ratios) # Parabolic terms are not supported on `StructuredMesh`
         # Catch case that cell is "too coarse" for method with fewest stage evals
         if level === nothing
             level = n_levels

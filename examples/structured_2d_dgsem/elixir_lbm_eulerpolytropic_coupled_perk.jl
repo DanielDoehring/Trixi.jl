@@ -205,6 +205,9 @@ analysis_callback = AnalysisCallbackCoupled(semi,
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
 cfl = 9.0 # NOTE: Unoptimized PERK2 (advection-only!)
+
+cfl = 3.0
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 # Need special version of the LBM collision callback for a `SemidiscretizationCoupled`
@@ -259,13 +262,62 @@ ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
 ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               [1.0])
-=#
+                                               [1.0], [1.0])
+
 ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               [1.0])
+                                               [1.0], [1.0])
+
+Stages = [16, 12, 10, 8, 6, 4]
+
+dtRatios = [
+    0.631627607345581,
+    0.485828685760498,
+    0.366690540313721,
+    0.282330989837646,
+    0.197234153747559,
+    0.124999046325684
+] ./ 0.631627607345581
+
+ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
+                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
+                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
+                                                    dtRatios, dtRatios)
+=#
+
+Stages = [16, 12, 10, 8, 6]
+
+dtRatios_1 = [
+    0.631627607345581,
+    0.485828685760498,
+    0.366690540313721,
+    0.282330989837646,
+    0.197234153747559
+] ./ 0.631627607345581
+
+dtRatios_2 = [
+    0.144900726262131,
+    0.105614699577563,
+    0.0812354683759622,
+    0.0640441864205059,
+    0.0421791076660156
+] ./ 0.144900726262131
+
+ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
+                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
+                                                    "/home/daniel/git/Paper_PERRK/Data/Kelvin_Helmholtz/p2/",
+                                                    dtRatios_1, dtRatios_2)
 
 sol = Trixi.solve(ode, ode_algorithm;
                   dt = 1.0, # Manual time step value, will be overwritten by the stepsize_callback when it is specified.
                   ode_default_options()..., callback = callbacks);
+
+using Plots
+
+plot_datas = PlotData2D(sol)
+pd_1 = plot_datas[1] # Euler
+pd_2 = plot_datas[2] # LBM
+
+plot(pd_1["rho"])
+plot!(getmesh(pd_1))
