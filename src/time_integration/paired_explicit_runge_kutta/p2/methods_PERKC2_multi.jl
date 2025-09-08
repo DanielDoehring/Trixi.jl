@@ -120,7 +120,7 @@ function init(ode::ODEProblem, alg::PairedExplicitCoupledRK2Multi;
     mesh_1 = semi_1.mesh
     n_levels = get_n_levels(mesh_1, alg)
     mesh_2 = semi_2.mesh
-    @assert n_levels == get_n_levels(mesh_2, alg) "Number of levels must be the same for both semi-discretizations!"
+    @assert n_levels==get_n_levels(mesh_2, alg) "Number of levels must be the same for both semi-discretizations!"
 
     level_info_elements_1 = [Vector{Int64}() for _ in 1:n_levels]
     level_info_elements_acc_1 = [Vector{Int64}() for _ in 1:n_levels]

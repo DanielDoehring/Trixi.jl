@@ -226,7 +226,6 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationCoupled, t,
     return nothing
 end
 
-
 ################################################################################
 ### AnalysisCallback
 ################################################################################
