@@ -94,7 +94,7 @@ analysis_callback = AnalysisCallback(semi, interval = 1000,
                                      analysis_integrals = (;))
 
 alive_callback = AliveCallback(alive_interval = 100)
-                                     
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback)
@@ -152,7 +152,7 @@ rtol_lin = 1e-3
 linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
 
 # For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               linsolve = linsolve)
 
 atol_nonlin = atol_lin

@@ -40,7 +40,7 @@ analysis_interval = 100_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = false,
                                      analysis_errors = [:l2_error, :l1_error, :linf_error],
-                                     extra_analysis_integrals = (entropy, ))
+                                     extra_analysis_integrals = (entropy,))
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
@@ -66,7 +66,9 @@ basepath = "/storage/home/daniel/PERRK/Data/Alfven_Wave/"
 
 Stages = [14, 13, 12, 11, 10]
 dtRatios = [42, 42, 42, 42, 42] # Not relevant (random assignment)
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10, root_tol = 1e-15, gamma_tol = eps(Float64))
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 10,
+                                                 root_tol = 1e-15,
+                                                 gamma_tol = eps(Float64))
 
 #=
 path = basepath * "k2/p2/"
@@ -79,10 +81,11 @@ ode_algorithm = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path, dtRatios; r
 =#
 
 path = basepath * "k4/p4/"
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios;
+                                                       relaxation_solver = relaxation_solver)
+
 # Test also non-relaxed schemes
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,

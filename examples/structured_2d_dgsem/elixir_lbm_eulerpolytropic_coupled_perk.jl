@@ -225,7 +225,8 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-ode_algorithm = Trixi.PairedExplicitRK2(16, "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+ode_algorithm = Trixi.PairedExplicitRK2(16,
+                                        "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
 ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
