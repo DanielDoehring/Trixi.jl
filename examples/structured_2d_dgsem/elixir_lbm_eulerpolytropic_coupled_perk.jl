@@ -27,6 +27,7 @@ using LinearAlgebra: norm
 # (-2, -1)                                   ( 2, -1)
 
 polydeg = 2
+
 cells_per_dim_per_section = (16, 8) .* 2
 
 ###########
@@ -61,6 +62,7 @@ mesh_euler = StructuredMesh(cells_per_dim_per_section,
                             coords_min_euler, coords_max_euler,
                             periodicity = (false, true))
 =#
+
 
 function mapping_left(xi_, eta_)
     xi = 0.5 * (xi_ - 1)  # Map [-1, 1] -> [-1, 0]
@@ -202,22 +204,6 @@ analysis_callback = AnalysisCallbackCoupled(semi,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-# Need to implement `cons2macroscopic` for `PolytropicEulerEquations2D`
-# in order to be able to use this in the `SaveSolutionCallback` below
-@inline function Trixi.cons2macroscopic(u, equations::PolytropicEulerEquations2D)
-    u_prim = cons2prim(u, equations)
-    p = pressure(u, equations)
-    return SVector(u_prim[1], u_prim[2], u_prim[3], p)
-end
-function Trixi.varnames(::typeof(cons2macroscopic), ::PolytropicEulerEquations2D)
-    ("rho", "v1", "v2", "p")
-end
-
-save_solution = SaveSolutionCallback(interval = 1000,
-                                     save_initial_solution = true,
-                                     save_final_solution = true,
-                                     solution_variables = cons2macroscopic)
-
 cfl = 9.0 # NOTE: Unoptimized PERK2 (advection-only!)
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -250,7 +236,6 @@ collision_callback = LBMCollisionCallback()
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        save_solution,
                         stepsize_callback,
                         collision_callback)
 
@@ -264,11 +249,22 @@ ode_algorithm = Trixi.PairedExplicitRK2(16,
 ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
-=#
 
 ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+=#
+
+#=
+ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
+                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
+                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
+                                               [1.0])
+=#
+ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
+                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
+                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
+                                               [1.0])
 
 sol = Trixi.solve(ode, ode_algorithm;
                   dt = 1.0, # Manual time step value, will be overwritten by the stepsize_callback when it is specified.

@@ -205,16 +205,20 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationCoupled, t,
             copy_to_coupled_boundary!(semi_.boundary_conditions, u_ode, semi, semi_)
         end
     end
+    
+    u_loc = get_system_u_ode(u_ode, 1, semi)
+    du_loc = get_system_u_ode(du_ode, 1, semi)
 
-    # Call rhs! for each semidiscretization
-    # TODO: Do I need to extract parts of `u_ode` and `du_ode` here?
-    rhs!(du_ode, u_ode, semis[1], t,
+    rhs!(du_loc, u_loc, semis[1], t,
          integrator.level_info_elements_acc_1[max_level],
          integrator.level_info_interfaces_acc_1[max_level],
          integrator.level_info_boundaries_acc_1[max_level],
          integrator.level_info_mortars_acc_1[max_level])
 
-    rhs!(du_ode, u_ode, semis[2], t,
+    u_loc = get_system_u_ode(u_ode, 2, semi)
+    du_loc = get_system_u_ode(du_ode, 2, semi)
+
+    rhs!(du_loc, u_loc, semis[2], t,
          integrator.level_info_elements_acc_2[max_level],
          integrator.level_info_interfaces_acc_2[max_level],
          integrator.level_info_boundaries_acc_2[max_level],
