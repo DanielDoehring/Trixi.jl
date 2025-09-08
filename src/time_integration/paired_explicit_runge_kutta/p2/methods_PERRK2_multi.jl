@@ -287,7 +287,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK2Multi;
                                                                 level_info_u,
                                                                 -1, n_levels,
                                                                 gamma, S_old,
-                                                                alg.relaxationsolver)
+                                                                alg.relaxation_solver)
     end
 
     initialize_callbacks!(callback, integrator)
