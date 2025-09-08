@@ -41,16 +41,16 @@ function PairedExplicitCoupledRK2Multi(stages::Vector{Int64},
                                                                     base_path_mon_coeffs_1,
                                                                     bS, cS)
 
-    a_matrices_2, _, _, = compute_PairedExplicitRK2Multi_butcher_tableau(stages,
-                                                                         num_stages,
-                                                                         base_path_mon_coeffs_2,
-                                                                         bS, cS)
+    a_matrices_2, _,
+    _, _ = compute_PairedExplicitRK2Multi_butcher_tableau(stages, num_stages,
+                                                          base_path_mon_coeffs_2,
+                                                          bS, cS)
 
-    return PairedExplicitRK2Multi(length(stages), num_stages, stages,
-                                  dt_ratios,
-                                  a_matrices_1, a_matrices_2,
-                                  c, 1 - bS, bS,
-                                  max_active_levels, max_add_levels)
+    return PairedExplicitCoupledRK2Multi(length(stages), num_stages, stages,
+                                         dt_ratios,
+                                         a_matrices_1, a_matrices_2,
+                                         c, 1 - bS, bS,
+                                         max_active_levels, max_add_levels)
 end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
@@ -73,7 +73,7 @@ mutable struct PairedExplicitRK2CoupledMultiIntegrator{RealT <: Real,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK2Multi
+    alg::PairedExplicitCoupledRK2Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -143,9 +143,10 @@ function init(ode::ODEProblem, alg::PairedExplicitCoupledRK2Multi;
     # Set (initial) distribution of DG nodal values
     level_info_u_1 = [Vector{Int64}() for _ in 1:n_levels]
 
+    u_1 = get_system_u_ode(u0, 1, semi)
     partition_u!(level_info_u_1,
                  level_info_elements_1, n_levels,
-                 u0, semi_1)
+                 u_1, semi_1)
 
     level_info_elements_2 = [Vector{Int64}() for _ in 1:n_levels]
     level_info_elements_acc_2 = [Vector{Int64}() for _ in 1:n_levels]
@@ -167,35 +168,41 @@ function init(ode::ODEProblem, alg::PairedExplicitCoupledRK2Multi;
 
     level_info_u_2 = [Vector{Int64}() for _ in 1:n_levels]
 
+    u_2 = get_system_u_ode(u0, 2, semi)
     partition_u!(level_info_u_2,
                  level_info_elements_2, n_levels,
-                 u0, semi_2)
+                 u_2, semi_2)
 
-    integrator = PairedExplicitRK2MultiIntegrator(u0, du, u_tmp,
-                                                  t0, tdir,
-                                                  dt, zero(dt),
-                                                  iter, semi,
-                                                  (prob = ode,),
-                                                  ode.f,
-                                                  alg,
-                                                  PairedExplicitRKOptions(callback,
-                                                                          ode.tspan;
-                                                                          kwargs...),
-                                                  false, true, false,
-                                                  k1,
-                                                  level_info_elements_1,
-                                                  level_info_elements_acc_1,
-                                                  level_info_interfaces_acc_1,
-                                                  level_info_boundaries_acc_1,
-                                                  level_info_mortars_acc_1,
-                                                  level_info_u_1,
-                                                  level_info_elements_2,
-                                                  level_info_elements_acc_2,
-                                                  level_info_interfaces_acc_2,
-                                                  level_info_boundaries_acc_2,
-                                                  level_info_mortars_acc_2,
-                                                  level_info_u_2,
-                                                  -1, n_levels)
+    # Convert local indices to global indices
+    max_u_1 = maximum(level_info_u_1[1])
+    for level in 1:n_levels
+        level_info_u_2[level] .+= max_u_1 # TODO: Test .+= without loop over levels for more compact code!
+    end
+
+    integrator = PairedExplicitRK2CoupledMultiIntegrator(u0, du, u_tmp,
+                                                         t0, tdir,
+                                                         dt, zero(dt),
+                                                         iter, semi,
+                                                         (prob = ode,),
+                                                         ode.f, alg,
+                                                         PairedExplicitRKOptions(callback,
+                                                                                 ode.tspan;
+                                                                                 kwargs...),
+                                                         false, true, false,
+                                                         k1,
+                                                         level_info_elements_1,
+                                                         level_info_elements_acc_1,
+                                                         level_info_interfaces_acc_1,
+                                                         level_info_boundaries_acc_1,
+                                                         level_info_mortars_acc_1,
+                                                         level_info_u_1,
+                                                         level_info_elements_2,
+                                                         level_info_elements_acc_2,
+                                                         level_info_interfaces_acc_2,
+                                                         level_info_boundaries_acc_2,
+                                                         level_info_mortars_acc_2,
+                                                         level_info_u_2,
+                                                         -1, n_levels)
 
     initialize_callbacks!(callback, integrator)
 

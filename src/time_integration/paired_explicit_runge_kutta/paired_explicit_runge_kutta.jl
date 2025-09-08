@@ -583,7 +583,7 @@ end
         a1_dt = alg.a_matrices_2[level, 1, stage - 2] * integrator.dt
         a2_dt = alg.a_matrices_2[level, 2, stage - 2] * integrator.dt
         @threaded for i in integrator.level_info_u_2[level]
-            integrator.u_tmp[i] = integrator.u_tmp[i] +
+            integrator.u_tmp[i] = integrator.u[i] +
                                   a1_dt * integrator.k1[i] +
                                   a2_dt * integrator.du[i]
         end
@@ -591,7 +591,7 @@ end
 
     for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
         @threaded for i in integrator.level_info_u_2[level]
-            integrator.u_tmp[i] = integrator.u_tmp[i] +
+            integrator.u_tmp[i] = integrator.u[i] +
                                   c_dt * integrator.k1[i]
         end
     end
