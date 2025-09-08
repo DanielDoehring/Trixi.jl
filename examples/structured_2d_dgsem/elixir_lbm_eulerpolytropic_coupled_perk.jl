@@ -54,10 +54,26 @@ function initial_condition_pressure_bump(x, t, equations::PolytropicEulerEquatio
 end
 initial_condition_euler = initial_condition_pressure_bump
 
+#=
 coords_min_euler = (-2.0, -1.0)
 coords_max_euler = (0.0, 1.0)
 mesh_euler = StructuredMesh(cells_per_dim_per_section,
                             coords_min_euler, coords_max_euler,
+                            periodicity = (false, true))
+=#
+
+function mapping_left(xi_, eta_)
+    xi = 0.5 * (xi_ - 1)  # Map [-1, 1] -> [-1, 0]
+    exponent = 1.4
+
+    #xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_))
+    xi_transformed = -abs(xi)^(exponent + abs(xi))
+
+    x = xi_transformed * 2 # Map [-1, 0] -> [-2, 0]
+
+    return SVector(x, eta_)
+end
+mesh_euler = StructuredMesh(cells_per_dim_per_section, mapping_left,
                             periodicity = (false, true))
 
 # Use macroscopic variables derived from LBM populations 
@@ -120,10 +136,26 @@ function initial_condition_lbm(x, t, equations::LatticeBoltzmannEquations2D)
     return equilibrium_distribution(rho, v1, v2, equations)
 end
 
+#=
 coords_min_lbm = (0.0, -1.0)
 coords_max_lbm = (2.0, 1.0)
 mesh_lbm = StructuredMesh(cells_per_dim_per_section,
                           coords_min_lbm, coords_max_lbm,
+                          periodicity = (false, true))
+=#
+
+function mapping_right(xi_, eta_)
+    xi = 0.5 * (xi_ + 1)  # Map [-1, 1] -> [0, 1]
+    exponent = 1.4
+
+    #xi_transformed = sign(xi_) * abs(xi_)^(exponent + abs(xi_))
+    xi_transformed = xi^(exponent + xi)
+
+    x = xi_transformed * 2 # Map [-1, 0] -> [-2, 0]
+
+    return SVector(x, eta_)
+end
+mesh_lbm = StructuredMesh(cells_per_dim_per_section, mapping_right,
                           periodicity = (false, true))
 
 # Supply equilibrium (Maxwellian) distribution function computed 
@@ -161,7 +193,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100
+analysis_interval = 1000
 analysis_callback_euler = AnalysisCallback(semi_euler, interval = analysis_interval)
 analysis_callback_lbm = AnalysisCallback(semi_lbm, interval = analysis_interval)
 analysis_callback = AnalysisCallbackCoupled(semi,
@@ -181,7 +213,7 @@ function Trixi.varnames(::typeof(cons2macroscopic), ::PolytropicEulerEquations2D
     ("rho", "v1", "v2", "p")
 end
 
-save_solution = SaveSolutionCallback(interval = 50,
+save_solution = SaveSolutionCallback(interval = 1000,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2macroscopic)
@@ -218,18 +250,21 @@ collision_callback = LBMCollisionCallback()
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        #save_solution,
+                        save_solution,
                         stepsize_callback,
                         collision_callback)
 
 ###############################################################################
 # run the simulation
 
+#=
 ode_algorithm = Trixi.PairedExplicitRK2(16,
                                         "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+
 ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+=#
 
 ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
                                                "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
