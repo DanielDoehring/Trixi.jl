@@ -96,5 +96,5 @@ ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
 ode_alg = Trixi.PairedExplicitRK2IMEXSplitMulti([12], path, [1])
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = 0.08/8,
+                  dt = 0.08,
                   save_everystep = false, callback = callbacks);

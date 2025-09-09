@@ -141,8 +141,8 @@ tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 30.25 * t_c) # For testing only
 #tspan = (30 * t_c, 30 * t_c) # Plot sol
 
-#ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
+ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
 ode_SD = semidiscretize(semi_SD, tspan, restart_filename; split_problem = false)
 
@@ -454,7 +454,6 @@ path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/full
 Stages = [14, 12, 10, 8, 7, 6, 5, 4, 2]
 
 dt_implicit = 0.26 # Pure mesh-based part.
-#dt_implicit = 0.5 # mesh & Sol. based part.
 
 dtRatios = [dt_implicit,
     0.253144726232790162612, # 14
@@ -468,6 +467,7 @@ dtRatios = [dt_implicit,
     0.0209738927526359475451] / dt_implicit #= 2 =#
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path_coeffs, dtRatios)
+ode_alg = Trixi.PairedExplicitRK2IMEXSplitMulti(Stages, path_coeffs, dtRatios)
 
 ### Repeat code from integrator init ###
 #=
@@ -543,8 +543,7 @@ end
 
 # TODO: Could try algorithms from IterativeSolvers, KrylovKit (wrappers provided by LinearSolve.jl)
 
-dt = 7e-4 # For mesh-based part.
-dt = 8e-4
+dt = 7e-4
 
 atol_lin = 1e-6
 rtol_lin = 1e-4
