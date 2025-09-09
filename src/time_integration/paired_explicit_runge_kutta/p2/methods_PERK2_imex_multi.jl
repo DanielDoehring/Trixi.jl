@@ -680,9 +680,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParams)
     end
 
     # Evaluate implicit stage
-    f(du, u_tmp, semi,
-      #t + alg.c[alg.num_stages] * dt,
-      t + a_dt,
+    f(du, u_tmp, semi, t + a_dt,
       element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
@@ -708,9 +706,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParamsParabolic
     end
 
     # Evaluate implicit stage
-    f(du, u_tmp, semi,
-      #t + alg.c[alg.num_stages] * dt,
-      t + a_dt,
+    f(du, u_tmp, semi, t + a_dt,
       du_para,
       element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
 
