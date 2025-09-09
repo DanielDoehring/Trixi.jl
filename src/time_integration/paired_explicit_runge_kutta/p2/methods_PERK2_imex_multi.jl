@@ -617,7 +617,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     # Evaluate implicit stage
     integrator.f(integrator.du, integrator.u_tmp, integrator.sol.prob.p,
                  #t + alg.c[alg.num_stages] * dt,
-                 integrator.t + 0.5 * integrator.dt, # Hard-coded for IMEX midpoint method
+                 integrator.t + a_dt,
                  integrator.level_info_elements_acc[R],
                  integrator.level_info_interfaces_acc[R],
                  integrator.level_info_boundaries_acc[R],
@@ -649,7 +649,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     # Evaluate implicit stage
     integrator.f(integrator.du, integrator.u_tmp, integrator.sol.prob.p,
                  #t + alg.c[alg.num_stages] * dt,
-                 integrator.t + 0.5 * integrator.dt, # Hard-coded for IMEX midpoint method
+                 integrator.t + a_dt,
                  integrator.du_para,
                  integrator.level_info_elements_acc[R],
                  integrator.level_info_interfaces_acc[R],
@@ -682,7 +682,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParams)
     # Evaluate implicit stage
     f(du, u_tmp, semi,
       #t + alg.c[alg.num_stages] * dt,
-      t + 0.5 * dt, # Hard-coded for IMEX midpoint method
+      t + a_dt,
       element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
@@ -710,7 +710,7 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParamsParabolic
     # Evaluate implicit stage
     f(du, u_tmp, semi,
       #t + alg.c[alg.num_stages] * dt,
-      t + 0.5 * dt, # Hard-coded for IMEX midpoint method
+      t + a_dt,
       du_para,
       element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
 
