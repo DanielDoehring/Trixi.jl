@@ -602,15 +602,14 @@ end
 # Version for manual Newton-Raphson, hyperbolic problems
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                                     integrator::PairedExplicitRK2IMEXMultiIntegrator)
-    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
-    a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
-
     R = integrator.alg.num_methods
-    u_indicies_implict = integrator.level_info_u[R]
+    u_indicies_implicit = integrator.level_info_u[R]
 
     # Add implicit contribution
-    @threaded for i in eachindex(u_indicies_implict)
-        u_idx = u_indicies_implict[i] # Ensure thread safety
+    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
+    a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
+    @threaded for i in eachindex(u_indicies_implicit)
+        u_idx = u_indicies_implicit[i] # Ensure thread safety
         integrator.u_tmp[u_idx] = integrator.u[u_idx] + a_dt * k_nonlin[i]
     end
 
@@ -624,8 +623,8 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                  integrator.level_info_mortars_acc[R])
 
     # Compute residual
-    @threaded for i in eachindex(u_indicies_implict)
-        residual[i] = k_nonlin[i] - integrator.du[u_indicies_implict[i]]
+    @threaded for i in eachindex(u_indicies_implicit)
+        residual[i] = k_nonlin[i] - integrator.du[u_indicies_implicit[i]]
     end
 
     return nothing
@@ -634,15 +633,14 @@ end
 # Version for manual Newton-Raphson, hyperbolic-parabolic problems
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                                     integrator::PairedExplicitRK2IMEXMultiParabolicIntegrator)
-    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
-    a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
-
     R = integrator.alg.num_methods
-    u_indicies_implict = integrator.level_info_u[R]
+    u_indicies_implicit = integrator.level_info_u[R]
 
     # Add implicit contribution
-    @threaded for i in eachindex(u_indicies_implict)
-        u_idx = u_indicies_implict[i] # Ensure thread safety
+    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
+    a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
+    @threaded for i in eachindex(u_indicies_implicit)
+        u_idx = u_indicies_implicit[i] # Ensure thread safety
         integrator.u_tmp[u_idx] = integrator.u[u_idx] + a_dt * k_nonlin[i]
     end
 
@@ -655,11 +653,11 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                  integrator.level_info_interfaces_acc[R],
                  integrator.level_info_boundaries_acc[R],
                  integrator.level_info_mortars_acc[R],
-                 u_indicies_implict)
+                 u_indicies_implicit)
 
     # Compute residual
-    @threaded for i in eachindex(u_indicies_implict)
-        residual[i] = k_nonlin[i] - integrator.du[u_indicies_implict[i]]
+    @threaded for i in eachindex(u_indicies_implicit)
+        residual[i] = k_nonlin[i] - integrator.du[u_indicies_implicit[i]]
     end
 
     return nothing
@@ -670,10 +668,9 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParams)
     @unpack t, dt, u, du, u_tmp, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
+    # Add implicit contribution
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
-
-    # Add implicit contribution
     @threaded for i in eachindex(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
         u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
@@ -696,10 +693,9 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParamsParabolic
     @unpack t, dt, u, du, u_tmp, du_para, semi, f,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
+    # Add implicit contribution
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
-
-    # Add implicit contribution
     @threaded for i in eachindex(u_indices)
         u_idx = u_indices[i] # Ensure thread safety
         u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
