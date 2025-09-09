@@ -125,6 +125,9 @@ abstract type AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} <:
 abstract type AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{ORDER} <:
               AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} end
 
+abstract type AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator{ORDER} <:
+              AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{ORDER} end
+
 # Euler-Acoustic Integrators
 abstract type AbstractPairedExplicitRKEulerAcousticSingleIntegrator{ORDER} <:
               AbstractPairedExplicitRKSingleIntegrator{ORDER} end
@@ -369,6 +372,24 @@ end
     return nothing
 end
 
+@inline function PERK_k2!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
+                          p, alg)
+    c_dt = alg.c[2] * integrator.dt
+    @threaded for i in eachindex(integrator.u)
+        integrator.u_tmp[i] = integrator.u[i] + c_dt * integrator.k1[i]
+    end
+
+    # k2: Only evaluated on finest (explicit) level: 1
+    # Hyperbolic part
+    integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                    integrator.t + c_dt, integrator, 1)
+    # Parabolic part
+    integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                    integrator.t + c_dt, integrator, 1)
+
+    return nothing
+end
+
 # Version with SAME number of stages for hyperbolic and parabolic part
 #=
 @inline function PERK_k2!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
@@ -601,6 +622,37 @@ end
 
     # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
     #integrator.coarsest_lvl = min(alg.max_active_levels[stage], integrator.n_levels)
+
+    return nothing
+end
+
+@inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
+                                               alg, stage)
+    # "PERK4" style
+    for level in 1:alg.max_add_levels[stage]
+        a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
+        a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
+        @threaded for i in integrator.level_info_u[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                    a1_dt * integrator.k1[i] +
+                                    a2_dt * (integrator.du[i] + integrator.du_para[i])
+        end
+    end
+
+    c_dt = alg.c[stage] * integrator.dt
+    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
+        @threaded for i in integrator.level_info_u[level]
+            integrator.u_tmp[i] = integrator.u[i] +
+                                    c_dt * integrator.k1[i]
+        end
+    end
+
+    # For statically non-uniform meshes/characteristic speeds
+    #integrator.coarsest_lvl = alg.max_active_levels[stage]
+
+    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
+    integrator.coarsest_lvl = min(alg.max_active_levels[stage],
+                                  integrator.n_levels)
 
     return nothing
 end
@@ -868,6 +920,36 @@ end
     return nothing
 end
 
+@inline function PERK_ki!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
+                          p, alg, stage)
+    PERKMulti_intermediate_stage!(integrator, alg, stage)
+
+    # Check if there are fewer integrators than grid levels (non-optimal method)
+    if integrator.coarsest_lvl == alg.num_methods
+        # NOTE: This is supposedly more efficient than setting
+        #integrator.coarsest_lvl = integrator.n_levels
+        # and then using the level-dependent function
+
+        # Hyperbolic part
+        integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                        integrator.t + alg.c[stage] * integrator.dt)
+        # Parabolic part
+        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                        integrator.t + alg.c[stage] * integrator.dt)
+    else
+        # Hyperbolic part
+        integrator.f.f2(integrator.du, integrator.u_tmp, p,
+                        integrator.t + alg.c[stage] * integrator.dt,
+                        integrator, integrator.coarsest_lvl)
+        # Parabolic part
+        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
+                        integrator.t + alg.c[stage] * integrator.dt,
+                        integrator, integrator.coarsest_lvl)
+    end
+
+    return nothing
+end
+
 # Version with SAME number of stages for hyperbolic and parabolic part
 #=
 @inline function PERK_ki!(integrator::AbstractPairedExplicitRKSplitMultiIntegrator,
@@ -1084,13 +1166,27 @@ end
 # Required for split methods
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
                       integrator::Union{AbstractPairedExplicitRKSplitMultiIntegrator,
-                                        AbstractPairedExplicitRelaxationRKSplitMultiIntegrator},
+                                        AbstractPairedExplicitRelaxationRKSplitMultiIntegrator,
+                                        AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator},
                       max_level)
     rhs!(du_ode, u_ode, semi, t,
          integrator.level_info_elements_acc[max_level],
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
+
+    return nothing
+end
+
+@inline function rhs_parabolic!(du_ode, u_ode,
+                                semi::SemidiscretizationHyperbolicParabolic, t,
+                                integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
+                                max_level)
+    rhs_parabolic!(du_ode, u_ode, semi, t,
+                   integrator.level_info_elements_acc[max_level],
+                   integrator.level_info_interfaces_acc[max_level],
+                   integrator.level_info_boundaries_acc[max_level],
+                   integrator.level_info_mortars_acc[max_level])
 
     return nothing
 end

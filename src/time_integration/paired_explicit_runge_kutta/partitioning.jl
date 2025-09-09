@@ -20,7 +20,7 @@ end
     n_levels = get_n_levels(mesh)
 
     # CARE: This is for testcases with special (random/round robin) assignment
-    #n_levels = alg.num_methods
+    n_levels = alg.num_methods
 
     return n_levels
 end
@@ -135,7 +135,8 @@ function partition_variables!(level_info_elements,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
                               n_levels, mesh::TreeMesh, dg, cache,
-                              alg)
+                              alg;
+                              quadratic_scaling = false)
     @unpack elements, interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)
@@ -293,7 +294,8 @@ function partition_variables!(level_info_elements,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
                               n_levels, mesh::TreeMesh, dg, cache,
-                              alg::AbstractPairedExplicitRKIMEXMulti)
+                              alg::AbstractPairedExplicitRKIMEXMulti;
+                              quadratic_scaling = false)
     @unpack elements, interfaces, boundaries = cache
 
     max_level = maximum_level(mesh.tree)

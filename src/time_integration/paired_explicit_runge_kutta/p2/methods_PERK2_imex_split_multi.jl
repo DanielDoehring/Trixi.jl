@@ -119,7 +119,7 @@ mutable struct PairedExplicitRK2IMEXSplitMultiParabolicIntegrator{RealT <: Real,
                                                                   PairedExplicitRKOptions,
                                                                   uImplicitType,
                                                                   NonlinCache} <:
-               AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{2}
+               AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator{2}
     u::uType
     du::uType # In-place output of `f`
     u_tmp::uType # Used for building the argument to `f`
@@ -173,7 +173,6 @@ mutable struct NonlinParamsParabolicSplit{RealT <: Real, uType <: AbstractVector
     t::RealT
     dt::RealT
     u::uType
-    du::uType
     u_tmp::uType
     du_para::uType
     semi::Semi
@@ -188,9 +187,9 @@ end
 
 function Base.copy(p::NonlinParamsParabolicSplit)
     return NonlinParamsParabolicSplit(p.t, p.dt,
-                                      p.u, p.du, p.u_tmp,
+                                      p.u, p.u_tmp,
                                       p.du_para,
-                                      p.semi, p.f.f1,
+                                      p.semi, p.f1,
                                       p.element_indices,
                                       p.interface_indices,
                                       p.boundary_indices,
@@ -255,8 +254,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXSplitMulti;
 
     p = NonlinParamsParabolicSplit{typeof(t), typeof(u),
                                    typeof(semi), typeof(ode.f.f1)}(t, dt,
-                                                                   u, du, u_tmp,
-                                                                   du_para,
+                                                                   u, u_tmp, du_para,
                                                                    semi, ode.f.f1,
                                                                    level_info_elements_acc[alg.num_methods],
                                                                    level_info_interfaces_acc[alg.num_methods],
@@ -359,19 +357,17 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
     end
 
     # Evaluate implicit stage
-    integrator.f.f1(integrator.du, integrator.u_tmp, integrator.sol.prob.p,
+    integrator.f.f1(integrator.du_para, integrator.u_tmp, integrator.sol.prob.p,
                     #t + alg.c[alg.num_stages] * dt,
-                    integrator.t + 0.5 * integrator.dt, # Hard-coded for IMEX midpoint method
-                    integrator.du_para,
+                    integrator.t + a_dt,
                     integrator.level_info_elements_acc[R],
                     integrator.level_info_interfaces_acc[R],
                     integrator.level_info_boundaries_acc[R],
-                    integrator.level_info_mortars_acc[R],
-                    u_indicies_implict)
+                    integrator.level_info_mortars_acc[R])
 
     # Compute residual
     @threaded for i in eachindex(u_indicies_implict)
-        residual[i] = k_nonlin[i] - integrator.du[u_indicies_implict[i]]
+        residual[i] = k_nonlin[i] - integrator.du_para[u_indicies_implict[i]]
     end
 
     return nothing
@@ -379,7 +375,7 @@ end
 
 # Version for handed-off nonlinear solve, hyperbolic-parabolic problems
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParamsParabolicSplit)
-    @unpack t, dt, u, du, u_tmp, du_para, semi, f1,
+    @unpack t, dt, u, u_tmp, du_para, semi, f1,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
@@ -392,17 +388,118 @@ function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParamsParabolic
     end
 
     # Evaluate implicit stage
-    f1(du, u_tmp, semi,
+    f1(du_para, u_tmp, semi,
        #t + alg.c[alg.num_stages] * dt,
-       t + 0.5 * dt, # Hard-coded for IMEX midpoint method
-       du_para,
-       element_indices, interface_indices, boundary_indices, mortar_indices, u_indices)
+       t + a_dt,
+       element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
     @threaded for i in eachindex(u_indices)
-        residual[i] = k_nonlin[i] - du[u_indices[i]]
+        residual[i] = k_nonlin[i] - du_para[u_indices[i]]
     end
 
     return nothing
 end
+
+function step!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator)
+    @unpack prob = integrator.sol
+    @unpack alg = integrator
+    t_end = last(prob.tspan)
+    callbacks = integrator.opts.callback
+
+    @assert !integrator.finalstep
+    if isnan(integrator.dt)
+        error("time step size `dt` is NaN")
+    end
+
+    #modify_dt_for_tstops!(integrator)
+
+    limit_dt!(integrator, t_end)
+
+    @trixi_timeit timer() "Paired Explicit Runge-Kutta ODE integration step" begin
+        # First and second stage are identical across all single/standalone PERK methods
+        PERK_k1!(integrator, prob.p)
+        PERK_k2!(integrator, prob.p, alg)
+
+        # Higher stages
+        for stage in 3:(alg.num_stages - 1) # Stop at S - 1, last stage demands IMEX treatment
+            PERK_ki!(integrator, prob.p, alg, stage)
+        end
+
+        # Build intermediate stage for implicit step: Explicit contributions
+        # Currently only implemented for the case `alg.num_methods == integrator.n_levels`!
+        for level in 1:(alg.num_methods - 1)
+            a1_dt = alg.a_matrices[level, 1, alg.num_stages - 2] * integrator.dt
+            a2_dt = alg.a_matrices[level, 2, alg.num_stages - 2] * integrator.dt
+            @threaded for i in integrator.level_info_u[level]
+                integrator.u_tmp[i] = integrator.u[i] +
+                                      a1_dt * integrator.k1[i] +
+                                      a2_dt * (integrator.du[i] + integrator.du_para[i])
+            end
+        end
+
+        #=
+        res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
+                                                                               k_nonlin,
+                                                                               integrator)
+        @trixi_timeit timer() "Jacobian computation" finite_difference_jacobian!(integrator.jac_sparse,
+                                                                                 res_S_PERK2IMEXMulti!,
+                                                                                 integrator.k_nonlin,
+                                                                                 integrator.jac_sparse_cache)
+
+        integrator.linear_cache.A = integrator.jac_sparse # Update system matrix
+
+        @trixi_timeit timer() "Frozen Newton-Raphson" newton_frozen_jac!(integrator)
+        =#
+
+        @trixi_timeit timer() "nonlinear solve" begin
+            SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
+                              # Does not seem to have an effect, need to re-copy data
+                              alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true))
+
+            # Update scalar fields, which are not automatically constructed as references
+            integrator.nonlin_cache.p.t = integrator.t
+            integrator.nonlin_cache.p.dt = integrator.dt
+
+            sol = SciMLBase.solve!(integrator.nonlin_cache) # Does not allocate more than `SciMLBase.solve!(integrator.nonlin_cache)`, ...
+            # ... but allows to use polyester for copying data back instead of `copyto!`
+            @threaded for i in eachindex(integrator.k_nonlin)
+                integrator.k_nonlin[i] = sol.u[i]
+            end
+
+            #=
+            SciMLBase.solve!(integrator.nonlin_cache)
+            copyto!(integrator.k_nonlin,
+                    NonlinearSolveBase.get_u(integrator.nonlin_cache))
+            =#
+        end
+
+        ### Final update ###
+        # Joint (with explicit part) re-evaluation of implicit stage
+        # => Makes conservation much simpler
+        # Hyperbolic part
+        integrator.f.f2(integrator.du, integrator.u_tmp, prob.p,
+                        integrator.t + alg.c[alg.num_stages] * integrator.dt)
+        # Parabolic part
+        integrator.f.f1(integrator.du_para, integrator.u_tmp, prob.p,
+                        integrator.t + alg.c[alg.num_stages] * integrator.dt)
+
+        b_dt = integrator.dt # Hard-coded for PERK2 IMEX midpoint method with bS = 1
+        @threaded for i in eachindex(integrator.u)
+            # Try optimize for `@muladd`: avoid `+=`
+            integrator.u[i] = integrator.u[i] +
+                              b_dt * (integrator.du[i] + integrator.du_para[i])
+        end
+    end
+
+    integrator.iter += 1
+    integrator.t += integrator.dt
+
+    @trixi_timeit timer() "Step-Callbacks" handle_callbacks!(callbacks, integrator)
+
+    check_max_iter!(integrator)
+
+    return nothing
+end
+
 end # @muladd

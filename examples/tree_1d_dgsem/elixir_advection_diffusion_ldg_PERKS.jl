@@ -50,6 +50,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 tspan = (0.0, 5.0)
 ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
@@ -60,6 +61,9 @@ cfl = 1.4 # Stable for a = 1.0, d = 0.02 with advection-only optimized coefficie
 cfl = 1.2 # Stable for a = 1.0, d = 0.02 with advection-diffusion jointly optimized coefficients
 cfl = 0.9 # Stable for a = 1.0, d = 0.02 with advection-diffusion separately optimized coefficients
 
+# p = 2
+cfl = 0.5
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
@@ -69,6 +73,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+#=
 base_path = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection_Diffusion/a1d002/"
 
 path_adv = base_path * "p4/" * "Adv/"
@@ -83,6 +88,11 @@ ode_alg = Trixi.PairedExplicitRK4(Stages, path_adv_diff)
 #ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv, path_adv)
 ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv_diff, path_adv_diff)
 ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv, path_diff)
+=#
+
+path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
+#ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
+ode_alg = Trixi.PairedExplicitRK2IMEXSplitMulti([12], path, [1])
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 0.2,
