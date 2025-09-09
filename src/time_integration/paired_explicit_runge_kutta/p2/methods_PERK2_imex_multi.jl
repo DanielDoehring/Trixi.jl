@@ -89,7 +89,7 @@ end
 
 struct PairedExplicitRK2IMEXMulti <:
        AbstractPairedExplicitRKIMEXMulti{2}
-    num_methods::Int64 # Number of optimized PERK family members, i.e., R + 1 for the implicit scheme
+    num_methods::Int64 # Number of optimized PERK family members, i.e., R + 1 with the implicit scheme
     num_stages::Int64 # = maximum number of stages
     stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
