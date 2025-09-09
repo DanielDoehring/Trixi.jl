@@ -188,7 +188,7 @@ mutable struct NonlinParamsParabolicSplit{RealT <: Real, uType <: AbstractVector
 end
 
 function Base.copy(p::NonlinParamsParabolicSplit)
-    return NonlinParamsParabolicSplit{typeof(p.t), typeof(p.u),
+    return NonlinParamsParabolicSplit{typeof(p.t), typeof(p.u_tmp),
                                       typeof(p.semi), typeof(p.f1)}(p.t, p.dt,
                                                                     p.u_tmp,
                                                                     p.du_para,
@@ -270,7 +270,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXSplitMulti;
         k_nonlin[i] = du[u_implicit[i]]
     end
 
-    p = NonlinParamsParabolicSplit{typeof(t), typeof(u),
+    p = NonlinParamsParabolicSplit{typeof(t), typeof(u_tmp),
                                    typeof(semi), typeof(ode.f.f1)}(t, dt,
                                                                    u_tmp, du_para,
                                                                    u_nonlin,
