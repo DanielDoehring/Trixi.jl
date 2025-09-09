@@ -138,6 +138,7 @@ mutable struct PairedExplicitRK2IMEXSplitMultiParabolicIntegrator{RealT <: Real,
     force_stepfail::Bool
     # Additional PERK register
     k1::uType
+    k1_para::uType # Additional PERK register for the parabolic part
 
     # Variables managing level-dependent integration
     level_info_elements::Vector{Vector{Int64}}
@@ -159,6 +160,7 @@ mutable struct PairedExplicitRK2IMEXSplitMultiParabolicIntegrator{RealT <: Real,
     # For nonlinear solve
     k_nonlin::uImplicitType
     residual::uImplicitType
+    u_nonlin::uImplicitType
 
     nonlin_cache::NonlinCache
 
@@ -169,14 +171,14 @@ mutable struct PairedExplicitRK2IMEXSplitMultiParabolicIntegrator{RealT <: Real,
 end
 
 mutable struct NonlinParamsParabolicSplit{RealT <: Real, uType <: AbstractVector,
-                                          Semi, F}
+                                          Semi, F1}
     t::RealT
     dt::RealT
-    u::uType
     u_tmp::uType
     du_para::uType
+    u_nonlin::uType
     semi::Semi
-    const f1::F # parabolic part of the overall `rhs! = f`
+    const f1::F1 # parabolic part of the overall `rhs! = f`
     # Do not support AMR for this: Keep indices constant
     const element_indices::Vector{Int64}
     const interface_indices::Vector{Int64}
@@ -186,15 +188,17 @@ mutable struct NonlinParamsParabolicSplit{RealT <: Real, uType <: AbstractVector
 end
 
 function Base.copy(p::NonlinParamsParabolicSplit)
-    return NonlinParamsParabolicSplit(p.t, p.dt,
-                                      p.u, p.u_tmp,
-                                      p.du_para,
-                                      p.semi, p.f1,
-                                      p.element_indices,
-                                      p.interface_indices,
-                                      p.boundary_indices,
-                                      p.mortar_indices,
-                                      p.u_indices)
+    return NonlinParamsParabolicSplit{typeof(p.t), typeof(p.u),
+                                      typeof(p.semi), typeof(p.f1)}(p.t, p.dt,
+                                                                    p.u_tmp,
+                                                                    p.du_para,
+                                                                    p.u_nonlin,
+                                                                    p.semi, p.f1,
+                                                                    p.element_indices,
+                                                                    p.interface_indices,
+                                                                    p.boundary_indices,
+                                                                    p.mortar_indices,
+                                                                    p.u_indices)
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXSplitMulti;
@@ -204,6 +208,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXSplitMulti;
     u_tmp = zero(u)
 
     k1 = zero(u) # Additional PERK register
+    k1_para = zero(u) # Additional PERK register for the parabolic part
 
     t = first(ode.tspan)
     tdir = sign(ode.tspan[end] - ode.tspan[1])
@@ -252,27 +257,29 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXSplitMulti;
     # Use the full system since the partitioned system occasionally crashes
     ode.f(du, u, semi, t, du_para)
 
-    p = NonlinParamsParabolicSplit{typeof(t), typeof(u),
-                                   typeof(semi), typeof(ode.f.f1)}(t, dt,
-                                                                   u, u_tmp, du_para,
-                                                                   semi, ode.f.f1,
-                                                                   level_info_elements_acc[alg.num_methods],
-                                                                   level_info_interfaces_acc[alg.num_methods],
-                                                                   level_info_boundaries_acc[alg.num_methods],
-                                                                   level_info_mortars_acc[alg.num_methods],
-                                                                   level_info_u[alg.num_methods])
-
     # For fixed meshes/no re-partitioning: Allocate only required storage
     u_implicit = level_info_u[alg.num_methods]
     n_nonlin = length(u_implicit)
     println("\nNonlinear system size: ", n_nonlin, " x ", n_nonlin)
     k_nonlin = zeros(eltype(u), n_nonlin)
     residual = copy(k_nonlin)
+    u_nonlin = copy(k_nonlin) # Required for (hyperbolic-parabolic) split methods
 
     # Initialize `k_nonlin` with values from `du`
     @threaded for i in eachindex(u_implicit)
         k_nonlin[i] = du[u_implicit[i]]
     end
+
+    p = NonlinParamsParabolicSplit{typeof(t), typeof(u),
+                                   typeof(semi), typeof(ode.f.f1)}(t, dt,
+                                                                   u_tmp, du_para,
+                                                                   u_nonlin,
+                                                                   semi, ode.f.f1,
+                                                                   level_info_elements_acc[alg.num_methods],
+                                                                   level_info_interfaces_acc[alg.num_methods],
+                                                                   level_info_boundaries_acc[alg.num_methods],
+                                                                   level_info_mortars_acc[alg.num_methods],
+                                                                   level_info_u[alg.num_methods])
 
     # Not needed for Jacobian-free Newton-Krylov(GMRES)
     jac_prototype = get(kwargs, :jac_prototype, nothing)
@@ -318,7 +325,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXSplitMulti;
                                                                                             ode.tspan;
                                                                                             kwargs...),
                                                                     false, true, false,
-                                                                    k1,
+                                                                    k1, k1_para,
                                                                     level_info_elements,
                                                                     level_info_elements_acc,
                                                                     level_info_interfaces_acc,
@@ -328,6 +335,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXSplitMulti;
                                                                     level_info_u_acc,
                                                                     -1, n_levels,
                                                                     k_nonlin, residual,
+                                                                    u_nonlin,
                                                                     #jac_sparse,
                                                                     #jac_sparse_cache,
                                                                     #abstol,
@@ -344,16 +352,15 @@ end
 # Version for manual Newton-Raphson, hyperbolic-parabolic problems
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin,
                                     integrator::PairedExplicitRK2IMEXSplitMultiParabolicIntegrator)
-    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
-    a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
-
     R = integrator.alg.num_methods
     u_indicies_implict = integrator.level_info_u[R]
 
     # Add implicit contribution
+    #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
+    a_dt = 0.5 * integrator.dt # Hard-coded for IMEX midpoint method
     @threaded for i in eachindex(u_indicies_implict)
-        u_idx = u_indicies_implict[i] # Ensure thread safety
-        integrator.u_tmp[u_idx] = integrator.u[u_idx] + a_dt * k_nonlin[i]
+        integrator.u_tmp[u_indicies_implict[i]] = integrator.u_nonlin[i] +
+                                                  a_dt * k_nonlin[i]
     end
 
     # Evaluate implicit stage
@@ -375,22 +382,18 @@ end
 
 # Version for handed-off nonlinear solve, hyperbolic-parabolic problems
 function residual_S_PERK2IMEXMulti!(residual, k_nonlin, p::NonlinParamsParabolicSplit)
-    @unpack t, dt, u, u_tmp, du_para, semi, f1,
+    @unpack t, dt, u_tmp, du_para, u_nonlin, semi, f1,
     element_indices, interface_indices, boundary_indices, mortar_indices, u_indices = p
 
+    # Add implicit contribution
     #a_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * dt
     a_dt = 0.5 * dt # Hard-coded for IMEX midpoint method
-
-    # Add implicit contribution
     @threaded for i in eachindex(u_indices)
-        u_idx = u_indices[i] # Ensure thread safety
-        u_tmp[u_idx] = u[u_idx] + a_dt * k_nonlin[i]
+        u_tmp[u_indices[i]] = u_nonlin[i] + a_dt * k_nonlin[i]
     end
 
     # Evaluate implicit stage
-    f1(du_para, u_tmp, semi,
-       #t + alg.c[alg.num_stages] * dt,
-       t + a_dt,
+    f1(du_para, u_tmp, semi, t + a_dt,
        element_indices, interface_indices, boundary_indices, mortar_indices)
 
     # Compute residual
@@ -436,6 +439,17 @@ function step!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegr
                                       a1_dt * integrator.k1[i] +
                                       a2_dt * (integrator.du[i] + integrator.du_para[i])
             end
+        end
+
+        # Add hyperbolic part to `u_nonlin`
+        a1_dt = alg.a_matrices[alg.num_methods, 1, alg.num_stages - 2] * integrator.dt
+        a2_dt = alg.a_matrices[alg.num_methods, 2, alg.num_stages - 2] * integrator.dt
+        u_indices = integrator.level_info_u[alg.num_methods]
+        @threaded for i in eachindex(u_indices)
+            u_idx = u_indices[i] # Ensure thread safety
+            integrator.u_nonlin[i] = integrator.u[u_idx] +
+                                     a1_dt * integrator.k1[u_idx] +
+                                     a2_dt * integrator.du[u_idx]
         end
 
         #=
@@ -501,5 +515,4 @@ function step!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegr
 
     return nothing
 end
-
 end # @muladd

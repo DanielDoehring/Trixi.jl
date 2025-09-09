@@ -49,8 +49,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 5.0)
+ode = semidiscretize(semi, tspan; split_problem = false)
 ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false)
 
 summary_callback = SummaryCallback()
 
@@ -68,7 +68,8 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        stepsize_callback)
+                        #stepsize_callback
+                        )
 
 ###############################################################################
 # run the simulation
@@ -91,9 +92,9 @@ ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv, path_diff)
 =#
 
 path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
-#ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
+ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
 ode_alg = Trixi.PairedExplicitRK2IMEXSplitMulti([12], path, [1])
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = 0.2,
+                  dt = 0.08/8,
                   save_everystep = false, callback = callbacks);

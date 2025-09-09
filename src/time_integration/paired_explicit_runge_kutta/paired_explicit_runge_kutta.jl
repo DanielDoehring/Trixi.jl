@@ -255,7 +255,8 @@ end
     return nothing
 end
 
-@inline function PERK_k1!(integrator::AbstractPairedExplicitRKSplitIntegrator,
+@inline function PERK_k1!(integrator::Union{AbstractPairedExplicitRKSplitIntegrator,
+                                            AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator},
                           p)
     integrator.f.f2(integrator.k1, integrator.u, p, integrator.t) # Hyperbolic part
     integrator.f.f1(integrator.k1_para, integrator.u, p, integrator.t) # Parabolic part
@@ -376,7 +377,7 @@ end
                           p, alg)
     c_dt = alg.c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] + c_dt * integrator.k1[i]
+        integrator.u_tmp[i] = integrator.u[i] + c_dt * (integrator.k1[i] + integrator.k1_para[i])
     end
 
     # k2: Only evaluated on finest (explicit) level: 1
@@ -634,7 +635,7 @@ end
         a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
         @threaded for i in integrator.level_info_u[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                    a1_dt * integrator.k1[i] +
+                                    a1_dt * (integrator.k1[i] + integrator.k1_para[i]) +
                                     a2_dt * (integrator.du[i] + integrator.du_para[i])
         end
     end
@@ -643,7 +644,7 @@ end
     for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
         @threaded for i in integrator.level_info_u[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                    c_dt * integrator.k1[i]
+                                    c_dt * (integrator.k1[i] + integrator.k1_para[i])
         end
     end
 
