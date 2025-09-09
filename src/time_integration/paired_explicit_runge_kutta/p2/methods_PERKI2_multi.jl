@@ -253,14 +253,15 @@ end
 
 # Somehow needed for NonlinearSolve
 function Base.copy(p::NonlinParams)
-    NonlinParams(p.t, p.dt,
-                 p.u, p.du, p.u_tmp,
-                 p.semi, p.f,
-                 p.element_indices,
-                 p.interface_indices,
-                 p.boundary_indices,
-                 p.mortar_indices,
-                 p.u_indices)
+    NonlinParams{typeof(p.t), typeof(p.u),
+                 typeof(p.semi), typeof(p.f)}(p.t, p.dt,
+                                              p.u, p.du, p.u_tmp,
+                                              p.semi, p.f,
+                                              p.element_indices,
+                                              p.interface_indices,
+                                              p.boundary_indices,
+                                              p.mortar_indices,
+                                              p.u_indices)
 end
 
 #=
@@ -400,15 +401,16 @@ mutable struct NonlinParamsParabolic{RealT <: Real, uType <: AbstractVector,
 end
 
 function Base.copy(p::NonlinParamsParabolic)
-    return NonlinParamsParabolic(p.t, p.dt,
-                                 p.u, p.du, p.u_tmp,
-                                 p.du_para,
-                                 p.semi, p.f,
-                                 p.element_indices,
-                                 p.interface_indices,
-                                 p.boundary_indices,
-                                 p.mortar_indices,
-                                 p.u_indices)
+    return NonlinParamsParabolic{typeof(p.t), typeof(p.u),
+                                 typeof(p.semi), typeof(p.f)}(p.t, p.dt,
+                                                              p.u, p.du, p.u_tmp,
+                                                              p.du_para,
+                                                              p.semi, p.f,
+                                                              p.element_indices,
+                                                              p.interface_indices,
+                                                              p.boundary_indices,
+                                                              p.mortar_indices,
+                                                              p.u_indices)
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
@@ -444,7 +446,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
                          n_levels, semi, alg) # Mesh-only based part.
-                         #n_levels, semi, alg, u) # Mesh+solution (CFL) based part.
+    #n_levels, semi, alg, u) # Mesh+solution (CFL) based part.
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
