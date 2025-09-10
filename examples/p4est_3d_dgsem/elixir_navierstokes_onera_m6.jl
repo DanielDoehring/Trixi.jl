@@ -126,8 +126,8 @@ restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 
 tspan = (load_time(restart_filename), 6.04901) # 6.05
 
-#ode = semidiscretize(semi, tspan, restart_filename)
-ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false)
+#ode = semidiscretize(semi, tspan, restart_filename) # Split methods
+ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
 
 # Callbacks
 ###############################################################################
@@ -357,6 +357,7 @@ ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_comple
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, path)
 
-sol = Trixi.solve(ode, ode_alg, dt = 9.5e-8, # Hyp-Para without stepsize control. 1e-7 already unstable
+dt = 9.5e-8 # Hyp-Para without stepsize control; 1e-7 already unstable
+sol = Trixi.solve(ode, ode_alg, dt = dt,
                   save_everystep = false, callback = callbacks);
 
