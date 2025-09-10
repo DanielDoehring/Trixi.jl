@@ -25,7 +25,7 @@ function get_elements_by_coordinates!(element_ids, coordinates, mesh::TreeMesh, 
         cell_id = cell_ids[element]
 
         # Iterate over coordinates
-        for index in 1:length(element_ids)
+        for index in eachindex(element_ids)
             # Skip coordinates for which an element has already been found
             if element_ids[index] > 0
                 continue
@@ -63,7 +63,7 @@ function calc_interpolating_polynomials!(interpolating_polynomials, coordinates,
 
     wbary = barycentric_weights(nodes)
 
-    for index in 1:length(element_ids)
+    for index in eachindex(element_ids)
         # Construct point
         x = SVector(ntuple(i -> coordinates[i, index], ndims(mesh)))
 
@@ -94,7 +94,7 @@ function record_state_at_points!(point_data, u, solution_variables,
     new_length = old_length + n_solution_variables
 
     # Loop over all points/elements that should be recorded
-    for index in 1:length(element_ids)
+    for index in eachindex(element_ids)
         # Extract data array and element id
         data = point_data[index]
         element_id = element_ids[index]
@@ -108,12 +108,14 @@ function record_state_at_points!(point_data, u, solution_variables,
             u_node = solution_variables(get_node_vars(u, equations, dg, i,
                                                       element_id), equations)
 
-            for v in 1:length(u_node)
+            for v in eachindex(u_node)
                 data[old_length + v] += (u_node[v] *
                                          interpolating_polynomials[i, 1, index])
             end
         end
     end
+
+    return nothing
 end
 
 # Record the solution variables at each given point for the 2D case
@@ -126,7 +128,7 @@ function record_state_at_points!(point_data, u, solution_variables,
     new_length = old_length + n_solution_variables
 
     # Loop over all points/elements that should be recorded
-    for index in 1:length(element_ids)
+    for index in eachindex(element_ids)
         # Extract data array and element id
         data = point_data[index]
         element_id = element_ids[index]
@@ -140,13 +142,15 @@ function record_state_at_points!(point_data, u, solution_variables,
             u_node = solution_variables(get_node_vars(u, equations, dg, i, j,
                                                       element_id), equations)
 
-            for v in 1:length(u_node)
+            for v in eachindex(u_node)
                 data[old_length + v] += (u_node[v]
                                          * interpolating_polynomials[i, 1, index]
                                          * interpolating_polynomials[j, 2, index])
             end
         end
     end
+
+    return nothing
 end
 
 # Record the solution variables at each given point for the 3D case
@@ -159,7 +163,7 @@ function record_state_at_points!(point_data, u, solution_variables,
     new_length = old_length + n_solution_variables
 
     # Loop over all points/elements that should be recorded
-    for index in 1:length(element_ids)
+    for index in eachindex(element_ids)
         # Extract data array and element id
         data = point_data[index]
         element_id = element_ids[index]
@@ -173,7 +177,7 @@ function record_state_at_points!(point_data, u, solution_variables,
             u_node = solution_variables(get_node_vars(u, equations, dg, i, j, k,
                                                       element_id), equations)
 
-            for v in 1:length(u_node)
+            for v in eachindex(u_node)
                 data[old_length + v] += (u_node[v]
                                          * interpolating_polynomials[i, 1, index]
                                          * interpolating_polynomials[j, 2, index]
@@ -181,5 +185,7 @@ function record_state_at_points!(point_data, u, solution_variables,
             end
         end
     end
+
+    return nothing
 end
 end # @muladd
