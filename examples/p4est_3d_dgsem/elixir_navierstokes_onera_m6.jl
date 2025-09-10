@@ -108,16 +108,10 @@ boundary_conditions_para = Dict(:Symmetry => bc_symmetry_plane_para, # Symmetry:
                                 :BottomWing => bc_wing, # Wing: bc_no_slip
                                 :TopWing => bc_wing)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
-                                    boundary_conditions = boundary_conditions)
-
 semi_hyp_para = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_para))
-
-#tspan = (0.0, 6.049)
-#ode = semidiscretize(semi, tspan)
 
 restart_file = "restart_t605_undamped.h5"
 
@@ -126,8 +120,8 @@ restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 
 tspan = (load_time(restart_filename), 6.04901) # 6.05
 
-#ode = semidiscretize(semi, tspan, restart_filename) # Split methods
-ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
+ode = semidiscretize(semi_hyp_para, tspan, restart_filename) # Split methods
+#ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
 
 # Callbacks
 ###############################################################################
@@ -165,7 +159,7 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                                            u_inf(), A))
 
 analysis_interval = 5 #100_000
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+analysis_callback = AnalysisCallback(semi_hyp_para, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,)
                                      #analysis_pointwise = (pressure_coefficient,)
@@ -352,12 +346,48 @@ callbacks = CallbackSet(summary_callback,
 ## k = 2, p = 2 ##
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
 
+Stages_14_max = reverse(collect(range(2, 14)))
+
+dtRatios_14_max = [
+    0.641318947672844,
+    0.574993145465851,
+    0.503288297653198,
+    0.442298481464386,
+    0.391183462142944,
+    0.346144811809063,
+    0.293439486026764,
+    0.243663728386164,
+    0.184185989908628,
+    0.15320873260498,
+    0.123865127563477,
+    0.0781898498535156,
+    0.0436210632324219
+] ./ 0.641318947672844
+
+Stages_para = [14, 12, 10, 7, 6, 5, 4, 3, 2]
+path_para = path * "para/"
+
+dtRatios_para = [3008.7179235408357, # 14
+    1762.72919916304,   # 12
+    842.7395049162385,  # 10
+    375.2614698283665,  # 7
+    272.91099615894865, # 6
+    186.2882904812082,  # 5
+    115.33971622203154, # 4
+    59.942706190483364, # 3
+    19.14860438454724] / 3008.7179235408357 #= 2 =#
+
+ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages_14_max, Stages_para,
+                                            path, path_para,
+                                            dtRatios_14_max, dtRatios_para)
+
 ## k = 2, p = 3 ##
 
 #ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
 #ode_alg = Trixi.PairedExplicitRK3(15, path)
 
-dt = 9.5e-8 # Hyp-Para without stepsize control; 1e-7 already unstable
+dt = 9.5e-8 # Hyp-Para without stepsize control; unsplit
+dt = 9e-8 # Hyp-Para without stepsize control; split
 sol = Trixi.solve(ode, ode_alg, dt = dt,
                   save_everystep = false, callback = callbacks);
 
