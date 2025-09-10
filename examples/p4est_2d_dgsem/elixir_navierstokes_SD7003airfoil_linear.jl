@@ -321,6 +321,7 @@ dtRatios = [0.253144726232790162612, # 14
 
 path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/full_rhs/"
 
+path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/para_rhs/"
 # Can run with these stages with cfl 8.7
 Stages_para = [14, 12, 10, 7, 6, 5, 4, 3, 2]
 dtRatios_para = [3008.7179235408357, # 14
@@ -341,8 +342,6 @@ dtRatios_para = [842.7395049162385,  # 10
     115.33971622203154, # 4
     59.942706190483364, # 3
     19.14860438454724] / 842.7395049162385 #= 2 =#
-
-path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p2/para_rhs/"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
 
