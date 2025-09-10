@@ -1,11 +1,5 @@
 using Trixi
-
-using SparseConnectivityTracer # For obtaining the Jacobian sparsity pattern
-using SparseMatrixColorings # For obtaining the coloring vector
-using JLD2 # For loading sparse matrix
-
 import LinearAlgebra:norm
-using NonlinearSolve, LinearSolve, LineSearch, ADTypes
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -62,10 +56,6 @@ vol_flux = flux_chandrashekar
 solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
                volume_integral = VolumeIntegralFluxDifferencing(vol_flux))
 
-# for sparsity [pattern] detection (SD): if-clause free
-solver_SD = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs,
-                  volume_integral = VolumeIntegralFluxDifferencing(flux_central))
-
 ###############################################################################
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
@@ -101,29 +91,14 @@ boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
 
     return flux
 end
-boundary_conditions_SD = Dict(:FarField => boundary_condition_free_stream,
-                              :Airfoil => bc_symmetry)
 
 boundary_conditions_parabolic = Dict(:FarField => boundary_condition_free_stream,
                                      :Airfoil => boundary_condition_airfoil)
-
-jac_detector = TracerSparsityDetector()
-# We need to construct the semidiscretization with the correct
-# sparsity-detection ready datatype, which is retrieved here
-jac_eltype = jacobian_eltype(real(solver), jac_detector)
-
-Trixi.sqrt(x::SparseConnectivityTracer.AbstractTracer) = Base.sqrt(x)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
-
-semi_SD = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                                initial_condition, solver_SD;
-                                                boundary_conditions = (boundary_conditions_SD,
-                                                                       boundary_conditions_parabolic),
-                                                uEltype = jac_eltype)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -144,13 +119,11 @@ tspan = (30 * t_c, 30.25 * t_c) # For testing only
 ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 #ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
-ode_SD = semidiscretize(semi_SD, tspan, restart_filename; split_problem = false)
-
 summary_callback = SummaryCallback()
 
 # Choose analysis interval such that roughly every dt_c = 0.005 a record is taken
-analysis_interval = 25 # Matches for PERK 4 schemes
-#analysis_interval = 1_000_000 # Only at end
+#analysis_interval = 25 # Matches for PERK 4 schemes
+analysis_interval = 1_000_000 # Only at end
 
 f_aoa() = aoa
 f_rho_inf() = rho_inf
@@ -293,12 +266,12 @@ save_solution = SaveSolutionCallback(interval = 1_000_000, # Only at end
                                      output_directory = "out",
                                      extra_node_variables = extra_node_variables)
 
-alive_callback = AliveCallback(alive_interval = 50) # 500
+alive_callback = AliveCallback(alive_interval = 50)
 
 save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
                                    save_final_restart = true)
 
-callbacks = CallbackSet(#stepsize_callback, # For measurements: Fixed timestep (do not use this)
+callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
                         #save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
