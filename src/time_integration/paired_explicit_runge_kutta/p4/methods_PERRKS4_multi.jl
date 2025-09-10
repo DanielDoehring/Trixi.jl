@@ -63,12 +63,10 @@ mutable struct PairedExplicitRelaxationRK4SplitMultiIntegrator{RealT <: Real,
     level_info_elements_acc::Vector{Vector{Int64}}
 
     level_info_interfaces_acc::Vector{Vector{Int64}}
-    level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
 
     level_info_boundaries_acc::Vector{Vector{Int64}}
 
     level_info_mortars_acc::Vector{Vector{Int64}}
-    level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
 
@@ -80,12 +78,10 @@ mutable struct PairedExplicitRelaxationRK4SplitMultiIntegrator{RealT <: Real,
     level_info_elements_para_acc::Vector{Vector{Int64}}
 
     level_info_interfaces_para_acc::Vector{Vector{Int64}}
-    level_info_mpi_interfaces_para_acc::Vector{Vector{Int64}}
 
     level_info_boundaries_para_acc::Vector{Vector{Int64}}
 
     level_info_mortars_para_acc::Vector{Vector{Int64}}
-    level_info_mpi_mortars_para_acc::Vector{Vector{Int64}}
 
     level_info_u_para::Vector{Vector{Int64}}
 
@@ -127,10 +123,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    # MPI additions
-    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
-    level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
-
     # For parabolic part
     level_info_elements_para = [Vector{Int64}() for _ in 1:n_levels_para]
     level_info_elements_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
@@ -141,73 +133,28 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
 
     level_info_mortars_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
 
-    level_info_mpi_interfaces_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
-    level_info_mpi_mortars_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
-
     # For entropy relaxation
     gamma = one(eltype(u0))
     u_wrap = wrap_array(u0, semi)
     S_old = integrate(entropy, u_wrap, mesh, equations, dg, cache)
 
-    if !mpi_isparallel()
-        partition_variables!(level_info_elements,
-                             level_info_elements_acc,
-                             level_info_interfaces_acc,
-                             level_info_boundaries_acc,
-                             level_info_mortars_acc,
-                             n_levels, semi,
-                             alg.PERK4SplitMulti)
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
+                         n_levels, semi,
+                         alg.PERK4SplitMulti)
 
-        # Partition parabolic helper variables
-        partition_variables!(level_info_elements_para,
-                             level_info_elements_para_acc,
-                             level_info_interfaces_para_acc,
-                             level_info_boundaries_para_acc,
-                             level_info_mortars_para_acc,
-                             n_levels_para, semi,
-                             alg.PERK4SplitMulti;
-                             quadratic_scaling = true)
-    else
-        if mesh isa ParallelP4estMesh
-            # Get cell distribution for standard partitioning
-            global_first_quadrant = unsafe_wrap(Array,
-                                                unsafe_load(mesh.p4est).global_first_quadrant,
-                                                mpi_nranks() + 1)
-            # Need to copy `global_first_quadrant` to different variable as the former will change 
-            # due to the call to `partition!`
-            old_global_first_quadrant = copy(global_first_quadrant)
-
-            # Get (global) element distribution to accordingly balance the solver
-            partition_variables!(level_info_elements, n_levels,
-                                 semi, alg.PERK4SplitMulti)
-
-            # Balance such that each rank has the same number of RHS calls                                    
-            balance_p4est_perk!(mesh, dg, cache, level_info_elements,
-                                alg.PERK4SplitMulti.stages)
-            # Actual move of elements across ranks
-            rebalance_solver!(u0, mesh, equations, dg, cache, old_global_first_quadrant)
-            reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
-
-            # Reset `level_info_elements` after rebalancing
-            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-
-            # Resize ODE vectors
-            n_new = length(u0)
-            resize!(du, n_new)
-            resize!(u_tmp, n_new)
-            resize!(k1, n_new)
-        end
-        partition_variables!(level_info_elements,
-                             level_info_elements_acc,
-                             level_info_interfaces_acc,
-                             level_info_boundaries_acc,
-                             level_info_mortars_acc,
-                             # MPI additions
-                             level_info_mpi_interfaces_acc,
-                             level_info_mpi_mortars_acc,
-                             n_levels, semi,
-                             alg.PERK4SplitMulti)
-    end
+    # Partition parabolic helper variables
+    partition_variables!(level_info_elements_para,
+                         level_info_elements_para_acc,
+                         level_info_interfaces_para_acc,
+                         level_info_boundaries_para_acc,
+                         level_info_mortars_para_acc,
+                         n_levels_para, semi,
+                         alg.PERK4SplitMulti;
+                         quadratic_scaling = true)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -245,19 +192,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRelaxationRK4SplitMulti;
                                                                  level_info_elements,
                                                                  level_info_elements_acc,
                                                                  level_info_interfaces_acc,
-                                                                 level_info_mpi_interfaces_acc,
                                                                  level_info_boundaries_acc,
                                                                  level_info_mortars_acc,
-                                                                 level_info_mpi_mortars_acc,
                                                                  level_info_u,
                                                                  -1, n_levels,
                                                                  level_info_elements_para,
                                                                  level_info_elements_para_acc,
                                                                  level_info_interfaces_para_acc,
-                                                                 level_info_mpi_interfaces_para_acc,
                                                                  level_info_boundaries_para_acc,
                                                                  level_info_mortars_acc,
-                                                                 level_info_mpi_mortars_para_acc,
                                                                  level_info_u_para,
                                                                  -1, n_levels_para,
                                                                  gamma, S_old,

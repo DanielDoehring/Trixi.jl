@@ -11,7 +11,6 @@ struct PairedExplicitRK2SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{2}
     num_methods::Int64 # Number of optimized PERK family members, i.e., R
     num_stages::Int64 # = maximum number of stages
-    stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
     # Δt of the different methods divided by Δt_max
     dt_ratios::Vector{Float64}
@@ -48,7 +47,7 @@ function PairedExplicitRK2SplitMulti(stages::Vector{Int64},
                                                                                  bS, cS)
 
     return PairedExplicitRK2SplitMulti(length(stages), num_stages,
-                                       stages, dt_ratios,
+                                       dt_ratios,
                                        a_matrices, a_matrices_para,
                                        c, 1 - bS, bS,
                                        max_active_levels, max_add_levels)
@@ -89,12 +88,10 @@ mutable struct PairedExplicitRK2SplitMultiIntegrator{RealT <: Real, uType <: Abs
     level_info_elements_acc::Vector{Vector{Int64}}
 
     level_info_interfaces_acc::Vector{Vector{Int64}}
-    level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
 
     level_info_boundaries_acc::Vector{Vector{Int64}}
 
     level_info_mortars_acc::Vector{Vector{Int64}}
-    level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
 
@@ -131,56 +128,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    # MPI additions
-    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
-    level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
-
-    if !mpi_isparallel()
-        partition_variables!(level_info_elements,
-                             level_info_elements_acc,
-                             level_info_interfaces_acc,
-                             level_info_boundaries_acc,
-                             level_info_mortars_acc,
-                             n_levels, semi, alg)
-    else
-        if mesh isa ParallelP4estMesh
-            # Get cell distribution for standard partitioning
-            global_first_quadrant = unsafe_wrap(Array,
-                                                unsafe_load(mesh.p4est).global_first_quadrant,
-                                                mpi_nranks() + 1)
-            # Need to copy `global_first_quadrant` to different variable as the former will change 
-            # due to the call to `partition!`
-            old_global_first_quadrant = copy(global_first_quadrant)
-
-            # Get (global) element distribution to accordingly balance the solver
-            partition_variables!(level_info_elements, n_levels,
-                                 semi, alg)
-
-            # Balance such that each rank has the same number of RHS calls                                    
-            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
-            # Actual move of elements across ranks
-            rebalance_solver!(u0, mesh, equations, dg, cache, old_global_first_quadrant)
-            reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
-
-            # Reset `level_info_elements` after rebalancing
-            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-
-            # Resize ODE vectors
-            n_new = length(u0)
-            resize!(du, n_new)
-            resize!(u_tmp, n_new)
-            resize!(k1, n_new)
-        end
-        partition_variables!(level_info_elements,
-                             level_info_elements_acc,
-                             level_info_interfaces_acc,
-                             level_info_boundaries_acc,
-                             level_info_mortars_acc,
-                             # MPI additions
-                             level_info_mpi_interfaces_acc,
-                             level_info_mpi_mortars_acc,
-                             n_levels, semi, alg)
-    end
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
+                         n_levels, semi, alg)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -209,10 +162,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
                                                        level_info_elements,
                                                        level_info_elements_acc,
                                                        level_info_interfaces_acc,
-                                                       level_info_mpi_interfaces_acc,
                                                        level_info_boundaries_acc,
                                                        level_info_mortars_acc,
-                                                       level_info_mpi_mortars_acc,
                                                        level_info_u,
                                                        -1, n_levels)
 
@@ -227,11 +178,9 @@ struct PairedExplicitRK2SplitMulti <:
        AbstractPairedExplicitRKSplitMulti{2}
     num_methods::Int64 # Number of optimized PERK family members, i.e., R
     num_stages::Int64 # = maximum number of stages
-    stages::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
     num_methods_para::Int64 # Number of optimized PERK family members for the parabolic part, i.e., R
     num_stages_para::Int64 # = maximum number of stages for the parabolic part
-    stages_para::Vector{Int64} # For load-balancing of MPI-parallel p4est simulations
 
     # Δt of the different methods divided by Δt_max
     dt_ratios::Vector{Float64} # hyperbolic timesteps
@@ -279,9 +228,8 @@ function PairedExplicitRK2SplitMulti(stages::Vector{Int64},
                                                                           base_path_mon_coeffs_para,
                                                                           bS, cS)
 
-    return PairedExplicitRK2SplitMulti(length(stages), num_stages, stages,
+    return PairedExplicitRK2SplitMulti(length(stages), num_stages,
                                        length(stages_para), num_stages_para,
-                                       stages_para,
                                        dt_ratios, dt_ratios_para,
                                        a_matrices, a_matrices_para,
                                        c, 1 - bS, bS,
@@ -322,12 +270,10 @@ mutable struct PairedExplicitRK2SplitMultiIntegrator{RealT <: Real,
     level_info_elements_acc::Vector{Vector{Int64}}
 
     level_info_interfaces_acc::Vector{Vector{Int64}}
-    level_info_mpi_interfaces_acc::Vector{Vector{Int64}}
 
     level_info_boundaries_acc::Vector{Vector{Int64}}
 
     level_info_mortars_acc::Vector{Vector{Int64}}
-    level_info_mpi_mortars_acc::Vector{Vector{Int64}}
 
     level_info_u::Vector{Vector{Int64}}
 
@@ -339,12 +285,10 @@ mutable struct PairedExplicitRK2SplitMultiIntegrator{RealT <: Real,
     level_info_elements_para_acc::Vector{Vector{Int64}}
 
     level_info_interfaces_para_acc::Vector{Vector{Int64}}
-    level_info_mpi_interfaces_para_acc::Vector{Vector{Int64}}
 
     level_info_boundaries_para_acc::Vector{Vector{Int64}}
 
     level_info_mortars_para_acc::Vector{Vector{Int64}}
-    level_info_mpi_mortars_para_acc::Vector{Vector{Int64}}
 
     level_info_u_para::Vector{Vector{Int64}}
 
@@ -381,10 +325,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
 
-    # MPI additions
-    level_info_mpi_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
-    level_info_mpi_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
-
     # For parabolic part
     level_info_elements_para = [Vector{Int64}() for _ in 1:n_levels_para]
     level_info_elements_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
@@ -395,64 +335,21 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
 
     level_info_mortars_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
 
-    level_info_mpi_interfaces_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
-    level_info_mpi_mortars_para_acc = [Vector{Int64}() for _ in 1:n_levels_para]
+    partition_variables!(level_info_elements,
+                         level_info_elements_acc,
+                         level_info_interfaces_acc,
+                         level_info_boundaries_acc,
+                         level_info_mortars_acc,
+                         n_levels, semi, alg)
 
-    if !mpi_isparallel()
-        partition_variables!(level_info_elements,
-                             level_info_elements_acc,
-                             level_info_interfaces_acc,
-                             level_info_boundaries_acc,
-                             level_info_mortars_acc,
-                             n_levels, semi, alg)
-
-        # Partition parabolic helper variables
-        partition_variables!(level_info_elements_para,
-                             level_info_elements_para_acc,
-                             level_info_interfaces_para_acc,
-                             level_info_boundaries_para_acc,
-                             level_info_mortars_para_acc,
-                             n_levels_para, semi, alg;
-                             quadratic_scaling = true)
-    else
-        if mesh isa ParallelP4estMesh
-            # Get cell distribution for standard partitioning
-            global_first_quadrant = unsafe_wrap(Array,
-                                                unsafe_load(mesh.p4est).global_first_quadrant,
-                                                mpi_nranks() + 1)
-            # Need to copy `global_first_quadrant` to different variable as the former will change 
-            # due to the call to `partition!`
-            old_global_first_quadrant = copy(global_first_quadrant)
-
-            # Get (global) element distribution to accordingly balance the solver
-            partition_variables!(level_info_elements, n_levels,
-                                 semi, alg)
-
-            # Balance such that each rank has the same number of RHS calls                                    
-            balance_p4est_perk!(mesh, dg, cache, level_info_elements, alg.stages)
-            # Actual move of elements across ranks
-            rebalance_solver!(u0, mesh, equations, dg, cache, old_global_first_quadrant)
-            reinitialize_boundaries!(semi.boundary_conditions, cache) # Needs to be called after `rebalance_solver!`
-
-            # Reset `level_info_elements` after rebalancing
-            level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
-
-            # Resize ODE vectors
-            n_new = length(u0)
-            resize!(du, n_new)
-            resize!(u_tmp, n_new)
-            resize!(k1, n_new)
-        end
-        partition_variables!(level_info_elements,
-                             level_info_elements_acc,
-                             level_info_interfaces_acc,
-                             level_info_boundaries_acc,
-                             level_info_mortars_acc,
-                             # MPI additions
-                             level_info_mpi_interfaces_acc,
-                             level_info_mpi_mortars_acc,
-                             n_levels, semi, alg)
-    end
+    # Partition parabolic helper variables
+    partition_variables!(level_info_elements_para,
+                         level_info_elements_para_acc,
+                         level_info_interfaces_para_acc,
+                         level_info_boundaries_para_acc,
+                         level_info_mortars_para_acc,
+                         n_levels_para, semi, alg;
+                         quadratic_scaling = true)
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
@@ -490,19 +387,15 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2SplitMulti;
                                                        level_info_elements,
                                                        level_info_elements_acc,
                                                        level_info_interfaces_acc,
-                                                       level_info_mpi_interfaces_acc,
                                                        level_info_boundaries_acc,
                                                        level_info_mortars_acc,
-                                                       level_info_mpi_mortars_acc,
                                                        level_info_u,
                                                        -1, n_levels,
                                                        level_info_elements_para,
                                                        level_info_elements_para_acc,
                                                        level_info_interfaces_para_acc,
-                                                       level_info_mpi_interfaces_para_acc,
                                                        level_info_boundaries_para_acc,
                                                        level_info_mortars_acc,
-                                                       level_info_mpi_mortars_para_acc,
                                                        level_info_u_para,
                                                        -1, n_levels_para)
 
