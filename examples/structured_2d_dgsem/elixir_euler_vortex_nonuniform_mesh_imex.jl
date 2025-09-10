@@ -122,50 +122,11 @@ dtRatios = [
 
 dt_explicit = 5e-3
 
-#=
+
 ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = dt_explicit,
                   save_everystep = false, callback = callbacks);
-=#
-###############################################################################
 
-timestep_implicit = 0.8
 
-dtRatios = [
-    timestep_implicit, # Implicit
-    0.631627607345581,
-    0.485828685760498,
-    0.366690540313721,
-    0.282330989837646,
-    0.197234153747559,
-    0.124999046325684
-] ./ timestep_implicit
-
-ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path, dtRatios)
-
-atol_lin = 1e-5
-rtol_lin = 1e-3
-#maxiters_lin = 50
-
-linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
-
-# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
-                              linsolve = linsolve)
-
-atol_nonlin = atol_lin
-rtol_nonlin = rtol_lin
-maxiters_nonlin = 20
-
-dt_implicit = dt_explicit * timestep_implicit / timestep_explicit
-dt_implicit = 8e-3
-integrator = Trixi.init(ode, ode_alg;
-                        dt = dt_implicit, callback = callbacks,
-                        # IMEX-specific kwargs
-                        nonlin_solver = nonlin_solver,
-                        abstol = atol_nonlin, reltol = rtol_nonlin,
-                        maxiters_nonlin = maxiters_nonlin);
-
-sol = Trixi.solve!(integrator);

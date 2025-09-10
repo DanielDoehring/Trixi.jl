@@ -74,7 +74,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-#=
+
 base_path = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/Spectra/1D_Advection_Diffusion/a1d002/"
 
 path_adv = base_path * "p4/" * "Adv/"
@@ -89,11 +89,7 @@ ode_alg = Trixi.PairedExplicitRK4(Stages, path_adv_diff)
 #ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv, path_adv)
 ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv_diff, path_adv_diff)
 ode_alg = Trixi.PairedExplicitRK4Split(Stages, path_adv, path_diff)
-=#
 
-path = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex/k6/p2/"
-ode_alg = Trixi.PairedExplicitRK2IMEXMulti([12], path, [1])
-ode_alg = Trixi.PairedExplicitRK2IMEXSplitMulti([12], path, [1])
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 0.08,

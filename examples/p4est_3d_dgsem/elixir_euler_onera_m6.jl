@@ -243,7 +243,7 @@ callbacks = CallbackSet(summary_callback,
 
 # Run the simulation
 ###############################################################################
-#=
+
 ## k = 2, p = 2 ##
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
 
@@ -267,61 +267,3 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
                   save_everystep = false, callback = callbacks);
-=#
-###############################################################################
-# IMEX
-
-# Mesh-based partitioning
-dt_implicit = 0.8
-
-# Solution-based partitioning
-#dt_implicit = 2.0
-
-dtRatios_imex_p2 = [
-    dt_implicit,
-    0.753155136853456,
-    0.695487338849343,
-    0.641318947672844,
-    0.574993145465851,
-    0.503288297653198,
-    0.442298481464386,
-    0.391183462142944,
-    0.346144811809063,
-    0.293439486026764,
-    0.243663728386164,
-    0.184185989908628,
-    0.15320873260498,
-    0.123865127563477,
-    0.0781898498535156,
-    0.0436210632324219
-] ./ dt_implicit
-
-ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages_complete_p2, path, dtRatios_imex_p2)
-
-atol_lin = 1e-3
-rtol_lin = 1e-2
-#maxiters_lin = 50
-
-linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
-
-linesearch = LiFukushimaLineSearch()
-linesearch = nothing
-
-# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
-nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(), 
-                              linsolve = linsolve,
-                              linesearch = linesearch)
-
-atol_nonlin = atol_lin
-rtol_nonlin = rtol_lin
-#maxiters_nonlin = 20
-
-dt_init = 3e-7
-integrator = Trixi.init(ode, ode_alg;
-                        dt = dt_init, callback = callbacks,
-                        # IMEX-specific kwargs
-                        nonlin_solver = nonlin_solver,
-                        abstol = atol_nonlin, reltol = rtol_nonlin);
-
-sol = Trixi.solve!(integrator);
-
