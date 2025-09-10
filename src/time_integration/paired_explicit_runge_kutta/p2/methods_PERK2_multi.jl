@@ -70,8 +70,6 @@ function compute_PairedExplicitRK2Multi_butcher_tableau(stages::Vector{Int64},
         # For `active_levels` (active/evaluated levels/stages):
         # Set to 0 to indicate no evaluation
         if active_levels[i] == []
-            # TODO: Change to `-1` to allow for an implicit scheme at level 0 ? Or push implicit scheme back at the end?
-            # Or shift for IMEX every scheme by one level - probably a lot of implementation re-doing
             active_levels[i] = [0] # `0` encodes no evaluation; also compatible with `maximum.` below
         end
 
@@ -258,7 +256,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                              level_info_boundaries_acc,
                              level_info_mortars_acc,
                              n_levels, semi, alg) # Mesh-only based part.
-                             #n_levels, semi, alg, u0) # Mesh+solution (CFL) based part.
+    #n_levels, semi, alg, u0) # Mesh+solution (CFL) based part.
     else
         if mesh isa ParallelP4estMesh
             # Get cell distribution for standard partitioning

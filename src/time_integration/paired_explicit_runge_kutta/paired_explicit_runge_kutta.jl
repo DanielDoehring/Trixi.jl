@@ -32,16 +32,6 @@ abstract type AbstractPairedExplicitRKSplitMulti{ORDER} <:
 abstract type AbstractPairedExplicitRKCoupledSingle{ORDER} <:
               AbstractPairedExplicitRKSingle{ORDER} end
 
-abstract type AbstractPairedExplicitRKIMEX{ORDER} <: AbstractPairedExplicitRK{ORDER} end
-
-abstract type AbstractPairedExplicitRKIMEXSingle{ORDER} <:
-              AbstractPairedExplicitRKIMEX{ORDER} end
-
-abstract type AbstractPairedExplicitRKIMEXMulti{ORDER} <:
-              AbstractPairedExplicitRKIMEX{ORDER} end
-
-# TODO: Split IMEX
-
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
 mutable struct PairedExplicitRKOptions{Callback, TStops}
     callback::Callback # callbacks; used in Trixi
@@ -112,21 +102,6 @@ abstract type AbstractPairedExplicitRelaxationRKSplitSingleIntegrator{ORDER} <: 
 
 abstract type AbstractPairedExplicitRelaxationRKSplitMultiIntegrator{ORDER} <:
               AbstractPairedExplicitRelaxationRKSplitIntegrator{ORDER} end
-
-# IMEX Integrators
-abstract type AbstractPairedExplicitRKIMEXIntegrator{ORDER} <:
-              AbstractPairedExplicitRKIntegrator{ORDER} end
-
-# Single IMEX does not make sense, as we have always at least two methods:
-# The explicit method and the implicit method (implicit midpoint for p = 2)
-abstract type AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} <:
-              AbstractPairedExplicitRKIMEXIntegrator{ORDER} end
-# parabolic additions
-abstract type AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{ORDER} <:
-              AbstractPairedExplicitRKIMEXMultiIntegrator{ORDER} end
-
-abstract type AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator{ORDER} <:
-              AbstractPairedExplicitRKIMEXMultiParabolicIntegrator{ORDER} end
 
 # Euler-Acoustic Integrators
 abstract type AbstractPairedExplicitRKEulerAcousticSingleIntegrator{ORDER} <:
@@ -255,8 +230,7 @@ end
     return nothing
 end
 
-@inline function PERK_k1!(integrator::Union{AbstractPairedExplicitRKSplitIntegrator,
-                                            AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator},
+@inline function PERK_k1!(integrator::AbstractPairedExplicitRKSplitIntegrator,
                           p)
     integrator.f.f2(integrator.k1, integrator.u, p, integrator.t) # Hyperbolic part
     integrator.f.f1(integrator.k1_para, integrator.u, p, integrator.t) # Parabolic part
@@ -358,8 +332,7 @@ end
 end
 
 @inline function PERK_k2!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                            AbstractPairedExplicitRelaxationRKMultiIntegrator,
-                                            AbstractPairedExplicitRKIMEXMultiIntegrator},
+                                            AbstractPairedExplicitRelaxationRKMultiIntegrator},
                           p, alg)
     c_dt = alg.c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
@@ -369,24 +342,6 @@ end
     # k2: Only evaluated on finest explicit level: 1
     integrator.f(integrator.du, integrator.u_tmp, p,
                  integrator.t + c_dt, integrator, 1)
-
-    return nothing
-end
-
-@inline function PERK_k2!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
-                          p, alg)
-    c_dt = alg.c[2] * integrator.dt
-    @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] + c_dt * (integrator.k1[i] + integrator.k1_para[i])
-    end
-
-    # k2: Only evaluated on finest (explicit) level: 1
-    # Hyperbolic part
-    integrator.f.f2(integrator.du, integrator.u_tmp, p,
-                    integrator.t + c_dt, integrator, 1)
-    # Parabolic part
-    integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
-                    integrator.t + c_dt, integrator, 1)
 
     return nothing
 end
@@ -552,34 +507,6 @@ end
     return nothing
 end
 
-@inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator,
-                                               alg, stage)
-    # CARE: Currently only implemented for matching number of methods and grid-levels!
-    ### Simplified implementation: Own method for each level ###
-    for level in 1:alg.max_add_levels[stage]
-        a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
-        a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
-        @threaded for i in integrator.level_info_u[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  a1_dt * integrator.k1[i] +
-                                  a2_dt * integrator.du[i]
-        end
-    end
-
-    c_dt = alg.c[stage] * integrator.dt
-    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
-        @threaded for i in integrator.level_info_u[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                  c_dt * integrator.k1[i]
-        end
-    end
-
-    # For statically non-uniform meshes/characteristic speeds
-    integrator.coarsest_lvl = alg.max_active_levels[stage]
-
-    return nothing
-end
-
 @inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKCoupledMultiIntegrator,
                                                alg, stage)
     # CARE: Currently only implemented for matching number of methods and grid-levels!
@@ -623,37 +550,6 @@ end
 
     # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
     #integrator.coarsest_lvl = min(alg.max_active_levels[stage], integrator.n_levels)
-
-    return nothing
-end
-
-@inline function PERKMulti_intermediate_stage!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
-                                               alg, stage)
-    # "PERK4" style
-    for level in 1:alg.max_add_levels[stage]
-        a1_dt = alg.a_matrices[level, 1, stage - 2] * integrator.dt
-        a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
-        @threaded for i in integrator.level_info_u[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                    a1_dt * (integrator.k1[i] + integrator.k1_para[i]) +
-                                    a2_dt * (integrator.du[i] + integrator.du_para[i])
-        end
-    end
-
-    c_dt = alg.c[stage] * integrator.dt
-    for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
-        @threaded for i in integrator.level_info_u[level]
-            integrator.u_tmp[i] = integrator.u[i] +
-                                    c_dt * (integrator.k1[i] + integrator.k1_para[i])
-        end
-    end
-
-    # For statically non-uniform meshes/characteristic speeds
-    #integrator.coarsest_lvl = alg.max_active_levels[stage]
-
-    # "coarsest_lvl" cannot be static for AMR, has to be checked with available levels
-    integrator.coarsest_lvl = min(alg.max_active_levels[stage],
-                                  integrator.n_levels)
 
     return nothing
 end
@@ -898,8 +794,7 @@ end
 end
 
 @inline function PERK_ki!(integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                            AbstractPairedExplicitRelaxationRKMultiIntegrator,
-                                            AbstractPairedExplicitRKIMEXMultiIntegrator},
+                                            AbstractPairedExplicitRelaxationRKMultiIntegrator},
                           p, alg, stage)
     PERKMulti_intermediate_stage!(integrator, alg, stage)
 
@@ -916,36 +811,6 @@ end
         integrator.f(integrator.du, integrator.u_tmp, p,
                      integrator.t + alg.c[stage] * integrator.dt,
                      integrator, integrator.coarsest_lvl)
-    end
-
-    return nothing
-end
-
-@inline function PERK_ki!(integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
-                          p, alg, stage)
-    PERKMulti_intermediate_stage!(integrator, alg, stage)
-
-    # Check if there are fewer integrators than grid levels (non-optimal method)
-    if integrator.coarsest_lvl == alg.num_methods
-        # NOTE: This is supposedly more efficient than setting
-        #integrator.coarsest_lvl = integrator.n_levels
-        # and then using the level-dependent function
-
-        # Hyperbolic part
-        integrator.f.f2(integrator.du, integrator.u_tmp, p,
-                        integrator.t + alg.c[stage] * integrator.dt)
-        # Parabolic part
-        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
-                        integrator.t + alg.c[stage] * integrator.dt)
-    else
-        # Hyperbolic part
-        integrator.f.f2(integrator.du, integrator.u_tmp, p,
-                        integrator.t + alg.c[stage] * integrator.dt,
-                        integrator, integrator.coarsest_lvl)
-        # Parabolic part
-        integrator.f.f1(integrator.du_para, integrator.u_tmp, p,
-                        integrator.t + alg.c[stage] * integrator.dt,
-                        integrator, integrator.coarsest_lvl)
     end
 
     return nothing
@@ -1152,8 +1017,7 @@ function solve_a_butcher_coeffs_unknown! end
 # Depending on the `semi`, different fields from `integrator` need to be passed on.
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
                       integrator::Union{AbstractPairedExplicitRKMultiIntegrator,
-                                        AbstractPairedExplicitRelaxationRKMultiIntegrator,
-                                        AbstractPairedExplicitRKIMEXMultiIntegrator},
+                                        AbstractPairedExplicitRelaxationRKMultiIntegrator},
                       max_level)
     rhs!(du_ode, u_ode, semi, t,
          integrator.level_info_elements_acc[max_level],
@@ -1167,27 +1031,13 @@ end
 # Required for split methods
 @inline function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t,
                       integrator::Union{AbstractPairedExplicitRKSplitMultiIntegrator,
-                                        AbstractPairedExplicitRelaxationRKSplitMultiIntegrator,
-                                        AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator},
+                                        AbstractPairedExplicitRelaxationRKSplitMultiIntegrator},
                       max_level)
     rhs!(du_ode, u_ode, semi, t,
          integrator.level_info_elements_acc[max_level],
          integrator.level_info_interfaces_acc[max_level],
          integrator.level_info_boundaries_acc[max_level],
          integrator.level_info_mortars_acc[max_level])
-
-    return nothing
-end
-
-@inline function rhs_parabolic!(du_ode, u_ode,
-                                semi::SemidiscretizationHyperbolicParabolic, t,
-                                integrator::AbstractPairedExplicitRKIMEXSplitMultiParabolicIntegrator,
-                                max_level)
-    rhs_parabolic!(du_ode, u_ode, semi, t,
-                   integrator.level_info_elements_acc[max_level],
-                   integrator.level_info_interfaces_acc[max_level],
-                   integrator.level_info_boundaries_acc[max_level],
-                   integrator.level_info_mortars_acc[max_level])
 
     return nothing
 end
@@ -1226,8 +1076,7 @@ end
 @inline function rhs_hyperbolic_parabolic!(du_ode, u_ode,
                                            semi::SemidiscretizationHyperbolicParabolic,
                                            t,
-                                           integrator::Union{AbstractPairedExplicitRKMultiParabolicIntegrator,
-                                                             AbstractPairedExplicitRKIMEXMultiParabolicIntegrator},
+                                           integrator::AbstractPairedExplicitRKMultiParabolicIntegrator,
                                            max_level)
     rhs_hyperbolic_parabolic!(du_ode, u_ode, semi, t,
                               integrator.du_para, max_level,

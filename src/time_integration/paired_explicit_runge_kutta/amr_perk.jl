@@ -109,8 +109,7 @@ function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKM
 end
 
 # Version for (hyperbolic-) parabolic integrators that carry `level_info_u_acc`
-function (amr_callback::AMRCallback)(integrator::Union{AbstractPairedExplicitRKMultiParabolicIntegrator,
-                                                       AbstractPairedExplicitRKIMEXMultiParabolicIntegrator};
+function (amr_callback::AMRCallback)(integrator::AbstractPairedExplicitRKMultiParabolicIntegrator;
                                      kwargs...)
     u_ode = integrator.u
     semi = integrator.p
