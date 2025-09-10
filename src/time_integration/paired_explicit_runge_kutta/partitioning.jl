@@ -48,7 +48,7 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels,
+                              n_levels::Int,
                               semi::AbstractSemidiscretization,
                               alg)
     mesh, _, dg, cache = mesh_equations_solver_cache(semi)
@@ -66,7 +66,7 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels,
+                              n_levels::Int,
                               semi::AbstractSemidiscretization,
                               alg, u_ode)
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
@@ -89,7 +89,7 @@ function partition_variables!(level_info_elements,
                               level_info_interfaces_acc,
                               level_info_boundaries_acc,
                               level_info_mortars_acc,
-                              n_levels,
+                              n_levels::Int,
                               semi::SemidiscretizationHyperbolicParabolic,
                               alg;
                               quadratic_scaling = false)
@@ -112,7 +112,7 @@ function partition_variables!(level_info_elements,
                               # MPI additions
                               level_info_mpi_interfaces_acc,
                               level_info_mpi_mortars_acc,
-                              n_levels,
+                              n_levels::Int,
                               semi::AbstractSemidiscretization,
                               alg)
     mesh, _, dg, cache = mesh_equations_solver_cache(semi)
