@@ -40,8 +40,6 @@ abstract type AbstractPairedExplicitRKIMEXSingle{ORDER} <:
 abstract type AbstractPairedExplicitRKIMEXMulti{ORDER} <:
               AbstractPairedExplicitRKIMEX{ORDER} end
 
-# TODO: Split IMEX
-
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L1
 mutable struct PairedExplicitRKOptions{Callback, TStops}
     callback::Callback # callbacks; used in Trixi
@@ -377,7 +375,8 @@ end
                           p, alg)
     c_dt = alg.c[2] * integrator.dt
     @threaded for i in eachindex(integrator.u)
-        integrator.u_tmp[i] = integrator.u[i] + c_dt * (integrator.k1[i] + integrator.k1_para[i])
+        integrator.u_tmp[i] = integrator.u[i] +
+                              c_dt * (integrator.k1[i] + integrator.k1_para[i])
     end
 
     # k2: Only evaluated on finest (explicit) level: 1
@@ -635,8 +634,8 @@ end
         a2_dt = alg.a_matrices[level, 2, stage - 2] * integrator.dt
         @threaded for i in integrator.level_info_u[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                    a1_dt * (integrator.k1[i] + integrator.k1_para[i]) +
-                                    a2_dt * (integrator.du[i] + integrator.du_para[i])
+                                  a1_dt * (integrator.k1[i] + integrator.k1_para[i]) +
+                                  a2_dt * (integrator.du[i] + integrator.du_para[i])
         end
     end
 
@@ -644,7 +643,7 @@ end
     for level in (alg.max_add_levels[stage] + 1):(integrator.n_levels)
         @threaded for i in integrator.level_info_u[level]
             integrator.u_tmp[i] = integrator.u[i] +
-                                    c_dt * (integrator.k1[i] + integrator.k1_para[i])
+                                  c_dt * (integrator.k1[i] + integrator.k1_para[i])
         end
     end
 
