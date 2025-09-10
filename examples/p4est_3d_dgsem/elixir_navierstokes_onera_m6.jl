@@ -305,7 +305,7 @@ Stages_complete_p2 = reverse(collect(range(2, 16)))
 # Only Flux-Differencing #
 cfl_interval = 2
 
-stepsize_callback = StepsizeCallback(cfl = 13.3, interval = cfl_interval) # PERK p2 2-16
+stepsize_callback = StepsizeCallback(cfl = 13.2, interval = cfl_interval) # PERK p2 2-16
 
 #path = base_path * "k2/p3/"
 

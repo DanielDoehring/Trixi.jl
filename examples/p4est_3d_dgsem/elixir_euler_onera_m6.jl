@@ -103,7 +103,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.0491) # 6.05
+tspan = (load_time(restart_filename), 6.05)
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -149,7 +149,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      #analysis_pointwise = (pressure_coefficient,)
                                      )
 
-alive_callback = AliveCallback(alive_interval = 3)
+alive_callback = AliveCallback(alive_interval = 50)
 
 save_sol_interval = analysis_interval
 
@@ -194,7 +194,7 @@ Stages_complete_p2 = reverse(collect(range(2, 16)))
 # Only Flux-Differencing #
 cfl_interval = 2
 
-cfl = 13.3 # PERK p2 2-16
+cfl = 13.2 # PERK p2 2-16
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = cfl_interval)
 
 #path = base_path * "k2/p3/"
@@ -235,7 +235,7 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         #save_solution,
                         #save_restart,
-                        #stepsize_callback
+                        stepsize_callback
                         );
 
 # Run the simulation
