@@ -1,6 +1,5 @@
 using Trixi
 using LinearAlgebra: norm
-using NonlinearSolve, LinearSolve, LineSearch, ADTypes
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
