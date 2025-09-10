@@ -205,7 +205,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationCoupled, t,
             copy_to_coupled_boundary!(semi_.boundary_conditions, u_ode, semi, semi_)
         end
     end
-    
+
     u_loc = get_system_u_ode(u_ode, 1, semi)
     du_loc = get_system_u_ode(du_ode, 1, semi)
 
