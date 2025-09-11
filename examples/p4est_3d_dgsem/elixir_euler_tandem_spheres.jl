@@ -77,10 +77,7 @@ alive_callback = AliveCallback(alive_interval = 50)
 
 save_sol_interval = 500
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
-                                     save_initial_solution = false,
-                                     save_final_solution = true,
-                                     solution_variables = cons2prim,
-                                     output_directory = "out/")
+                                     save_initial_solution = false)
 
 save_restart = SaveRestartCallback(interval = save_sol_interval)
 

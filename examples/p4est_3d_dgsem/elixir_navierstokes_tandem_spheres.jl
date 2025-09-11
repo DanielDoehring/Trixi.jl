@@ -58,9 +58,9 @@ boundary_conditions = Dict(:FrontSphere => boundary_condition_slip_wall,
                            :BackSphere => boundary_condition_slip_wall,
                            :FarField => bc_farfield)
 
-velocity_bc_plane = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
+velocity_bc = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
-bc_spheres = BoundaryConditionNavierStokesWall(velocity_bc_plane, heat_bc)
+bc_spheres = BoundaryConditionNavierStokesWall(velocity_bc, heat_bc)
 
 boundary_conditions_para = Dict(:FrontSphere => bc_spheres,
                                 :BackSphere => bc_spheres,
@@ -88,10 +88,7 @@ alive_callback = AliveCallback(alive_interval = 50)
 
 save_sol_interval = 500
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
-                                     save_initial_solution = false,
-                                     save_final_solution = true,
-                                     solution_variables = cons2prim,
-                                     output_directory = "out/")
+                                     save_initial_solution = false)
 
 save_restart = SaveRestartCallback(interval = save_sol_interval)
 
