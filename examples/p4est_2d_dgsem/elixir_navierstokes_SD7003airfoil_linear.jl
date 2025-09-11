@@ -60,7 +60,7 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surf_flux,
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
 #path = "/storage/home/daniel/PERK4/SD7003/"
-path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
+path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]

@@ -83,7 +83,7 @@ volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-#mesh_path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
+#mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
 mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
 
 mesh_file = mesh_path * "m6wing_sanitized.inp"
@@ -116,7 +116,7 @@ semi_hyp_para = SemidiscretizationHyperbolicParabolic(mesh, (equations, equation
 restart_file = "restart_t605_undamped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
-#restart_filename = joinpath("/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
+#restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
 tspan = (load_time(restart_filename), 6.04901) # 6.05
 

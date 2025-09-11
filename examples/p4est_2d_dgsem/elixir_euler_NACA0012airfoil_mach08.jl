@@ -38,7 +38,7 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-mesh_file = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C1.2_quadgrids/naca_ref2_quadr_relabel.inp"
+mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C1.2_quadgrids/naca_ref2_quadr_relabel.inp"
 
 boundary_symbols = [:Airfoil, :Inflow, :Outflow]
 mesh = P4estMesh{2}(mesh_file, boundary_symbols = boundary_symbols)
