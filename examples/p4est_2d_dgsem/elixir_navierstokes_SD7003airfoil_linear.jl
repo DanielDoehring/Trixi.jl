@@ -70,7 +70,7 @@ solver_SD = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs,
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
 #path = "/storage/home/daniel/PERK4/SD7003/"
-path = "/home/daniel/ownCloud - Döhring, Daniel (1MH1D4@rwth-aachen.de)@rwth-aachen.sciebo.de/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
+path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/PERK_mesh/SD7003Laminar/"
 mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
@@ -139,10 +139,10 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 30.25 * t_c) # For testing only
-#tspan = (30 * t_c, 30 * t_c) # Plot sol
+tspan = (30 * t_c, 30 * t_c) # Plot sol
 
 ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
-#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
 
 ode_SD = semidiscretize(semi_SD, tspan, restart_filename; split_problem = false)
 
@@ -300,7 +300,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 
 callbacks = CallbackSet(#stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        #save_solution, # For plotting during measurement run
+                        save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
                         analysis_callback,
                         summary_callback);
@@ -441,11 +441,9 @@ ode_alg = Trixi.PairedExplicitRelaxationRK4SplitMulti(Stages, Stages_para,
 # For measurement run with fixed timestep
 dt = 1e-3 # PERK4, dt_c = 2e-4
 
-#=
 sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
-=#
 
 ###############################################################################
 # IMEX
