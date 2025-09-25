@@ -39,13 +39,17 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
 polydeg = 2
 surface_flux = flux_hll
+surface_flux = flux_lax_friedrichs
 
-# Flux Differencing required to make this example run
+#=
 volume_flux = flux_ranocha
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
+=#
+
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
@@ -84,7 +88,7 @@ summary_callback = SummaryCallback()
 analysis_interval = 500
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-alive_callback = AliveCallback(alive_interval = 50)
+alive_callback = AliveCallback(alive_interval = 1)
 
 save_sol_interval = 500
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
