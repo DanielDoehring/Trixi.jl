@@ -63,9 +63,11 @@ boundary_conditions = Dict(:FrontSphere => boundary_condition_slip_wall,
                            :BackSphere => boundary_condition_slip_wall,
                            :FarField => bc_farfield)
 
+#=
 semi_hyp = SemidiscretizationHyperbolic(mesh, equations,
                                         initial_condition, solver;
                                         boundary_conditions = boundary_conditions)
+=#
 
 velocity_bc = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
@@ -80,12 +82,24 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_para))
 
-t_star_end = 50 # 100
+# Strategy:
+# 1) 0 to 50: Inviscid, k = 2
+# 2) 50 to 100: Viscous, k = 2
+# 3) 100 to 200: Viscous, k = 3
+t_star_end = 100
 t_end = t_star_end * D/U()
 tspan = (0.0, t_end)
 
-ode = semidiscretize(semi_hyp, tspan)
-#ode = semidiscretize(semi, tspan)
+#ode = semidiscretize(semi_hyp, tspan)
+
+#restart_file = "restart_ts50_hyp.h5"
+restart_file = "restart_000004000.h5"
+
+restart_filename = joinpath("out", restart_file)
+mesh = load_mesh(restart_filename)
+
+tspan = (load_time(restart_filename), t_end)
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 ###############################################################################
 
@@ -99,9 +113,15 @@ alive_callback = AliveCallback(alive_interval = 50)
 
 t_ramp_up() = 5e-2 # For dimensionalized units
 cfl_0() = 10.0
-cfl_max() = 17.0
 
-cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+# Hyp
+#cfl_max() = 17.0
+# Hyp-Diff
+cfl_max() = 14.0
+
+#cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+
+cfl = cfl_max()
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -121,8 +141,8 @@ callbacks = CallbackSet(summary_callback,
 
 ###############################################################################
 
-Stages = reverse(collect(range(2, 15)))
-
+# Hyp only
+#=
 Stages = [15, 14, 13, 12, 11, 9, 8, 7, 5, 4, 3, 2]
 
 dtRatios = reverse([0.0717675685882568359375
@@ -139,8 +159,27 @@ dtRatios = reverse([0.0717675685882568359375
 1.04339599609375
 ] ./ 1.04339599609375)
 
-path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp/k2_LLF_weakform/"
-path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp/k2_LLF_weakform"
+
+path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp/k2_LLF_weakform/"
+=#
+
+Stages = reverse(collect(range(2, 14)))
+Stages = [14, 13, 12, 11, 10, 8, 7, 5, 4, 3, 2]
+
+dtRatios = reverse([0.07416057586669921875
+0.14945125579833984375
+0.236209869384765625
+0.29239177703857421875
+0.447246551513671875
+0.51645755767822265625
+0.64532947540283203125
+0.72096157073974609375
+0.7944393157958984375
+0.899280548095703125
+0.9783477783203125
+] ./ 0.9783477783203125)
+
+path_coeffs = "//storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
 
