@@ -5,11 +5,7 @@ using OrdinaryDiffEqLowStorageRK
 # semidiscretization of the compressible Euler equations
 
 gamma = 1.4
-prandtl_number = 0.72
-
-D = 1 # Follows from mesh
-
-Re_D = 3900
+equations = CompressibleEulerEquations3D(gamma)
 
 rho_ref() = 1.255 # kg/m^3
 R_specific_air() = 287.052874 # J/(kg K)
@@ -21,9 +17,11 @@ c_ref() = sqrt(gamma * p_ref()/rho_ref()) # m/s
 Ma_ref() = 0.1
 U() = Ma_ref() * c_ref() # m/s
 
+D = 1 # Follows from mesh
+Re_D = 3900
 mu() = rho_ref() * D * U()/Re_D # TODO: Sutherlands law
 
-equations = CompressibleEulerEquations3D(gamma)
+prandtl_number = 0.72
 equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
                                                           Prandtl = prandtl_number)
 
@@ -47,19 +45,14 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 polydeg = 2
 
 surface_flux = flux_hll
-surface_flux = flux_lax_friedrichs
-
-#=
 volume_flux = flux_ranocha
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
-=#
-
-solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
+case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
 # Boundary symbols follow from nodesets in the mesh file
@@ -99,12 +92,12 @@ ode = semidiscretize(semi_hyp, tspan)
 summary_callback = SummaryCallback()
 
 # TODO: Lift/Drag coefficients
-analysis_interval = 500
+analysis_interval = 50_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-alive_callback = AliveCallback(alive_interval = 10)
+alive_callback = AliveCallback(alive_interval = 50)
 
-t_ramp_up() = 2e-3 # For dimensionalized units
+t_ramp_up() = 5e-2 # For dimensionalized units
 cfl_0() = 10.0
 cfl_max() = 17.0
 
@@ -112,7 +105,7 @@ cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-save_sol_interval = 500
+save_sol_interval = 2000
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false)
 
@@ -123,7 +116,7 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         stepsize_callback,
                         #save_solution,
-                        #save_restart
+                        save_restart
                         )
 
 ###############################################################################
@@ -147,15 +140,18 @@ dtRatios = reverse([0.0717675685882568359375
 ] ./ 1.04339599609375)
 
 path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp/k2_LLF_weakform/"
+path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp/k2_LLF_weakform"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = 42.0,
+                  dt = 2.5e-5,
                   save_everystep = false, callback = callbacks);
 
 ###############################################################################
 
+#=
 sol = solve(ode, RDPK3SpFSAL35(thread = Trixi.True());
             abstol = 1.0e-5, reltol = 1.0e-5,
             ode_default_options()..., callback = callbacks);
+=#
