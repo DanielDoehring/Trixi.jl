@@ -17,9 +17,9 @@ c_ref() = sqrt(gamma * p_ref()/rho_ref()) # m/s
 Ma_ref() = 0.1
 U() = Ma_ref() * c_ref() # m/s
 
-D = 1 # Follows from mesh
-Re_D = 3900
-mu() = rho_ref() * D * U()/Re_D # TODO: Sutherlands law
+D() = 1 # Follows from mesh
+Re_D() = 3900
+mu() = rho_ref() * D() * U()/Re_D() # TODO: Sutherlands law
 
 prandtl_number = 0.72
 equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
@@ -87,13 +87,13 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 2) 50 to 100: Viscous, k = 2
 # 3) 100 to 200: Viscous, k = 3
 t_star_end = 100
-t_end = t_star_end * D/U()
+t_end = t_star_end * D()/U()
 tspan = (0.0, t_end)
 
 #ode = semidiscretize(semi_hyp, tspan)
 
 #restart_file = "restart_ts50_hyp.h5"
-restart_file = "restart_000004000.h5"
+restart_file = "restart_000006000.h5"
 
 restart_filename = joinpath("out", restart_file)
 mesh = load_mesh(restart_filename)
@@ -105,8 +105,24 @@ ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 summary_callback = SummaryCallback()
 
-# TODO: Lift/Drag coefficients
+# TODO: Drag coefficients shear stress
 analysis_interval = 50_000
+
+A_sphere() = pi * (D()/2)^2
+drag_coeff_front = AnalysisSurfaceIntegral((:FrontSphere,),
+                                           DragCoefficientPressure3D(0.0, rho_ref(),
+                                                                     U(), A_sphere()))
+
+drag_coeff_back = AnalysisSurfaceIntegral((:BackSphere,),
+                                          DragCoefficientPressure3D(0.0, rho_ref(),
+                                                                    U(), A_sphere()))
+
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     save_analysis = true,
+                                     analysis_errors = Symbol[], # Turn off error computation
+                                     analysis_integrals = (drag_coeff_front,
+                                                           drag_coeff_back))
+
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 50)
