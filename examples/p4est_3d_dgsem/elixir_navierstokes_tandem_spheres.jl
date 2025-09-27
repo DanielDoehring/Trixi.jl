@@ -19,10 +19,10 @@ U() = Ma_ref() * c_ref() # m/s
 
 D() = 1 # Follows from mesh
 Re_D() = 3900
-mu() = rho_ref() * D() * U()/Re_D() # TODO: Sutherlands law
+mu_ref() = rho_ref() * D() * U()/Re_D() # TODO: Sutherlands law
 
 prandtl_number = 0.72
-equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
+equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu_ref(),
                                                           Prandtl = prandtl_number)
 
 @inline function initial_condition(x, t, equations)
@@ -86,14 +86,14 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 1) 0 to 50: Inviscid, k = 2
 # 2) 50 to 100: Viscous, k = 2
 # 3) 100 to 200: Viscous, k = 3
-t_star_end = 100
+t_star_end = 200
 t_end = t_star_end * D()/U()
 tspan = (0.0, t_end)
 
 #ode = semidiscretize(semi_hyp, tspan)
 
 #restart_file = "restart_ts50_hyp.h5"
-restart_file = "restart_000006000.h5"
+restart_file = "restart_ts100_hyp_para.h5"
 
 restart_filename = joinpath("out", restart_file)
 mesh = load_mesh(restart_filename)
@@ -133,7 +133,7 @@ cfl_0() = 10.0
 # Hyp
 #cfl_max() = 17.0
 # Hyp-Diff
-cfl_max() = 14.0
+cfl_max() = 13.5
 
 #cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
