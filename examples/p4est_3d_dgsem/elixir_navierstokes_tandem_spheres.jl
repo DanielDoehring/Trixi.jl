@@ -1,5 +1,6 @@
 using Trixi
 using OrdinaryDiffEqLowStorageRK
+import LinearAlgebra: norm # For vorticity magnitude
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -52,7 +53,7 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
-case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
+#case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
 # Boundary symbols follow from nodesets in the mesh file
@@ -86,7 +87,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 1) 0 to 50: Inviscid, k = 2
 # 2) 50 to 100: Viscous, k = 2
 # 3) 100 to 200: Viscous, k = 3
-t_star_end = 200
+t_star_end = 100
 t_end = t_star_end * D()/U()
 tspan = (0.0, t_end)
 
@@ -95,7 +96,9 @@ tspan = (0.0, t_end)
 #restart_file = "restart_ts50_hyp.h5"
 restart_file = "restart_ts100_hyp_para.h5"
 
-restart_filename = joinpath("out", restart_file)
+restart_path = "out/"
+restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+restart_filename = joinpath(restart_path, restart_file)
 mesh = load_mesh(restart_filename)
 
 tspan = (load_time(restart_filename), t_end)
@@ -147,8 +150,48 @@ cfl = cfl_max()
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 save_sol_interval = 2000
+
+extra_node_variables = (:vorticity_magnitude,)
+function Trixi.get_node_variable(::Val{:vorticity_magnitude}, u, mesh, equations, dg, cache,
+                                 equations_parabolic, cache_parabolic)
+    n_nodes = nnodes(dg)
+    n_elements = nelements(dg, cache)
+    # By definition, the variable must be provided at every node of every element!
+    # Otherwise, the `SaveSolutionCallback` will crash.
+    vorticity_array = zeros(eltype(cache.elements),
+                            n_nodes, n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
+                            n_elements)
+
+    @unpack viscous_container = cache_parabolic
+    @unpack gradients = viscous_container
+    gradients_x, gradients_y, gradients_z = gradients
+
+    # We can accelerate the computation by thread-parallelizing the loop over elements
+    # by using the `@threaded` macro.
+    Trixi.@threaded for element in eachelement(dg, cache)
+        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+
+            gradients_1 = get_node_vars(gradients_x, equations_parabolic, dg,
+                                        i, j, k, element)
+            gradients_2 = get_node_vars(gradients_y, equations_parabolic, dg,
+                                        i, j, k, element)
+            gradients_3 = get_node_vars(gradients_z, equations_parabolic, dg,
+                                        i, j, k, element)
+
+            vorticity_nodal = vorticity(u_node, 
+                                        (gradients_1, gradients_2, gradients_3),
+                                        equations_parabolic)
+            vorticity_array[i, j, k, element] = norm(vorticity_nodal)
+        end
+    end
+
+    return vorticity_array
+end
+
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
-                                     save_initial_solution = false)
+                                     save_initial_solution = true,
+                                     extra_node_variables = extra_node_variables)
 
 save_restart = SaveRestartCallback(interval = save_sol_interval)
 
@@ -156,8 +199,8 @@ callbacks = CallbackSet(summary_callback,
                         alive_callback, 
                         analysis_callback,
                         stepsize_callback,
-                        #save_solution,
-                        save_restart
+                        save_solution,
+                        #save_restart
                         )
 
 ###############################################################################
@@ -200,7 +243,8 @@ dtRatios = reverse([0.07416057586669921875
 0.9783477783203125
 ] ./ 0.9783477783203125)
 
-path_coeffs = "//storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
+path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
+path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
 
