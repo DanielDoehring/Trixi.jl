@@ -53,7 +53,7 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
-#case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
+case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
 # Boundary symbols follow from nodesets in the mesh file
@@ -97,7 +97,7 @@ tspan = (0.0, t_end)
 restart_file = "restart_ts100_hyp_para.h5"
 
 restart_path = "out/"
-restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+#restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 restart_filename = joinpath(restart_path, restart_file)
 mesh = load_mesh(restart_filename)
 
@@ -121,7 +121,7 @@ drag_p_back = AnalysisSurfaceIntegral((:BackSphere,),
                                                                 U(), A_sphere()))
 
 drag_f_front = AnalysisSurfaceIntegral((:FrontSphere,),
-                                       DragCoefficientShearStress2D(0.0, rho_ref(),
+                                       DragCoefficientShearStress3D(0.0, rho_ref(),
                                                                     U(), A_sphere()))
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
@@ -199,7 +199,7 @@ callbacks = CallbackSet(summary_callback,
                         alive_callback, 
                         analysis_callback,
                         stepsize_callback,
-                        save_solution,
+                        #save_solution,
                         #save_restart
                         )
 
@@ -244,7 +244,7 @@ dtRatios = reverse([0.07416057586669921875
 ] ./ 0.9783477783203125)
 
 path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
-path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
+#path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
 

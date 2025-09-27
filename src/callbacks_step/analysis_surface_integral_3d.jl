@@ -305,6 +305,10 @@ function analyze(surface_variable::AnalysisSurfaceIntegral{Variable}, du, u, t,
                 x = get_node_coords(node_coordinates, equations, dg,
                                     i_node, j_node, k_node, element)
 
+                # L2 norm of normal direction (contravariant_vector) is the surface element
+                dS = weights[node_index1] * weights[node_index2] *
+                     norm(normal_direction)
+
                 gradients_1 = get_node_vars(gradients_x, equations_parabolic, dg,
                                             i_node, j_node, k_node, element)
                 gradients_2 = get_node_vars(gradients_y, equations_parabolic, dg,
