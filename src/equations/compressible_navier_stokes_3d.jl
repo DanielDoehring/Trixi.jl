@@ -166,11 +166,11 @@ function flux(u, gradients, orientation::Integer,
 
     # Diagonal parts
     # (4 * (v1)_x / 3 - 2 * ((v2)_y + (v3)_z)) / 3)
-    tau_11 = 4 * dv1dx / 3 - 2 * (dv2dy + dv3dz) / 3
+    tau_11 = (4 * dv1dx - 2 * (dv2dy + dv3dz)) / 3
     # (4 * (v2)_y / 3 - 2 * ((v1)_x + (v3)_z) / 3)
-    tau_22 = 4 * dv2dy / 3 - 2 * (dv1dx + dv3dz) / 3
+    tau_22 = (4 * dv2dy - 2 * (dv1dx + dv3dz)) / 3
     # (4 * (v3)_z / 3 - 2 * ((v1)_x + (v2)_y) / 3)
-    tau_33 = 4 * dv3dz / 3 - 2 * (dv1dx + dv2dy) / 3
+    tau_33 = (4 * dv3dz - 2 * (dv1dx + dv2dy)) / 3
 
     # Off diagonal parts, exploit that stress tensor is symmetric
     # ((v1)_y + (v2)_x)

@@ -109,21 +109,26 @@ summary_callback = SummaryCallback()
 analysis_interval = 50_000
 
 A_sphere() = pi * (D()/2)^2
-drag_coeff_front = AnalysisSurfaceIntegral((:FrontSphere,),
-                                           DragCoefficientPressure3D(0.0, rho_ref(),
-                                                                     U(), A_sphere()))
+drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
+                                        DragCoefficientPressure3D(0.0, rho_ref(),
+                                                                 U(), A_sphere()))
 
-drag_coeff_back = AnalysisSurfaceIntegral((:BackSphere,),
-                                          DragCoefficientPressure3D(0.0, rho_ref(),
+drag_p_back = AnalysisSurfaceIntegral((:BackSphere,),
+                                      DragCoefficientPressure3D(0.0, rho_ref(),
+                                                                U(), A_sphere()))
+
+drag_f_front = AnalysisSurfaceIntegral((:FrontSphere,),
+                                       DragCoefficientShearStress2D(0.0, rho_ref(),
                                                                     U(), A_sphere()))
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[], # Turn off error computation
-                                     analysis_integrals = (drag_coeff_front,
-                                                           drag_coeff_back))
+                                     analysis_integrals = (drag_p_front,
+                                                           drag_p_back,
+                                                           drag_f_front))
 
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+#analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 50)
 

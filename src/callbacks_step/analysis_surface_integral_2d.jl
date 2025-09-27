@@ -135,7 +135,7 @@ end
 # This is required for drag and lift coefficients based on shear stress,
 # as well as for the non-integrated quantities such as
 # skin friction coefficient (to be added).
-function viscous_stress_tensor(u, normal_direction, equations_parabolic,
+function viscous_stress_tensor(u, equations_parabolic,
                                gradients_1, gradients_2)
     _, dv1dx, dv2dx, _ = convert_derivative_to_primitive(u, gradients_1,
                                                          equations_parabolic)
@@ -144,12 +144,12 @@ function viscous_stress_tensor(u, normal_direction, equations_parabolic,
 
     # Components of viscous stress tensor
     # (4/3 * (v1)_x - 2/3 * (v2)_y)
-    tau_11 = 4.0 / 3.0 * dv1dx - 2.0 / 3.0 * dv2dy
+    tau_11 = (4 * dv1dx - 2 * dv2dy) / 3
     # ((v1)_y + (v2)_x)
     # stress tensor is symmetric
     tau_12 = dv1dy + dv2dx # = tau_21
     # (4/3 * (v2)_y - 2/3 * (v1)_x)
-    tau_22 = 4.0 / 3.0 * dv2dy - 2.0 / 3.0 * dv1dx
+    tau_22 = (4 * dv2dy - 2 * dv1dx) / 3
 
     mu = dynamic_viscosity(u, equations_parabolic)
 
@@ -163,8 +163,7 @@ function viscous_stress_vector(u, normal_direction, equations_parabolic,
     #  Normalize normal direction, should point *into* the fluid => *(-1)
     n_normal = -normal_direction / norm(normal_direction)
 
-    tau_11, tau_12, tau_22 = viscous_stress_tensor(u, normal_direction,
-                                                   equations_parabolic,
+    tau_11, tau_12, tau_22 = viscous_stress_tensor(u, equations_parabolic,
                                                    gradients_1, gradients_2)
 
     # Viscous stress vector: Stress tensor * normal vector
@@ -183,7 +182,8 @@ function (lift_coefficient::LiftCoefficientShearStress{RealT, 2})(u, normal_dire
     visc_stress_vector = viscous_stress_vector(u, normal_direction, equations_parabolic,
                                                gradients_1, gradients_2)
     @unpack psi, rho_inf, u_inf, l_inf = lift_coefficient.force_state
-    return (visc_stress_vector[1] * psi[1] + visc_stress_vector[2] * psi[2]) /
+    return (visc_stress_vector[1] * psi[1] +
+            visc_stress_vector[2] * psi[2]) /
            (0.5f0 * rho_inf * u_inf^2 * l_inf)
 end
 
@@ -196,7 +196,8 @@ function (drag_coefficient::DragCoefficientShearStress{RealT, 2})(u, normal_dire
     visc_stress_vector = viscous_stress_vector(u, normal_direction, equations_parabolic,
                                                gradients_1, gradients_2)
     @unpack psi, rho_inf, u_inf, l_inf = drag_coefficient.force_state
-    return (visc_stress_vector[1] * psi[1] + visc_stress_vector[2] * psi[2]) /
+    return (visc_stress_vector[1] * psi[1] +
+            visc_stress_vector[2] * psi[2]) /
            (0.5f0 * rho_inf * u_inf^2 * l_inf)
 end
 
