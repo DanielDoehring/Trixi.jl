@@ -114,7 +114,7 @@ analysis_interval = 50_000
 A_sphere() = pi * (D()/2)^2
 drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
                                         DragCoefficientPressure3D(0.0, rho_ref(),
-                                                                 U(), A_sphere()))
+                                                                  U(), A_sphere()))
 
 drag_p_back = AnalysisSurfaceIntegral((:BackSphere,),
                                       DragCoefficientPressure3D(0.0, rho_ref(),
