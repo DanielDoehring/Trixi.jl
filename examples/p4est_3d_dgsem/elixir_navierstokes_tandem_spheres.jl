@@ -43,7 +43,7 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 2
+polydeg = 4
 
 surface_flux = flux_hll
 volume_flux = flux_ranocha
@@ -86,8 +86,9 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Strategy:
 # 1) 0 to 50: Inviscid, k = 2
 # 2) 50 to 100: Viscous, k = 2
-# 3) 100 to 200: Viscous, k = 3
-t_star_end = 100
+# 3) 100 to 150: Viscous, k = 4
+# 4) 150 to 200: Viscous, k = 4, statistics
+t_star_end = 150
 t_end = t_star_end * D()/U()
 tspan = (0.0, t_end)
 
@@ -131,7 +132,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                                            drag_p_back,
                                                            drag_f_front))
 
-#analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 50)
 
@@ -141,7 +142,8 @@ cfl_0() = 10.0
 # Hyp
 #cfl_max() = 17.0
 # Hyp-Diff
-cfl_max() = 13.5
+cfl_max() = 13.5 # k = 2; 14.0 stable for a long time
+cfl_max() = 6.0 # k = 4
 
 #cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -200,7 +202,7 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         stepsize_callback,
                         #save_solution,
-                        #save_restart
+                        save_restart
                         )
 
 ###############################################################################
