@@ -101,7 +101,6 @@ restart_path = "out/"
 restart_filename = joinpath(restart_path, restart_file)
 mesh = load_mesh(restart_filename)
 
-tspan = (load_time(restart_filename), t_end)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 ###############################################################################
