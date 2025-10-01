@@ -108,6 +108,7 @@ restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWor
 
 restart_filename = joinpath(restart_path, restart_file)
 
+tspan = (load_time(restart_filename), t_end)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 
