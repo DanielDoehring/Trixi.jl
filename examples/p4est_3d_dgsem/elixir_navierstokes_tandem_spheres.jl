@@ -107,7 +107,6 @@ restart_path = "out/"
 #restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 restart_filename = joinpath(restart_path, restart_file)
 
-tspan = (load_time(restart_filename), t_end)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 
@@ -121,7 +120,7 @@ analysis_interval = 50_000
 A_sphere() = pi * (D()/2)^2
 drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
                                         DragCoefficientPressure3D(0.0, rho_ref(),
-                                                                 U(), A_sphere()))
+                                                                  U(), A_sphere()))
 
 drag_p_back = AnalysisSurfaceIntegral((:BackSphere,),
                                       DragCoefficientPressure3D(0.0, rho_ref(),
