@@ -30,7 +30,7 @@ end
 # So it is not provably stable for variable coefficients due to the the metric terms.
 function calc_volume_integral!(du, u,
                                mesh::UnstructuredMesh2D,
-                               nonconservative_terms::False, equations,
+                               have_nonconservative_terms::False, equations,
                                volume_integral::VolumeIntegralStrongForm,
                                dg::FDSBP, cache,
                                element_indices = eachelement(dg, cache))
@@ -94,7 +94,7 @@ end
 # of the flux splitting f^-.
 function calc_volume_integral!(du, u,
                                mesh::UnstructuredMesh2D,
-                               nonconservative_terms::False, equations,
+                               have_nonconservative_terms::False, equations,
                                volume_integral::VolumeIntegralUpwind,
                                dg::FDSBP, cache,
                                element_indices = eachelement(dg, cache))

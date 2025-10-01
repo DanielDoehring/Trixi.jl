@@ -746,7 +746,7 @@ end
 
 function calc_mpi_interface_flux!(surface_flux_values,
                                   mesh::ParallelTreeMesh{2},
-                                  nonconservative_terms::False, equations,
+                                  have_nonconservative_terms::False, equations,
                                   surface_integral, dg::DG, cache,
                                   mpiinterface_indices = eachmpiinterface(dg, cache))
     @unpack surface_flux = surface_integral
@@ -788,7 +788,7 @@ end
 
 function calc_mpi_mortar_flux!(surface_flux_values,
                                mesh::ParallelTreeMesh{2},
-                               nonconservative_terms::False, equations,
+                               have_nonconservative_terms::False, equations,
                                mortar_l2::LobattoLegendreMortarL2,
                                surface_integral, dg::DG, cache,
                                mpimortar_indices = eachmpimortar(dg, cache))
@@ -803,7 +803,7 @@ function calc_mpi_mortar_flux!(surface_flux_values,
         fstar_secondary_upper = fstar_secondary_upper_threaded[Threads.threadid()]
         fstar_secondary_lower = fstar_secondary_lower_threaded[Threads.threadid()]
 
-        # Because `nonconservative_terms` is `False` the primary and secondary fluxes
+        # Because `have_nonconservative_terms` is `False` the primary and secondary fluxes
         # are identical. So, we could possibly save on computation and just pass two copies later.
         orientation = orientations[mortar]
         calc_fstar!(fstar_primary_upper, equations, surface_flux, dg, u_upper, mortar,

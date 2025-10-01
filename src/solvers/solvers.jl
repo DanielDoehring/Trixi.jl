@@ -5,6 +5,17 @@
 @muladd begin
 #! format: noindent
 
+# Used by both `dg::DGSEM` and `dg::FDSBP`
+function reset_du!(du, dg, cache, element_indices = eachelement(dg, cache))
+    # du .= zero(eltype(du)) doesn't scale when using multiple threads.
+    # See https://github.com/trixi-framework/Trixi.jl/pull/924 for a performance comparison.
+    @threaded for element in element_indices
+        du[.., element] .= zero(eltype(du))
+    end
+
+    return nothing
+end
+
 # define types for parabolic solvers
 include("solvers_parabolic.jl")
 
