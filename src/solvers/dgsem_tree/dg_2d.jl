@@ -177,28 +177,6 @@ function rhs!(du, u, t,
     return nothing
 end
 
-function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                           StructuredMeshView{2}, UnstructuredMesh2D,
-                                           P4estMesh{2}, P4estMeshView{2},
-                                           T8codeMesh{2},
-                                           TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
-                                           T8codeMesh{3}},
-                               nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralWeakForm,
-                               dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache),
-                               interface_indices = nothing,
-                               mortar_indices = nothing)
-    @threaded for element in element_indices
-        weak_form_kernel!(du, u, element, mesh,
-                          nonconservative_terms, equations,
-                          dg, cache)
-    end
-
-    return nothing
-end
-
 #=
 `weak_form_kernel!` is only implemented for conserved terms as
 non-conservative terms should always be discretized in conjunction with a flux-splitting scheme,
@@ -232,29 +210,6 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
     end
 
     return nothing
-end
-
-# flux differencing volume integral. For curved meshes averaging of the
-# mapping terms, stored in `cache.elements.contravariant_vectors`, is peeled apart
-# from the evaluation of the physical fluxes in each Cartesian direction
-function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                           StructuredMeshView{2},
-                                           UnstructuredMesh2D, P4estMesh{2},
-                                           T8codeMesh{2},
-                                           TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
-                                           T8codeMesh{3}},
-                               nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralFluxDifferencing,
-                               dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache),
-                               interface_indices = nothing,
-                               mortar_indices = nothing)
-    @threaded for element in element_indices
-        flux_differencing_kernel!(du, u, element, mesh,
-                                  nonconservative_terms, equations,
-                                  volume_integral.volume_flux, dg, cache)
-    end
 end
 
 @inline function flux_differencing_kernel!(du, u,
@@ -383,29 +338,6 @@ function calc_volume_integral!(du, u,
             fv_kernel!(du, u, mesh, nonconservative_terms, equations, volume_flux_fv,
                        dg, cache, element, alpha_element)
         end
-    end
-
-    return nothing
-end
-
-function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                           UnstructuredMesh2D, P4estMesh{2},
-                                           T8codeMesh{2},
-                                           TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
-                                           T8codeMesh{3}},
-                               nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralPureLGLFiniteVolume,
-                               dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache),
-                               interface_indices = nothing,
-                               mortar_indices = nothing)
-    @unpack volume_flux_fv = volume_integral
-
-    # Calculate LGL FV volume integral
-    @threaded for element in element_indices
-        fv_kernel!(du, u, mesh, nonconservative_terms, equations, volume_flux_fv,
-                   dg, cache, element, true)
     end
 
     return nothing

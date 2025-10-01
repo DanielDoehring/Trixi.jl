@@ -11,14 +11,14 @@ function create_cache(mesh, equations,
     return NamedTuple()
 end
 
-# The following `calc_volume_integral!` functions are
-# dimension and meshtype agnostic, i.e., valid for all 1D, 2D, and 3D meshes.
-#=
-function calc_volume_integral!(du, u, mesh,
+function calc_volume_integral!(du, u,
+                               mesh::AbstractMesh{1},
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralWeakForm,
-                               dg::DGSEM, cache)
-    @threaded for element in eachelement(dg, cache)
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing)
+    @threaded for element in element_indices
         weak_form_kernel!(du, u, element, mesh,
                           nonconservative_terms, equations,
                           dg, cache)
@@ -27,11 +27,31 @@ function calc_volume_integral!(du, u, mesh,
     return nothing
 end
 
-function calc_volume_integral!(du, u, mesh,
+function calc_volume_integral!(du, u,
+                               mesh::Union{AbstractMesh{2}, AbstractMesh{3}},
+                               nonconservative_terms, equations,
+                               volume_integral::VolumeIntegralWeakForm,
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing)
+    @threaded for element in element_indices
+        weak_form_kernel!(du, u, element, mesh,
+                          nonconservative_terms, equations,
+                          dg, cache)
+    end
+
+    return nothing
+end
+
+function calc_volume_integral!(du, u,
+                               mesh::AbstractMesh{1},
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralFluxDifferencing,
-                               dg::DGSEM, cache)
-    @threaded for element in eachelement(dg, cache)
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing)
+    @threaded for element in element_indices
         flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms,
                                   equations,
                                   volume_integral.volume_flux, dg, cache)
@@ -40,7 +60,24 @@ function calc_volume_integral!(du, u, mesh,
     return nothing
 end
 
-function calc_volume_integral!(du, u, mesh,
+function calc_volume_integral!(du, u,
+                               mesh::Union{AbstractMesh{2}, AbstractMesh{3}},
+                               nonconservative_terms, equations,
+                               volume_integral::VolumeIntegralFluxDifferencing,
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing)
+    @threaded for element in element_indices
+        flux_differencing_kernel!(du, u, element, mesh,
+                                  nonconservative_terms, equations,
+                                  volume_integral.volume_flux, dg, cache)
+    end
+end
+
+#=
+function calc_volume_integral!(du, u,
+                               mesh,
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralShockCapturingHG,
                                dg::DGSEM, cache)
@@ -77,20 +114,42 @@ function calc_volume_integral!(du, u, mesh,
 
     return nothing
 end
+=#
 
-function calc_volume_integral!(du, u, mesh,
+function calc_volume_integral!(du, u,
+                               mesh::AbstractMesh{1},
                                nonconservative_terms, equations,
                                volume_integral::VolumeIntegralPureLGLFiniteVolume,
-                               dg::DGSEM, cache)
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing)
     @unpack volume_flux_fv = volume_integral
 
     # Calculate LGL FV volume integral
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         fv_kernel!(du, u, mesh, nonconservative_terms, equations, volume_flux_fv,
                    dg, cache, element, true)
     end
 
     return nothing
 end
-=#
+
+function calc_volume_integral!(du, u,
+                               mesh::Union{AbstractMesh{2}, AbstractMesh{3}},
+                               nonconservative_terms, equations,
+                               volume_integral::VolumeIntegralPureLGLFiniteVolume,
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing)
+    @unpack volume_flux_fv = volume_integral
+
+    # Calculate LGL FV volume integral
+    @threaded for element in element_indices
+        fv_kernel!(du, u, mesh, nonconservative_terms, equations, volume_flux_fv,
+                   dg, cache, element, true)
+    end
+
+    return nothing
+end
 end # @muladd
