@@ -104,7 +104,8 @@ restart_file = "restart_ts50_hyp.h5"
 restart_file = "restart_000010000.h5"
 
 restart_path = "out/"
-#restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+
 restart_filename = joinpath(restart_path, restart_file)
 
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
@@ -196,7 +197,7 @@ function Trixi.get_node_variable(::Val{:vorticity_magnitude}, u, mesh, equations
 end
 
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
-                                     save_initial_solution = true,
+                                     save_initial_solution = false,
                                      extra_node_variables = extra_node_variables)
 
 save_restart = SaveRestartCallback(interval = save_sol_interval)
