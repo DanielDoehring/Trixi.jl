@@ -49,6 +49,7 @@ polydeg = 2
 surface_flux = FluxLMARS(c_ref())
 
 volume_flux = flux_ranocha
+volume_flux = flux_kennedy_gruber
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
@@ -101,10 +102,10 @@ tspan = (0.0, t_end)
 
 restart_file = "restart_ts50_hyp.h5"
 #restart_file = "restart_ts100_hyp_para.h5"
-restart_file = "restart_000010000.h5"
+#restart_file = "restart_000010000.h5"
 
 restart_path = "out/"
-restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+#restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
 restart_filename = joinpath(restart_path, restart_file)
 
