@@ -196,7 +196,7 @@ function step!(integrator::Union{AbstractPairedExplicitRelaxationRKIntegrator{3}
             # Note: We re-use `du` for the "direction"
             #integrator.u[i] += integrator.gamma * integrator.du[i]
             # Try optimize for `@muladd`: avoid `+=`
-            integrator.u[i] = integrator.u[i] + integrator.gamma * integrator
+            integrator.u[i] = integrator.u[i] + integrator.gamma * integrator.du[i]
         end
     end
 
