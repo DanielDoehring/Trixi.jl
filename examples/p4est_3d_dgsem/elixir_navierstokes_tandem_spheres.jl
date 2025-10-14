@@ -46,9 +46,6 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 polydeg = 2
 
 surface_flux = flux_hll
-#surface_flux = FluxLMARS(c_ref())
-
-volume_flux = flux_ranocha
 volume_flux = flux_kennedy_gruber
 
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
@@ -59,22 +56,14 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
 case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 
-mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P1_fixed.inp"
-#mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
+mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
 # Boundary symbols follow from nodesets in the mesh file
 boundary_symbols = [:FrontSphere, :BackSphere, :FarField]
 mesh = P4estMesh{3}(mesh_file; boundary_symbols = boundary_symbols)
 
-#=
 boundary_conditions = Dict(:FrontSphere => boundary_condition_slip_wall,
                            :BackSphere => boundary_condition_slip_wall,
-                           :FarField => bc_farfield)
-=#
-
-# For testing free stream preservation
-boundary_conditions = Dict(:FrontSphere => bc_farfield,
-                           :BackSphere => bc_farfield,
                            :FarField => bc_farfield)
 
 #=
@@ -87,15 +76,8 @@ velocity_bc = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
 bc_spheres = BoundaryConditionNavierStokesWall(velocity_bc, heat_bc)
 
-#=
 boundary_conditions_para = Dict(:FrontSphere => bc_spheres,
                                 :BackSphere => bc_spheres,
-                                :FarField => bc_farfield)
-=#
-
-# For testing free stream preservation (with viscosity)
-boundary_conditions_para = Dict(:FrontSphere => bc_farfield,
-                                :BackSphere => bc_farfield,
                                 :FarField => bc_farfield)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
@@ -168,8 +150,6 @@ t_ramp_up() = 1e-2 # For dimensionalized units
 # Hyp-Diff
 cfl_max() = 13.5 # k = 2; 14.0 stable for a long time
 
-cfl_max() = 10.0
-
 #cfl_max() = 9.0 # k = 3
 #cfl_max() = 6.0 # k = 4
 
@@ -228,7 +208,7 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         stepsize_callback,
                         #save_solution,
-                        save_restart
+                        #save_restart
                         )
 
 ###############################################################################
@@ -282,8 +262,11 @@ sol = Trixi.solve(ode, ode_alg,
 
 ###############################################################################
 
-#=
+callbacks = CallbackSet(summary_callback,
+                        alive_callback,
+                        analysis_callback,
+                        )
+
 sol = solve(ode, RDPK3SpFSAL35(thread = Trixi.True());
             abstol = 1.0e-5, reltol = 1.0e-5,
             ode_default_options()..., callback = callbacks);
-=#
