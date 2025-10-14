@@ -45,11 +45,12 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
 polydeg = 2
 
-#surface_flux = flux_hll
-surface_flux = FluxLMARS(c_ref())
+surface_flux = flux_hll
+#surface_flux = FluxLMARS(c_ref())
 
 volume_flux = flux_ranocha
 volume_flux = flux_kennedy_gruber
+
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
@@ -58,14 +59,22 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
 case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 
-mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
+mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P1_fixed.inp"
+#mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
 # Boundary symbols follow from nodesets in the mesh file
 boundary_symbols = [:FrontSphere, :BackSphere, :FarField]
 mesh = P4estMesh{3}(mesh_file; boundary_symbols = boundary_symbols)
 
+#=
 boundary_conditions = Dict(:FrontSphere => boundary_condition_slip_wall,
                            :BackSphere => boundary_condition_slip_wall,
+                           :FarField => bc_farfield)
+=#
+
+# For testing free stream preservation
+boundary_conditions = Dict(:FrontSphere => bc_farfield,
+                           :BackSphere => bc_farfield,
                            :FarField => bc_farfield)
 
 #=
@@ -78,8 +87,15 @@ velocity_bc = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
 bc_spheres = BoundaryConditionNavierStokesWall(velocity_bc, heat_bc)
 
+#=
 boundary_conditions_para = Dict(:FrontSphere => bc_spheres,
                                 :BackSphere => bc_spheres,
+                                :FarField => bc_farfield)
+=#
+
+# For testing free stream preservation (with viscosity)
+boundary_conditions_para = Dict(:FrontSphere => bc_farfield,
+                                :BackSphere => bc_farfield,
                                 :FarField => bc_farfield)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
@@ -97,9 +113,9 @@ t_end = t_star_end * D()/U()
 tspan = (0.0, t_end)
 
 #ode = semidiscretize(semi_hyp, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false)
+ode = semidiscretize(semi, tspan; split_problem = false)
 
-
+#=
 restart_file = "restart_ts50_hyp.h5"
 #restart_file = "restart_ts100_hyp_para.h5"
 #restart_file = "restart_000010000.h5"
@@ -111,14 +127,14 @@ restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-
+=#
 
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
 analysis_interval = 50_000
-#analysis_interval = 50
+analysis_interval = 500
 
 A_sphere() = pi * (D()/2)^2
 drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
@@ -151,6 +167,9 @@ t_ramp_up() = 1e-2 # For dimensionalized units
 #cfl_max() = 17.0
 # Hyp-Diff
 cfl_max() = 13.5 # k = 2; 14.0 stable for a long time
+
+cfl_max() = 10.0
+
 #cfl_max() = 9.0 # k = 3
 #cfl_max() = 6.0 # k = 4
 
