@@ -44,14 +44,16 @@ end
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
 polydeg = 2
-
 surface_flux = flux_hll
+
+solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+
+#=
 volume_flux = flux_kennedy_gruber
-
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
-
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
+=#
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
 case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
@@ -90,16 +92,15 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 2) 50 to 100: Viscous, k = 2
 # 3) 100 to 150: Viscous, k = 4
 # 4) 150 to 200: Viscous, k = 4, statistics
-t_star_end = 150
+t_star_end = 75
 t_end = t_star_end * D()/U()
+
 tspan = (0.0, t_end)
-
 #ode = semidiscretize(semi_hyp, tspan)
-ode = semidiscretize(semi, tspan; split_problem = false)
+#ode = semidiscretize(semi, tspan; split_problem = false)
 
-#=
+
 restart_file = "restart_ts50_hyp.h5"
-#restart_file = "restart_ts100_hyp_para.h5"
 #restart_file = "restart_000010000.h5"
 
 restart_path = "out/"
@@ -109,14 +110,13 @@ restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-=#
+
 
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
 analysis_interval = 50_000
-analysis_interval = 500
 
 A_sphere() = pi * (D()/2)^2
 drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
@@ -208,7 +208,7 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         stepsize_callback,
                         #save_solution,
-                        #save_restart
+                        save_restart
                         )
 
 ###############################################################################
@@ -262,11 +262,12 @@ sol = Trixi.solve(ode, ode_alg,
 
 ###############################################################################
 
+#=
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        analysis_callback,
-                        )
+                        analysis_callback)
 
 sol = solve(ode, RDPK3SpFSAL35(thread = Trixi.True());
             abstol = 1.0e-5, reltol = 1.0e-5,
             ode_default_options()..., callback = callbacks);
+=#
