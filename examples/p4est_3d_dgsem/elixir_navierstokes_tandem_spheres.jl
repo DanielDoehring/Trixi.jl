@@ -43,17 +43,15 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 2
+polydeg = 4
 surface_flux = flux_hll
 
-solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+#solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
 
-#=
 volume_flux = flux_kennedy_gruber
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
-=#
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
 case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
@@ -88,11 +86,11 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                                                     boundary_conditions_para))
 
 # Strategy:
-# 1) 0 to 10: Inviscid, k = 2
-# 2) 50 to 100: Viscous, k = 2
-# 3) 100 to 150: Viscous, k = 4
-# 4) 150 to 200: Viscous, k = 4, statistics
-t_star_end = 75
+# 1) 0 to 50: Inviscid, k = 2
+# 2) 50 to 100: Viscous, k = 2/3/4, p2/p3
+# 3) 100 to 150: Viscous, k = 4, p3
+# 4) 150 to 200: Viscous, k = 4, p4, statistics
+t_star_end = 100
 t_end = t_star_end * D()/U()
 
 tspan = (0.0, t_end)
@@ -100,8 +98,8 @@ tspan = (0.0, t_end)
 #ode = semidiscretize(semi, tspan; split_problem = false)
 
 
-restart_file = "restart_ts50_hyp.h5"
-#restart_file = "restart_000010000.h5"
+#restart_file = "restart_ts50_hyp.h5"
+restart_file = "restart_000016000.h5"
 
 restart_path = "out/"
 #restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
@@ -148,10 +146,10 @@ t_ramp_up() = 1e-2 # For dimensionalized units
 # Hyp
 #cfl_max() = 17.0
 # Hyp-Diff
-cfl_max() = 13.5 # k = 2; 14.0 stable for a long time
+#cfl_max() = 13.5 # k = 2; 14.0 stable for a long time
 
 #cfl_max() = 9.0 # k = 3
-#cfl_max() = 6.0 # k = 4
+cfl_max() = 6.0 # k = 4, p3
 
 #cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -214,8 +212,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 
 ### p2 ###
-
-# Pointwise:
+#=
 Stages = [14, 13, 12, 11, 10, 8, 7, 5, 4, 3, 2]
 
 dtRatios = reverse([0.07416057586669921875
@@ -236,25 +233,26 @@ path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coef
 
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
+=#
 
 ### p3 ###
 
-#=
-Stages = [14, 13, 12, 11, 10, 8, 7, 6, 4, 3]
-dtRatios = reverse([0.00918807983398437551025
-0.0122711181640625006812
-0.0167221069335937509287
-0.0271781921386718765098
-0.0316619873046875017584
-0.0463378906250000025723
-0.0513610839843750028528
-0.061634063720703128422
-0.0701828002929687538964
-0.0815246582031250045238] ./ 0.0815246582031250045238)
+Stages = [14, 13, 12, 11, 10, 9, 8, 6, 5, 4, 3]
+dtRatios = reverse([0.000120724458014592531464
+0.00022078421326354146521
+0.000356726163243874915506
+0.00049591444368474186554
+0.000669575841305777445039
+0.000789872415727004425815
+0.000921498959874734302254
+0.00105325164646841587883
+0.00114614301623776557516
+0.00124876051938161256589
+0.00135157296740449967876] ./ 0.00135157296740449967876)
 
-path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/"
+path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
-=#
+
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 1e-5,
