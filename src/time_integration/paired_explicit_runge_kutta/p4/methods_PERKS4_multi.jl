@@ -360,6 +360,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
                          level_info_mortars_para_acc,
                          n_levels_para, semi, alg;
                          quadratic_scaling = true)
+                         #quadratic_scaling = false) # TODO: Could make this variable of the algorithm to avoid manual hacks
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
