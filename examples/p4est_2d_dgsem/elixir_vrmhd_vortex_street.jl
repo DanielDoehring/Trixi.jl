@@ -127,7 +127,7 @@ boundary_conditions = Dict(:Circle => bc_slip_wall_no_mag, # top half of the cyl
 
                            :Right => bc_freestream,
                            :Right_R => bc_freestream, 
-                           
+
                            :Left => bc_freestream,
                            :Left_R => bc_freestream)
 
@@ -186,8 +186,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Setup an ODE problem
 
 tspan = (0.0, 120.0)
-#ode = semidiscretize(semi, tspan)
+
+#ode = semidiscretize(semi, tspan) # Standard or split-PERK Multirate
 ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multirate
+
 
 # For finding final CFL
 #=
@@ -224,7 +226,7 @@ cfl_0() = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
 #cfl_0() = 1.3 # R-TS64
 #cfl_0() = 2.2 # R-CKL54
 
-### Restared CFL ###
+### Restarted CFL ###
 
 cfl_max() = 6.5 # PER(R)K4 13, 8, 6, 5
 #cfl_max() = 7.3 # Standalone PERRK4 13
@@ -252,14 +254,25 @@ cfl_0() = 1.0 # PE (Relaxation) RK 4 13, 8, 6, 5
 #cfl_0() = 1.3 # R-TS64
 #cfl_0() = 2.2 # R-CKL54
 
-### Restared CFL ###
+### Restarted CFL ###
 
-cfl_max() = 5.1 # PER(R)K4 13, 8, 6, 5
+cfl_max() = 5.1 # PER(R)K4 13, 8, 6, 5 => roughly 320 sec on 8 threads
 #cfl_max() = 7.3 # Standalone PERRK4 13
 
 #cfl_max() = 1.5 # R-RK44
 #cfl_max() = 2.1 # R-TS64
 #cfl_max() = 2.7 # R-CKL54
+
+### Split schemes ###
+#=
+cfl_0() = 1.0
+
+# PERKS 4 without quadratic scaling for viscous part partitioning
+# => Roughly 400 sec on 8 threads
+cfl_max() = 4.1
+
+t_ramp_up() = 5.0
+=#
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -328,6 +341,20 @@ ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 #ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
 #ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+
+### Split schemes ###
+
+Stages_para = [10, 8, 6, 5]
+dtRatios_para = [312.83020308753, # 10
+    152.879047415621, #  8
+    61.6046703927691, #  6
+    27.9645800405075] / 312.83020308753 #= 5 =#
+
+path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p4/para_rhs/"
+
+ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages, Stages_para,
+                                                  path, path_coeffs_para,
+                                                  dtRatios, dtRatios_para)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
