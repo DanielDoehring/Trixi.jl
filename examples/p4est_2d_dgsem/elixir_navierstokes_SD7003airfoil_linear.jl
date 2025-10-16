@@ -170,7 +170,7 @@ cfl = 8.7 # PERK2 split multi with same stages & distribution
 #cfl = 5.6 # PERK 4 Multi Split E = 5, ..., 10
 #cfl = 6.1 # PERK 4 Multi Split (14, 10)
 
-#cfl = 7.4 # PEERRKS_4 Multi E = 5, ..., 14
+#cfl = 7.4 # PERRKS_4 Multi E = 5, ..., 14
 #cfl = 6.1 # PERRK 4 Multi Split (14, 10) # Seems to have no benefit of RESTARTED simulation from relaxation
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
