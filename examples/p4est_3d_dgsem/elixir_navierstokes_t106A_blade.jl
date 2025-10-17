@@ -23,7 +23,9 @@ solver = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs)
 
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS2/T106A_HOW4/"
+
 mesh_file = case_path * "t106A_3D_coarse_fixed2.inp"
+mesh_file = case_path * "t106A_3D_baseline_fixed2.inp"
 
 #  1: Back (z-) x-y plane
 # 13: Front (z+) x-y plane
