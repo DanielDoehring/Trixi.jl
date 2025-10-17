@@ -52,6 +52,8 @@ boundary_symbols = [:SurfSet1, :SurfSet2, :SurfSet3, :SurfSet4,
 
 mesh = P4estMesh{3}(mesh_file; boundary_symbols = boundary_symbols)
 
+# TODO: Bundle nodesets with same boundary condition for efficiency
+
 boundary_conditions = Dict(:SurfSet1 => BoundaryConditionDirichlet(initial_condition),
 
                            :SurfSet2 => BoundaryConditionDirichlet(initial_condition),
