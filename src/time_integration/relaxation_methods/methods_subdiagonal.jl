@@ -179,7 +179,7 @@ implemented as a [`SubDiagonalRelaxationAlgorithm`](@ref).
 The default relaxation solver [`AbstractRelaxationSolver`](@ref) is [`RelaxationSolverNewton`](@ref).
 """
 struct RelaxationTS64{RelaxationSolver} <: SubDiagonalRelaxationAlgorithm
-    sub_diag_alg::TS64
+    sub_diagonal_alg::TS64
     relaxation_solver::RelaxationSolver
 end
 function RelaxationTS64(; relaxation_solver = RelaxationSolverNewton())

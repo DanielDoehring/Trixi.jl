@@ -31,7 +31,6 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu,
                                                           Prandtl = prandtl_number,
                                                           gradient_variables = GradientVariablesPrimitive())
 
-# TODO: Ramp up to avoid the need for adaptive timestepping
 # Freestream configuration
 @inline function initial_condition(x, t, equations::CompressibleEulerEquations2D)
     rho = rho_in
@@ -56,10 +55,13 @@ bc_freestream = BoundaryConditionDirichlet(initial_condition)
 # the mirrored boundaries are named with a "_R" suffix.
 boundary_conditions = Dict(:Circle => boundary_condition_slip_wall, # top half of the cylinder
                            :Circle_R => boundary_condition_slip_wall, # bottom half of the cylinder
+
                            :Top => bc_freestream,
                            :Top_R => bc_freestream, # aka bottom
+
                            :Right => bc_freestream,
-                           :Right_R => bc_freestream, 
+                           :Right_R => bc_freestream,
+
                            :Left => bc_freestream,
                            :Left_R => bc_freestream)
 
@@ -103,7 +105,7 @@ boundary_conditions_para = Dict(:Circle => boundary_condition_cylinder, # top ha
                                 :Left => boundary_condition_free,
                                 :Left_R => boundary_condition_free)
 
-polydeg = 3
+polydeg = 4 # 3 for PERRK paper
 surface_flux = flux_hll
 volume_flux = flux_ranocha
 solver = DGSEM(polydeg = polydeg, surface_flux = flux_hll)
@@ -192,11 +194,13 @@ function Trixi.get_node_variable(::Val{:vorticity}, u, mesh, equations, dg, cach
     return vorticity_array
 end
 
-save_solution = SaveSolutionCallback(dt = 1.0,
-                                     save_initial_solution = true,
+save_solution = SaveSolutionCallback(interval = 100_000,
+                                     save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
                                      extra_node_variables = extra_node_variables) # Supply the additional `extra_node_variables` here
+
+### k = 3 ###
 
 #cfl = 12.0 # Restarted PERK4 Single 16
 #cfl = 7.4 # Restarted PERK4 Multi 16, 10, 7, 6, 5
@@ -207,6 +211,10 @@ save_solution = SaveSolutionCallback(dt = 1.0,
 t_ramp_up() = 4.55 # PE Relaxation RK 4
 
 cfl(t) = min(7.4, 1.5 + t/t_ramp_up() * 5.9)
+
+### k = 4 ###
+
+cfl(t) = min(5.2, 1.0 + t/t_ramp_up() * 4.2)
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 

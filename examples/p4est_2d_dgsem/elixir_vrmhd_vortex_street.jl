@@ -251,27 +251,27 @@ t_ramp_up() = 1.10 # R-CKL54
 cfl_0() = 1.0 # PE (Relaxation) RK 4 13, 8, 6, 5
 cfl_0() = 1.0 # PE (Relaxation) RK 4 13 (Standalone)
 
-#cfl_0() = ?? # R-RK44
-#cfl_0() = ?? # R-TS64
-cfl_0() = 0.5 # R-CKL54
+cfl_0() = 0.5 # R-RK44
+cfl_0() = 0.5 # R-TS64
+#cfl_0() = 0.5 # R-CKL54
 
 ### Restarted CFL ###
 
-cfl_max() = 5.1 # PER(R)K4 13, 8, 6, 5 => roughly 320 sec on 8 threads
-cfl_max() = 5.5 # Standalone PERRK4 13
+#cfl_max() = 5.1 # PER(R)K4 13, 8, 6, 5 => roughly 320 sec on 8 threads
+#cfl_max() = 5.5 # Standalone PERRK4 13
 
-#cfl_max() = ?? # R-RK44
-#cfl_max() = ?? # R-TS64
-cfl_max() = 1.8 # R-CKL54
+cfl_max() = 1.0 # R-RK44
+cfl_max() = 1.4 # R-TS64
+#cfl_max() = 1.8 # R-CKL54
 
 ### Ramp-Up CFL ###
-t_ramp_up() = 4.40 # PER(R)K4 4 13, 8, 6, 5 
+#t_ramp_up() = 4.40 # PER(R)K4 4 13, 8, 6, 5 
 
-t_ramp_up() = 5.00 # Standalone PERRK4 13
+#t_ramp_up() = 5.00 # Standalone PERRK4 13
 
-#t_ramp_up() = ?? # R-RK44
-#t_ramp_up() = ?? # R-TS64
-t_ramp_up() = 3.0 # R-CKL54
+#t_ramp_up() = 1.0 # R-RK44
+t_ramp_up() = 3.0 # R-TS64
+#t_ramp_up() = 3.0 # R-CKL54
 
 ### Split schemes ###
 #=
@@ -345,12 +345,12 @@ Stages = [13, 8, 7, 6, 5]
 #ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
 
 #ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
-ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
 
 
 #ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
-ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
+ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
+#ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
 
 ### Split schemes ###
 

@@ -65,11 +65,47 @@ ode = semidiscretize(semi, tspan, restart_filename)
 
 summary_callback = SummaryCallback()
 
-save_sol_interval = 100_000
+save_sol_interval = 500_000
+
+# Add `:Mach` to `extra_node_variables` tuple ...
+extra_node_variables = (:Mach,)
+
+# ... and specify the function `get_node_variable` for this symbol, 
+# with first argument matching the symbol (turned into a type via `Val`) for dispatching.
+# Note that for parabolic(-extended) equations, `equations_parabolic` and `cache_parabolic`
+# must be declared as the last two arguments of the function to match the expected signature.
+function Trixi.get_node_variable(::Val{:Mach}, u, mesh, equations, dg, cache)
+    n_nodes = nnodes(dg)
+    n_elements = nelements(dg, cache)
+    # By definition, the variable must be provided at every node of every element!
+    # Otherwise, the `SaveSolutionCallback` will crash.
+    Mach_array = zeros(eltype(cache.elements),
+                            n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
+                            n_elements)
+
+    # We can accelerate the computation by thread-parallelizing the loop over elements
+    # by using the `@threaded` macro.
+    Trixi.@threaded for element in eachelement(dg, cache)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, element)
+            prim_node = cons2prim(u_node, equations)
+            
+            sound_speed = sqrt(equations.gamma * prim_node[4] / prim_node[1])
+            velocity_magnitude = sqrt(prim_node[2]^2 + prim_node[3]^2)
+
+            Mach_nodal = velocity_magnitude / sound_speed
+            Mach_array[i, j, element] = Mach_nodal
+        end
+    end
+
+    return Mach_array
+end
+
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
-                                     solution_variables = cons2prim)
+                                     solution_variables = cons2prim,
+                                     extra_node_variables = extra_node_variables)
 
 l_inf = 1.0 # Length of airfoil
 force_boundary_names = (:Airfoil,)
@@ -126,7 +162,8 @@ callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         save_solution,
                         stepsize_callback,
-                        amr_callback)
+                        amr_callback
+                        )
 
 ###############################################################################
 # run the simulation
