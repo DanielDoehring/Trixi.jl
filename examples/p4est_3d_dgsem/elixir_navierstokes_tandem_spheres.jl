@@ -90,7 +90,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 2) 50 to 100: Viscous, k = 2/3/4, p2/p3
 # 3) 100 to 150: Viscous, k = 4, p3
 # 4) 150 to 200: Viscous, k = 4, p4, statistics
-t_star_end = 100
+t_star_end = 150
 t_end = t_star_end * D()/U()
 
 tspan = (0.0, t_end)
@@ -99,7 +99,7 @@ tspan = (0.0, t_end)
 
 
 #restart_file = "restart_ts50_hyp.h5"
-restart_file = "restart_000040000.h5"
+restart_file = "restart_000072000.h5"
 
 restart_path = "out/"
 #restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
@@ -255,7 +255,7 @@ ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = 6.2e-6, # k = 4, p3 run, no stepsize_callback
+                  dt = 7.0e-6, # k = 4, p3 run, no stepsize_callback
                   save_everystep = false, callback = callbacks);
 
 ###############################################################################
