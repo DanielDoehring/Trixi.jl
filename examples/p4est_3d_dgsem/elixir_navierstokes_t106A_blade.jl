@@ -9,8 +9,8 @@ equations = CompressibleEulerEquations3D(1.4)
 
 function initial_condition_Ma015(x, t, equations::CompressibleEulerEquations3D)
     # Choose rho, p s.t. c = 1
-    rho = 1
-    p = 1.4
+    rho = 1.4
+    p = 1.0
 
     v1 = 0.15
     v2 = 0
