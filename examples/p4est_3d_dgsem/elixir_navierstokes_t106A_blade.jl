@@ -116,6 +116,7 @@ boundary_condition_outflow = boundary_condition_outflow_general
 
 # Ensure that rho and p are the same across symmetry line and allow only 
 # tangential velocity
+# TODO: Check if Navier-Stokes turns this into a true 3D simulation
 @inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
                              surface_flux_function, equations)
     norm_ = norm(normal_direction)
