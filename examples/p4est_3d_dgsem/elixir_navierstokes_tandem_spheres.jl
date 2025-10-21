@@ -43,7 +43,7 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 2 # 3, 4
+polydeg = 3 # 2, 3, 4
 surface_flux = flux_hll
 
 #solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
@@ -90,7 +90,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 2) 50(0) to 150(100): Viscous, k = 2
 # 3) 150(100) to 175(125): Viscous, k = 3, p = 2
 # 4) 175(125) to 225(175): Viscous, k = 4, p = 3
-t_star_end = 150
+t_star_end = 175
 t_end = t_star_end * D()/U()
 
 tspan = (0.0, t_end)
@@ -99,7 +99,7 @@ tspan = (0.0, t_end)
 
 
 restart_file = "restart_ts50_hyp.h5"
-#restart_file = "restart_000094000.h5"
+restart_file = "restart_ts150_hyp_para.h5"
 
 #restart_path = "out/"
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2"
@@ -114,7 +114,7 @@ ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 10_000
+analysis_interval = 2000
 
 A_sphere() = pi * (D()/2)^2
 drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
@@ -230,7 +230,7 @@ dtRatios = reverse([0.07416057586669921875
 ] ./ 0.9783477783203125)
 
 path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
-path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/p2/"
+#path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/p2/"
 
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
@@ -259,7 +259,7 @@ dt_k2p2 = 2.3e-5
 dt_k3p2 = 1.2e-5
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = dt_k2p2,
+                  dt = dt_k3p2,
                   save_everystep = false, callback = callbacks);
 
 ###############################################################################
