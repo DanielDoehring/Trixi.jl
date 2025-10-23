@@ -56,11 +56,9 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 2 # 2, 3, 4
+polydeg = 3 # 2, 3, 4
 
-#surface_flux = flux_hll
-surface_flux = FluxLMARS(1.0)
-
+surface_flux = flux_hll
 volume_flux = flux_kennedy_gruber
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
@@ -69,7 +67,6 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 #case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
 case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 
-#mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P1.inp" # Tried for drag coeff comparison
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
 # Boundary symbols follow from nodesets in the mesh file
@@ -79,16 +76,6 @@ mesh = P4estMesh{3}(mesh_file; boundary_symbols = boundary_symbols)
 boundary_conditions = Dict(:FrontSphere => boundary_condition_slip_wall,
                            :BackSphere => boundary_condition_slip_wall,
                            :FarField => bc_farfield)
-
-#=
-boundary_conditions = Dict(:FrontSphere => bc_farfield,
-                           :BackSphere => bc_farfield,
-                           :FarField => bc_farfield)
-
-semi_hyp = SemidiscretizationHyperbolic(mesh, equations,
-                                        initial_condition, solver;
-                                        boundary_conditions = boundary_conditions)
-=#
 
 velocity_bc = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
@@ -104,11 +91,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                                                     boundary_conditions_para))
 
 # Strategy:
-# 1) 0 to 50: Inviscid, k = 2
-# 2) 50(0) to 150(100): Viscous, k = 2
-# 3) 150(100) to 175(125): Viscous, k = 3, p = 2
-# 4) 175(125) to 225(175): Viscous, k = 4, p = 3
-t_star_end = 50
+# 1) 0 to 75: k2, p2
+# 2) 75 to 100: k3, p2
+# 3) 100 to 200: k4, p3
+t_star_end = 100
 t_end = t_star_end * D()/U()
 
 
@@ -122,14 +108,14 @@ ode = semidiscretize(semi, tspan; split_problem = false)
 #restart_path = "out/"
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
-#=
-restart_file = "restart_000002000.h5"
+restart_file = "restart_ts50_hp.h5"
+restart_file = "restart_ts75_hp.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-=#
+
 
 ###############################################################################
 
@@ -145,10 +131,6 @@ drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
 drag_p_back = AnalysisSurfaceIntegral((:BackSphere,),
                                       DragCoefficientPressure3D(0.0, rho_ref(),
                                                                 U(), A_sphere()))
-
-drag_f_front = AnalysisSurfaceIntegral((:FrontSphere,),
-                                       DragCoefficientShearStress3D(0.0, rho_ref(),
-                                                                    U(), A_sphere()))
 
 analysis_callback = AnalysisCallback(semi,
                                      interval = analysis_interval,
@@ -172,12 +154,12 @@ t_ramp_up() = 5.0
 
 # Hyp-Diff
 cfl_max() = 13.5 # k = 2
-#cfl_max() = 9.0 # k = 3
+cfl_max() = 9.0 # k = 3
 #cfl_max() = 6.0 # k = 4
 
-cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+#cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
-#cfl = cfl_max()
+cfl = cfl_max()
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
