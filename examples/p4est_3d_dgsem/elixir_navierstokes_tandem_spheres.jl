@@ -8,6 +8,7 @@ import LinearAlgebra: norm # For vorticity magnitude
 gamma = 1.4
 equations = CompressibleEulerEquations3D(gamma)
 
+#=
 rho_ref() = 1.255 # kg/m^3
 R_specific_air() = 287.052874 # J/(kg K)
 T_ref() = 300 # K
@@ -17,10 +18,19 @@ p_ref() = rho_ref() * R_specific_air() * T_ref() # Pa = N/m^2
 c_ref() = sqrt(gamma * p_ref()/rho_ref()) # m/s
 Ma_ref() = 0.1
 U() = Ma_ref() * c_ref() # m/s
+=#
+
+
+# NOTE: non-dim for more homogeneous setup/better vorticity visualization?
+rho_ref() = 1.4
+p_ref() = 1.0
+c_ref() = 1.0
+Ma_ref() = 0.1
+U() = Ma_ref() * c_ref()
 
 D() = 1 # Follows from mesh
 Re_D() = 3900
-mu_ref() = rho_ref() * D() * U()/Re_D() # TODO: Sutherlands law
+mu_ref() = rho_ref() * U() * D()/Re_D() # TODO: Sutherlands law
 
 prandtl_number = 0.72
 equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu_ref(),
@@ -28,14 +38,17 @@ equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu_ref
 
 @inline function initial_condition(x, t, equations)
     # set the freestream flow parameters
-    rho_freestream = 1.255
+    #rho_freestream = 1.255
+    rho_freestream = 1.4
 
     # v_total = 0.1 = Mach (for c = 1)
-    v1 = 34.72206893029273
+    #v1 = 34.72206893029273
+    v1 = 0.1
     v2 = 0.0
     v3 = 0.0
 
-    p_freestream = 108075.40706099998
+    #p_freestream = 108075.40706099998
+    p_freestream = 1.0
 
     prim = SVector(rho_freestream, v1, v2, v3, p_freestream)
     return prim2cons(prim, equations)
@@ -43,19 +56,20 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 3 # 2, 3, 4
-surface_flux = flux_hll
+polydeg = 2 # 2, 3, 4
 
-#solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux)
+#surface_flux = flux_hll
+surface_flux = FluxLMARS(1.0)
 
 volume_flux = flux_kennedy_gruber
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
+#case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
 case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 
+#mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P1.inp" # Tried for drag coeff comparison
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
 # Boundary symbols follow from nodesets in the mesh file
@@ -67,6 +81,10 @@ boundary_conditions = Dict(:FrontSphere => boundary_condition_slip_wall,
                            :FarField => bc_farfield)
 
 #=
+boundary_conditions = Dict(:FrontSphere => bc_farfield,
+                           :BackSphere => bc_farfield,
+                           :FarField => bc_farfield)
+
 semi_hyp = SemidiscretizationHyperbolic(mesh, equations,
                                         initial_condition, solver;
                                         boundary_conditions = boundary_conditions)
@@ -90,25 +108,28 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 2) 50(0) to 150(100): Viscous, k = 2
 # 3) 150(100) to 175(125): Viscous, k = 3, p = 2
 # 4) 175(125) to 225(175): Viscous, k = 4, p = 3
-t_star_end = 175
+t_star_end = 50
 t_end = t_star_end * D()/U()
+
 
 tspan = (0.0, t_end)
 #ode = semidiscretize(semi_hyp, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false)
+
+ode = semidiscretize(semi, tspan; split_problem = false)
 
 
-restart_file = "restart_ts50_hyp.h5"
-restart_file = "restart_ts150_hyp_para.h5"
 
 #restart_path = "out/"
-restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2"
+restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+
+#=
+restart_file = "restart_000002000.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
-
+=#
 
 ###############################################################################
 
@@ -135,25 +156,28 @@ analysis_callback = AnalysisCallback(semi,
                                      analysis_errors = Symbol[], # Turn off error computation
                                      analysis_integrals = (drag_p_front,
                                                            #drag_p_back,
-                                                           drag_f_front))
+                                                           #drag_f_front
+                                                           ))
 
-#analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
+#analysis_callback = AnalysisCallback(semi_hyp, interval = analysis_interval)
 
 alive_callback = AliveCallback(alive_interval = 50)
 
-t_ramp_up() = 1e-2 # For dimensionalized units
+cfl_0() = 5.0 # k = 2
+
+t_ramp_up() = 5.0
 
 # Hyp
 #cfl_max() = 17.0
+
 # Hyp-Diff
-cfl_max() = 13.5 # k = 2; 14.0 stable for a long time
+cfl_max() = 13.5 # k = 2
+#cfl_max() = 9.0 # k = 3
+#cfl_max() = 6.0 # k = 4
 
-cfl_max() = 9.0 # k = 3
-#cfl_max() = 6.0 # k = 4, p3 (not sure if maxed out)
+cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
-#cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
-
-cfl = cfl_max()
+#cfl = cfl_max()
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -205,7 +229,7 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        #stepsize_callback,
+                        stepsize_callback,
                         #save_solution,
                         save_restart
                         )
@@ -214,6 +238,7 @@ callbacks = CallbackSet(summary_callback,
 
 ### p2 ###
 
+# Pointwise
 Stages = [14, 13, 12, 11, 10, 8, 7, 5, 4, 3, 2]
 
 dtRatios = reverse([0.07416057586669921875
@@ -255,11 +280,8 @@ path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coef
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 =#
 
-dt_k2p2 = 2.3e-5
-dt_k3p2 = 1.2e-5
-
 sol = Trixi.solve(ode, ode_alg,
-                  dt = dt_k3p2,
+                  dt = 1e-3,
                   save_everystep = false, callback = callbacks);
 
 ###############################################################################
