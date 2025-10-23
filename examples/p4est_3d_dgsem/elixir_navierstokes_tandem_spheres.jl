@@ -138,7 +138,6 @@ analysis_callback = AnalysisCallback(semi,
                                      analysis_errors = Symbol[], # Turn off error computation
                                      analysis_integrals = (drag_p_front,
                                                            #drag_p_back,
-                                                           #drag_f_front
                                                            ))
 
 #analysis_callback = AnalysisCallback(semi_hyp, interval = analysis_interval)
