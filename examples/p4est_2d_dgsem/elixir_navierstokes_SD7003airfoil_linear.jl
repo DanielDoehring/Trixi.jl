@@ -166,6 +166,13 @@ cfl = 7.6 # 7.6 # PERK2 unsplit/standard multi
 cfl = 8.7 # PERK2 split multi with same stages & distribution
 #cfl = 7.9 # PERK2 split multi with different stages (14, 10) & distribution
 
+cfl = 7.7 # PERK3 S = 14 unsplit/standard multi
+cfl = 6.4 # PERK3 S = 11 unsplit/standard multi
+
+cfl = 6.6 # PERK3 S = 11 split multi with different E & distribution
+
+#cfl = 7.0 # PERK3 split multi with different stages (14, 11) & distribution
+
 #cfl = 6.2 # PERK 4 Multi E = 5, ..., 14
 #cfl = 5.6 # PERK 4 Multi Split E = 5, ..., 10
 #cfl = 6.1 # PERK 4 Multi Split (14, 10)
@@ -353,6 +360,54 @@ ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages,
 =#
 # Version with DIFFERENT number of stages for hyperbolic and parabolic part
 ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages, Stages_para,
+                                            path_coeffs, path_coeffs_para,
+                                            dtRatios, dtRatios_para)
+
+# p = 3
+
+Stages = [14, 12, 10, 9, 8, 6, 5, 4, 3]
+dtRatios = reverse([0.000120724458014592531464
+0.00022078421326354146521
+0.000356726163243874915506
+0.00049591444368474186554
+0.000669575841305777445039
+0.000789872415727004425815
+0.000921498959874734302254
+0.00114614301623776557516
+0.00135157296740449967876] ./ 0.00135157296740449967876)
+
+path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
+
+Stages = [11, 9, 8, 7, 6, 5, 4, 3]
+dtRatios = reverse([
+0.0263493899255990982056
+0.0435247420100495219231
+0.065533457673154771328
+0.0874434555880725383759
+0.101405674999114125967
+0.125155970221385359764
+0.148401642218232154846
+0.180304279143456369638] ./ 0.180304279143456369638)
+
+path_coeffs = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p3/full_rhs/"
+
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
+
+Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
+
+dtRatios_para = reverse([
+24.0577830892107158434
+57.7068278563046987983
+100.871206187048301217
+153.64991724289893682
+216.032961715648070822
+288.013926266510225105
+461.074489651061867335
+611.284322126177812606] ./ 611.284322126177812606)
+
+path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p3/para_rhs/"
+
+ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
                                             path_coeffs, path_coeffs_para,
                                             dtRatios, dtRatios_para)
 

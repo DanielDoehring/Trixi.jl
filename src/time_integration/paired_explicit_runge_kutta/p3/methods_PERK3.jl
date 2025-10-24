@@ -317,5 +317,6 @@ include("methods_PERRK3.jl")
 include("methods_PERRK3_multi.jl")
 
 # Split methods targeting hyperbolic-parabolic problems
-include("methods_PERKS3.jl")
+include("methods_PERK3S.jl")
+include("methods_PERK3S_multi.jl")
 end # @muladd

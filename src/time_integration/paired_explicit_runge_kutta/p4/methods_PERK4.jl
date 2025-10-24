@@ -374,8 +374,8 @@ include("methods_PERRK4.jl")
 include("methods_PERRK4_multi.jl")
 
 # Split Explicit Runge-Kutta (PERRKS) methods targeting hyperbolic-parabolic problems
-include("methods_PERKS4.jl")
-include("methods_PERKS4_multi.jl")
+include("methods_PERK4S.jl")
+include("methods_PERK4S_multi.jl")
 
 # Split Explicit Relaxation Runge-Kutta (PERRKS) methods
 include("methods_PERRKS4_multi.jl")

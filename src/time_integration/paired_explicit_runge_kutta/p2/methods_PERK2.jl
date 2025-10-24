@@ -300,8 +300,8 @@ include("methods_PERRK2.jl")
 include("methods_PERRK2_multi.jl")
 
 # Split methods targeting hyperbolic-parabolic problems
-include("methods_PERKS2.jl")
-include("methods_PERKS2_multi.jl")
+include("methods_PERK2S.jl")
+include("methods_PERK2S_multi.jl")
 
 include("methods_PERKC2.jl")
 include("methods_PERKC2_multi.jl")

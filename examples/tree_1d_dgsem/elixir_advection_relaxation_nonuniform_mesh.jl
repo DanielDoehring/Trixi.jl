@@ -36,7 +36,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_gauss,
 # ODE solvers, callbacks etc.
 
 t_end = 1.0
-t_end = 1 * length + 1
+t_end = 1 * length + 1 # = 9
 ode = semidiscretize(semi, (0.0, t_end))
 
 summary_callback = SummaryCallback()
@@ -54,7 +54,7 @@ cfl = 3.5 # [16, 8]
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback
+                        analysis_callback
                         #stepsize_callback
                         )
 
@@ -82,6 +82,10 @@ dt = 0.373
 sol = Trixi.solve(ode, ode_alg,
                   dt = dt,
                   save_everystep = false, callback = callbacks);
+
+using Plots
+
+plot(sol)
 
 ###############################################################################
 
@@ -226,7 +230,7 @@ NumStagesMax = 16
 b1 = 0
 bS = 1
 cS = 0.5
-AMatrices, c, ActiveLevels, _, _ = Trixi.compute_PairedExplicitRK2Multi_butcher_tableau(Stages,
+AMatrices, c, ActiveLevels, max_add_levels = Trixi.compute_PairedExplicitRK2Multi_butcher_tableau(Stages,
                                                                                         NumStagesMax,
                                                                                         path,
                                                                                         bS,
@@ -281,14 +285,14 @@ row_sums = sum(K_Perk, dims = 2) # sanity check, should all be 1
 K_PERK_EigVals = eigvals(K_Perk)
 # Complex conjugate eigenvalues have same modulus
 K_PERK_EigVals = K_PERK_EigVals[imag(K_PERK_EigVals) .>= 0]
-writedlm("K_PERK_EigVals.txt", K_PERK_EigVals)
+#writedlm("K_PERK_EigVals.txt", K_PERK_EigVals)
 spectral_radius = maximum(abs.(K_PERK_EigVals))
 
 minimum(K_Perk)
 maximum(K_Perk)
 
 # First steps' relaxation parameter gamma
-gamma = 0.7721910021820937
+gamma = 0.8874006066856927
 K_Perk_Relaxation = I + gamma * (b1 * K1 + bS * K_higher)
 
 row_sums = sum(K_Perk_Relaxation, dims = 2) # sanity check, should all be 1
@@ -297,7 +301,7 @@ row_sums = sum(K_Perk_Relaxation, dims = 2) # sanity check, should all be 1
 K_PERK_EigVals = eigvals(K_Perk_Relaxation)
 # Complex conjugate eigenvalues have same modulus
 K_PERK_EigVals = K_PERK_EigVals[imag(K_PERK_EigVals) .>= 0]
-writedlm("K_PERK_Relaxation_1_EigVals.txt", K_PERK_EigVals)
+#writedlm("K_PERK_Relaxation_1_EigVals.txt", K_PERK_EigVals)
 spectral_radius = maximum(abs.(K_PERK_EigVals))
 
 minimum(K_Perk_Relaxation)
