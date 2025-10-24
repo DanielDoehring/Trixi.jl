@@ -322,7 +322,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
 
     ### Set datastructures for handling of level-dependent integration ###
     semi = ode.p
-    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
+    mesh, _, _, _ = mesh_equations_solver_cache(semi)
 
     n_levels, n_levels_para = get_n_levels(mesh, alg)
 
@@ -382,7 +382,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4SplitMulti;
                  n_levels_para, u0, semi)
 
     ### Done with setting up for handling of level-dependent integration ###
-    du_para = zero(u0)
     integrator = PairedExplicitRK4SplitMultiIntegrator(u0, du, u_tmp,
                                                        t0, tdir,
                                                        dt, zero(dt),
