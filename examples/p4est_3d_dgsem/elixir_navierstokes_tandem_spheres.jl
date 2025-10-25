@@ -104,11 +104,14 @@ ode = semidiscretize(semi, tspan; split_problem = false)
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
 restart_file = "restart_ts100_hp.h5"
+restart_file = "restart_000002000.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+
+ode = semidiscretize(semi, tspan, restart_filename) # Split method
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 
 ###############################################################################
@@ -146,7 +149,9 @@ t_ramp_up() = 5.0
 # Hyp-Diff
 cfl_max() = 13.5 # k = 2 p2
 cfl_max() = 9.0 # k = 3, p2
+
 cfl_max() = 6.0 # k = 4, p3
+cfl_max() = 6.7 # k = 4, p3 14-11 Split
 
 #cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -252,10 +257,27 @@ dtRatios = reverse([0.000120724458014592531464
 path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 
+Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
+dtRatios_para = reverse([
+24.0577830892107158434
+57.7068278563046987983
+100.871206187048301217
+153.64991724289893682
+216.032961715648070822
+288.013926266510225105
+461.074489651061867335
+611.284322126177812606] ./ 611.284322126177812606)
+
+path_coeffs_para = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/para/"
+
+ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
+                                            path_coeffs, path_coeffs_para,
+                                            dtRatios, dtRatios_para)
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 1e-3,
-                  save_everystep = false, callback = callbacks);
+                  save_everystep = false, save_start = false,
+                  callback = callbacks);
 
 ###############################################################################
 

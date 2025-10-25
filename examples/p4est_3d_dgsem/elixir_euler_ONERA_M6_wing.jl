@@ -167,5 +167,5 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 
 sol = solve(ode, SSPRK43(); abstol = 1.0e-6, reltol = 1.0e-6,
-            dt = 1e-8,
+            dt = 1e-8, save_start = false,
             ode_default_options()..., callback = callbacks);

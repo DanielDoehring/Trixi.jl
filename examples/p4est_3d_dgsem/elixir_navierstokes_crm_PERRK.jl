@@ -262,4 +262,5 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 
 sol = Trixi.solve(ode, ode_alg, dt = 42.0,
-                  save_everystep = false, callback = callbacks);
+                  save_everystep = false, save_start = false,
+                  callback = callbacks);
