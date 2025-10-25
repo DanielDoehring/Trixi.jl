@@ -52,6 +52,7 @@ function calc_interface_flux!(cache, u, mesh::StructuredMesh{1},
 
     @threaded for element in element_indices
         left_element = cache.elements.left_neighbors[1, element]
+        # => `element` is the right element of the interface
 
         if left_element > 0 # left_element = 0 at boundaries
             u_ll = get_node_vars(u, equations, dg, nnodes(dg), left_element)
@@ -103,6 +104,24 @@ function calc_boundary_flux!(cache, u, t, boundary_conditions::NamedTuple,
     # Copy flux to left and right element storage
     for v in eachvariable(equations)
         surface_flux_values[v, direction, nelements(dg, cache)] = flux[v]
+    end
+
+    return nothing
+end
+
+function apply_jacobian!(du, mesh::StructuredMesh{1},
+                         equations, dg::DG, cache,
+                         element_indices = eachelement(dg, cache))
+    @unpack inverse_jacobian = cache.elements
+
+    @threaded for element in element_indices
+        for i in eachnode(dg)
+            factor = -inverse_jacobian[i, element]
+
+            for v in eachvariable(equations)
+                du[v, i, element] *= factor
+            end
+        end
     end
 
     return nothing
