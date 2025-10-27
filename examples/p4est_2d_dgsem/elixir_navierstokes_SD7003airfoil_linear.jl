@@ -65,7 +65,7 @@ mesh_file = path * "sd7003_laminar_straight_sided_Trixi.inp"
 
 boundary_symbols = [:Airfoil, :FarField]
 
-mesh = P4estMesh{2}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
+mesh = P4estMesh{2}(mesh_file, boundary_symbols = boundary_symbols)
 
 boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
                            :Airfoil => boundary_condition_slip_wall)
