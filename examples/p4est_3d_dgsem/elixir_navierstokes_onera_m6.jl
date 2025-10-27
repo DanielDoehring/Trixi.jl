@@ -388,6 +388,6 @@ ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages_14_max, Stages_para,
 
 dt = 9.5e-8 # Hyp-Para without stepsize control; unsplit
 dt = 9e-8 # Hyp-Para without stepsize control; split
-sol = Trixi.solve(ode, ode_alg, dt = dt,
+sol = Trixi.solve(ode, ode_alg, dt = dt, save_start = false,
                   save_everystep = false, callback = callbacks);
 
