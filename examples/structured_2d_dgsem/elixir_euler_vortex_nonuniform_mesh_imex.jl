@@ -2,12 +2,20 @@ using Trixi
 
 using NonlinearSolve, LinearSolve, ADTypes
 
+using SparseConnectivityTracer # For obtaining the Jacobian sparsity pattern
+using SparseMatrixColorings # For obtaining the coloring vector
+using JLD2 # For loading/storing sparsity info
+
 # Ratio of specific heats
 gamma = 1.4
 equations = CompressibleEulerEquations2D(gamma)
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_hll,
                volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+
+# For SD: a flux without if-clauses
+solver_SD = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs,
+                  volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
 
 EdgeLength() = 20.0
 """
@@ -81,55 +89,50 @@ mesh = StructuredMesh(cells_per_dimension, mapping)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
+jac_detector = TracerSparsityDetector()
+# We need to construct the semidiscretization with the correct
+# sparsity-detection ready datatype, which is retrieved here
+jac_eltype = jacobian_eltype(real(solver), jac_detector)
+
+
+@inline function Trixi.ln_mean(x::SparseConnectivityTracer.AbstractTracer, y::SparseConnectivityTracer.AbstractTracer)
+    return (y - x) / log(y / x)
+end
+
+@inline function Trixi.inv_ln_mean(x::SparseConnectivityTracer.AbstractTracer, y::SparseConnectivityTracer.AbstractTracer)
+    return log(y / x) / (y - x)
+end
+
+
+# For sparsity detection
+semi_SD = SemidiscretizationHyperbolic(mesh, equations,
+                                       initial_condition, solver_SD;
+                                       uEltype = jac_eltype)
+
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 ode = semidiscretize(semi, t_span)
 
-summary_callback = SummaryCallback()
+#=
+ode_SD = semidiscretize(semi_SD, t_span)
 
-# NOTE: Not really well-suited for convergence test
-analysis_callback = AnalysisCallback(semi, interval = 1000,
-                                     extra_analysis_errors = (:conservation_error,),
-                                     analysis_integrals = (;))
+u = copy(ode_SD.u0)
+du = zero(u)
+u_tmp = zero(u)
 
-alive_callback = AliveCallback(alive_interval = 100)
+k1 = zero(u) # Additional PERK register
 
-callbacks = CallbackSet(summary_callback,
-                        analysis_callback,
-                        alive_callback)
+semi = ode_SD.p
+cache = semi_SD.cache
+=#
 
-###############################################################################
-# run the simulation
+Stages = [16, 12, 10, 8, 6, 4]
 
 basepath = "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/"
 
 # p = 2
 path = basepath * "p2/"
-
-Stages = [16, 12, 10, 8, 6, 4]
-
-timestep_explicit = 0.631627607345581
-
-dtRatios = [
-    0.631627607345581,
-    0.485828685760498,
-    0.366690540313721,
-    0.282330989837646,
-    0.197234153747559,
-    0.124999046325684
-] ./ 0.631627607345581
-
-dt_explicit = 5e-3
-
-#=
-ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
-
-sol = Trixi.solve(ode, ode_algorithm,
-                  dt = dt_explicit,
-                  save_everystep = false, callback = callbacks);
-=#
-###############################################################################
 
 timestep_implicit = 0.8
 
@@ -144,6 +147,133 @@ dtRatios = [
 ] ./ timestep_implicit
 
 ode_alg = Trixi.PairedExplicitRK2IMEXMulti(Stages, path, dtRatios)
+
+#=
+n_levels = Trixi.get_n_levels(mesh, ode_alg)
+
+level_info_elements = [Vector{Int64}() for _ in 1:n_levels]
+level_info_elements_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_interfaces_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_boundaries_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_mortars_acc = [Vector{Int64}() for _ in 1:n_levels]
+
+Trixi.partition_variables!(level_info_elements,
+                           level_info_elements_acc,
+                           level_info_interfaces_acc,
+                           level_info_boundaries_acc,
+                           level_info_mortars_acc,
+                           n_levels, mesh, solver, cache, ode_alg)
+
+level_info_u = [Vector{Int64}() for _ in 1:n_levels]
+
+level_info_u_acc = [Vector{Int64}() for _ in 1:n_levels]
+Trixi.partition_u!(level_info_u, level_info_u_acc,
+                   level_info_elements, n_levels,
+                   u, mesh, equations, solver, cache)
+
+# For fixed meshes/no re-partitioning: Allocate only required storage
+R = ode_alg.num_methods
+u_implicit = level_info_u[R]
+N_nonlin = length(u_implicit)
+k_nonlin = zeros(eltype(u), N_nonlin)
+residual = copy(k_nonlin)
+
+dt = 8e-3
+t0 = t_span[1]
+
+p = Trixi.NonlinParams{typeof(t0), typeof(u),
+                    typeof(semi), typeof(ode.f)}(t0, dt,
+                                                u, du, u_tmp,
+                                                semi, ode.f,
+                                                level_info_elements_acc[R],
+                                                level_info_interfaces_acc[R],
+                                                level_info_boundaries_acc[R],
+                                                level_info_mortars_acc[R],
+                                                level_info_u[R])
+
+res_wrapped! = (residual, k_nonlin) -> Trixi.residual_S_PERK2IMEXMulti!(residual, k_nonlin, p)
+
+ode_SD.f(du, u, semi_SD, t0) # Do one step to prevent e.g. undefined BCs
+jac_prototype = jacobian_sparsity(res_wrapped!, residual, k_nonlin, jac_detector)
+
+coloring_prob = ColoringProblem(; structure = :nonsymmetric, partition = :column)
+coloring_alg = GreedyColoringAlgorithm(; decompression = :direct)
+coloring_result = coloring(jac_prototype, coloring_prob, coloring_alg)
+colorvec = column_colors(coloring_result)
+
+maximum(colorvec) + 1 # Number RHS evaluations to get full Jacobian
+
+# Store the sparsity information
+jldopen("/home/daniel/git/DissDoc/Data/IMEX_Sparse_Frozen_Jacobian/sparsity_info.jld2", "w") do file
+    file["jac_prototype"] = jac_prototype
+    file["colorvec"] = colorvec  # Also store the coloring vector
+end
+=#
+
+# Load the sparsity information
+jac_prototype, colorvec = jldopen("/home/daniel/git/DissDoc/Data/IMEX_Sparse_Frozen_Jacobian/sparsity_info.jld2", "r") do file
+    return file["jac_prototype"], file["colorvec"]
+end
+
+summary_callback = SummaryCallback()
+
+# NOTE: Not really well-suited for convergence test
+analysis_callback = AnalysisCallback(semi, interval = 10_000,
+                                     extra_analysis_errors = (:conservation_error,),
+                                     analysis_integrals = (;))
+
+alive_callback = AliveCallback(alive_interval = 100)
+
+callbacks = CallbackSet(summary_callback,
+                        analysis_callback,
+                        alive_callback)
+
+###############################################################################
+# run the simulation
+
+#=
+timestep_explicit = 0.631627607345581
+
+dtRatios = [
+    0.631627607345581,
+    0.485828685760498,
+    0.366690540313721,
+    0.282330989837646,
+    0.197234153747559,
+    0.124999046325684
+] ./ 0.631627607345581
+
+dt_explicit = 5e-3 # very close to max dt for HLL
+
+
+ode_algorithm = Trixi.PairedExplicitRK2Multi(Stages, path, dtRatios)
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = dt_explicit,
+                  save_everystep = false, callback = callbacks);
+=#
+
+###############################################################################
+
+### Frozen Sparse Jacobian setup ###
+maxiters_nonlin = 5
+abstol = 1e-3
+
+dt_implicit = 8e-3
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt_implicit, callback = callbacks,
+                        # IMEX-specific kwargs
+                        jac_prototype = jac_prototype,
+                        colorvec = colorvec,
+                        maxiters_nonlin = maxiters_nonlin,
+                        abstol = abstol);
+
+sol = Trixi.solve!(integrator);
+
+### Jacobian-Free Newton-Krylov solver setup ###
 
 atol_lin = 1e-5
 rtol_lin = 1e-3
