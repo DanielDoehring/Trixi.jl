@@ -9,7 +9,7 @@ c_inf = 1.0
 
 rho_inf = 1.4 # with gamma = 1.4 => p_inf = 1.0
 
-Re = 10^4 # 10^3 for diff-som figure
+Re = 10^4 # 500 for diff-dom figure
 airfoil_cord_length = 1.0
 
 t_c = airfoil_cord_length / U_inf
@@ -106,7 +106,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 tspan = (0.0, 30 * t_c) # Try to get into a state where initial pressure wave is gone
 
 #ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
+ode = semidiscretize(semi, tspan; split_problem = false) # for multirate PERK
 
 # For PERK Multi coefficient measurements
 restart_file = "restart_000126951.h5"
