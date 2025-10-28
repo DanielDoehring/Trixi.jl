@@ -2,9 +2,11 @@ using Trixi
 
 using NonlinearSolve, LinearSolve, ADTypes
 
+#=
 using SparseConnectivityTracer # For obtaining the Jacobian sparsity pattern
 using SparseMatrixColorings # For obtaining the coloring vector
 using JLD2 # For loading/storing sparsity info
+=#
 
 # Ratio of specific heats
 gamma = 1.4
@@ -12,10 +14,6 @@ equations = CompressibleEulerEquations2D(gamma)
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_hll,
                volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
-
-# For SD: a flux without if-clauses
-solver_SD = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs,
-                  volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
 
 EdgeLength() = 20.0
 """
@@ -89,6 +87,11 @@ mesh = StructuredMesh(cells_per_dimension, mapping)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
+#=
+# For SD: a flux without if-clauses
+solver_SD = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs,
+                  volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+
 jac_detector = TracerSparsityDetector()
 # We need to construct the semidiscretization with the correct
 # sparsity-detection ready datatype, which is retrieved here
@@ -103,11 +106,10 @@ end
     return log(y / x) / (y - x)
 end
 
-
-# For sparsity detection
 semi_SD = SemidiscretizationHyperbolic(mesh, equations,
                                        initial_condition, solver_SD;
                                        uEltype = jac_eltype)
+=#
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -213,11 +215,6 @@ jldopen("/home/daniel/git/DissDoc/Data/IMEX_Sparse_Frozen_Jacobian/sparsity_info
 end
 =#
 
-# Load the sparsity information
-jac_prototype, colorvec = jldopen("/home/daniel/git/DissDoc/Data/IMEX_Sparse_Frozen_Jacobian/sparsity_info.jld2", "r") do file
-    return file["jac_prototype"], file["colorvec"]
-end
-
 summary_callback = SummaryCallback()
 
 # NOTE: Not really well-suited for convergence test
@@ -259,10 +256,19 @@ sol = Trixi.solve(ode, ode_algorithm,
 ###############################################################################
 
 ### Frozen Sparse Jacobian setup ###
+
+#=
 maxiters_nonlin = 20
 abstol = 1e-5 # Should suffice (compare initial errors). 1e-4 gives same behaviour
 
 dt_implicit = 8e-3 # 5e-3 yields identical errors to explicit solve
+
+# Load the sparsity information
+jac_prototype, colorvec = jldopen("/home/daniel/git/DissDoc/Data/IMEX_Sparse_Frozen_Jacobian/sparsity_info.jld2", "r") do file
+    return file["jac_prototype"], file["colorvec"]
+end
+
+
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt_implicit, callback = callbacks,
                         # IMEX-specific kwargs
@@ -272,12 +278,13 @@ integrator = Trixi.init(ode, ode_alg;
                         abstol = abstol);
 
 sol = Trixi.solve!(integrator);
+=#
 
 ### Jacobian-Free Newton-Krylov solver setup ###
 
-#=
-atol_lin = 1e-5
-rtol_lin = 1e-3
+
+atol_lin = 1e-6
+rtol_lin = 1e-4
 #maxiters_lin = 50
 
 linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
@@ -286,11 +293,10 @@ linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
 nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
                               linsolve = linsolve)
 
-atol_nonlin = atol_lin
-rtol_nonlin = rtol_lin
+atol_nonlin = atol_lin * 10
+rtol_nonlin = rtol_lin * 10
 maxiters_nonlin = 20
 
-dt_implicit = dt_explicit * timestep_implicit / timestep_explicit
 dt_implicit = 8e-3
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt_implicit, callback = callbacks,
@@ -300,4 +306,3 @@ integrator = Trixi.init(ode, ode_alg;
                         maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);
-=#

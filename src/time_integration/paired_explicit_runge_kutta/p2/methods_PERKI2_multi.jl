@@ -131,7 +131,7 @@ end
 # This implements the interface components described at
 # https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
 # which are used in Trixi.
-
+#=
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType <: AbstractVector,
                                                     Params, Sol, F,
                                                     PairedExplicitRKOptions,
@@ -184,8 +184,8 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real, uType <: Abst
 
     linear_cache::LinCache # using `LinearCache` leads to many more allocations
 end
+=#
 
-#=
 mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real,
                                                     uType <: AbstractVector,
                                                     Params, Sol, F,
@@ -233,7 +233,7 @@ mutable struct PairedExplicitRK2IMEXMultiIntegrator{RealT <: Real,
 
     nonlin_cache::NonlinCache
 end
-=#
+
 
 mutable struct NonlinParams{RealT <: Real, uType <: AbstractVector,
                             Semi, F}
@@ -517,7 +517,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     maxiters_nonlin = get(kwargs, :maxiters_nonlin, typemax(Int64))
     abstol = get(kwargs, :abstol, nothing)
 
-    #=
     nonlin_func = NonlinearFunction{true, SciMLBase.FullSpecialize}(residual_S_PERK2IMEXMulti!;
                                                                     jac_prototype = jac_prototype,
                                                                     colorvec = colorvec)
@@ -535,8 +534,8 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                   alias = SciMLBase.NonlinearAliasSpecifier(alias_u0 = true),
                                   abstol = abstol, reltol = reltol,
                                   maxiters = maxiters_nonlin)
-    =#
     
+    #=
     jac_sparse_cache = JacobianCache(k_nonlin, colorvec = colorvec,
                                      sparsity = jac_prototype)
     jac_sparse = SparseMatrixCSC{eltype(u), Int}(jac_prototype) # Set up memory for sparse Jacobian
@@ -544,7 +543,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
     linear_prob = LinearSolve.LinearProblem(jac_sparse, k_nonlin)
     linear_solver = get(kwargs, :linear_solver, KLUFactorization())
     linear_cache = init(linear_prob, linear_solver)
-    
+    =#
 
     ### Done with setting up for handling of level-dependent integration ###
     if isa(semi, SemidiscretizationHyperbolicParabolic)
@@ -593,10 +592,12 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                                                           level_info_u,
                                                           -1, n_levels,
                                                           k_nonlin, residual,
+                                                          #=
                                                           jac_sparse, jac_sparse_cache,
                                                           abstol, maxiters_nonlin,
                                                           linear_cache
-                                                          #nonlin_cache
+                                                          =#
+                                                          nonlin_cache
                                                           )
     end
 
@@ -781,7 +782,7 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
             end
         end
 
-        
+        #=
         res_S_PERK2IMEXMulti!(residual, k_nonlin) = residual_S_PERK2IMEXMulti!(residual,
                                                                                k_nonlin,
                                                                                integrator)
@@ -793,9 +794,9 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
         integrator.linear_cache.A = integrator.jac_sparse # Update system matrix
 
         @trixi_timeit timer() "Frozen Newton-Raphson" newton_frozen_jac!(integrator)
-        
+        =#
 
-        #=
+        
         @trixi_timeit timer() "nonlinear solve" begin
             SciMLBase.reinit!(integrator.nonlin_cache, integrator.k_nonlin;
                               # Does not seem to have an effect, need to re-copy data
@@ -817,7 +818,7 @@ function step!(integrator::AbstractPairedExplicitRKIMEXMultiIntegrator)
                     NonlinearSolveBase.get_u(integrator.nonlin_cache))
             =#
         end
-        =#
+        
 
         ### Final update ###
         # Joint (with explicit part) re-evaluation of implicit stage
