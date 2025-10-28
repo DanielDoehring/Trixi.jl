@@ -259,10 +259,10 @@ sol = Trixi.solve(ode, ode_algorithm,
 ###############################################################################
 
 ### Frozen Sparse Jacobian setup ###
-maxiters_nonlin = 5
-abstol = 1e-3
+maxiters_nonlin = 20
+abstol = 1e-5 # Should suffice (compare initial errors). 1e-4 gives same behaviour
 
-dt_implicit = 8e-3
+dt_implicit = 8e-3 # 5e-3 yields identical errors to explicit solve
 integrator = Trixi.init(ode, ode_alg;
                         dt = dt_implicit, callback = callbacks,
                         # IMEX-specific kwargs
@@ -275,6 +275,7 @@ sol = Trixi.solve!(integrator);
 
 ### Jacobian-Free Newton-Krylov solver setup ###
 
+#=
 atol_lin = 1e-5
 rtol_lin = 1e-3
 #maxiters_lin = 50
@@ -299,3 +300,4 @@ integrator = Trixi.init(ode, ode_alg;
                         maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);
+=#
