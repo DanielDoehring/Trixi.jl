@@ -209,7 +209,7 @@ colorvec = column_colors(coloring_result)
 maximum(colorvec) + 1 # Number RHS evaluations to get full Jacobian
 
 # Store the sparsity information
-jldopen("/home/daniel/git/DissDoc/Data/IMEX_Sparse_Frozen_Jacobian/sparsity_info.jld2", "w") do file
+jldopen("/home/daniel/git/DissDoc/Data/IMEX/IsentropicVortexAdvection/sparsity_info.jld2", "w") do file
     file["jac_prototype"] = jac_prototype
     file["colorvec"] = colorvec  # Also store the coloring vector
 end
@@ -264,7 +264,7 @@ abstol = 1e-5 # Should suffice (compare initial errors). 1e-4 gives same behavio
 dt_implicit = 8e-3 # 5e-3 yields identical errors to explicit solve
 
 # Load the sparsity information
-jac_prototype, colorvec = jldopen("/home/daniel/git/DissDoc/Data/IMEX_Sparse_Frozen_Jacobian/sparsity_info.jld2", "r") do file
+jac_prototype, colorvec = jldopen("/home/daniel/git/DissDoc/Data/IMEX/IsentropicVortexAdvection/sparsity_info.jld2", "r") do file
     return file["jac_prototype"], file["colorvec"]
 end
 
