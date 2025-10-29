@@ -136,15 +136,14 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # Set up integrator
 
-n_conv = 4
+n_conv = 0
 
 atol_nonlin = 1e-7
 maxiters_nonlin = 20
 
 dt = (2e-3)/2^n_conv
 
-ode = semidiscretize(semi, t_span)
-
+#=
 # Load the sparsity information
 jac_prototype, colorvec = jldopen("/home/daniel/git/DissDoc/Data/IMEX/Burgers/sparsity_info.jld2", "r") do file
     return file["jac_prototype"], file["colorvec"]
@@ -157,5 +156,25 @@ integrator = Trixi.init(ode, ode_alg;
                         colorvec = colorvec,
                         maxiters_nonlin = maxiters_nonlin,
                         abstol = atol_nonlin);
+=#
+
+atol_lin = 1e-8
+rtol_lin = 1e-6
+#maxiters_lin = 50
+
+linsolve = KrylovJL_GMRES(atol = atol_lin, rtol = rtol_lin)
+
+# For Krylov.jl kwargs see https://jso.dev/Krylov.jl/stable/solvers/unsymmetric/#Krylov.gmres
+nonlin_solver = NewtonRaphson(autodiff = AutoFiniteDiff(),
+                              linsolve = linsolve)
+
+rtol_nonlin = 1e-4
+
+integrator = Trixi.init(ode, ode_alg;
+                        dt = dt, callback = callbacks,
+                        # IMEX-specific kwargs
+                        nonlin_solver = nonlin_solver,
+                        abstol = atol_nonlin, reltol = rtol_nonlin,
+                        maxiters_nonlin = maxiters_nonlin);
 
 sol = Trixi.solve!(integrator);
