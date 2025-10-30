@@ -94,7 +94,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 1) 0 to 75: k2, p2
 # 2) 75 to 100: k3, p2
 # 3) 100 to 150: k4, p3
-t_star_end = 150
+t_star_end = 200
 t_end = t_star_end * D()/U()
 
 tspan = (0.0, t_end)
@@ -125,8 +125,16 @@ drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
                                         DragCoefficientPressure3D(0.0, rho_ref(),
                                                                   U(), A_sphere()))
 
+drag_shear_front = AnalysisSurfaceIntegral((:FrontSphere,),
+                                        DragCoefficientShearStress3D(0.0, rho_ref(),
+                                                                  U(), A_sphere()))
+
 drag_p_back = AnalysisSurfaceIntegral((:BackSphere,),
                                       DragCoefficientPressure3D(0.0, rho_ref(),
+                                                                U(), A_sphere()))
+
+drag_shear_back = AnalysisSurfaceIntegral((:BackSphere,),
+                                      DragCoefficientShearStress3D(0.0, rho_ref(),
                                                                 U(), A_sphere()))
 
 analysis_callback = AnalysisCallback(semi,
@@ -135,7 +143,9 @@ analysis_callback = AnalysisCallback(semi,
                                      output_directory = restart_path,
                                      analysis_errors = Symbol[], # Turn off error computation
                                      analysis_integrals = (drag_p_front,
+                                                           drag_shear_front,
                                                            drag_p_back,
+                                                           drag_shear_back
                                                            ))
 
 #analysis_callback = AnalysisCallback(semi_hyp, interval = analysis_interval)
@@ -207,9 +217,9 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 callbacks = CallbackSet(summary_callback,
                         #alive_callback,
                         analysis_callback,
-                        stepsize_callback,
+                        #stepsize_callback,
                         #save_solution,
-                        #save_restart
+                        save_restart
                         )
 
 ###############################################################################
@@ -275,7 +285,7 @@ ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
                                             dtRatios, dtRatios_para)
 
 sol = Trixi.solve(ode, ode_alg,
-                  dt = 1e-3,
+                  dt = 2.37e-3,
                   save_everystep = false, save_start = false,
                   callback = callbacks);
 
