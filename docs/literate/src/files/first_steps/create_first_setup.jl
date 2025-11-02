@@ -25,7 +25,7 @@
 # command and improve your comprehension of the process.
 
 # To be able to use functionalities of Trixi.jl, you always need to load Trixi.jl itself
-# and the [OrdinaryDiffEqSSPRK.jl](https://github.com/SciML/OrdinaryDiffEq.jl) package.
+# and the [OrdinaryDiffEqSSPRK.jl](https://github.com/SciML/OrdinaryDiffEq.jl) sub-package.
 
 using Trixi
 using OrdinaryDiffEqSSPRK
@@ -92,7 +92,7 @@ solver = DGSEM(polydeg = 3)
 # condition, but might also be used to describe an analytical solution if known. If you use the
 # initial condition as analytical solution, you can analyze your numerical solution by computing
 # the error, see also the
-# [section about analyzing the solution](https://trixi-framework.github.io/Trixi.jl/stable/callbacks/#Analyzing-the-numerical-solution).
+# [section about analyzing the solution](https://trixi-framework.github.io/TrixiDocumentation/stable/callbacks/#Analyzing-the-numerical-solution).
 
 function initial_condition_sinpi(x, t, equations::LinearScalarAdvectionEquation2D)
     u = sinpi(x[1]) * sinpi(x[2])
