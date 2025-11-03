@@ -336,7 +336,8 @@ end
                    restart_file::AbstractString;
                    jac_prototype_parabolic::Union{AbstractMatrix, Nothing} = nothing,
                    colorvec_parabolic::Union{AbstractVector, Nothing} = nothing,
-                   split_problem = true)
+                   split_problem = true,
+                   interpolate_high2low = true)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
 that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
@@ -360,6 +361,7 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
                         jac_prototype_parabolic::Union{AbstractMatrix, Nothing} = nothing,
                         colorvec_parabolic::Union{AbstractVector, Nothing} = nothing,
                         split_problem = true,
+                        interpolate_high2low = true,
                         reset_threads = true)
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
