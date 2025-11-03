@@ -30,7 +30,7 @@ U() = Ma_ref() * c_ref()
 
 D() = 1 # Follows from mesh
 Re_D() = 3900
-mu_ref() = rho_ref() * U() * D()/Re_D() # TODO: Sutherlands law
+mu_ref() = rho_ref() * U() * D()/Re_D()
 
 prandtl_number = 0.72
 equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu_ref(),
@@ -64,8 +64,8 @@ volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-#case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
-case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
+case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
+#case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
@@ -104,15 +104,16 @@ tspan = (0.0, t_end)
 
 #restart_path = "out/"
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
-restart_file = "restart_ts150_hp.h5"
+restart_file = "restart_ts200_hp.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 
-ode = semidiscretize(semi, tspan, restart_filename) # Split method
-#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+#ode = semidiscretize(semi, tspan, restart_filename) # Split method
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 ###############################################################################
 
@@ -218,8 +219,8 @@ callbacks = CallbackSet(summary_callback,
                         #alive_callback,
                         analysis_callback,
                         #stepsize_callback,
-                        #save_solution,
-                        save_restart
+                        save_solution,
+                        #save_restart
                         )
 
 ###############################################################################
@@ -265,6 +266,8 @@ dtRatios = reverse([0.000120724458014592531464
 0.00135157296740449967876] ./ 0.00135157296740449967876)
 
 path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
+path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
+
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 
 Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
