@@ -356,13 +356,15 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred Trixi.entropy_thermodynamic(cons, equations)) == RealT
             @test typeof(@inferred energy_internal(cons, equations)) == RealT
 
-            @test eltype(@inferred Trixi.gradient_conservative(pressure, u, equations)) ==
+            @test eltype(@inferred Trixi.pressure_gradient_conservative(u,
+                                                                        equations)) ==
                   RealT
-            @test eltype(@inferred Trixi.gradient_conservative(Trixi.entropy_math, u,
-                                                               equations)) == RealT
-            @test eltype(@inferred Trixi.gradient_conservative(Trixi.entropy_guermond_etal,
-                                                               u,
-                                                               equations)) == RealT
+            @test eltype(@inferred Trixi.entropy_math_gradient_conservative(u,
+                                                                            equations)) ==
+                  RealT
+            @test eltype(@inferred Trixi.entropy_guermond_etal_gradient_conservative(u,
+                                                                                     equations)) ==
+                  RealT
         end
     end
 
