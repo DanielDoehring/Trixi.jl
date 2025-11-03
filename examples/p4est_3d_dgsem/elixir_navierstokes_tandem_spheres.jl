@@ -93,7 +93,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # Strategy:
 # 1) 0 to 75: k2, p2
 # 2) 75 to 100: k3, p2
-# 3) 100 to 150: k4, p3
+# 3) 100 to 200: k4, p3
 t_star_end = 200
 t_end = t_star_end * D()/U()
 
