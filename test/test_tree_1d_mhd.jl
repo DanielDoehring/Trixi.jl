@@ -325,11 +325,14 @@ end
                             1.1435297153639112e-14,
                             3.207308695504664,
                             0.0
-                        ],
-                        tspan=(0.0, 0.2),)
+                        ])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    @test_allocations(Trixi.rhs!, semi, sol, 1000)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15000)
 end
 
 end
