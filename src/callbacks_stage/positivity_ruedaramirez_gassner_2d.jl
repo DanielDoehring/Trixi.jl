@@ -166,7 +166,7 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{2}, semi, limiter!)
                     end
 
                     if newton_it == max_iterations
-                        @warn "RRG Limiter: ($max_iterations) not enough to correct pressure! Simulation might crash soon!"
+                        error("RRG Limiter: ($max_iterations) not enough to correct pressure! Simulation might crash soon!")
                     end
                 end
                 delta_alpha = max(delta_alpha, delta_alpha_ij)
