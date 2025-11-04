@@ -30,6 +30,7 @@ function initial_condition_kelvin_helmholtz_instability(x, t,
 end
 initial_condition = initial_condition_kelvin_helmholtz_instability
 
+# Solver setup similar to the one in the paper
 surface_flux = flux_lax_friedrichs
 volume_flux = flux_chandrashekar
 polydeg = 7
@@ -65,7 +66,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-stepsize_callback = StepsizeCallback(cfl = 0.5)
+stepsize_callback = StepsizeCallback(cfl = 0.35)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
