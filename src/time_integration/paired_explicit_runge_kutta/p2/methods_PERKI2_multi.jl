@@ -447,7 +447,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2IMEXMulti;
                          level_info_boundaries_acc,
                          level_info_mortars_acc,
                          n_levels, semi, alg) # Mesh-only based part.
-    #n_levels, semi, alg, u) # Mesh+solution (CFL) based part.
+                         #n_levels, semi, alg, u) # Mesh+solution (CFL) based part.
 
     for i in 1:n_levels
         println("Number Elements integrated with level $i: ",
