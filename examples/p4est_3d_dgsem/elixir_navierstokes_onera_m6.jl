@@ -118,10 +118,10 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.1) # 6.05
+tspan = (load_time(restart_filename), 6.107785712295452) # 6.05
 
-ode = semidiscretize(semi_hyp_para, tspan, restart_filename) # Split methods
-#ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
+#ode = semidiscretize(semi_hyp_para, tspan, restart_filename) # Split methods
+ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
 
 # Callbacks
 ###############################################################################
@@ -158,10 +158,10 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                                            rho_inf(),
                                                                            u_inf()))
 
-analysis_interval = 500 #100_000
+analysis_interval = 5000 #100_000
 analysis_callback = AnalysisCallback(semi_hyp_para, interval = analysis_interval,
                                      analysis_errors = Symbol[],
-                                     analysis_integrals = (lift_coefficient,)
+                                     analysis_integrals = (lift_coefficient,),
                                      #analysis_pointwise = (pressure_coefficient,)
                                      )
 
@@ -208,18 +208,9 @@ Stages_complete_p2 = reverse(collect(range(2, 16)))
 # Only Flux-Differencing #
 
 #cfl = 13.2 # PERK p2 2-16, inviscid
-#cfl = 4.0 # PERK p2 2-16, viscous, unsplit
+cfl = 4.3 # PERK p2 2-16, viscous, unsplit
 
 #cfl = 3.0 # PERK p2 2-16, viscous, split
-
-# P-ER(R)K 4 Multi
-cfl_0() = 3.0
-cfl_max() = 6.0
-
-t_0() = 6.049
-t_ramp_up() = 0.0005
-
-cfl(t) = min(cfl_max(), cfl_0() + (t - t_0())/t_ramp_up() * (cfl_max() - cfl_0()))
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -227,9 +218,9 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        analysis_callback,
+                        #analysis_callback,
                         #save_solution,
-                        #save_restart,
+                        save_restart,
                         stepsize_callback
                         );
 
@@ -239,6 +230,7 @@ callbacks = CallbackSet(summary_callback,
 ## k = 2, p = 2 ##
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
 
+#=
 Stages_para = [10, 9, 8, 7, 6, 5, 4, 3, 2]
 dtRatios_para = reverse([19.1486043845472408975
 59.9427061904833635708
@@ -255,7 +247,7 @@ path_coeffs_para = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_
 ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages_complete_p2, Stages_para,
                                             path, path_coeffs_para,
                                             dtRatios_complete_p2, dtRatios_para)
-
+=#
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
 
