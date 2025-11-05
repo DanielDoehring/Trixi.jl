@@ -41,7 +41,6 @@ end
 struct FlowState{RealT <: Real}
     rho_inf::RealT
     u_inf::RealT
-    l_inf::RealT
 end
 
 struct SurfacePressureCoefficient{RealT <: Real}
@@ -53,14 +52,13 @@ struct SurfaceFrictionCoefficient{RealT <: Real} <: VariableViscous
     flow_state::FlowState{RealT}
 end
 
-# TODO: Revisit `l_inf` (for 3D)
 """
-    SurfacePressureCoefficient(p_inf, rho_inf, u_inf, l_inf)
+    SurfacePressureCoefficient(p_inf, rho_inf, u_inf)
 
 Compute the surface pressure coefficient
 ```math
 C_p \\coloneqq \\frac{p - p_{\\infty}}
-                     {0.5 \\rho_{\\infty} U_{\\infty}^2 L_{\\infty}}
+                     {0.5 \\rho_{\\infty} U_{\\infty}^2}
 ```
 based on the pressure distribution along a boundary.
 Supposed to be used in conjunction with [`AnalysisSurfacePointwise`](@ref)
@@ -69,14 +67,13 @@ which stores the boundary information and semidiscretization.
 - `p_inf::Real`: Free-stream pressure
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function SurfacePressureCoefficient(p_inf, rho_inf, u_inf, l_inf)
-    return SurfacePressureCoefficient(p_inf, FlowState(rho_inf, u_inf, l_inf))
+function SurfacePressureCoefficient(p_inf, rho_inf, u_inf)
+    return SurfacePressureCoefficient(p_inf, FlowState(rho_inf, u_inf))
 end
 
 """
-SurfaceFrictionCoefficient(rho_inf, u_inf, l_inf)
+SurfaceFrictionCoefficient(rho_inf, u_inf)
 
 Compute the surface skin friction coefficient
 ```math
@@ -89,20 +86,19 @@ which stores the boundary information and semidiscretization.
 
 - `rho_inf::Real`: Free-stream density
 - `u_inf::Real`: Free-stream velocity
-- `l_inf::Real`: Reference length of geometry (e.g. airfoil chord length)
 """
-function SurfaceFrictionCoefficient(rho_inf, u_inf, l_inf)
-    return SurfaceFrictionCoefficient(FlowState(rho_inf, u_inf, l_inf))
+function SurfaceFrictionCoefficient(rho_inf, u_inf)
+    return SurfaceFrictionCoefficient(FlowState(rho_inf, u_inf))
 end
 
 # Compute local pressure coefficient.
 # Works for both purely hyperbolic and hyperbolic-parabolic systems.
-# C_p(x) = (p(x) - p_inf) / (0.5 * rho_inf * u_inf^2 * l_inf)
+# C_p(x) = (p(x) - p_inf) / (0.5 * rho_inf * u_inf^2)
 function (pressure_coefficient::SurfacePressureCoefficient)(u, equations)
     p = pressure(u, equations)
     @unpack p_inf = pressure_coefficient
-    @unpack rho_inf, u_inf, l_inf = pressure_coefficient.flow_state
-    return (p - p_inf) / (0.5 * rho_inf * u_inf^2 * l_inf)
+    @unpack rho_inf, u_inf = pressure_coefficient.flow_state
+    return (p - p_inf) / (0.5 * rho_inf * u_inf^2)
 end
 
 varname(::Any) = @assert false "Surface variable name not assigned" # This makes sure default behaviour is not overwriting

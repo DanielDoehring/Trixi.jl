@@ -7,14 +7,14 @@
 
 # Compute local friction coefficient.
 # Works only in conjunction with a hyperbolic-parabolic system.
-# C_f(x) = (tau_w(x) * n_perp(x)) / (0.5 * rho_inf * u_inf^2 * l_inf)
+# C_f(x) = (tau_w(x) * n_perp(x)) / (0.5 * rho_inf * u_inf^2)
 function (surface_friction::SurfaceFrictionCoefficient)(u, normal_direction, x, t,
                                                         equations_parabolic,
                                                         gradients_1, gradients_2)
     viscous_stress_vector_ = viscous_stress_vector(u, normal_direction,
                                                    equations_parabolic,
                                                    gradients_1, gradients_2)
-    @unpack rho_inf, u_inf, l_inf = surface_friction.flow_state
+    @unpack rho_inf, u_inf = surface_friction.flow_state
 
     # Normalize as `normal_direction` is not necessarily a unit vector
     n = normal_direction / norm(normal_direction)
@@ -22,7 +22,7 @@ function (surface_friction::SurfaceFrictionCoefficient)(u, normal_direction, x, 
     t = (-n[2], n[1])
     return (viscous_stress_vector_[1] * t[1] +
             viscous_stress_vector_[2] * t[2]) /
-           (0.5 * rho_inf * u_inf^2 * l_inf)
+           (0.5 * rho_inf * u_inf^2)
 end
 
 # Compute and save to disk a space-dependent `surface_variable`.

@@ -118,7 +118,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.04901) # 6.05
+tspan = (load_time(restart_filename), 6.1) # 6.05
 
 ode = semidiscretize(semi_hyp_para, tspan, restart_filename) # Split methods
 #ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
@@ -156,9 +156,9 @@ p_inf() = 1.0
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(),
                                                                            rho_inf(),
-                                                                           u_inf(), A))
+                                                                           u_inf()))
 
-analysis_interval = 5 #100_000
+analysis_interval = 500 #100_000
 analysis_callback = AnalysisCallback(semi_hyp_para, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,)
@@ -167,115 +167,24 @@ analysis_callback = AnalysisCallback(semi_hyp_para, interval = analysis_interval
 
 alive_callback = AliveCallback(alive_interval = 50)
 
-extra_node_variables = (:cfl_diffusion, :cfl_convection)
-
-function Trixi.get_node_variable(::Val{:cfl_diffusion}, u, mesh, equations, dg, cache,
-                                 equations_parabolic, cache_parabolic)
-    n_nodes = nnodes(dg)
-    n_elements = nelements(dg, cache)
-    # By definition, the variable must be provided at every node of every element!
-    # Otherwise, the `SaveSolutionCallback` will crash.
-    cfl_d_array = zeros(eltype(cache.elements),
-                        n_nodes, n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
-                        n_elements)
-
-    @unpack contravariant_vectors, inverse_jacobian = cache.elements
-
-    # We can accelerate the computation by thread-parallelizing the loop over elements
-    # by using the `@threaded` macro.
-    Trixi.@threaded for element in eachelement(dg, cache)
-        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
-            u_node = get_node_vars(u, equations, dg, i, j, k, element)
-
-            # Speeds
-            d = Trixi.max_diffusivity(u_node, equations_parabolic)
-
-            # Mesh data
-            Ja11, Ja12, Ja13 = Trixi.get_contravariant_vector(1, contravariant_vectors,
-                                                              i, j, k, element)
-            Ja21, Ja22, Ja23 = Trixi.get_contravariant_vector(2, contravariant_vectors,
-                                                              i, j, k, element)
-            Ja31, Ja32, Ja33 = Trixi.get_contravariant_vector(3, contravariant_vectors,
-                                                              i, j, k, element)
-
-            inv_jacobian = abs(inverse_jacobian[i, j, k, element])
-
-            # See FLUXO:
-            # https://github.com/project-fluxo/fluxo/blob/c7e0cc9b7fd4569dcab67bbb6e5a25c0a84859f1/src/equation/navierstokes/calctimestep.f90#L130-L137
-            d1_transformed = d * (Ja11^2 + Ja12^2 + Ja13^2) * inv_jacobian^2
-            d2_transformed = d * (Ja21^2 + Ja22^2 + Ja23^2) * inv_jacobian^2
-            d3_transformed = d * (Ja31^2 + Ja32^2 + Ja33^2) * inv_jacobian^2
-
-            cfl_d_array[i, j, k, element] = d1_transformed + d2_transformed + d3_transformed
-        end
-    end
-
-    return cfl_d_array
-end
-
-function Trixi.get_node_variable(::Val{:cfl_convection}, u, mesh, equations, dg, cache,
-                                 equations_parabolic, cache_parabolic)
-    n_nodes = nnodes(dg)
-    n_elements = nelements(dg, cache)
-    # By definition, the variable must be provided at every node of every element!
-    # Otherwise, the `SaveSolutionCallback` will crash.
-    cfl_a_array = zeros(eltype(cache.elements),
-                            n_nodes, n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
-                            n_elements)
-
-    @unpack contravariant_vectors, inverse_jacobian = cache.elements
-
-    # We can accelerate the computation by thread-parallelizing the loop over elements
-    # by using the `@threaded` macro.
-    Trixi.@threaded for element in eachelement(dg, cache)
-        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
-            u_node = get_node_vars(u, equations, dg, i, j, k, element)
-
-            # Speeds
-            a1, a2, a3 = Trixi.max_abs_speeds(u_node, equations)
-
-            # Mesh data
-            Ja11, Ja12, Ja13 = Trixi.get_contravariant_vector(1, contravariant_vectors,
-                                                              i, j, k, element)
-            Ja21, Ja22, Ja23 = Trixi.get_contravariant_vector(2, contravariant_vectors,
-                                                              i, j, k, element)
-            Ja31, Ja32, Ja33 = Trixi.get_contravariant_vector(3, contravariant_vectors,
-                                                              i, j, k, element)
-
-            inv_jacobian = abs(inverse_jacobian[i, j, k, element])
-
-            # Transform
-            a1_transformed = abs(Ja11 * a1 + Ja12 * a2 + Ja13 * a3) * inv_jacobian
-            a2_transformed = abs(Ja21 * a1 + Ja22 * a2 + Ja23 * a3) * inv_jacobian
-            a3_transformed = abs(Ja31 * a1 + Ja32 * a2 + Ja33 * a3) * inv_jacobian
-
-            cfl_a_array[i, j, k, element] = a1_transformed + a2_transformed + a3_transformed
-        end
-    end
-
-    return cfl_a_array
-end
-
 save_sol_interval = analysis_interval
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = true, # false
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
-                                     output_directory = "/storage/home/daniel/OneraM6/",
-                                     extra_node_variables = extra_node_variables)
+                                     output_directory = "/storage/home/daniel/OneraM6/")
 
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
                                    output_directory = "/storage/home/daniel/OneraM6/")
 
 ## k = 2 ##
-
 base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
 #base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
 
 path = base_path * "k1/p2/"
 
-dtRatios_complete_p2 = [
+dtRatios_complete_p2 = [ 
     0.753155136853456,
     0.695487338849343,
     0.641318947672844,
@@ -291,103 +200,63 @@ dtRatios_complete_p2 = [
     0.123865127563477,
     0.0781898498535156,
     0.0436210632324219
-] ./ 0.753155136853456
+                      ] ./ 0.753155136853456
 Stages_complete_p2 = reverse(collect(range(2, 16)))
 
 ## 6.049 -> 6.05 ##
 
 # Only Flux-Differencing #
-cfl_interval = 2
 
-stepsize_callback = StepsizeCallback(cfl = 13.2, interval = cfl_interval) # PERK p2 2-16
+#cfl = 13.2 # PERK p2 2-16, inviscid
+#cfl = 4.0 # PERK p2 2-16, viscous, unsplit
+
+#cfl = 3.0 # PERK p2 2-16, viscous, split
+
+# P-ER(R)K 4 Multi
+cfl_0() = 3.0
+cfl_max() = 6.0
+
+t_0() = 6.049
+t_ramp_up() = 0.0005
+
+cfl(t) = min(cfl_max(), cfl_0() + (t - t_0())/t_ramp_up() * (cfl_max() - cfl_0()))
+
+stepsize_callback = StepsizeCallback(cfl = cfl)
 
 #path = base_path * "k2/p3/"
 
-#=
-
-dtRatios_complete_p3 = [ 
-    0.309904923439026,
-    0.277295976877213,
-    0.250083755254746,
-    0.228134118318558,
-    0.20889208316803,
-    0.185411275029182,
-    0.160719511508942,
-    0.138943578004837,
-    0.111497408151627,
-    0.0973129367828369,
-    0.0799268364906311,
-    0.0501513481140137,
-    0.0280734300613403
-                      ] ./ 0.309904923439026
-Stages_complete_p3 = reverse(collect(range(3, 15)))
-
-## 6.049 -> 6.05 ##
-
-# Only Flux-Differencing #
-cfl_interval = 2
-
-stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(R)K p3 3-15
-#stepsize_callback = StepsizeCallback(cfl = 10.7, interval = cfl_interval) # PER(R)K p3 15
-=#
-
 callbacks = CallbackSet(summary_callback,
-                        #alive_callback,
+                        alive_callback,
                         analysis_callback,
                         #save_solution,
                         #save_restart,
-                        #stepsize_callback
+                        stepsize_callback
                         );
 
 # Run the simulation
 ###############################################################################
 
-
 ## k = 2, p = 2 ##
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
 
-Stages_14_max = reverse(collect(range(2, 14)))
+Stages_para = [10, 9, 8, 7, 6, 5, 4, 3, 2]
+dtRatios_para = reverse([19.1486043845472408975
+59.9427061904833635708
+115.339716222031540838
+186.288290481208207439
+272.910996158948648826
+375.261469828366500678
+493.338227837213594285
+627.968143075108287121
+842.739504916238502119] ./ 842.739504916238502119)
 
-dtRatios_14_max = [
-    0.641318947672844,
-    0.574993145465851,
-    0.503288297653198,
-    0.442298481464386,
-    0.391183462142944,
-    0.346144811809063,
-    0.293439486026764,
-    0.243663728386164,
-    0.184185989908628,
-    0.15320873260498,
-    0.123865127563477,
-    0.0781898498535156,
-    0.0436210632324219
-] ./ 0.641318947672844
+path_coeffs_para = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/k1/p2/para/"
 
-Stages_para = [14, 12, 10, 7, 6, 5, 4, 3, 2]
-path_para = path * "para/"
+ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages_complete_p2, Stages_para,
+                                            path, path_coeffs_para,
+                                            dtRatios_complete_p2, dtRatios_para)
 
-dtRatios_para = [3008.7179235408357, # 14
-    1762.72919916304,   # 12
-    842.7395049162385,  # 10
-    375.2614698283665,  # 7
-    272.91099615894865, # 6
-    186.2882904812082,  # 5
-    115.33971622203154, # 4
-    59.942706190483364, # 3
-    19.14860438454724] / 3008.7179235408357 #= 2 =#
-
-ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages_14_max, Stages_para,
-                                            path, path_para,
-                                            dtRatios_14_max, dtRatios_para)
-
-## k = 2, p = 3 ##
-
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
-#ode_alg = Trixi.PairedExplicitRK3(15, path)
-
-dt = 9.5e-8 # Hyp-Para without stepsize control; unsplit
-dt = 9e-8 # Hyp-Para without stepsize control; split
-sol = Trixi.solve(ode, ode_alg, dt = dt, save_start = false,
+sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
+
 
