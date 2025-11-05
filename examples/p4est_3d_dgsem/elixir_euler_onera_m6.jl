@@ -74,8 +74,8 @@ volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-#mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
-mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
+mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
+#mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
 
 mesh_file = mesh_path * "m6wing_sanitized.inp"
 
@@ -84,7 +84,7 @@ boundary_symbols = [:Symmetry,
                     :BottomWing,
                     :TopWing]
 
-mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
+mesh = P4estMesh{3}(mesh_file, boundary_symbols = boundary_symbols)
 
 boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
                            :FarField => bc_farfield, # Farfield: bc_farfield
@@ -101,9 +101,9 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 restart_file = "restart_t605_undamped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
-#restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
+restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.05)
+tspan = (load_time(restart_filename), load_time(restart_filename))
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -140,13 +140,15 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
 p_inf() = 1.0
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
-                                                                        u_inf(equations), A))
+                                                                        u_inf(equations)))
 
 analysis_interval = 100_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
-                                     #analysis_pointwise = (pressure_coefficient,)
+                                     analysis_pointwise = (pressure_coefficient,),
+                                     save_analysis = true,
+                                     output_directory="out/"
                                      )
 
 alive_callback = AliveCallback(alive_interval = 50)
@@ -157,16 +159,20 @@ save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
-                                     output_directory="/storage/home/daniel/OneraM6/")
+                                     #output_directory="/storage/home/daniel/OneraM6/"
+                                     output_directory="out/"
+                                     )
 
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
-                                   output_directory="/storage/home/daniel/OneraM6/")
+                                   #output_directory="/storage/home/daniel/OneraM6/"
+                                   output_directory="out/"
+                                   )
 
 ## k = 2 ##
 
-base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
-#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
+#base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
+base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
 
 path = base_path * "k1/p2/"
 
@@ -262,5 +268,5 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 #ode_alg = Trixi.RK33()
 
-sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
+sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
