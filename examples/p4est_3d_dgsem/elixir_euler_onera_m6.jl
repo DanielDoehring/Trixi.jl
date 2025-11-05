@@ -74,8 +74,8 @@ volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-#mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
-mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
+mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
+#mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
 
 mesh_file = mesh_path * "m6wing_sanitized.inp"
 
@@ -84,7 +84,7 @@ boundary_symbols = [:Symmetry,
                     :BottomWing,
                     :TopWing]
 
-mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
+mesh = P4estMesh{3}(mesh_file, boundary_symbols = boundary_symbols)
 
 boundary_conditions = Dict(:Symmetry => bc_symmetry, # Symmetry: bc_symmetry
                            :FarField => bc_farfield, # Farfield: bc_farfield
@@ -146,7 +146,9 @@ analysis_interval = 100_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
-                                     analysis_pointwise = (pressure_coefficient,)
+                                     analysis_pointwise = (pressure_coefficient,),
+                                     save_analysis = true,
+                                     output_directory="out/"
                                      )
 
 alive_callback = AliveCallback(alive_interval = 50)
@@ -157,16 +159,20 @@ save_solution = SaveSolutionCallback(interval = save_sol_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
-                                     output_directory="/storage/home/daniel/OneraM6/")
+                                     #output_directory="/storage/home/daniel/OneraM6/"
+                                     output_directory="out/"
+                                     )
 
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true,
-                                   output_directory="/storage/home/daniel/OneraM6/")
+                                   #output_directory="/storage/home/daniel/OneraM6/"
+                                   output_directory="out/"
+                                   )
 
 ## k = 2 ##
 
-base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
-#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
+#base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
+base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
 
 path = base_path * "k1/p2/"
 
