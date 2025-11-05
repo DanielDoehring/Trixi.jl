@@ -101,9 +101,9 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
 restart_file = "restart_t605_undamped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
-#restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
+restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.05)
+tspan = (load_time(restart_filename), load_time(restart_filename))
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -140,13 +140,13 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
 p_inf() = 1.0
 pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
-                                                                        u_inf(equations), A))
+                                                                        u_inf(equations)))
 
 analysis_interval = 100_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
-                                     #analysis_pointwise = (pressure_coefficient,)
+                                     analysis_pointwise = (pressure_coefficient,)
                                      )
 
 alive_callback = AliveCallback(alive_interval = 50)
@@ -262,5 +262,5 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 #ode_alg = Trixi.RK33()
 
-sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
+sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
