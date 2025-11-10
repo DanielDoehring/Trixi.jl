@@ -177,8 +177,8 @@ mutable struct vanderHouwenRelaxationIntegrator{RealT <: Real, uType <: Abstract
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi.jl
     sol::Sol # faked
-    f::F # `rhs` of the semidiscretization
-    alg::Alg # `vanderHouwenRelaxationAlgorithm`
+    const f::F # `rhs` of the semidiscretization
+    const alg::Alg # `vanderHouwenRelaxationAlgorithm`
     opts::SimpleIntegratorOptions
     finalstep::Bool # added for convenience
     # Addition for efficient implementation

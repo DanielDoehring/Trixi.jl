@@ -204,8 +204,8 @@ mutable struct SubDiagonalRelaxationIntegrator{RealT <: Real, uType <: AbstractV
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi.jl
     sol::Sol # faked
-    f::F # `rhs` of the semidiscretization
-    alg::Alg # `SubDiagonalRelaxationAlgorithm`
+    const f::F # `rhs` of the semidiscretization
+    const alg::Alg # `SubDiagonalRelaxationAlgorithm`
     opts::SimpleIntegratorOptions
     finalstep::Bool # added for convenience
     # Addition for Relaxation methodology

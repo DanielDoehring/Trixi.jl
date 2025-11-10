@@ -82,12 +82,12 @@ mutable struct PairedExplicitRK3SplitMultiIntegrator{RealT <: Real,
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK3SplitMulti
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK3SplitMulti
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK3 registers
     k1::uType
     kS1::uType
