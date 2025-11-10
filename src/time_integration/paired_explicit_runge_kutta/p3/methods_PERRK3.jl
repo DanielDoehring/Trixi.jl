@@ -68,8 +68,8 @@ mutable struct PairedExplicitRelaxationRK3Integrator{RealT <: Real,
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK3
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK3
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

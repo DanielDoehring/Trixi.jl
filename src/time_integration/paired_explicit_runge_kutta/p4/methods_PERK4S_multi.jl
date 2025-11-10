@@ -79,8 +79,8 @@ mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real, uType <: Abs
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK4SplitMulti
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK4SplitMulti
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -263,8 +263,8 @@ mutable struct PairedExplicitRK4SplitMultiIntegrator{RealT <: Real,
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK4SplitMulti
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK4SplitMulti
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

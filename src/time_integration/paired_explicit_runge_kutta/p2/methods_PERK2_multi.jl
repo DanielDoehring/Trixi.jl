@@ -143,8 +143,8 @@ mutable struct PairedExplicitRK2MultiIntegrator{RealT <: Real, uType <: Abstract
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK2Multi
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK2Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -185,8 +185,8 @@ mutable struct PairedExplicitRK2MultiParabolicIntegrator{RealT <: Real,
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK2Multi
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK2Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool

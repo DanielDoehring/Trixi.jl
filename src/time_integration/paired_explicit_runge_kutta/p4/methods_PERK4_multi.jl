@@ -144,8 +144,8 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType <: Abstract
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK4Multi
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -186,8 +186,8 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real,
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK4Multi
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
@@ -234,8 +234,8 @@ mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real,
     iter::Int # current number of time steps (iteration)
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
-    f::F # `rhs!` of the semidiscretization
-    alg::PairedExplicitRK4Multi
+    const f::F # `rhs!` of the semidiscretization
+    const alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     dtchangeable::Bool
