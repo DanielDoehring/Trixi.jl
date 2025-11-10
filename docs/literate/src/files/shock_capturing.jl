@@ -274,7 +274,7 @@ callbacks = CallbackSet(analysis_callback, stepsize_callback);
 # $\alpha^\mathrm{SC-HG} + \alpha^\mathrm{PP-RRG}$ to avoid excessive dissipation.
 # Note that this needs to be larger than the `alpha_max` parameter of the
 # shock capturing volume integral to have any effect.
-limiter! = PositivityPreservingLimiterRuedaRamirezGassner(semi;
+limiter! = LowerBoundPreservingLimiterRuedaRamirezGassner(semi;
                                                           root_tol = 1e-8,
                                                           alpha_max = 0.8)
 

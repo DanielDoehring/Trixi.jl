@@ -23,11 +23,8 @@ function correct_u!(u_dgfv::AbstractArray{<:Any, 3}, u_fv, u_dg_node,
             u_fv_node = get_node_vars(u_fv, equations, solver, i, element)
             u_dgfv_node = get_node_vars(u_dgfv, equations, solver, i, element)
             for v in eachvariable(equations)
-                # Compute pure DG solution given Hennemann-Gassner blending:
-                #     u_dgfv = (1 - α) u_dg + α * u_FV
-                # <=>   u_dg = (u_dgfv - α * u_FV) / (1 - α)
-                u_dg_node[v] = (u_dgfv_node[v] - alpha[element] * u_fv_node[v]) /
-                               (1 - alpha[element])
+                u_dg_node[v] = compute_pure_dg(u_dgfv_node[v], u_fv_node[v],
+                                               alpha[element])
 
                 u_dgfv[v, i, element] = u_dgfv_node[v] +
                                         delta_alpha * (u_fv_node[v] - u_dg_node[v])
@@ -71,19 +68,16 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{1}, semi, limiter!)
 
             a_rho = beta_rho * rho_fv - rho_dgfv
             if a_rho > root_tol # => non-zero `delta_alpha` required
-                # Compute pure DG solution given Hennemann-Gassner blending:
-                #     u_dgfv = (1 - α) u_dg + α * u_FV
-                # <=>   u_dg = (u_dgfv - α * u_FV) / (1 - α)
-                rho_dg = (rho_dgfv - alpha[element] * rho_fv) / (1 - alpha[element])
+                rho_dg = compute_pure_dg(rho_dgfv, rho_fv, alpha[element])
 
-                # Avoid division for densities close to each other
+                # Avoid division (and correction due to this node) for densities close to each other
                 if abs(rho_fv - rho_dg) < near_zero_tol
                     continue
                 end
 
                 delta_alpha_i = a_rho / (rho_fv - rho_dg)
 
-                # `delta_alpha_ij` is calculated at each node, use maximum for the entire element
+                # `delta_alpha_i` is calculated at each node, use maximum for the entire element
                 delta_alpha = max(delta_alpha, delta_alpha_i)
             end
         end
@@ -113,7 +107,6 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{1}, semi, limiter!)
             p_dgfv = pressure(u_dgfv_node, equations)
 
             a_p = beta_p * p_fv - p_dgfv # This is -g(alpha_new) in the paper, see eq. (15)
-
             if a_p > root_tol # => non-zero `delta_alpha` required
                 # Initial guess for Newton iteration
                 delta_alpha_i = use_density_init ? delta_alpha_density :
@@ -128,8 +121,8 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{1}, semi, limiter!)
                     # Compute ∂u/∂α
                     for v in eachvariable(equations)
                         # Compute pure DG solution
-                        u_dg_node[v] = (u_dgfv_node[v] - alpha_n * u_fv_node[v]) /
-                                       (1 - alpha_n)
+                        u_dg_node[v] = compute_pure_dg(u_dgfv_node[v], u_fv_node[v],
+                                                       alpha_n)
 
                         # Derivate follows simply from
                         # u_dgfv = (1 - α) u_dg + α * u_FV
