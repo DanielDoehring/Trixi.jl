@@ -171,8 +171,8 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 
 ## k = 2 ##
 
-#base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
-base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
+base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
+#base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
 
 path = base_path * "k1/p2/"
 
@@ -195,6 +195,25 @@ dtRatios_complete_p2 = [
                       ] ./ 0.753155136853456
 Stages_complete_p2 = reverse(collect(range(2, 16)))
 
+safety_factor = 1.8
+dtRatios_complete_p2_mod = [ 
+    0.753155136853456,
+    0.695487338849343 / safety_factor, 
+    0.641318947672844 / safety_factor,
+    0.574993145465851 / safety_factor,
+    0.503288297653198 / safety_factor,
+    0.442298481464386 / safety_factor,
+    0.391183462142944 / safety_factor,
+    0.346144811809063 / safety_factor,
+    0.293439486026764 / safety_factor,
+    0.243663728386164 / safety_factor,
+    0.184185989908628 / safety_factor,
+    0.15320873260498 / safety_factor,
+    0.123865127563477 / safety_factor,
+    0.0781898498535156 / safety_factor,
+    0.0436210632324219 / safety_factor
+                      ] ./ 0.753155136853456
+
 ## 6.049 -> 6.05 ##
 
 # Only Flux-Differencing #
@@ -202,13 +221,15 @@ cfl_interval = 2
 
 cfl = 13.2 # PERK p2 2-16
 
+cfl = 20.0 # PERK p2 2-16 mod2, safety_factor = 1.8
 
-# TODO: Dissertation: Compare p=2 to these methods from OrdinaryDiffEq.jl:
+# steady-state near (restarted 6.049)
 
-# 1) SSPRK22
-# 2) ORK256
-# 3) ParsaniKetchesonDeconinck3S82
+cfl = 31.0 # PERK p2 E16
 
+#cfl = 2.0 # SSPRK22
+#cfl = 3.6 # ORK256
+#cfl = 9.4 # ParsaniKetchesonDeconinck3S82
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = cfl_interval)
 
@@ -257,7 +278,9 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 
 ## k = 2, p = 2 ##
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
+ode_alg = Trixi.PairedExplicitRK2(16, path)
+
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2_mod)
 
 ## k = 2, p = 3 ##
 
@@ -277,5 +300,19 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 #ode_alg = Trixi.RK33()
 
+
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
+
+
+#=
+using OrdinaryDiffEqSSPRK
+using OrdinaryDiffEqLowStorageRK
+
+#ode_alg = SSPRK22(thread = Trixi.True())
+#ode_alg = ORK256(thread = Trixi.True())
+ode_alg = ParsaniKetchesonDeconinck3S82(thread = Trixi.True())
+
+sol = solve(ode, ode_alg, dt = 42.0, save_start = false, adaptive = false,
+            save_everystep = false, callback = callbacks);
+=#
