@@ -48,8 +48,8 @@ mutable struct PairedExplicitRelaxationRK2MultiIntegrator{RealT <: Real,
     const alg::PairedExplicitRK2Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK register
     k1::uType
 
@@ -97,8 +97,8 @@ mutable struct PairedExplicitRelaxationRK2MultiParabolicIntegrator{RealT <: Real
     const alg::PairedExplicitRK2Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK register
     k1::uType
 

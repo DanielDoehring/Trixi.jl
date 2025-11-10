@@ -148,8 +148,8 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType <: Abstract
     const alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK register
     k1::uType
 
@@ -190,8 +190,8 @@ mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real,
     const alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK register
     k1::uType
 
@@ -238,8 +238,8 @@ mutable struct PairedExplicitRK4EulerAcousticMultiIntegrator{RealT <: Real,
     const alg::PairedExplicitRK4Multi
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK register
     k1::uType
 

@@ -68,8 +68,8 @@ mutable struct PairedExplicitRK2CoupledIntegrator{RealT <: Real,
     const alg::PairedExplicitRK2Coupled
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK register
     k1::uType
 end

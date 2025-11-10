@@ -48,8 +48,8 @@ mutable struct PairedExplicitRelaxationRK4Integrator{RealT <: Real,
     const alg::PairedExplicitRK4
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK register
     k1::uType
     # Entropy Relaxation additions

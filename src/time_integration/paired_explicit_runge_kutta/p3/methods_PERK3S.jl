@@ -63,8 +63,8 @@ mutable struct PairedExplicitRK3SplitIntegrator{RealT <: Real, uType <: Abstract
     const alg::PairedExplicitRK3Split
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
-    dtchangeable::Bool
-    force_stepfail::Bool
+    const dtchangeable::Bool
+    const force_stepfail::Bool
     # Additional PERK3 registers
     k1::uType
     kS1::uType
