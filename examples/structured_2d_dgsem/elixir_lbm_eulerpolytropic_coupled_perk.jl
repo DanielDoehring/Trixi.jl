@@ -28,7 +28,7 @@ using LinearAlgebra: norm
 
 polydeg = 2
 
-cells_per_dim_per_section = (16, 8) .* 2
+cells_per_dim_per_section = (16, 8) .* 4
 
 ###########
 # system #1
@@ -55,6 +55,8 @@ function initial_condition_pressure_bump(x, t, equations::PolytropicEulerEquatio
 end
 initial_condition_euler = initial_condition_pressure_bump
 
+### Mesh ###
+
 #=
 coords_min_euler = (-2.0, -1.0)
 coords_max_euler = (0.0, 1.0)
@@ -62,7 +64,6 @@ mesh_euler = StructuredMesh(cells_per_dim_per_section,
                             coords_min_euler, coords_max_euler,
                             periodicity = (false, true))
 =#
-
 
 function mapping_left(xi_, eta_)
     xi = 0.5 * (xi_ - 1)  # Map [-1, 1] -> [-1, 0]
@@ -138,6 +139,8 @@ function initial_condition_lbm(x, t, equations::LatticeBoltzmannEquations2D)
     return equilibrium_distribution(rho, v1, v2, equations)
 end
 
+### Mesh ###
+
 #=
 coords_min_lbm = (0.0, -1.0)
 coords_max_lbm = (2.0, 1.0)
@@ -204,9 +207,7 @@ analysis_callback = AnalysisCallbackCoupled(semi,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-cfl = 9.0 # NOTE: Unoptimized PERK2 (advection-only!)
-
-cfl = 3.0
+cfl = 7.9 # PERKC E = 2, ..., 14
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -238,79 +239,50 @@ end
 collision_callback = LBMCollisionCallback()
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback, alive_callback,
+                        #analysis_callback, 
+                        alive_callback,
                         stepsize_callback,
                         collision_callback)
 
 ###############################################################################
 # run the simulation
 
-#=
-ode_algorithm = Trixi.PairedExplicitRK2(16,
-                                        "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+Stages = reverse(collect(range(2, 14)))
+Stages = [14, 10, 9, 8, 7, 6, 5, 4, 3, 2]
 
-ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+dtRatios_1 = reverse([
+0.00634761689434526
+0.017211914055224
+0.023534263476904
+0.0311396100587444
+0.034179626898549
+0.0334708633818082
+0.0521053968259366
+0.0585699034127174
+0.0675582884214236
+0.0955725097528193
+]) ./ 0.0955725097528193
 
-ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
-=#
-
-#=
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               [1.0], [1.0])
-
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               [1.0], [1.0])
-
-Stages = [16, 12, 10, 8, 6, 4]
-
-dtRatios = [
-    0.631627607345581,
-    0.485828685760498,
-    0.366690540313721,
-    0.282330989837646,
-    0.197234153747559,
-    0.124999046325684
-] ./ 0.631627607345581
+dtRatios_2 = reverse([
+0.0147388602108549093828
+0.0232984380272682756186
+0.033390275928468327038
+0.0433764819426869507879
+0.0573439450781734194607
+0.0667714400187833234668
+0.0800166520693892380223
+0.090337837411425425671
+0.100877118193238857202
+0.14419732724127243273
+]) ./ 0.14419732724127243273
 
 ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
-                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
-                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
-                                                    dtRatios, dtRatios)
-=#
-
-Stages = [16, 12, 10, 8, 6]
-
-dtRatios_1 = [
-    0.631627607345581,
-    0.485828685760498,
-    0.366690540313721,
-    0.282330989837646,
-    0.197234153747559
-] ./ 0.631627607345581
-
-dtRatios_2 = [
-    0.144900726262131,
-    0.105614699577563,
-    0.0812354683759622,
-    0.0640441864205059,
-    0.0421791076660156
-] ./ 0.144900726262131
-
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
-                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
-                                                    "/home/daniel/git/Paper_PERRK/Data/Kelvin_Helmholtz/p2/",
+                                                    "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                                    "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
                                                     dtRatios_1, dtRatios_2)
 
 sol = Trixi.solve(ode, ode_algorithm;
-                  dt = 1.0, # Manual time step value, will be overwritten by the stepsize_callback when it is specified.
+                  dt = 1.0,
                   ode_default_options()..., callback = callbacks);
 
 using Plots
