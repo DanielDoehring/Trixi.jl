@@ -284,6 +284,8 @@ dtRatios_2 = reverse([
 0.14419732724127243273
 ]) ./ 0.14419732724127243273
 
+# TODO: Demonstrate performance advantage over only one perk method
+
 ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
                                                     "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
                                                     "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
