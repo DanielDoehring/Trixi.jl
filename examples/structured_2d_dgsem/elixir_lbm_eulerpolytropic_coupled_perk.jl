@@ -1,6 +1,8 @@
 using Trixi
 using LinearAlgebra: norm
 
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
+
 ###############################################################################
 # Semidiscretizations of the polytropic Euler equations and Lattice-Boltzmann method (LBM)
 # coupled using converter functions across their respective domains to generate a periodic system.
@@ -207,9 +209,15 @@ analysis_callback = AnalysisCallbackCoupled(semi,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
+
 cfl = 7.9 # PERKC E = 2, ..., 14
 
+#cfl = 1.2 # SSPRK22
+#cfl = 2.7 # ORK256
+#cfl = 8.7 # ParsaniKetchesonDeconinck3S82
+
 stepsize_callback = StepsizeCallback(cfl = cfl)
+
 
 # Need special version of the LBM collision callback for a `SemidiscretizationCoupled`
 @inline function Trixi.lbm_collision_callback(integrator)
@@ -247,7 +255,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-Stages = reverse(collect(range(2, 14)))
+
 Stages = [14, 10, 9, 8, 7, 6, 5, 4, 3, 2]
 
 dtRatios_1 = reverse([
@@ -281,9 +289,19 @@ ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
                                                     "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
                                                     dtRatios_1, dtRatios_2)
 
-sol = Trixi.solve(ode, ode_algorithm;
-                  dt = 1.0,
+sol = Trixi.solve(ode, ode_algorithm; dt = 1.0,
                   ode_default_options()..., callback = callbacks);
+
+
+#=
+ode_alg = SSPRK22()
+ode_alg = ORK256()
+ode_alg = ParsaniKetchesonDeconinck3S82()
+
+
+sol = solve(ode, ode_alg; dt = 0.1,
+            ode_default_options()..., callback = callbacks);
+=#
 
 using Plots
 
