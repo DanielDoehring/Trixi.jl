@@ -200,7 +200,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 10_000
 analysis_callback_euler = AnalysisCallback(semi_euler, interval = analysis_interval)
 analysis_callback_lbm = AnalysisCallback(semi_lbm, interval = analysis_interval)
 analysis_callback = AnalysisCallbackCoupled(semi,
@@ -215,11 +215,11 @@ cfl = 7.9 # PERKC E = 2, ..., 14
 cfl = 6.7 # PERK 1/PTE E = 3, ..., 14
 cfl = 7.9 # PERK 2/LBM E = 2, ..., 14
 
-cfl = 15.5 # PERKC Single E = 14
+#cfl = 15.5 # PERKC Single E = 14
 
-#cfl = 1.2 # SSPRK22
-#cfl = 2.7 # ORK256
-#cfl = 8.7 # ParsaniKetchesonDeconinck3S82
+cfl = 1.2 # SSPRK22
+cfl = 2.7 # ORK256
+cfl = 8.7 # ParsaniKetchesonDeconinck3S82
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -252,7 +252,7 @@ end
 collision_callback = LBMCollisionCallback()
 
 callbacks = CallbackSet(summary_callback,
-                        #analysis_callback, 
+                        analysis_callback, # for exact number of timesteps
                         alive_callback,
                         stepsize_callback,
                         collision_callback)
@@ -313,7 +313,7 @@ ode_algorithm = Trixi.PairedExplicitRK2Coupled(14,
                                                "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/")
 
 
-#=
+
 ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages_3_to_14,
                                              "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
                                              "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
@@ -324,22 +324,22 @@ ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages,
                                              "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
                                              "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
                                              dtRatios_2, dtRatios_2)
-=#
-
-
-sol = Trixi.solve(ode, ode_algorithm; dt = 1.0,
-                  ode_default_options()..., callback = callbacks);
 
 
 #=
+sol = Trixi.solve(ode, ode_algorithm; dt = 1.0,
+                  ode_default_options()..., callback = callbacks);
+=#
+
+
 ode_alg = SSPRK22()
-#ode_alg = ORK256()
-#ode_alg = ParsaniKetchesonDeconinck3S82()
+ode_alg = ORK256()
+ode_alg = ParsaniKetchesonDeconinck3S82()
 
 
 sol = solve(ode, ode_alg; dt = 0.1,
             ode_default_options()..., callback = callbacks);
-=#
+
 
 using Plots
 
@@ -348,4 +348,9 @@ pd_1 = plot_datas[1] # Euler
 pd_2 = plot_datas[2] # LBM
 
 plot(pd_1["rho"])
+#=
 plot!(getmesh(pd_1))
+
+plot(getmesh(pd_1), xlabel = "\$x\$", ylabel = "\$y\$",
+guidefont = font("Computer Modern", 14), tickfont = font("Computer Modern", 8))
+=#
