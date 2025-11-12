@@ -207,10 +207,15 @@ analysis_callback = AnalysisCallbackCoupled(semi,
                                             analysis_callback_euler,
                                             analysis_callback_lbm)
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 100)
 
 
 cfl = 7.9 # PERKC E = 2, ..., 14
+
+cfl = 6.7 # PERK 1/PTE E = 3, ..., 14
+cfl = 7.9 # PERK 2/LBM E = 2, ..., 14
+
+cfl = 15.5 # PERKC Single E = 14
 
 #cfl = 1.2 # SSPRK22
 #cfl = 2.7 # ORK256
@@ -257,6 +262,7 @@ callbacks = CallbackSet(summary_callback,
 
 
 Stages = [14, 10, 9, 8, 7, 6, 5, 4, 3, 2]
+Stages_3_to_14 = [14, 10, 9, 8, 6, 5, 4, 3]
 
 dtRatios_1 = reverse([
 0.00634761689434526
@@ -265,6 +271,17 @@ dtRatios_1 = reverse([
 0.0311396100587444
 0.034179626898549
 0.0334708633818082
+0.0521053968259366
+0.0585699034127174
+0.0675582884214236
+0.0955725097528193
+]) ./ 0.0955725097528193
+
+dtRatios_1_3_to_14 = reverse([
+0.017211914055224
+0.023534263476904
+0.0311396100587444
+0.034179626898549
 0.0521053968259366
 0.0585699034127174
 0.0675582884214236
@@ -284,12 +301,31 @@ dtRatios_2 = reverse([
 0.14419732724127243273
 ]) ./ 0.14419732724127243273
 
-# TODO: Demonstrate performance advantage over only one perk method
-
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
+ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages,
                                                     "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
                                                     "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
                                                     dtRatios_1, dtRatios_2)
+
+
+
+ode_algorithm = Trixi.PairedExplicitRK2Coupled(14,
+                                               "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                               "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/")
+
+
+#=
+ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages_3_to_14,
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                             dtRatios_1_3_to_14, dtRatios_1_3_to_14)
+
+
+ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages,
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
+                                             dtRatios_2, dtRatios_2)
+=#
+
 
 sol = Trixi.solve(ode, ode_algorithm; dt = 1.0,
                   ode_default_options()..., callback = callbacks);
@@ -297,8 +333,8 @@ sol = Trixi.solve(ode, ode_algorithm; dt = 1.0,
 
 #=
 ode_alg = SSPRK22()
-ode_alg = ORK256()
-ode_alg = ParsaniKetchesonDeconinck3S82()
+#ode_alg = ORK256()
+#ode_alg = ParsaniKetchesonDeconinck3S82()
 
 
 sol = solve(ode, ode_alg; dt = 0.1,
