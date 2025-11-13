@@ -113,7 +113,7 @@ semi_hyp_para = SemidiscretizationHyperbolicParabolic(mesh, (equations, equation
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_para))
 
-restart_file = "restart_000420000.h5"
+restart_file = "restart_000015000.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
