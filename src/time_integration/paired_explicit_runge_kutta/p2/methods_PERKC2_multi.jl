@@ -5,7 +5,7 @@
 @muladd begin
 #! format: noindent
 
-struct PairedExplicitCoupledRK2Multi <:
+struct PairedExplicitRK2MultiCoupled <:
        AbstractPairedExplicitRKMulti{2}
     num_methods::Int64 # Number of optimized PERK family members, i.e., R
     num_stages::Int64 # = maximum number of stages
@@ -28,7 +28,7 @@ struct PairedExplicitCoupledRK2Multi <:
     max_add_levels::Vector{Int64}
 end
 
-function PairedExplicitCoupledRK2Multi(stages::Vector{Int64},
+function PairedExplicitRK2MultiCoupled(stages::Vector{Int64},
                                        base_path_mon_coeffs_1::AbstractString,
                                        base_path_mon_coeffs_2::AbstractString,
                                        dt_ratios_1, dt_ratios_2;
@@ -46,7 +46,7 @@ function PairedExplicitCoupledRK2Multi(stages::Vector{Int64},
                                                           base_path_mon_coeffs_2,
                                                           bS, cS)
 
-    return PairedExplicitCoupledRK2Multi(length(stages), num_stages,
+    return PairedExplicitRK2MultiCoupled(length(stages), num_stages,
                                          dt_ratios_1, dt_ratios_2,
                                          a_matrices_1, a_matrices_2,
                                          c, 1 - bS, bS,
@@ -73,7 +73,7 @@ mutable struct PairedExplicitRK2CoupledMultiIntegrator{RealT <: Real,
     p::Params # will be the semidiscretization from Trixi
     sol::Sol # faked
     const f::F # `rhs!` of the semidiscretization
-    const alg::PairedExplicitCoupledRK2Multi
+    const alg::PairedExplicitRK2MultiCoupled
     opts::PairedExplicitRKOptions
     finalstep::Bool # added for convenience
     const dtchangeable::Bool
@@ -100,7 +100,7 @@ mutable struct PairedExplicitRK2CoupledMultiIntegrator{RealT <: Real,
     n_levels::Int64
 end
 
-function init(ode::ODEProblem, alg::PairedExplicitCoupledRK2Multi;
+function init(ode::ODEProblem, alg::PairedExplicitRK2MultiCoupled;
               dt, callback = nothing, kwargs...)
     u0 = copy(ode.u0)
     du = zero(u0)

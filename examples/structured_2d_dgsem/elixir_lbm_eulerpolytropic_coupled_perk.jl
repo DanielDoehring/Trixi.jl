@@ -1,6 +1,8 @@
 using Trixi
 using LinearAlgebra: norm
 
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
+
 ###############################################################################
 # Semidiscretizations of the polytropic Euler equations and Lattice-Boltzmann method (LBM)
 # coupled using converter functions across their respective domains to generate a periodic system.
@@ -28,7 +30,7 @@ using LinearAlgebra: norm
 
 polydeg = 2
 
-cells_per_dim_per_section = (16, 8) .* 2
+cells_per_dim_per_section = (16, 8) .* 4
 
 ###########
 # system #1
@@ -55,6 +57,8 @@ function initial_condition_pressure_bump(x, t, equations::PolytropicEulerEquatio
 end
 initial_condition_euler = initial_condition_pressure_bump
 
+### Mesh ###
+
 #=
 coords_min_euler = (-2.0, -1.0)
 coords_max_euler = (0.0, 1.0)
@@ -62,7 +66,6 @@ mesh_euler = StructuredMesh(cells_per_dim_per_section,
                             coords_min_euler, coords_max_euler,
                             periodicity = (false, true))
 =#
-
 
 function mapping_left(xi_, eta_)
     xi = 0.5 * (xi_ - 1)  # Map [-1, 1] -> [-1, 0]
@@ -138,6 +141,8 @@ function initial_condition_lbm(x, t, equations::LatticeBoltzmannEquations2D)
     return equilibrium_distribution(rho, v1, v2, equations)
 end
 
+### Mesh ###
+
 #=
 coords_min_lbm = (0.0, -1.0)
 coords_max_lbm = (2.0, 1.0)
@@ -195,20 +200,29 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 10_000
 analysis_callback_euler = AnalysisCallback(semi_euler, interval = analysis_interval)
 analysis_callback_lbm = AnalysisCallback(semi_lbm, interval = analysis_interval)
 analysis_callback = AnalysisCallbackCoupled(semi,
                                             analysis_callback_euler,
                                             analysis_callback_lbm)
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 100)
 
-cfl = 9.0 # NOTE: Unoptimized PERK2 (advection-only!)
 
-cfl = 3.0
+cfl = 7.9 # PERKC E = 2, ..., 14
+
+cfl = 6.7 # PERK 1/PTE E = 3, ..., 14
+cfl = 7.9 # PERK 2/LBM E = 2, ..., 14
+
+#cfl = 15.5 # PERKC Single E = 14
+
+cfl = 1.2 # SSPRK22
+cfl = 2.7 # ORK256
+cfl = 8.7 # ParsaniKetchesonDeconinck3S82
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
+
 
 # Need special version of the LBM collision callback for a `SemidiscretizationCoupled`
 @inline function Trixi.lbm_collision_callback(integrator)
@@ -238,80 +252,94 @@ end
 collision_callback = LBMCollisionCallback()
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback, alive_callback,
+                        analysis_callback, # for exact number of timesteps
+                        alive_callback,
                         stepsize_callback,
                         collision_callback)
 
 ###############################################################################
 # run the simulation
 
-#=
-ode_algorithm = Trixi.PairedExplicitRK2(16,
-                                        "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
 
-ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
+Stages = [14, 10, 9, 8, 7, 6, 5, 4, 3, 2]
+Stages_3_to_14 = [14, 10, 9, 8, 6, 5, 4, 3]
 
-ode_algorithm = Trixi.PairedExplicitRK2Coupled(16,
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/")
-=#
+dtRatios_1 = reverse([
+0.00634761689434526
+0.017211914055224
+0.023534263476904
+0.0311396100587444
+0.034179626898549
+0.0334708633818082
+0.0521053968259366
+0.0585699034127174
+0.0675582884214236
+0.0955725097528193
+]) ./ 0.0955725097528193
 
-#=
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               [1.0], [1.0])
+dtRatios_1_3_to_14 = reverse([
+0.017211914055224
+0.023534263476904
+0.0311396100587444
+0.034179626898549
+0.0521053968259366
+0.0585699034127174
+0.0675582884214236
+0.0955725097528193
+]) ./ 0.0955725097528193
 
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi([16],
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_CEE_Structured/",
-                                               "/home/daniel/git/MA/EigenspectraGeneration/Spectra/2D_Adv/",
-                                               [1.0], [1.0])
+dtRatios_2 = reverse([
+0.0147388602108549093828
+0.0232984380272682756186
+0.033390275928468327038
+0.0433764819426869507879
+0.0573439450781734194607
+0.0667714400187833234668
+0.0800166520693892380223
+0.090337837411425425671
+0.100877118193238857202
+0.14419732724127243273
+]) ./ 0.14419732724127243273
 
-Stages = [16, 12, 10, 8, 6, 4]
-
-dtRatios = [
-    0.631627607345581,
-    0.485828685760498,
-    0.366690540313721,
-    0.282330989837646,
-    0.197234153747559,
-    0.124999046325684
-] ./ 0.631627607345581
-
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
-                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
-                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
-                                                    dtRatios, dtRatios)
-=#
-
-Stages = [16, 12, 10, 8, 6]
-
-dtRatios_1 = [
-    0.631627607345581,
-    0.485828685760498,
-    0.366690540313721,
-    0.282330989837646,
-    0.197234153747559
-] ./ 0.631627607345581
-
-dtRatios_2 = [
-    0.144900726262131,
-    0.105614699577563,
-    0.0812354683759622,
-    0.0640441864205059,
-    0.0421791076660156
-] ./ 0.144900726262131
-
-ode_algorithm = Trixi.PairedExplicitCoupledRK2Multi(Stages,
-                                                    "/home/daniel/git/Paper_PERRK/Data/IsentropicVortex/IsentropicVortex_EC/k3/p2/",
-                                                    "/home/daniel/git/Paper_PERRK/Data/Kelvin_Helmholtz/p2/",
+ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages,
+                                                    "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                                    "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
                                                     dtRatios_1, dtRatios_2)
 
-sol = Trixi.solve(ode, ode_algorithm;
-                  dt = 1.0, # Manual time step value, will be overwritten by the stepsize_callback when it is specified.
+
+
+ode_algorithm = Trixi.PairedExplicitRK2Coupled(14,
+                                               "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                               "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/")
+
+
+
+ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages_3_to_14,
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/PTE/",
+                                             dtRatios_1_3_to_14, dtRatios_1_3_to_14)
+
+
+ode_algorithm = Trixi.PairedExplicitRK2MultiCoupled(Stages,
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
+                                             "/home/daniel/git/DissDoc/Data/InterfaceCoupling_LBM_PTE/Spectra/LBM/",
+                                             dtRatios_2, dtRatios_2)
+
+
+#=
+sol = Trixi.solve(ode, ode_algorithm; dt = 1.0,
                   ode_default_options()..., callback = callbacks);
+=#
+
+
+ode_alg = SSPRK22()
+ode_alg = ORK256()
+ode_alg = ParsaniKetchesonDeconinck3S82()
+
+
+sol = solve(ode, ode_alg; dt = 0.1,
+            ode_default_options()..., callback = callbacks);
+
 
 using Plots
 
@@ -320,4 +348,9 @@ pd_1 = plot_datas[1] # Euler
 pd_2 = plot_datas[2] # LBM
 
 plot(pd_1["rho"])
+#=
 plot!(getmesh(pd_1))
+
+plot(getmesh(pd_1), xlabel = "\$x\$", ylabel = "\$y\$",
+guidefont = font("Computer Modern", 14), tickfont = font("Computer Modern", 8))
+=#
