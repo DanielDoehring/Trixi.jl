@@ -20,7 +20,7 @@ end
     n_levels = get_n_levels(mesh)
 
     # CARE: This is for testcases with special (random/round robin) assignment
-    n_levels = alg.num_methods
+    #n_levels = alg.num_methods
 
     return n_levels
 end
