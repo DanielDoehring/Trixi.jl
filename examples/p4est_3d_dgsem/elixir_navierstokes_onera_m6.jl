@@ -113,15 +113,16 @@ semi_hyp_para = SemidiscretizationHyperbolicParabolic(mesh, (equations, equation
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_para))
 
-restart_file = "restart_000015000.h5"
+restart_file = "restart_t605_undamped.h5"
 
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.107785712295452) # t_c = 9.5
+tspan = (load_time(restart_filename), 6.0491) # t_c = 9.5
+#tspan = (load_time(restart_filename), 6.05) # t_c = 9.5
 
-#ode = semidiscretize(semi_hyp_para, tspan, restart_filename) # Split methods
-ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
+ode = semidiscretize(semi_hyp_para, tspan, restart_filename) # Split methods
+#ode = semidiscretize(semi_hyp_para, tspan, restart_filename; split_problem = false) # Unsplit methods
 
 # Callbacks
 ###############################################################################
@@ -158,14 +159,15 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                                            rho_inf(),
                                                                            u_inf()))
 
-analysis_interval = 5000 #100_000
+analysis_interval = 100 #100_000
 analysis_callback = AnalysisCallback(semi_hyp_para, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
                                      #analysis_pointwise = (pressure_coefficient,)
+                                     #output_directory = "/storage/home/daniel/OneraM6/"
                                      )
 
-alive_callback = AliveCallback(alive_interval = 50)
+alive_callback = AliveCallback(alive_interval = 1)
 
 save_sol_interval = analysis_interval
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
@@ -183,6 +185,8 @@ base_path = "/storage/home/daniel/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha
 #base_path = "/home/daniel/git/Paper_PERRK/Data/OneraM6/Spectra_OptimizedCoeffs/LLF_FD_Ranocha/"
 
 path = base_path * "k1/p2/"
+
+# TODO: Safety factor, see inviscid
 
 dtRatios_complete_p2 = [ 
     0.753155136853456,
@@ -203,14 +207,38 @@ dtRatios_complete_p2 = [
                       ] ./ 0.753155136853456
 Stages_complete_p2 = reverse(collect(range(2, 16)))
 
+safety_factor = 1.8
+dtRatios_complete_p2_mod = [ 
+    0.753155136853456,
+    0.695487338849343 / safety_factor, 
+    0.641318947672844 / safety_factor,
+    0.574993145465851 / safety_factor,
+    0.503288297653198 / safety_factor,
+    0.442298481464386 / safety_factor,
+    0.391183462142944 / safety_factor,
+    0.346144811809063 / safety_factor,
+    0.293439486026764 / safety_factor,
+    0.243663728386164 / safety_factor,
+    0.184185989908628 / safety_factor,
+    0.15320873260498 / safety_factor,
+    0.123865127563477 / safety_factor,
+    0.0781898498535156 / safety_factor,
+    0.0436210632324219 / safety_factor
+                      ] ./ 0.753155136853456
+
 ## 6.049 -> 6.05 ##
 
 # Only Flux-Differencing #
 
-#cfl = 13.2 # PERK p2 2-16, inviscid
-cfl = 4.0 # PERK p2 2-16, viscous, unsplit
+cfl = 4.0 # PERK p2 2-16, unsplit
+cfl = 4.3 # PERK p2 2-16, unsplit
 
-#cfl = 3.0 # PERK p2 2-16, viscous, split
+#cfl = 6.2 # PERK p2 16, unsplit, mod
+
+#cfl = 9.4 # PERK p2 16
+
+cfl = 1.2 # ORK
+#cfl = 2.5 # PKD
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -218,9 +246,9 @@ stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        #analysis_callback,
+                        analysis_callback,
                         #save_solution,
-                        save_restart,
+                        #save_restart,
                         stepsize_callback
                         );
 
@@ -228,7 +256,13 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 
 ## k = 2, p = 2 ##
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
+ode_alg = Trixi.PairedExplicitRK2(16, path)
+
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2)
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2_mod)
+
+#relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
+#ode_alg = Trixi.PairedExplicitRelaxationRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2; relaxation_solver = relaxation_solver)
 
 #=
 Stages_para = [10, 9, 8, 7, 6, 5, 4, 3, 2]
@@ -248,7 +282,18 @@ ode_alg = Trixi.PairedExplicitRK2SplitMulti(Stages_complete_p2, Stages_para,
                                             path, path_coeffs_para,
                                             dtRatios_complete_p2, dtRatios_para)
 =#
+
+#=
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
+=#
 
+using OrdinaryDiffEqSSPRK
+using OrdinaryDiffEqLowStorageRK
 
+#ode_alg = SSPRK22(thread = Trixi.True())
+ode_alg = ORK256(thread = Trixi.True())
+#ode_alg = ParsaniKetchesonDeconinck3S82(thread = Trixi.True())
+
+sol = solve(ode, ode_alg, dt = 42.0, save_start = false, adaptive = false,
+            save_everystep = false, callback = callbacks);

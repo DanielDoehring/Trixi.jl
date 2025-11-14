@@ -227,7 +227,7 @@ cfl = 20.0 # PERK p2 2-16 mod2, safety_factor = 1.8
 
 cfl = 31.0 # PERK p2 E16
 
-#cfl = 2.0 # SSPRK22
+cfl = 2.0 # SSPRK22
 #cfl = 3.6 # ORK256
 #cfl = 9.4 # ParsaniKetchesonDeconinck3S82
 
@@ -278,9 +278,10 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 
 ## k = 2, p = 2 ##
-ode_alg = Trixi.PairedExplicitRK2(16, path)
 
-#ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2_mod)
+ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2_mod)
+
+ode_alg = Trixi.PairedExplicitRK2(16, path)
 
 ## k = 2, p = 3 ##
 
@@ -300,19 +301,17 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 #ode_alg = Trixi.RK33()
 
-
+#=
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
+=#
 
-
-#=
 using OrdinaryDiffEqSSPRK
 using OrdinaryDiffEqLowStorageRK
 
-#ode_alg = SSPRK22(thread = Trixi.True())
+ode_alg = SSPRK22(thread = Trixi.True())
 #ode_alg = ORK256(thread = Trixi.True())
-ode_alg = ParsaniKetchesonDeconinck3S82(thread = Trixi.True())
+#ode_alg = ParsaniKetchesonDeconinck3S82(thread = Trixi.True())
 
 sol = solve(ode, ode_alg, dt = 42.0, save_start = false, adaptive = false,
             save_everystep = false, callback = callbacks);
-=#
