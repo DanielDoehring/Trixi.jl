@@ -237,7 +237,8 @@ cfl = 4.3 # PERK p2 2-16, unsplit
 
 #cfl = 9.4 # PERK p2 16
 
-cfl = 1.2 # ORK
+cfl = 0.5 # SSPRK22
+#cfl = 1.0 # ORK
 #cfl = 2.5 # PKD
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
@@ -291,8 +292,8 @@ sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
 using OrdinaryDiffEqSSPRK
 using OrdinaryDiffEqLowStorageRK
 
-#ode_alg = SSPRK22(thread = Trixi.True())
-ode_alg = ORK256(thread = Trixi.True())
+ode_alg = SSPRK22(thread = Trixi.True())
+#ode_alg = ORK256(thread = Trixi.True())
 #ode_alg = ParsaniKetchesonDeconinck3S82(thread = Trixi.True())
 
 sol = solve(ode, ode_alg, dt = 42.0, save_start = false, adaptive = false,
