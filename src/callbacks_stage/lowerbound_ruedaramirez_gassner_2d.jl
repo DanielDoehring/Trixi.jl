@@ -146,7 +146,8 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{2}, semi, limiter!)
                     # Calculate corrected u
                     for v in eachvariable(equations)
                         u_newton_node[v] = u_dgfv_node[v] +
-                                           delta_alpha_ij * (u_fv_node[v] - u_dg_node[v])
+                                           delta_alpha_ij *
+                                           (u_fv_node[v] - u_dg_node[v])
                     end
                     # Compute new pressure value
                     p_newton = pressure(u_newton_node, equations)
