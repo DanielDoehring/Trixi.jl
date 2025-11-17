@@ -26,8 +26,10 @@ function correct_u!(u_dgfv::AbstractArray{<:Any, 4}, u_fv, u_dg_node,
                 u_dg_node[v] = compute_pure_dg(u_dgfv_node[v], u_fv_node[v],
                                                alpha[element])
 
-                u_dgfv[v, i, j, element] = u_dgfv_node[v] +
-                                           delta_alpha * (u_fv_node[v] - u_dg_node[v])
+                u_dgfv[v, i, j, element] = compute_dgfv_update(u_dgfv_node[v],
+                                                               u_fv_node[v],
+                                                               u_dg_node[v],
+                                                               delta_alpha)
             end
         end
     end
@@ -145,9 +147,10 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{2}, semi, limiter!)
 
                     # Calculate corrected u
                     for v in eachvariable(equations)
-                        u_newton_node[v] = u_dgfv_node[v] +
-                                           delta_alpha_ij *
-                                           (u_fv_node[v] - u_dg_node[v])
+                        u_newton_node[v] = compute_dgfv_update(u_dgfv_node[v],
+                                                               u_fv_node[v],
+                                                               u_dg_node[v],
+                                                               delta_alpha_ij)
                     end
                     # Compute new pressure value
                     p_newton = pressure(u_newton_node, equations)
