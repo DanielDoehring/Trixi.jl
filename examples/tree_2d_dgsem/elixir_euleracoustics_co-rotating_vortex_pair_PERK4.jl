@@ -352,9 +352,6 @@ sol_averaging = Trixi.solve(ode_averaging, ode_alg_Euler,
                             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                             save_everystep = false, callback = callbacks_averaging);
 
-# Print the timer summary
-summary_callback()
-
 ###############################################################################
 # set up coupled semidiscretization
 
@@ -419,9 +416,6 @@ ode_alg_Acoustic = Trixi.PairedExplicitRK4Multi(Stages_Acoustics, base_path * "A
 sol = Trixi.solve(ode, ode_alg_Acoustic,
                   dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                   save_everystep = false, callback = callbacks);
-
-# Print the timer summary
-summary_callback()
 
 using Plots
 
