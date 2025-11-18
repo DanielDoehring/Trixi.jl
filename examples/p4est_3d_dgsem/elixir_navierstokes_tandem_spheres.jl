@@ -65,7 +65,7 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
 case_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/"
-#case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
+case_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/"
 
 mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 
@@ -104,9 +104,9 @@ tspan = (0.0, t_end)
 
 #restart_path = "out/"
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
-restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
+#restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
-restart_file = "restart_ts200_hp.h5"
+restart_file = "restart_ts150_hp.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
@@ -151,7 +151,7 @@ analysis_callback = AnalysisCallback(semi,
 
 #analysis_callback = AnalysisCallback(semi_hyp, interval = analysis_interval)
 
-alive_callback = AliveCallback(alive_interval = 50)
+alive_callback = AliveCallback(alive_interval = 5)
 
 cfl_0() = 5.0 # k = 2
 
@@ -162,7 +162,9 @@ cfl_max() = 13.5 # k = 2 p2
 cfl_max() = 9.0 # k = 3, p2
 
 cfl_max() = 6.0 # k = 4, p3
-cfl_max() = 6.7 # k = 4, p3 14-11 Split
+cfl_max() = 6.0 # k = 4, p3, relaxation TODO: Check this!
+
+#cfl_max() = 6.7 # k = 4, p3 14-11 Split
 
 #cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -218,8 +220,8 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
 callbacks = CallbackSet(summary_callback,
                         #alive_callback,
                         analysis_callback,
-                        #stepsize_callback,
-                        save_solution,
+                        stepsize_callback,
+                        #save_solution,
                         #save_restart
                         )
 
@@ -266,10 +268,14 @@ dtRatios = reverse([0.000120724458014592531464
 0.00135157296740449967876] ./ 0.00135157296740449967876)
 
 path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
-path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
+#path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 
+relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
+ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
+
+#=
 Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
 dtRatios_para = reverse([
 24.0577830892107158434
@@ -286,6 +292,7 @@ path_coeffs_para = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra
 ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
                                             path_coeffs, path_coeffs_para,
                                             dtRatios, dtRatios_para)
+=#
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 2.37e-3,
