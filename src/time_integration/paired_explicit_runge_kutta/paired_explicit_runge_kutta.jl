@@ -190,32 +190,18 @@ function solve!(integrator::AbstractPairedExplicitRKIntegrator)
     integrator.finalstep = false
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
+        # NOTE: Euler-Acoustic AveragingCallback additions
+        @threaded for u_ind in eachindex(integrator.u)
+            integrator.uprev[u_ind] = integrator.u[u_ind]
+        end
+        integrator.tprev = integrator.t
+
         step!(integrator)
     end
 
     finalize_callbacks(integrator)
     # For AMR: Counting RHS evals
     #println("RHS Calls: ", integrator.RHSCalls)
-
-    return TimeIntegratorSolution((first(prob.tspan), integrator.t),
-                                  (prob.u0, integrator.u),
-                                  integrator.sol.prob)
-end
-
-# Euler-Acoustic requires storing the previous time step
-function solve!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleIntegrator,
-                                  AbstractPairedExplicitRKEulerAcousticMultiIntegrator})
-    @unpack prob = integrator.sol
-
-    integrator.finalstep = false
-
-    @trixi_timeit timer() "main loop" while !integrator.finalstep
-        # Store variables of previous time step
-        integrator.t_prev = integrator.t
-        integrator.u_prev .= integrator.u # TODO: Probably slower than @threaded loop!
-
-        step!(integrator)
-    end
 
     return TimeIntegratorSolution((first(prob.tspan), integrator.t),
                                   (prob.u0, integrator.u),
