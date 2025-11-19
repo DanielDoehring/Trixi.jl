@@ -322,7 +322,7 @@ averaging_callback = AveragingCallback(semi_euler, tspan_averaging)
 
 cfl_Euler = 5.0 # PERK4 Multi [5, 6, 8, 13] # Ref_3
 
-cfl_Euler = 6.2 # PERK4 Single 13
+#cfl_Euler = 6.2 # PERK4 Single 13
 
 stepsize_callback = StepsizeCallback(cfl = cfl_Euler)
 
@@ -345,7 +345,7 @@ Stages_Euler = [13, 8, 6, 5]
 dtRatios = [1, 0.5, 0.25, 0.125]
 ode_alg_Euler = Trixi.PairedExplicitRK4Multi(Stages_Euler, base_path * "Euler/Ref_3/", dtRatios)
 
-ode_alg_Euler = Trixi.PairedExplicitRK4(13, base_path * "Euler/Ref_4/")
+#ode_alg_Euler = Trixi.PairedExplicitRK4(13, base_path * "Euler/Ref_4/")
 
 # TODO: Need to execute plain OrdinaryDiffEq before to avoid insane allocations due to mortars (type instability, very strange)
 
@@ -395,8 +395,8 @@ cfl_Euler_Coupling = 5.0 # PERK Multi
 #cfl_Euler_Coupling = 5.2 # PERK Single
 
 euler_acoustics_coupling = EulerAcousticsCouplingCallback(ode_euler,
-                                                          #base_path *  "averaging_PERK_Single.h5",
-                                                          base_path * "averaging_PERK_Multi.h5",
+                                                          "/home/daniel/git/DissDoc/Data/EulerAcoustic/averaging_PERK_Single.h5",
+                                                          #"/home/daniel/git/DissDoc/Data/EulerAcoustic/averaging_PERK_Multi.h5",
                                                           ode_alg_Euler,
                                                           cfl_Acoustics, cfl_Euler_Coupling)
 

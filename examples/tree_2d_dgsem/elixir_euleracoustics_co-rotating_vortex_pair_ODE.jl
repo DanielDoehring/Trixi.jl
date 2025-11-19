@@ -349,7 +349,7 @@ callbacks_averaging = CallbackSet(summary_callback, alive_callback, averaging_ca
 ode_alg = DGLDDRK84_F(williamson_condition = false, thread = Trixi.True())
 
 sol_averaging = solve(ode_averaging, ode_alg,
-                      dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                      dt = 1.0,
                       adaptive = false,
                       save_everystep = false, callback = callbacks_averaging);
 
