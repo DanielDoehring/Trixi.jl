@@ -210,10 +210,6 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType <: AbstractVecto
     const force_stepfail::Bool
     # Additional PERK register
     k1::uType
-
-    # NOTE: Euler-Acoustic AveragingCallback additions
-    uprev::uType
-    tprev::RealT
 end
 
 function init(ode::ODEProblem, alg::PairedExplicitRK4;
@@ -243,10 +239,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
                                                               k1,
                                                               u_prev, t_prev)
     else # Parabolic, purely hyperbolic, Euler-Gravity, ...
-        # NOTE: Euler-Acoustic AveragingCallback additions
-        uprev = copy(u0)
-        tprev = t0
-
         integrator = PairedExplicitRK4Integrator(u0, du, u_tmp,
                                                  t0, tdir, dt, zero(dt),
                                                  iter, ode.p,
@@ -256,8 +248,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4;
                                                                          ode.tspan;
                                                                          kwargs...),
                                                  false, true, false,
-                                                 k1,
-                                                 uprev, tprev)
+                                                 k1)
     end
 
     initialize_callbacks!(callback, integrator)

@@ -190,12 +190,6 @@ function solve!(integrator::AbstractPairedExplicitRKIntegrator)
     integrator.finalstep = false
 
     @trixi_timeit timer() "main loop" while !integrator.finalstep
-        # NOTE: Euler-Acoustic AveragingCallback additions
-        @threaded for u_ind in eachindex(integrator.u)
-            integrator.uprev[u_ind] = integrator.u[u_ind]
-        end
-        integrator.tprev = integrator.t
-
         step!(integrator)
     end
 

@@ -169,10 +169,6 @@ mutable struct PairedExplicitRK4MultiIntegrator{RealT <: Real, uType <: Abstract
 
     coarsest_lvl::Int64
     n_levels::Int64
-
-    # NOTE: Euler-Acoustic AveragingCallback additions
-    uprev::uType
-    tprev::RealT
 end
 
 mutable struct PairedExplicitRK4MultiParabolicIntegrator{RealT <: Real,
@@ -344,11 +340,6 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
         partition_u!(level_info_u,
                      level_info_elements, n_levels,
                      u0, semi)
-
-        # NOTE: Euler-Acoustic AveragingCallback additions
-        uprev = copy(u0)
-        tprev = t0
-
         integrator = PairedExplicitRK4MultiIntegrator(u0, du, u_tmp,
                                                       t0, tdir,
                                                       dt, zero(dt),
@@ -369,8 +360,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                       level_info_mortars_acc,
                                                       level_info_mpi_mortars_acc,
                                                       level_info_u,
-                                                      -1, n_levels,
-                                                      uprev, tprev)
+                                                      -1, n_levels)
 
         if :semi_gravity in fieldnames(typeof(semi))
             partition_u_gravity!(integrator)
