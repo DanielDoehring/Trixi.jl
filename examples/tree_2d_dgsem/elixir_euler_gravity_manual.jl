@@ -69,6 +69,8 @@ end
 
 rho0 = 1.5e7
 G = 6.674e-8
+atol = 1e-7
+rtol = 1e-6
 
 # TODO: Can I dispatch on `source_terms` to make this less hacky?
 function Trixi.calc_sources!(du_euler, u_euler, t, source_terms,
@@ -88,19 +90,20 @@ function Trixi.calc_sources!(du_euler, u_euler, t, source_terms,
                                                (u_euler[1, .., element] - rho0)
     end
 
-    #u_gravity_ode, stats = gmres(A_map, du_gravity_ode, atol = 1.0e-11, rtol = 1.0e-10)
+    # Step 2: Solve for gravitational potential ϕ
+
+    #u_gravity_ode, stats = gmres(A_map, du_gravity_ode, atol = atol, rtol = rtol)
     u_gravity_ode = A_sparse \ du_gravity_ode
 
     u_gravity = Trixi.wrap_array(u_gravity_ode, mesh, advection_eq, solver_gravity,
                                  cache)
 
+    # Step 3: Update Euler RHS with gravitational source terms
     Trixi.@threaded for element in element_indices
         for j in eachnode(dg), i in eachnode(dg)
             phi_node = u_gravity[1, i, j, element]
-            #phi_node = Trixi.get_node_vars(u_gravity, advection_eq, dg, i, j, element)[1]
-            
             (phi_x, phi_y) = calc_potential_derivative(phi_node, mesh, equations,
-                                                     dg, cache, i, j, element)
+                                                       dg, cache, i, j, element)
 
             du_euler[2, i, j, element] -= u_euler[1, i, j, element] * phi_x
             du_euler[3, i, j, element] -= u_euler[1, i, j, element] * phi_y
