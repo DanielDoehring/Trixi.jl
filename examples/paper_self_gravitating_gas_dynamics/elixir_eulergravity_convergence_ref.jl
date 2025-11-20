@@ -1,5 +1,4 @@
 
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqLowStorageRK
 using Trixi
 
 initial_condition = initial_condition_eoc_test_coupled_euler_gravity
@@ -80,7 +79,7 @@ cfl_euler = 0.5
 stepsize_callback = StepsizeCallback(cfl = cfl_euler)
 
 analysis_interval = 10_000
-alive_callback = AliveCallback(alive_interval = 20)
+alive_callback = AliveCallback(alive_interval = 1)
 
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
                                      save_analysis = true,
