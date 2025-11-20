@@ -122,7 +122,6 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{1}, semi, limiter!)
                     alpha_n = alpha[element] + delta_alpha_i
                     # Compute ∂u/∂α
                     for v in eachvariable(equations)
-                        # Compute pure DG solution
                         u_dg_node[v] = compute_pure_dg(u_dgfv_node[v], u_fv_node[v],
                                                        alpha_n)
 
