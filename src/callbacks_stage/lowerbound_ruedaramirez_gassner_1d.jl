@@ -147,10 +147,10 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{1}, semi, limiter!)
                                                                delta_alpha_i)
                     end
                     # Compute new pressure value
-                    p_newton = pressure(u_newton_node, equations)
+                    p_new = pressure(u_newton_node, equations)
 
                     # Check convergence
-                    a_p = beta_p * p_fv - p_newton
+                    a_p = beta_p * p_fv - p_new
                     if a_p <= root_tol
                         break
                     end
