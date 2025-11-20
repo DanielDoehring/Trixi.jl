@@ -136,7 +136,8 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{1}, semi, limiter!)
                     dp_dalpha = dot(dp_du_node, du_dalpha_node)
 
                     # Newton update to `delta_alpha_i`
-                    # "+" due "-" of Newton formula and "-" in definition of a_p = beta_p * p_fv - p_dgfv
+                    # "+" due "-" of Newton formula and "-" in definition of
+                    # a_p = beta_p * p_fv - p_dgfv
                     delta_alpha_i += damping * a_p / dp_dalpha
 
                     # Calculate corrected u
@@ -146,7 +147,6 @@ function limiter_rueda_gassner!(u_dgfv, mesh::AbstractMesh{1}, semi, limiter!)
                                                                u_dg_node[v],
                                                                delta_alpha_i)
                     end
-                    # Compute new pressure value
                     p_new = pressure(u_newton_node, equations)
 
                     # Check convergence
