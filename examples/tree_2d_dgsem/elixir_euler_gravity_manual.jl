@@ -21,6 +21,7 @@ polydeg = 3
 # the hyperbolic part is zero.
 solver_gravity = DGSEM(polydeg = polydeg, surface_flux = flux_central)
 
+# IC does not matter for elliptic equation
 function initial_condition_jeans_instability(x, t,
                                              equations::LinearScalarAdvectionEquation2D)
     # gravity equation: -Δϕ = -4πGρ
@@ -72,12 +73,24 @@ G = 6.674e-8
 atol = 1e-7
 rtol = 1e-6
 
-# TODO: Can I dispatch on `source_terms` to make this less hacky?
-function Trixi.calc_sources!(du_euler, u_euler, t, source_terms,
+struct SourceTerms
+    A_sparse::SparseMatrixCSC{Float64, Int64}
+    #A_map::LinearMap{Float64}
+
+    du_gravity_ode::Vector{Float64}
+
+    rho0::Float64
+    G::Float64
+end
+source_terms = SourceTerms(A_sparse, du_gravity_ode, rho0, G)
+
+function Trixi.calc_sources!(du_euler, u_euler, t, source_terms::SourceTerms,
                              equations::CompressibleEulerEquations2D, dg::DG, cache,
                              element_indices = eachelement(dg, cache))
+    @unpack A_sparse, du_gravity_ode, rho0, G = source_terms
+
     #grav_scale = -4.0 * pi * G
-    grav_scale = -4.0 * pi * G # TODO minus yes-no?
+    grav_scale = 4.0 * pi * G # TODO minus yes-no?
 
     # Step 1: Update RHS of gravity solver
     #
@@ -152,11 +165,9 @@ function initial_condition_jeans_instability(x, t,
     return prim2cons((dens, velx, vely, pres), equations)
 end
 
-dummy() = 42 # something different from `nothing`
-
 semi_euler = SemidiscretizationHyperbolic(mesh, equations_euler,
                                           initial_condition_jeans_instability,
-                                          solver_euler, source_terms = dummy())
+                                          solver_euler, source_terms = source_terms)
 
 tspan = (0.0, 5.0)
 ode = semidiscretize(semi_euler, tspan)
@@ -169,6 +180,14 @@ analysis_interval = 100
 alive_callback = AliveCallback(alive_interval = 100)
 
 analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval)
+
+analysis_interval = 1
+analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
+                                     save_analysis = true,
+                                     analysis_errors = Symbol[],
+                                     analysis_integrals = (energy_total, # Pretty much only sanity check
+                                                           energy_kinetic,
+                                                           energy_internal))
 
 callbacks = CallbackSet(summary_callback, stepsize_callback,
                         analysis_callback, alive_callback)
