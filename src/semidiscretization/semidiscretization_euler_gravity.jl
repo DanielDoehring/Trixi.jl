@@ -438,7 +438,6 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                                       level_info_mortars_acc[max_level])
 
     # compute gravitational potential and forces
-    #=
     @trixi_timeit timer() "gravity solver (part.)" update_gravity!(semi, u_ode,
                                                                    max_level,
                                                                    level_info_elements_acc,
@@ -447,8 +446,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationEulerGravity, t,
                                                                    level_info_mortars_acc,
                                                                    cache.level_info_u_gravity,
                                                                    n_levels)
-    =#
-    @trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
+    #@trixi_timeit timer() "gravity solver" update_gravity!(semi, u_ode)
 
     # add gravitational source source_terms to the Euler part
     if ndims(semi_euler) == 1

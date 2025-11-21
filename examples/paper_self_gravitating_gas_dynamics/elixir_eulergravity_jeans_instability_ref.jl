@@ -80,7 +80,7 @@ refinement_patches = ((type = "box", coordinates_min = (0.25, 0.25),
                        coordinates_max = (0.625, 0.625)))
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 4, # 5
+                initial_refinement_level = 5, # 5
                 refinement_patches = refinement_patches,
                 n_cells_max = 10_000)
 
@@ -103,7 +103,7 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Jeans_Instab/"
 #base_path = "/storage/home/daniel/PERK4/EulerGravity/Jeans_Instab/"
 
-#=
+
 Stages_Gravity = [10, 7, 5]
 dtRatios = [1, 0.5, 0.25]
 
@@ -121,8 +121,8 @@ parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     n_iterations_max = 1000,
                                     timestep_gravity = Trixi.timestep_gravity_PERK4_Multi!)
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
-=#
 
+#=
 parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     gravitational_constant = 6.674e-8, # aka G
                                     cfl = 0.8, # value as used in the paper
@@ -131,10 +131,10 @@ parameters = ParametersEulerGravity(background_density = 1.5e7, # aka rho0
                                     timestep_gravity = timestep_gravity_carpenter_kennedy_erk54_2N!)
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
-
+=#
 ###############################################################################
 # ODE solvers, callbacks etc.
-tspan = (0.0, 1.0) # 5.0
+tspan = (0.0, 5.0) # 5.0
 ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
@@ -177,7 +177,7 @@ analysis_callback = AnalysisCallback(semi_euler, interval = analysis_interval,
 cfl = 1.7 # CK2N54
 
 cfl = 4.6 # PERK4_11 Single
-#cfl = 2.0 # PERK4_11 Multi
+cfl = 3.0 # PERK4_11 Multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
@@ -197,8 +197,8 @@ sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
 dtRatios = [1, 0.5, 0.25]
 Stages = [11, 7, 5]
 
-ode_algorithm = Trixi.PairedExplicitRK4(11, base_path * "Euler_only/")
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
+#ode_algorithm = Trixi.PairedExplicitRK4(11, base_path * "Euler_only/")
+ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, base_path * "Euler_only/", dtRatios)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 2.5e-3,
