@@ -76,7 +76,8 @@ rtol = 1e-6
 function Trixi.calc_sources!(du_euler, u_euler, t, source_terms,
                              equations::CompressibleEulerEquations2D, dg::DG, cache,
                              element_indices = eachelement(dg, cache))
-    grav_scale = -4.0 * pi * G
+    #grav_scale = -4.0 * pi * G
+    grav_scale = -4.0 * pi * G # TODO minus yes-no?
 
     # Step 1: Update RHS of gravity solver
     #
