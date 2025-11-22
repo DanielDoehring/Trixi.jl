@@ -202,26 +202,6 @@ function solve!(integrator::AbstractPairedExplicitRKIntegrator)
                                   integrator.sol.prob)
 end
 
-# Euler-Acoustic requires storing the previous time step
-function solve!(integrator::Union{AbstractPairedExplicitRKEulerAcousticSingleIntegrator,
-                                  AbstractPairedExplicitRKEulerAcousticMultiIntegrator})
-    @unpack prob = integrator.sol
-
-    integrator.finalstep = false
-
-    @trixi_timeit timer() "main loop" while !integrator.finalstep
-        # Store variables of previous time step
-        integrator.t_prev = integrator.t
-        integrator.u_prev .= integrator.u # TODO: Probably slower than @threaded loop!
-
-        step!(integrator)
-    end
-
-    return TimeIntegratorSolution((first(prob.tspan), integrator.t),
-                                  (prob.u0, integrator.u),
-                                  integrator.sol.prob)
-end
-
 # Function that computes the first stage of a general PERK method
 @inline function PERK_k1!(integrator::AbstractPairedExplicitRKIntegrator,
                           p)
@@ -942,11 +922,14 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
     if :kS1 in fieldnames(typeof(integrator))
         resize!(integrator.kS1, new_size)
     end
+
+    #=
     # Check if we have Euler-Gravity situation
     if :semi_gravity in fieldnames(typeof(integrator.p))
         partition_u_gravity!(integrator)
     end
-
+    =#
+    
     return nothing
 end
 

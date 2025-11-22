@@ -42,6 +42,7 @@ function calc_acoustic_sources!(acoustic_source_terms, u_euler, u_acoustics,
     return nothing
 end
 
+#=
 function calc_acoustic_sources!(acoustic_source_terms, u_euler, u_acoustics,
                                 vorticity_mean,
                                 coupled_element_ids_acc::Vector{Vector{Int64}}, mesh,
@@ -76,4 +77,5 @@ function calc_acoustic_sources!(acoustic_source_terms, u_euler, u_acoustics,
 
     return nothing
 end
+=#
 end # @muladd

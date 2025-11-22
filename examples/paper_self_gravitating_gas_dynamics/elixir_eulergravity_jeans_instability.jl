@@ -114,7 +114,9 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-stepsize_callback = StepsizeCallback(cfl = 0.5) # value as used in the paper
+cfl = 0.5 # CK2N54
+cfl = 4.9 # PERK4_11
+stepsize_callback = StepsizeCallback(cfl = cfl) # value as used in the paper
 
 save_solution = SaveSolutionCallback(interval = 10,
                                      save_initial_solution = true,
@@ -166,8 +168,18 @@ callbacks = CallbackSet(summary_callback, stepsize_callback,
 
 ###############################################################################
 # run the simulation
+
+base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Jeans_Instab/"
+ode_algorithm = Trixi.PairedExplicitRK4(11, base_path * "Euler_only/")
+
+sol = Trixi.solve(ode, ode_algorithm,
+                  dt = 1.0,
+                  save_everystep = false, callback = callbacks);
+
+#=
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             ode_default_options()..., callback = callbacks);
+=#
 
 println("Number of gravity subcycles: ", semi.gravity_counter.ncalls_since_readout)

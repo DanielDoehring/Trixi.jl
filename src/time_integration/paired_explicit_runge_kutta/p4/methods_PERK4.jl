@@ -212,34 +212,6 @@ mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType <: AbstractVecto
     k1::uType
 end
 
-mutable struct PairedExplicitRK4EulerAcousticIntegrator{RealT <: Real,
-                                                        uType <: AbstractVector,
-                                                        Params, Sol, F,
-                                                        PairedExplicitRKOptions} <:
-               AbstractPairedExplicitRKEulerAcousticSingleIntegrator{4}
-    u::uType
-    du::uType # In-place output of `f`
-    u_tmp::uType # Used for building the argument to `f`
-    t::RealT
-    tdir::RealT # DIRection of time integration, i.e, if one marches forward or backward in time
-    dt::RealT # current time step
-    dtcache::RealT # manually set time step
-    iter::Int # current number of time steps (iteration)
-    p::Params # will be the semidiscretization from Trixi
-    sol::Sol # faked
-    const f::F # `rhs!` of the semidiscretization
-    const alg::PairedExplicitRK4
-    opts::PairedExplicitRKOptions
-    finalstep::Bool # added for convenience
-    const dtchangeable::Bool
-    const force_stepfail::Bool
-    # Additional PERK register
-    k1::uType
-    # Euler-acoustic coupling additions
-    u_prev::uType
-    t_prev::RealT
-end
-
 function init(ode::ODEProblem, alg::PairedExplicitRK4;
               dt, callback::Union{CallbackSet, Nothing} = nothing, kwargs...)
     u0 = copy(ode.u0)
