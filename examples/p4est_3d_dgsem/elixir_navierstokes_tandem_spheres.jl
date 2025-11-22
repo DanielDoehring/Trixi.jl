@@ -94,7 +94,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 1) 0 to 75: k2, p2
 # 2) 75 to 100: k3, p2
 # 3) 100 to 200: k4, p3
-t_star_end = 200
+t_star_end = 160 # for relaxation improvement check run
 t_end = t_star_end * D()/U()
 
 tspan = (0.0, t_end)
@@ -140,7 +140,7 @@ drag_shear_back = AnalysisSurfaceIntegral((:BackSphere,),
 
 analysis_callback = AnalysisCallback(semi,
                                      interval = analysis_interval,
-                                     save_analysis = true,
+                                     save_analysis = false,
                                      output_directory = restart_path,
                                      analysis_errors = Symbol[], # Turn off error computation
                                      analysis_integrals = (drag_p_front,
@@ -162,7 +162,7 @@ cfl_max() = 13.5 # k = 2 p2
 cfl_max() = 9.0 # k = 3, p2
 
 cfl_max() = 6.0 # k = 4, p3
-cfl_max() = 6.0 # k = 4, p3, relaxation TODO: Check this!
+cfl_max() = 6.4 # k = 4, p3, (relaxation), restarted from ts = 150
 
 #cfl_max() = 6.7 # k = 4, p3 14-11 Split
 
@@ -218,7 +218,7 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    output_directory = restart_path)
 
 callbacks = CallbackSet(summary_callback,
-                        #alive_callback,
+                        alive_callback,
                         analysis_callback,
                         stepsize_callback,
                         #save_solution,
@@ -272,8 +272,8 @@ path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coef
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
-ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
+#relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
+#ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
 
 #=
 Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
