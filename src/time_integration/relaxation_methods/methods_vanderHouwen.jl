@@ -187,7 +187,7 @@ mutable struct vanderHouwenRelaxationIntegrator{RealT <: Real, uType <: Abstract
     direction::uType # RK update, i.e., sum of stages K_i times weights b_i
     gamma::RealT # Relaxation parameter
     S_old::RealT # Entropy of previous iterate
-    relaxation_solver::AbstractRelaxationSolver
+    const relaxation_solver::AbstractRelaxationSolver
     # Note: Could add another register which would store the summed-up 
     # dot products ∑ₖ (wₖ ⋅ kₖ) and then integrate only once and not per stage k
     # Could also add option `recompute_entropy` for entropy-conservative problems
