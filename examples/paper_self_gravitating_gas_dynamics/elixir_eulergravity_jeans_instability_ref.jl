@@ -107,10 +107,7 @@ base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Jeans
 Stages_Gravity = [10, 7, 5]
 dtRatios = [1, 0.5, 0.25]
 
-Stages_Gravity = [7, 5]
-
 cfl_gravity = 0.9 # Seems to be stability limit
-cfl_gravity = 2.0
 
 alg_gravity = Trixi.PairedExplicitRK4Multi(Stages_Gravity, base_path * "HypDiff/", dtRatios)
 
