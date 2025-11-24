@@ -361,11 +361,10 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                                                       level_info_mpi_mortars_acc,
                                                       level_info_u,
                                                       -1, n_levels)
-        #=
+         
         if :semi_gravity in fieldnames(typeof(semi))
             partition_u_gravity!(integrator)
         end
-        =#
     end
 
     initialize_callbacks!(callback, integrator)

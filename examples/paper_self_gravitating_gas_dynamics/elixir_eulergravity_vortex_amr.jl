@@ -1,6 +1,6 @@
 
 using Trixi
-using OrdinaryDiffEqLowStorageRK
+using OrdinaryDiffEqLowStorageRK, OrdinaryDiffEqLowOrderRK
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -125,7 +125,7 @@ solver = DGSEM(polydeg=PolyDeg, surface_flux=surf_flux)
 coordinates_min = (-EdgeLength, -EdgeLength)
 coordinates_max = ( EdgeLength,  EdgeLength)
 
-Refinement = 6
+Refinement = 5
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level=Refinement,
                 n_cells_max=100_000)
@@ -152,17 +152,42 @@ semi_gravity = SemidiscretizationHyperbolic(mesh, equations_gravity, initial_con
 ###############################################################################
 # combining both semidiscretizations for Euler + self-gravity
 
-# TODO: Check if I can use PERK here
+rho_0 = 1.0 # Un-perturbed density outside the vortex
+residual_tol = 1e-3 # -2
+n_max = 200
 
 # These parameters are taken from the Euler-Gravity Sedov case
-parameters = ParametersEulerGravity(background_density = 0.0, # aka rho0
+parameters = ParametersEulerGravity(background_density = rho_0,
                                     gravitational_constant = 6.674e-8, # aka G
-                                    cfl = 2.4,
-                                    resid_tol = 1.0e-2,
-                                    n_iterations_max = 100,
+                                    cfl = 2.6,
+                                    resid_tol = residual_tol,
+                                    n_iterations_max = n_max,
                                     timestep_gravity = timestep_gravity_erk52_3Sstar!)
 
 semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters)
+
+#=
+base_path = "/home/daniel/git/MA/EigenspectraGeneration/PERK4/EulerGravity/Blob/2D/"
+
+dtRatios = [1, 0.5, 0.25]
+StagesGravity = [5, 3, 2]
+
+cfl_gravity = 1.9 # Gravity Multi
+
+#alg_gravity = Trixi.PairedExplicitRK2(5, base_path * "HypDiff/p2/")
+alg_gravity = Trixi.PairedExplicitRK2Multi(StagesGravity, base_path * "HypDiff/p2/", dtRatios)
+
+parameters = ParametersEulerGravity(background_density = rho_0,
+                                    gravitational_constant = 6.674e-8, # aka G
+                                    cfl = cfl_gravity,
+                                    resid_tol = residual_tol,
+                                    n_iterations_max = n_max,
+                                    #timestep_gravity = Trixi.timestep_gravity_PERK2!
+                                    timestep_gravity = Trixi.timestep_gravity_PERK2_Multi!
+                                    )
+
+semi = SemidiscretizationEulerGravity(semi_euler, semi_gravity, parameters, alg_gravity)
+=#
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -182,9 +207,9 @@ amr_controller = ControllerThreeLevel(semi, TrixiExtension.IndicatorVortex(semi.
                                       max_level=Refinement+3, max_threshold=-0.6)
                                      
 amr_interval = 16 # PERK4 Multi
-#amr_interval = 10 # PERK4 19
+amr_interval = 10 # PERK4 19
 
-amr_interval = 18 # NDBLSRK144
+#amr_interval = 18 # NDBLSRK144
 #amr_interval = 30 # DGLDDRK84_C
 #amr_interval = 26 # RDPK3SpFSAL49
 #amr_interval = 74 # RK4
@@ -199,14 +224,16 @@ amr_callback = AMRCallback(semi, amr_controller,
 CFL = 7.4
 
 # PERK4 Standalone #
-#CFL = 11.5 # S = 19
+CFL = 11.5 # S = 19
 
 # OrdinaryDiffEq.jl methods
 
+#=
 CFL = 6.7 # NDBLSRK144
-#CFL = 3.9 # DGLDDRK84_C
-#CFL = 4.6 # RDPK3SpFSAL49
-#CFL = 1.6 # RK4
+CFL = 3.9 # DGLDDRK84_C
+CFL = 4.6 # ParsaniKetchesonDeconinck3S94
+CFL = 1.6 # RK4
+=#
 
 stepsize_callback = StepsizeCallback(cfl = CFL)
 
@@ -228,7 +255,7 @@ Stages = [19, 11, 7, 5]
 path = "/home/daniel/git/paper-2024-perk4/6_Applications/6_3_IsentropicVortexAdvection/"
 ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
 
-#ode_algorithm = Trixi.PairedExplicitRK4(19, path)
+ode_algorithm = Trixi.PairedExplicitRK4(19, path)
 
 sol = Trixi.solve(ode, ode_algorithm,
                   dt = 42.0,
@@ -237,13 +264,14 @@ sol = Trixi.solve(ode, ode_algorithm,
 
 ###############################################################################
 
-
-ode_algorithm = NDBLSRK144(williamson_condition = false, thread = Trixi.True())
-#ode_algorithm = DGLDDRK84_C(williamson_condition = false)
-#ode_algorithm = RDPK3SpFSAL49()
-#ode_algorithm = RK4()
+#=
+ode_algorithm = NDBLSRK144(williamson_condition = false)
+ode_algorithm = DGLDDRK84_C(williamson_condition = false)
+ode_algorithm = ParsaniKetchesonDeconinck3S94()
+ode_algorithm = RK4()
 
 sol = solve(ode, ode_algorithm,
             dt = 42.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks, 
             adaptive = false);
+=#
