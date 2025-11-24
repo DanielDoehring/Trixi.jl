@@ -94,7 +94,8 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # 1) 0 to 75: k2, p2
 # 2) 75 to 100: k3, p2
 # 3) 100 to 200: k4, p3
-t_star_end = 160 # for relaxation improvement check run
+t_star_end = 200
+t_star_end = 100.05
 t_end = t_star_end * D()/U()
 
 tspan = (0.0, t_end)
@@ -106,14 +107,14 @@ tspan = (0.0, t_end)
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 #restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
-restart_file = "restart_ts150_hp.h5"
+restart_file = "restart_ts100_hp.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 
-#ode = semidiscretize(semi, tspan, restart_filename) # Split method
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+ode = semidiscretize(semi, tspan, restart_filename) # Split method
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 ###############################################################################
 
@@ -162,9 +163,19 @@ cfl_max() = 13.5 # k = 2 p2
 cfl_max() = 9.0 # k = 3, p2
 
 cfl_max() = 6.0 # k = 4, p3
-cfl_max() = 6.4 # k = 4, p3, (relaxation), restarted from ts = 150
 
-#cfl_max() = 6.7 # k = 4, p3 14-11 Split
+cfl_max() = 6.4 # k = 4, p3, (relaxation), restarted from ts = 100
+
+#cfl_max() = 6.7 # k = 4, p3 14-11 Split Multi
+cfl_max() = 9.2 # k = 4, p3 14-11 Split
+
+#cfl_max() = 6.2 # k = 4, p3, S=14
+# TODO: Check relaxation standalone!
+# TODO: 11-Stage Split standalone
+
+#cfl_max() = 4.6 # DGLDDRK73_C
+#cfl_max() = 11.1 # ParsaniKetchesonDeconinck3S173
+#cfl_max() = 1.5 # CKLLSRK43_2
 
 #cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
@@ -272,9 +283,12 @@ path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coef
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 
+#ode_alg = Trixi.PairedExplicitRK3(14, path_coeffs)
+
 #relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
 
+path_coeffs_para = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/para/"
 #=
 Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
 dtRatios_para = reverse([
@@ -287,26 +301,26 @@ dtRatios_para = reverse([
 461.074489651061867335
 611.284322126177812606] ./ 611.284322126177812606)
 
-path_coeffs_para = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/para/"
-
 ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
                                             path_coeffs, path_coeffs_para,
                                             dtRatios, dtRatios_para)
 =#
+
+ode_alg = Trixi.PairedExplicitRK3Split(11, path_coeffs, path_coeffs_para)
+
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 2.37e-3,
                   save_everystep = false, save_start = false,
                   callback = callbacks);
 
+
 ###############################################################################
 
-#=
-callbacks = CallbackSet(summary_callback,
-                        alive_callback,
-                        analysis_callback)
+#ode_alg = DGLDDRK73_C(thread = Trixi.True())
+#ode_alg = ParsaniKetchesonDeconinck3S173(thread = Trixi.True())
+ode_alg = CKLLSRK43_2(thread = Trixi.True()) 
 
-sol = solve(ode, RDPK3SpFSAL35(thread = Trixi.True());
-            abstol = 1.0e-5, reltol = 1.0e-5,
+sol = solve(ode, ode_alg; dt = 1.0e-3,
+            adaptive = false,
             ode_default_options()..., callback = callbacks);
-=#
