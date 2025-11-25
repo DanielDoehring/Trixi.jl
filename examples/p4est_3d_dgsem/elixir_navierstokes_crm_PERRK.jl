@@ -9,11 +9,9 @@ prandtl_number() = 0.72
 # Follows problem C3.5 of the 2015 Third International Workshop on High-Order CFD Methods
 # https://www1.grc.nasa.gov/research-and-engineering/hiocfd/
 
-#Re = 5 * 10^6 # C3.5 testcase
-Re = 5 * 10^6 / 0.0254
+Re = 5 * 10^6 # C3.5 testcase
 
 chord = 7.005 # m = 275.80 inches
-#chord = 7.005 * 0.0254 # m = 7.005 inches (conversion from running case for mesh in inches)
 
 c = 343.0 # m/s = 13504 inches/s
 rho() = 1.293 # kg/m^3 = 2.1199e-5 kg/inches^3
@@ -65,9 +63,10 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)              
 
-#mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
-base_path = "/storage/home/daniel/CRM/"
-mesh_file = base_path * "crm_q3_lin_relabel_m.inp" # Meters
+mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
+
+#base_path = "/storage/home/daniel/CRM/"
+#mesh_file = base_path * "crm_q3_lin_relabel_m.inp" # Meters
 
 boundary_symbols = [:SYMMETRY,
                     :FARFIELD,
@@ -160,9 +159,7 @@ analysis_interval = 100_000
 force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
 
 A = 191.8 # m^2 = 297360.0 inch^2
-pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
-                                                SurfacePressureCoefficient(p(), rho(),
-                                                                           U(), A))
+
 aoa() = 0.0
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            LiftCoefficientPressure3D(aoa(), rho(),
