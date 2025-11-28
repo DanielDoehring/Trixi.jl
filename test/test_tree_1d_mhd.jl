@@ -334,7 +334,6 @@ end
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
     @test_allocations(Trixi.rhs!, semi, sol, 15000)
 end
-
 end
 
 end # module
