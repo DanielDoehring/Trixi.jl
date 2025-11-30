@@ -9,11 +9,11 @@ prandtl_number() = 0.72
 # Follows problem C3.5 of the 2015 Third International Workshop on High-Order CFD Methods
 # https://www1.grc.nasa.gov/research-and-engineering/hiocfd/
 
-#Re = 5 * 10^6 # C3.5 testcase
-Re = 5 * 10^6 / 0.0254
+Re = 5 * 10^6 # C3.5 testcase
 
 chord = 7.005 # m = 275.80 inches
-#chord = 7.005 * 0.0254 # m = 7.005 inches (conversion from running case for mesh in inches)
+
+aoa() = 2.3 # degrees
 
 c = 343.0 # m/s = 13504 inches/s
 rho() = 1.293 # kg/m^3 = 2.1199e-5 kg/inches^3
@@ -34,8 +34,10 @@ equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
     # set the freestream flow parameters
     rho_freestream = 1.293
 
-    v1 = 291.55
-    v2 = 0.0
+    #v1 = 291.55
+    v1 = 291.31512589561675
+    #v2 = 0.0
+    v2 = 11.70042411286779
     v3 = 0.0
 
     p_freestream = 108657.255
@@ -46,21 +48,25 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 2
+polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
+
+surface_flux = flux_hll
+volume_flux = flux_ranocha
+
 
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 0.5,
                                             alpha_min = 0.001,
                                             alpha_smooth = true,
-                                            variable = pressure)
-
-surface_flux = flux_hll
-volume_flux = flux_ranocha
+                                            variable = density_pressure)
 
 volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_dg = volume_flux,
                                                  volume_flux_fv = surface_flux)
+
+
+#volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)              
@@ -129,40 +135,35 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-# Run until crashes (standard multirate vs. relaxed multirate method)
-#tspan = (0.0, 1e-4)
 
-# Use for timings
-tspan = (0.0, 5e-6)
+semi = SemidiscretizationHyperbolic(mesh, equations,
+                                    initial_condition, solver;
+                                    boundary_conditions = boundary_conditions_hyp)
 
-ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multi
+
+#tspan = (0.0, 1e-3)
 #ode = semidiscretize(semi, tspan) # Everything else
 
-#=
-## Second run: Confirm increased robustness of relaxed multirate method ##
-restart_file = "restart_15e-6.h5"
-restart_filename = joinpath("out", restart_file)
 
-# Run until crashes
-tspan = (load_time(restart_filename), 1e-4)
+restart_file = "restart_000808829.h5"
+restart_filename = joinpath(base_path * "restart", restart_file)
 
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
-#ode = semidiscretize(semi, tspan, restart_filename)
-=#
+tspan = (load_time(restart_filename), 10 * 0.02402675355856628)
+
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
+ode = semidiscretize(semi, tspan, restart_filename)
+
 
 # Callbacks
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100_000
+analysis_interval = 3000
 
 force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
 
 A = 191.8 # m^2 = 297360.0 inch^2
-pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
-                                                SurfacePressureCoefficient(p(), rho(),
-                                                                           U(), A))
 aoa() = 0.0
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            LiftCoefficientPressure3D(aoa(), rho(),
@@ -176,33 +177,26 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(alive_interval = 100)
 
-save_sol_interval = 15000
-save_solution = SaveSolutionCallback(interval = save_sol_interval,
+save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
                                      output_directory = "out")
 
-save_restart = SaveRestartCallback(interval = save_sol_interval,
+save_restart = SaveRestartCallback(interval = analysis_interval,
                                    save_final_restart = true,
-                                   output_directory = "out")
+                                   output_directory = base_path * "restart")
 
-cfl_0() = 0.8 # PERRK
-
-# For Re = ~200M
-cfl_max() = 1.3 # PERRK Multi
-#cfl_max() = 2.1 # PERRK Standalone 15
+# Inviscid first run, k = 2
+cfl_0() = 0.5 # PERK
+cfl_max() = 3.1 # PERK Multi
 
 t_ramp_up() = 1e-6
 
 cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
-#cfl = 0.5 # R-CKL43
-#cfl = 0.4 # R-RK33
-
-## Restarted simulations ##
-
-#cfl = 1.2 # PERRK Multi
+# inviscid, restarted, k = 3
+#cfl = 3.1
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
@@ -210,7 +204,7 @@ callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
                         #save_solution,
-                        #save_restart,
+                        save_restart,
                         stepsize_callback
                         )
 
@@ -234,27 +228,30 @@ dtRatios_complete_p3 = [
                       ] ./ 0.00106435123831034
 Stages_complete_p3 = reverse(collect(range(3, 15)))
 
+# TODO: Safety factor?
+safety_factor = 1
+
 dtRatios_red_p3 = [ 
     0.00106435123831034,
-    0.000776133546233177,
-    0.000684534176141024,
-    0.00062269344329834,
-    0.000545023646652699,
-    0.000463906383514404,
-    0.000371748408675194,
-    0.000263250452280045,
-    0.000177319368720055,
-    0.000112414136528969
+    0.000776133546233177 / safety_factor,
+    0.000684534176141024 / safety_factor,
+    0.00062269344329834 / safety_factor,
+    0.000545023646652699 / safety_factor,
+    0.000463906383514404 / safety_factor,
+    0.000371748408675194 / safety_factor,
+    0.000263250452280045 / safety_factor,
+    0.000177319368720055 / safety_factor,
+    0.000112414136528969 / safety_factor
                       ] ./ 0.00106435123831034
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
-#ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
 
-
+#=
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
-
 ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3;
                                                  relaxation_solver = newton)
+=#
 
 #ode_alg = Trixi.PairedExplicitRelaxationRK3(15, base_path * "k2/p3/"; relaxation_solver = newton)
 
