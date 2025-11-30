@@ -68,9 +68,9 @@ function PairedExplicitRK3SplitMulti(stages::Vector{Int64},
 end
 
 mutable struct PairedExplicitRK3SplitMultiIntegrator{RealT <: Real,
-                                                         uType <: AbstractVector,
-                                                         Params, Sol, F,
-                                                         PairedExplicitRKOptions} <:
+                                                     uType <: AbstractVector,
+                                                     Params, Sol, F,
+                                                     PairedExplicitRKOptions} <:
                AbstractPairedExplicitRKSplitMultiIntegrator{3}
     u::uType
     du::uType # In-place output of `f`
@@ -144,7 +144,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK3SplitMulti;
     tdir = sign(ode.tspan[end] - ode.tspan[1])
     iter = 0
 
-     ### Set datastructures for handling of level-dependent integration ###
+    ### Set datastructures for handling of level-dependent integration ###
     semi = ode.p
     mesh, _, _, _ = mesh_equations_solver_cache(semi)
 

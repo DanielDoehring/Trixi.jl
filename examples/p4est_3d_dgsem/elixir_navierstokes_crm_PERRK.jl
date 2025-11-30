@@ -71,9 +71,10 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)              
 
-#mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
-base_path = "/storage/home/daniel/CRM/"
-mesh_file = base_path * "crm_q3_lin_relabel_m.inp" # Meters
+mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
+
+#base_path = "/storage/home/daniel/CRM/"
+#mesh_file = base_path * "crm_q3_lin_relabel_m.inp" # Meters
 
 boundary_symbols = [:SYMMETRY,
                     :FARFIELD,
@@ -164,7 +165,6 @@ analysis_interval = 3000
 force_boundary_names = (:WING, :FUSELAGE, :WING_UP, :WING_LO)
 
 A = 191.8 # m^2 = 297360.0 inch^2
-aoa() = 0.0
 lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
                                            LiftCoefficientPressure3D(aoa(), rho(),
                                                                      U(), A))

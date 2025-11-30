@@ -927,7 +927,7 @@ function Base.resize!(integrator::AbstractPairedExplicitRKMultiIntegrator,
     if :semi_gravity in fieldnames(typeof(integrator.p))
         partition_u_gravity!(integrator)
     end
-    
+
     return nothing
 end
 
