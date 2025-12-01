@@ -71,10 +71,10 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)              
 
-mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel.inp"
+#mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/C3.5_gridfiles/crm_q3_lin_relabel_m.inp"
 
-#base_path = "/storage/home/daniel/CRM/"
-#mesh_file = base_path * "crm_q3_lin_relabel_m.inp" # Meters
+base_path = "/storage/home/daniel/CRM/"
+mesh_file = base_path * "crm_q3_lin_relabel_m.inp" # Meters
 
 boundary_symbols = [:SYMMETRY,
                     :FARFIELD,
@@ -149,7 +149,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations,
 restart_file = "restart_000808829.h5"
 restart_filename = joinpath(base_path * "restart", restart_file)
 
-tspan = (load_time(restart_filename), 10 * 0.02402675355856628)
+tspan = (load_time(restart_filename), 10 * convective_timescale)
 
 #ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
 ode = semidiscretize(semi, tspan, restart_filename)
@@ -193,10 +193,10 @@ cfl_max() = 3.1 # PERK Multi
 
 t_ramp_up() = 1e-6
 
-cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
+#cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
 
 # inviscid, restarted, k = 3
-#cfl = 3.1
+cfl = 3.1
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
