@@ -81,7 +81,7 @@ stepsize_callback = StepsizeCallback(cfl = 1.3)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        save_solution,
+                        #save_solution,
                         stepsize_callback)
 
 ###############################################################################
@@ -90,3 +90,11 @@ callbacks = CallbackSet(summary_callback,
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
             ode_default_options()..., callback = callbacks);
+
+using BenchmarkTools
+
+u_ode = sol.u[1]
+du_ode = similar(u_ode)
+t0 = sol.t[1]
+
+@benchmark Trixi.rhs!(du_ode, u_ode, semi, t0)

@@ -87,7 +87,8 @@ Return an iterator over the indices that specify the location in relevant data s
 for the directions in `AbstractTree`.
 In particular, not the directions themselves are returned.
 """
-@inline eachdirection(tree::AbstractTree) = Base.OneTo(n_directions(tree))
+#@inline eachdirection(tree::AbstractTree) = Base.SOneTo(n_directions(tree))
+@inline eachdirection(tree::AbstractTree) = SOneTo(n_directions(tree))
 
 # For a given direction, return its opposite direction
 #

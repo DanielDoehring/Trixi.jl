@@ -15,7 +15,8 @@
 Return an iterator over the indices that specify the location in relevant data structures
 for the variables in `equations`. In particular, not the variables themselves are returned.
 """
-@inline eachvariable(equations::AbstractEquations) = Base.OneTo(nvariables(equations))
+#@inline eachvariable(equations::AbstractEquations) = Base.SOneTo(nvariables(equations))
+@inline eachvariable(equations::AbstractEquations) = SOneTo(nvariables(equations))
 
 """
     get_name(equations::AbstractEquations)
