@@ -586,7 +586,6 @@ Return an iterator over the indices that specify the location in relevant data s
 for the nodes in `dg`.
 In particular, not the nodes themselves are returned.
 """
-#@inline eachnode(dg::DG) = Base.SOneTo(nnodes(dg))
 @inline eachnode(dg::DG) = SOneTo(nnodes(dg))
 
 @inline nnodes(dg::DG) = nnodes(dg.basis)

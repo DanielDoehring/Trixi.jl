@@ -143,7 +143,6 @@ Return an iterator over the indices that specify the location in relevant data s
 for the nodes in `basis`. 
 In particular, not the nodes themselves are returned.
 """
-#@inline eachnode(basis::LobattoLegendreBasis) = Base.SOneTo(nnodes(basis))
 @inline eachnode(basis::LobattoLegendreBasis) = SOneTo(nnodes(basis))
 
 @inline polydeg(basis::LobattoLegendreBasis) = nnodes(basis) - 1
@@ -332,7 +331,6 @@ Return an iterator over the indices that specify the location in relevant data s
 for the nodes in `analyzer`. 
 In particular, not the nodes themselves are returned.
 """
-#@inline eachnode(analyzer::LobattoLegendreAnalyzer) = Base.SOneTo(nnodes(analyzer))
 @inline eachnode(analyzer::LobattoLegendreAnalyzer) = SOneTo(nnodes(analyzer))
 
 @inline polydeg(analyzer::LobattoLegendreAnalyzer) = nnodes(analyzer) - 1

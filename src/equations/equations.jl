@@ -15,7 +15,6 @@
 Return an iterator over the indices that specify the location in relevant data structures
 for the variables in `equations`. In particular, not the variables themselves are returned.
 """
-#@inline eachvariable(equations::AbstractEquations) = Base.SOneTo(nvariables(equations))
 @inline eachvariable(equations::AbstractEquations) = SOneTo(nvariables(equations))
 
 """
@@ -653,6 +652,8 @@ include("passive_tracers.jl")
                                                                                                }
     NCOMP
 end
+
+# TODO: Taal performance, 1:NCOMP vs. Base.OneTo(NCOMP) vs. SOneTo(NCOMP)
 """
     eachcomponent(equations::AbstractCompressibleEulerMulticomponentEquations)
 
@@ -661,7 +662,7 @@ for the components in `AbstractCompressibleEulerMulticomponentEquations`.
 In particular, not the components themselves are returned.
 """
 @inline function eachcomponent(equations::AbstractCompressibleEulerMulticomponentEquations)
-    Base.OneTo(ncomponents(equations))
+    return SOneTo(ncomponents(equations))
 end
 
 # Ideal MHD
@@ -693,6 +694,8 @@ include("ideal_glm_mhd_multiion_3d.jl")
                                                                                          }
     NCOMP
 end
+
+# TODO: Taal performance, 1:NVARS vs. Base.OneTo(NVARS) vs. SOneTo(NVARS)
 """
     eachcomponent(equations::AbstractIdealGlmMhdMulticomponentEquations)
 
@@ -701,7 +704,7 @@ for the components in `AbstractIdealGlmMhdMulticomponentEquations`.
 In particular, not the components themselves are returned.
 """
 @inline function eachcomponent(equations::AbstractIdealGlmMhdMulticomponentEquations)
-    Base.OneTo(ncomponents(equations))
+    return SOneTo(ncomponents(equations))
 end
 
 # Retrieve number of components from equation instance for the multi-ion case
@@ -714,6 +717,7 @@ end
     NCOMP
 end
 
+# TODO: Taal performance, 1:NCOMP vs. Base.OneTo(NCOMP) vs. SOneTo(NCOMP)
 """
     eachcomponent(equations::AbstractIdealGlmMhdMultiIonEquations)
 
@@ -722,7 +726,7 @@ for the components in `AbstractIdealGlmMhdMultiIonEquations`.
 In particular, not the components themselves are returned.
 """
 @inline function eachcomponent(equations::AbstractIdealGlmMhdMultiIonEquations)
-    Base.OneTo(ncomponents(equations))
+    return SOneTo(ncomponents(equations))
 end
 
 # Diffusion equation: first order hyperbolic system
