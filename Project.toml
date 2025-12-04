@@ -1,7 +1,7 @@
 name = "Trixi"
 uuid = "a7f1ee26-1774-49b1-8366-f1abc58fbfcb"
+version = "0.13.20-DEV"
 authors = ["Michael Schlottke-Lakemper <michael.schlottke-lakemper@uni-a.de>", "Gregor Gassner <ggassner@uni-koeln.de>", "Hendrik Ranocha <mail@ranocha.de>", "Andrew R. Winters <andrew.ross.winters@liu.se>", "Jesse Chan <jesse.chan@rice.edu>", "Andrés Rueda-Ramírez <am.rueda@upm.es>"]
-version = "0.13.19-DEV"
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -88,7 +88,7 @@ TrixiSparseConnectivityTracerExt = "SparseConnectivityTracer"
 Accessors = "0.1.36"
 Adapt = "4"
 CUDA = "5.8"
-CodeTracking = "1.0.5, 2"
+CodeTracking = "1.0.5, 2, 3"
 ConstructionBase = "1.5"
 Convex = "0.16"
 DataStructures = "0.18.15, 0.19"
