@@ -1135,8 +1135,7 @@ function calc_gradient!(gradients, u_transformed, t,
         @unpack surface_flux_values = cache.elements
         calc_gradient_interface_flux!(surface_flux_values, mesh, equations_parabolic,
                                       dg, parabolic_scheme,
-                                      cache,
-                                      interface_indices)
+                                      cache, interface_indices)
     end
 
     # Prolong solution to boundaries
