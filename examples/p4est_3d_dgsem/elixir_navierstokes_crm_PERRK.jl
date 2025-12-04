@@ -9,11 +9,12 @@ prandtl_number() = 0.72
 # Follows problem C3.5 of the 2015 Third International Workshop on High-Order CFD Methods
 # https://www1.grc.nasa.gov/research-and-engineering/hiocfd/
 
-Re = 5 * 10^6 # C3.5 testcase
+#Re = 5 * 10^6 # C3.5 testcase
+Re = 50 * 10^6 # C3.5 testcase
 
 chord = 7.005 # m = 275.80 inches
 
-aoa() = 2.3 # degrees
+aoa() = deg2rad(2.3) # 2.3°
 
 c = 343.0 # m/s = 13504 inches/s
 rho() = 1.293 # kg/m^3 = 2.1199e-5 kg/inches^3
@@ -81,7 +82,7 @@ boundary_symbols = [:SYMMETRY,
                     :WING, :FUSELAGE, :WING_UP, :WING_LO,
                     :OUTFLOW]
 
-mesh = P4estMesh{3}(mesh_file, polydeg = polydeg, boundary_symbols = boundary_symbols)
+mesh = P4estMesh{3}(mesh_file, boundary_symbols = boundary_symbols)
 
 # Ensure that rho and p are the same across symmetry line and allow only 
 # tangential velocity.
@@ -136,20 +137,21 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions_hyp,
                                                                     boundary_conditions_para))
 
-
+#=
 semi = SemidiscretizationHyperbolic(mesh, equations,
                                     initial_condition, solver;
                                     boundary_conditions = boundary_conditions_hyp)
+=#
 
+#=
+tspan = (0.0, 0.0)
+ode = semidiscretize(semi, tspan) # Everything else
+=#
 
-#tspan = (0.0, 1e-3)
-#ode = semidiscretize(semi, tspan) # Everything else
-
-
-restart_file = "restart_000808829.h5"
+restart_file = "restart_000003000.h5"
 restart_filename = joinpath(base_path * "restart", restart_file)
 
-tspan = (load_time(restart_filename), 10 * convective_timescale)
+tspan = (load_time(restart_filename), 1.75e-3)
 
 #ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # PER(R)K Multi
 ode = semidiscretize(semi, tspan, restart_filename)
@@ -197,6 +199,10 @@ t_ramp_up() = 1e-6
 
 # inviscid, restarted, k = 3
 cfl = 3.1
+
+# viscous with Re = 50e6, restarted, k = 3
+cfl = 0.26 # Split Multi
+#cfl = 0.24 # Standard Multi
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = 5)
 
@@ -246,6 +252,23 @@ dtRatios_red_p3 = [
 Stages_red_p3 = [15, 12, 11, 10, 9, 8, 7, 5, 4, 3]
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_red_p3, base_path * "k2/p3/", dtRatios_red_p3)
+
+path_coeffs_para = base_path * "k2/p3/para/"
+Stages_para = [12, 10, 9, 8, 7, 6, 5, 4, 3]
+dtRatios_para = reverse([
+24.0577830892107158434
+57.7068278563046987983
+100.871206187048301217
+153.64991724289893682
+216.032961715648070822
+288.013926266510225105
+369.574786731707263243
+461.074489651061867335
+835.93788176775] ./ 835.93788176775)
+
+ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages_red_p3, Stages_para,
+                                            base_path * "k2/p3/", path_coeffs_para,
+                                            dtRatios_red_p3, dtRatios_para)
 
 #=
 newton = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-13, gamma_tol = 1e-13)
