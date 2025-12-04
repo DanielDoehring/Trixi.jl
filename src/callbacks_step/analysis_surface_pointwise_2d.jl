@@ -34,12 +34,18 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
                  mesh::P4estMesh{2},
                  equations, dg::DGSEM, cache, semi, iter)
     @unpack boundaries = cache
-    @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
+    @unpack node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
 
     @unpack variable, boundary_symbols = surface_variable
     @unpack boundary_symbol_indices = semi.boundary_conditions
     boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
+
+    # Restore boundary values for parabolic equations
+    # which overwrite the solution boundary values with the gradients
+    if semi isa SemidiscretizationHyperbolicParabolic
+        prolong2boundaries!(cache, u, mesh, equations, dg)
+    end
 
     dim = 2 # Follows from mesh dispatch 
     n_nodes = nnodes(dg)
@@ -103,12 +109,16 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
                  dg::DGSEM, cache, semi,
                  cache_parabolic, iter) where {Variable <: VariableViscous}
     @unpack boundaries = cache
-    @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
+    @unpack node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
 
     @unpack variable, boundary_symbols = surface_variable
     @unpack boundary_symbol_indices = semi.boundary_conditions
     boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
+
+    # Restore boundary values for parabolic equations
+    # which overwrite the solution boundary values with the gradients
+    prolong2boundaries!(cache, u, mesh, equations, dg)
 
     dim = 2 # Follows from mesh dispatch 
     n_nodes = nnodes(dg)

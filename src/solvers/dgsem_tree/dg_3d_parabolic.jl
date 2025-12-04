@@ -175,7 +175,7 @@ end
 function prolong2boundaries!(cache, flux_viscous::Tuple,
                              mesh::TreeMesh{3},
                              equations_parabolic::AbstractEquationsParabolic,
-                             surface_integral, dg::DG,
+                             dg::DG,
                              boundary_indices = eachboundary(dg, cache))
     @unpack boundaries = cache
     @unpack orientations, neighbor_sides, neighbor_ids = boundaries
@@ -1142,7 +1142,7 @@ function calc_gradient!(gradients, u_transformed, t,
     # This reuses `prolong2boundaries` for the purely hyperbolic case.
     @trixi_timeit timer() "prolong2boundaries" begin
         prolong2boundaries!(cache, u_transformed, mesh, equations_parabolic,
-                            dg.surface_integral, dg, boundary_indices)
+                            dg, boundary_indices)
     end
 
     # Calculate boundary fluxes

@@ -559,7 +559,7 @@ function calc_interface_flux!(surface_flux_values,
 end
 
 function prolong2boundaries!(cache, u,
-                             mesh::TreeMesh{3}, equations, surface_integral, dg::DG,
+                             mesh::TreeMesh{3}, equations, dg::DG,
                              boundary_indices = eachboundary(dg, cache))
     @unpack boundaries = cache
     @unpack orientations, neighbor_sides = boundaries

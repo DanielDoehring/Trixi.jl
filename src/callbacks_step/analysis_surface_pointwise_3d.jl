@@ -21,6 +21,12 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
     @unpack boundary_symbol_indices = semi.boundary_conditions
     boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
 
+    # Restore boundary values for parabolic equations
+    # which overwrite the solution boundary values with the gradients
+    if equations isa AbstractEquationsHyperbolicParabolic
+        prolong2boundaries!(cache, u, mesh, equations, dg)
+    end
+
     dim = 3 # Follows from mesh dispatch 
     n_nodes = nnodes(dg)
     n_boundary_elements = length(boundary_indices)
