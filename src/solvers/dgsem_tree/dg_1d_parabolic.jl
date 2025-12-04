@@ -72,7 +72,7 @@ function rhs_parabolic!(du, u, t, mesh::TreeMesh{1},
     # This reuses `prolong2interfaces!` for the purely hyperbolic case.
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache, flux_viscous, mesh, equations_parabolic,
-                            dg, cache, interface_indices)
+                            dg, interface_indices)
     end
 
     # Calculate interface fluxes.

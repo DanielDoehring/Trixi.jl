@@ -132,7 +132,7 @@ end
 # This is the version used when calculating the divergence of the viscous fluxes
 function calc_interface_flux!(surface_flux_values, mesh::TreeMesh{3},
                               equations_parabolic,
-                              dg::DG, parabolic_scheme,
+                              dg::DG, parabolic_scheme, cache,
                               interface_indices = eachinterface(dg, cache))
     @unpack neighbor_ids, orientations = cache.interfaces
 

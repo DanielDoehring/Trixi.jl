@@ -88,7 +88,7 @@ function rhs_parabolic!(du, u, t, mesh::Union{P4estMesh{2}, P4estMesh{3}},
     # `dg_2d_parabolic.jl` or `dg_3d_parabolic.jl`.
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache, flux_viscous, mesh, equations_parabolic,
-                            dg, cache, interface_indices)
+                            dg, interface_indices)
     end
 
     # Calculate interface fluxes
@@ -185,7 +185,7 @@ function calc_gradient!(gradients, u_transformed, t,
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(cache.elements.surface_flux_values,
                              mesh, False(), # False() = no nonconservative terms
-                             equations_parabolic, dg.surface_integral, dg,
+                             equations_parabolic, dg.surface_integral, dg, cache,
                              interface_indices)
     end
 
@@ -380,8 +380,7 @@ end
 function prolong2interfaces!(cache, flux_viscous::Tuple,
                              mesh::Union{P4estMesh{2}, P4estMeshView{2}},
                              equations_parabolic::AbstractEquationsParabolic,
-                             dg::DG,
-                             interface_indices = eachinterface(dg, cache))
+                             dg::DG, interface_indices = eachinterface(dg, cache))
     (; interfaces) = cache
     (; contravariant_vectors) = cache.elements
     index_range = eachnode(dg)

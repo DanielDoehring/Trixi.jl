@@ -436,8 +436,8 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
                         boundary_indices, mortar_indices)
     @unpack mesh, equations_parabolic, initial_condition, boundary_conditions_parabolic, source_terms, solver, solver_parabolic, cache, cache_parabolic = semi
 
-    u = wrap_array(u_ode, mesh, equations_parabolic, solver, cache_parabolic)
-    du = wrap_array(du_ode, mesh, equations_parabolic, solver, cache_parabolic)
+    u = wrap_array(u_ode, mesh, equations_parabolic, solver, cache)
+    du = wrap_array(du_ode, mesh, equations_parabolic, solver, cache)
 
     time_start = time_ns()
 

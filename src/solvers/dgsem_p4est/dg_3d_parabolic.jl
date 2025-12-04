@@ -284,7 +284,7 @@ end
 function prolong2interfaces!(cache, flux_viscous::Tuple,
                              mesh::P4estMesh{3},
                              equations_parabolic::AbstractEquationsParabolic,
-                             dg::DG, cache::NamedTuple,
+                             dg::DG,
                              interface_indices = eachinterface(dg, cache))
     (; interfaces) = cache
     (; contravariant_vectors) = cache.elements
@@ -796,7 +796,7 @@ end
 function prolong2boundaries!(cache, flux_viscous::Tuple,
                              mesh::P4estMesh{3},
                              equations_parabolic::AbstractEquationsParabolic,
-                             surface_integral, dg::DG, cache::NamedTuple,
+                             surface_integral, dg::DG,
                              boundary_indices = eachboundary(dg, cache))
     (; boundaries) = cache
     (; contravariant_vectors) = cache.elements

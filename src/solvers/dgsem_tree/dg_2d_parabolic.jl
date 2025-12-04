@@ -205,7 +205,7 @@ function prolong2interfaces!(cache, flux_viscous::Tuple,
                              equations_parabolic::AbstractEquationsParabolic,
                              dg::DG,
                              interface_indices = eachinterface(dg, cache))
-    @unpack interfaces = cache_parabolic
+    @unpack interfaces = cache
     @unpack orientations, neighbor_ids = interfaces
     interfaces_u = interfaces.u
 
@@ -242,7 +242,7 @@ end
 # This is the version used when calculating the divergence of the viscous fluxes
 function calc_interface_flux!(surface_flux_values, mesh::TreeMesh{2},
                               equations_parabolic,
-                              dg::DG, parabolic_scheme,
+                              dg::DG, parabolic_scheme, cache,
                               interface_indices = eachinterface(dg, cache))
     @unpack neighbor_ids, orientations = cache.interfaces
 
@@ -287,7 +287,7 @@ function prolong2boundaries!(cache, flux_viscous::Tuple,
                              equations_parabolic::AbstractEquationsParabolic,
                              surface_integral, dg::DG,
                              boundary_indices = eachboundary(dg, cache))
-    @unpack boundaries = cache_parabolic
+    @unpack boundaries = cache
     @unpack orientations, neighbor_sides, neighbor_ids = boundaries
     boundaries_u = boundaries.u
     flux_viscous_x, flux_viscous_y = flux_viscous
