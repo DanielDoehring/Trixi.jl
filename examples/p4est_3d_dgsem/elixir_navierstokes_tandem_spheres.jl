@@ -56,7 +56,7 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 4 # 2, 3, 4
+polydeg = 3 # 2, 3, 4
 
 surface_flux = flux_hll
 volume_flux = flux_kennedy_gruber
@@ -90,16 +90,25 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_para))
 
-# Strategy:
-# 1) 0 to 75: k2, p2
-# 2) 75 to 100: k3, p2
-# 3) 100 to 200: k4, p3
-t_star_end = 200
-t_star_end = 100.05
-t_end = t_star_end * D()/U()
+#=
+semi = SemidiscretizationHyperbolic(mesh, equations,
+                                    initial_condition, solver;
+                                    boundary_conditions = boundary_conditions)
+=#
 
+# Strategy:
+# 1) 0 to 50: k2, p2, Euler only
+# 2) 50 to 75: k3, p2
+# 3) 75 to 100: k3, p3
+# 4) 100 to 200: k4, p3
+t_star_end = 75
+#t_star_end = 200
+#t_star_end = 100.05
+
+t_end = t_star_end * D()/U()
 tspan = (0.0, t_end)
 #tspan = (0.0, 0.0) # Record "reference" drag coeffs
+#ode = semidiscretize(semi, tspan)
 #ode = semidiscretize(semi, tspan; split_problem = false)
 
 
@@ -107,20 +116,21 @@ tspan = (0.0, t_end)
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 #restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
-restart_file = "restart_ts100_hp.h5"
+restart_file = "restart_ts50_h.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 
-ode = semidiscretize(semi, tspan, restart_filename) # Split method
-#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+#ode = semidiscretize(semi, tspan, restart_filename) # Split method
+ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+
 
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 50 # For coefficient recording run
+analysis_interval = 500 # 50 for coefficient recording run
 
 A_sphere() = pi * (D()/2)^2
 drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
@@ -145,29 +155,29 @@ analysis_callback = AnalysisCallback(semi,
                                      output_directory = restart_path,
                                      analysis_errors = Symbol[], # Turn off error computation
                                      analysis_integrals = (drag_p_front,
-                                                           drag_shear_front,
+                                                           #drag_shear_front,
                                                            drag_p_back,
-                                                           drag_shear_back
+                                                           #drag_shear_back
                                                            ))
 
 #analysis_callback = AnalysisCallback(semi_hyp, interval = analysis_interval)
 
-alive_callback = AliveCallback(alive_interval = 5)
+alive_callback = AliveCallback(alive_interval = 50)
 
 cfl_0() = 5.0 # k = 2
 
 t_ramp_up() = 5.0
 
 # Hyp-Diff
-cfl_max() = 13.5 # k = 2 p2
+#cfl_max() = 13.5 # k = 2 p2
 cfl_max() = 9.0 # k = 3, p2
 
-cfl_max() = 6.0 # k = 4, p3
+#cfl_max() = 6.0 # k = 4, p3
 
-cfl_max() = 6.4 # k = 4, p3, (relaxation), restarted from ts = 100
+#cfl_max() = 6.4 # k = 4, p3, (relaxation), restarted from ts = 100
 
 #cfl_max() = 6.7 # k = 4, p3 14-11 Split Multi
-cfl_max() = 9.2 # k = 4, p3 14-11 Split
+#cfl_max() = 9.2 # k = 4, p3 14-11 Split
 
 #cfl_max() = 6.2 # k = 4, p3, S=14
 # TODO: Check relaxation standalone!
@@ -183,7 +193,7 @@ cfl = cfl_max()
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-save_sol_interval = 2000
+save_sol_interval = 5000
 
 extra_node_variables = (:vorticity_magnitude,)
 function Trixi.get_node_variable(::Val{:vorticity_magnitude}, u, mesh, equations, dg, cache,
@@ -233,14 +243,14 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         stepsize_callback,
                         #save_solution,
-                        #save_restart
+                        save_restart
                         )
 
 ###############################################################################
 
 ### p2 ###
 
-#=
+
 # Pointwise
 Stages = [14, 13, 12, 11, 10, 8, 7, 5, 4, 3, 2]
 
@@ -257,14 +267,14 @@ dtRatios = reverse([0.07416057586669921875
 0.9783477783203125
 ] ./ 0.9783477783203125)
 
-path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/"
+path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/p2/"
 #path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/p2/"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
-=#
+
 
 ### p3 ###
-
+#=
 Stages = [14, 13, 12, 11, 10, 9, 8, 6, 5, 4, 3]
 dtRatios = reverse([0.000120724458014592531464
 0.00022078421326354146521
@@ -282,14 +292,15 @@ path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coef
 #path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
-
+=#
 #ode_alg = Trixi.PairedExplicitRK3(14, path_coeffs)
 
 #relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
 
-path_coeffs_para = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/para/"
 #=
+path_coeffs_para = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/para/"
+
 Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
 dtRatios_para = reverse([
 24.0577830892107158434
@@ -304,10 +315,10 @@ dtRatios_para = reverse([
 ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
                                             path_coeffs, path_coeffs_para,
                                             dtRatios, dtRatios_para)
-=#
+
 
 ode_alg = Trixi.PairedExplicitRK3Split(11, path_coeffs, path_coeffs_para)
-
+=#
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 2.37e-3,
@@ -317,6 +328,7 @@ sol = Trixi.solve(ode, ode_alg,
 
 ###############################################################################
 
+#=
 #ode_alg = DGLDDRK73_C(thread = Trixi.True())
 #ode_alg = ParsaniKetchesonDeconinck3S173(thread = Trixi.True())
 ode_alg = CKLLSRK43_2(thread = Trixi.True()) 
@@ -324,3 +336,4 @@ ode_alg = CKLLSRK43_2(thread = Trixi.True())
 sol = solve(ode, ode_alg; dt = 1.0e-3,
             adaptive = false,
             ode_default_options()..., callback = callbacks);
+=#
