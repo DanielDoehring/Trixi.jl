@@ -25,8 +25,8 @@ end
 
 # Extract contravariant vector Ja^i (i = index) as SVector
 @inline function get_contravariant_vector(index, contravariant_vectors, indices...)
-    SVector(ntuple(@inline(dim->contravariant_vectors[dim, index, indices...]),
-                   Val(ndims(contravariant_vectors) - 3)))
+    return SVector(ntuple(@inline(dim->contravariant_vectors[dim, index, indices...]),
+                          Val(ndims(contravariant_vectors) - 3)))
 end
 
 # Dimension agnostic, i.e., valid for all 1D, 2D, and 3D `StructuredMesh`es.
@@ -34,6 +34,7 @@ function calc_boundary_flux!(cache, u, t, boundary_condition::BoundaryConditionP
                              mesh::StructuredMesh, equations, surface_integral,
                              dg::DG)
     @assert isperiodic(mesh)
+    return nothing
 end
 
 function rhs!(du, u, t,

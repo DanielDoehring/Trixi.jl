@@ -96,32 +96,32 @@ end
 
 # general fallback
 function digest_boundary_conditions(boundary_conditions, mesh, solver, cache)
-    boundary_conditions
+    return boundary_conditions
 end
 
 # general fallback
 function digest_boundary_conditions(boundary_conditions::BoundaryConditionPeriodic,
                                     mesh, solver, cache)
-    boundary_conditions
+    return boundary_conditions
 end
 
 # resolve ambiguities with definitions below
 function digest_boundary_conditions(boundary_conditions::BoundaryConditionPeriodic,
                                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, solver,
                                     cache)
-    boundary_conditions
+    return boundary_conditions
 end
 
 function digest_boundary_conditions(boundary_conditions::BoundaryConditionPeriodic,
                                     mesh::Union{TreeMesh{2}, StructuredMesh{2}}, solver,
                                     cache)
-    boundary_conditions
+    return boundary_conditions
 end
 
 function digest_boundary_conditions(boundary_conditions::BoundaryConditionPeriodic,
                                     mesh::Union{TreeMesh{3}, StructuredMesh{3}}, solver,
                                     cache)
-    boundary_conditions
+    return boundary_conditions
 end
 
 # allow passing a single BC that get converted into a tuple of BCs
@@ -129,22 +129,22 @@ end
 function digest_boundary_conditions(boundary_conditions,
                                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, solver,
                                     cache)
-    (; x_neg = boundary_conditions, x_pos = boundary_conditions)
+    return (; x_neg = boundary_conditions, x_pos = boundary_conditions)
 end
 
 function digest_boundary_conditions(boundary_conditions,
                                     mesh::Union{TreeMesh{2}, StructuredMesh{2}}, solver,
                                     cache)
-    (; x_neg = boundary_conditions, x_pos = boundary_conditions,
-     y_neg = boundary_conditions, y_pos = boundary_conditions)
+    return (; x_neg = boundary_conditions, x_pos = boundary_conditions,
+            y_neg = boundary_conditions, y_pos = boundary_conditions)
 end
 
 function digest_boundary_conditions(boundary_conditions,
                                     mesh::Union{TreeMesh{3}, StructuredMesh{3}}, solver,
                                     cache)
-    (; x_neg = boundary_conditions, x_pos = boundary_conditions,
-     y_neg = boundary_conditions, y_pos = boundary_conditions,
-     z_neg = boundary_conditions, z_pos = boundary_conditions)
+    return (; x_neg = boundary_conditions, x_pos = boundary_conditions,
+            y_neg = boundary_conditions, y_pos = boundary_conditions,
+            z_neg = boundary_conditions, z_pos = boundary_conditions)
 end
 
 # allow passing a tuple of BCs that get converted into a named tuple to make it
@@ -152,22 +152,22 @@ end
 function digest_boundary_conditions(boundary_conditions::NTuple{2, Any},
                                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, solver,
                                     cache)
-    (; x_neg = boundary_conditions[1], x_pos = boundary_conditions[2])
+    return (; x_neg = boundary_conditions[1], x_pos = boundary_conditions[2])
 end
 
 function digest_boundary_conditions(boundary_conditions::NTuple{4, Any},
                                     mesh::Union{TreeMesh{2}, StructuredMesh{2}}, solver,
                                     cache)
-    (; x_neg = boundary_conditions[1], x_pos = boundary_conditions[2],
-     y_neg = boundary_conditions[3], y_pos = boundary_conditions[4])
+    return (; x_neg = boundary_conditions[1], x_pos = boundary_conditions[2],
+            y_neg = boundary_conditions[3], y_pos = boundary_conditions[4])
 end
 
 function digest_boundary_conditions(boundary_conditions::NTuple{6, Any},
                                     mesh::Union{TreeMesh{3}, StructuredMesh{3}}, solver,
                                     cache)
-    (; x_neg = boundary_conditions[1], x_pos = boundary_conditions[2],
-     y_neg = boundary_conditions[3], y_pos = boundary_conditions[4],
-     z_neg = boundary_conditions[5], z_pos = boundary_conditions[6])
+    return (; x_neg = boundary_conditions[1], x_pos = boundary_conditions[2],
+            y_neg = boundary_conditions[3], y_pos = boundary_conditions[4],
+            z_neg = boundary_conditions[5], z_pos = boundary_conditions[6])
 end
 
 # allow passing named tuples of BCs constructed in an arbitrary order
@@ -176,26 +176,26 @@ function digest_boundary_conditions(boundary_conditions::NamedTuple{Keys, ValueT
                                     mesh::Union{TreeMesh{1}, StructuredMesh{1}}, solver,
                                     cache) where {Keys, ValueTypes <: NTuple{2, Any}}
     @unpack x_neg, x_pos = boundary_conditions
-    (; x_neg, x_pos)
+    return (; x_neg, x_pos)
 end
 
 function digest_boundary_conditions(boundary_conditions::NamedTuple{Keys, ValueTypes},
                                     mesh::Union{TreeMesh{2}, StructuredMesh{2}}, solver,
                                     cache) where {Keys, ValueTypes <: NTuple{4, Any}}
     @unpack x_neg, x_pos, y_neg, y_pos = boundary_conditions
-    (; x_neg, x_pos, y_neg, y_pos)
+    return (; x_neg, x_pos, y_neg, y_pos)
 end
 
 function digest_boundary_conditions(boundary_conditions::NamedTuple{Keys, ValueTypes},
                                     mesh::Union{TreeMesh{3}, StructuredMesh{3}}, solver,
                                     cache) where {Keys, ValueTypes <: NTuple{6, Any}}
     @unpack x_neg, x_pos, y_neg, y_pos, z_neg, z_pos = boundary_conditions
-    (; x_neg, x_pos, y_neg, y_pos, z_neg, z_pos)
+    return (; x_neg, x_pos, y_neg, y_pos, z_neg, z_pos)
 end
 
 # sort the boundary conditions from a dictionary and into tuples
 function digest_boundary_conditions(boundary_conditions::Dict, mesh, solver, cache)
-    UnstructuredSortedBoundaryTypes(boundary_conditions, cache)
+    return UnstructuredSortedBoundaryTypes(boundary_conditions, cache)
 end
 
 function digest_boundary_conditions(boundary_conditions::AbstractArray, mesh, solver,
@@ -210,6 +210,7 @@ function check_periodicity_mesh_boundary_conditions(mesh::Union{P4estMesh,
                                                                 T8codeMesh,
                                                                 DGMultiMesh},
                                                     boundary_conditions)
+    return nothing
 end
 
 # No actions needed for periodic boundary conditions
@@ -217,6 +218,7 @@ function check_periodicity_mesh_boundary_conditions(mesh::Union{TreeMesh,
                                                                 StructuredMesh,
                                                                 StructuredMeshView},
                                                     boundary_conditions::BoundaryConditionPeriodic)
+    return nothing
 end
 
 function check_periodicity_mesh_boundary_conditions_x(mesh, x_neg, x_pos)
@@ -225,6 +227,8 @@ function check_periodicity_mesh_boundary_conditions_x(mesh, x_neg, x_pos)
         x_pos != BoundaryConditionPeriodic())
         @error "For periodic mesh non-periodic boundary conditions in x-direction are supplied."
     end
+
+    return nothing
 end
 
 function check_periodicity_mesh_boundary_conditions_y(mesh, y_neg, y_pos)
@@ -233,6 +237,8 @@ function check_periodicity_mesh_boundary_conditions_y(mesh, y_neg, y_pos)
         y_pos != BoundaryConditionPeriodic())
         @error "For periodic mesh non-periodic boundary conditions in y-direction are supplied."
     end
+
+    return nothing
 end
 
 function check_periodicity_mesh_boundary_conditions_z(mesh, z_neg, z_pos)
@@ -241,6 +247,8 @@ function check_periodicity_mesh_boundary_conditions_z(mesh, z_neg, z_pos)
         z_pos != BoundaryConditionPeriodic())
         @error "For periodic mesh non-periodic boundary conditions in z-direction are supplied."
     end
+
+    return nothing
 end
 
 function check_periodicity_mesh_boundary_conditions(mesh::Union{TreeMesh{1},
