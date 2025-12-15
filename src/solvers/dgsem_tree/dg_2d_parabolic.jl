@@ -1015,7 +1015,7 @@ function calc_gradient!(gradients, u_transformed, t,
     # Calculate surface integrals
     @trixi_timeit timer() "surface integral" begin
         calc_gradient_surface_integral!(gradients, mesh, equations_parabolic,
-                                        dg, cache)
+                                        dg, cache, element_indices)
     end
 
     # Apply Jacobian from mapping to reference element
