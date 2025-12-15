@@ -25,7 +25,7 @@ end
 # TODO: can we avoid copying data?
 function transform_variables!(u_transformed, u, mesh::Union{TreeMesh{3}, P4estMesh{3}},
                               equations_parabolic::AbstractEquationsParabolic,
-                              dg::DG, parabolic_scheme, cache,
+                              dg::DG, cache,
                               element_indices = eachelement(dg, cache))
     transformation = gradient_variable_transformation(equations_parabolic)
 
@@ -146,9 +146,8 @@ end
 
 # This is the version used when calculating the divergence of the viscous fluxes
 function calc_interface_flux!(surface_flux_values, mesh::TreeMesh{3},
-                              equations_parabolic,
-                              dg::DG, parabolic_scheme, cache,
-                              interface_indices = eachinterface(dg, cache))
+                              equations_parabolic, dg::DG, parabolic_scheme,
+                              cache, interface_indices = eachinterface(dg, cache))
     @unpack neighbor_ids, orientations = cache.interfaces
 
     @threaded for interface in interface_indices
@@ -170,7 +169,7 @@ function calc_interface_flux!(surface_flux_values, mesh::TreeMesh{3},
                                                      i, j, interface)
 
             flux = flux_parabolic(flux_ll, flux_rr, Divergence(),
-                                  mesh, equations_parabolic, parabolic_scheme)
+                                  equations_parabolic, parabolic_scheme)
 
             # Copy flux to left and right element storage
             for v in eachvariable(equations_parabolic)
@@ -345,7 +344,7 @@ function calc_gradient_boundary_flux!(cache, t,
     return nothing
 end
 
-function calc_boundary_flux_divergence!(cache, t,
+function calc_divergence_boundary_flux!(cache, t,
                                         boundary_conditions_parabolic::BoundaryConditionPeriodic,
                                         mesh::Union{TreeMesh{3}, P4estMesh{3}},
                                         equations_parabolic::AbstractEquationsParabolic,
@@ -402,8 +401,7 @@ end
 
 function calc_gradient_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:Any,
                                                                                       5},
-                                                   t,
-                                                   boundary_condition,
+                                                   t, boundary_condition,
                                                    equations_parabolic::AbstractEquationsParabolic,
                                                    surface_integral, dg::DG, cache,
                                                    direction, first_boundary,
@@ -446,7 +444,7 @@ function calc_gradient_boundary_flux_by_direction!(surface_flux_values::Abstract
     return nothing
 end
 
-function calc_boundary_flux_divergence!(cache, t,
+function calc_divergence_boundary_flux!(cache, t,
                                         boundary_conditions_parabolic::NamedTuple,
                                         mesh::TreeMesh{3},
                                         equations_parabolic::AbstractEquationsParabolic,
@@ -834,7 +832,7 @@ end
                                            i, j, interface)
 
         flux = flux_parabolic(u_ll, u_rr, gradient_or_divergence,
-                              mesh, equations_parabolic, parabolic_scheme)
+                              equations_parabolic, parabolic_scheme)
 
         # Copy flux to left and right element storage
         set_node_vars!(destination, flux, equations_parabolic, dg, i, j)
@@ -971,11 +969,10 @@ function calc_gradient_volume_integral!(gradients, u_transformed,
 end
 
 function calc_gradient_interface_flux!(surface_flux_values,
-                                       mesh::TreeMesh{3}, equations, dg::DG,
-                                       parabolic_scheme,
-                                       cache,
-                                       interface_indices = eachinterface(dg,
-                                                                         cache))
+                                       mesh::TreeMesh{3},
+                                       equations_parabolic,
+                                       dg::DG, parabolic_scheme, cache,
+                                       interface_indices = eachinterface(dg, cache))
     @unpack neighbor_ids, orientations = cache.interfaces
 
     @threaded for interface in interface_indices
@@ -993,14 +990,14 @@ function calc_gradient_interface_flux!(surface_flux_values,
         for j in eachnode(dg), i in eachnode(dg)
             # Call pointwise Riemann solver
             u_ll, u_rr = get_surface_node_vars(cache.interfaces.u,
-                                               equations, dg,
+                                               equations_parabolic, dg,
                                                i, j, interface)
 
             flux = flux_parabolic(u_ll, u_rr, Gradient(),
-                                  mesh, equations, parabolic_scheme)
+                                  equations_parabolic, parabolic_scheme)
 
             # Copy flux to left and right element storage
-            for v in eachvariable(equations)
+            for v in eachvariable(equations_parabolic)
                 surface_flux_values[v, i, j, left_direction, left_id] = flux[v]
                 surface_flux_values[v, i, j, right_direction, right_id] = flux[v]
             end
@@ -1116,8 +1113,8 @@ end
 # Calculate the gradient of the transformed variables
 function calc_gradient!(gradients, u_transformed, t,
                         mesh::TreeMesh{3}, equations_parabolic,
-                        boundary_conditions_parabolic, dg::DG, parabolic_scheme,
-                        cache,
+                        boundary_conditions_parabolic,
+                        dg::DG, parabolic_scheme, cache,
                         element_indices = eachelement(dg, cache),
                         interface_indices = eachinterface(dg, cache),
                         boundary_indices = eachboundary(dg, cache),

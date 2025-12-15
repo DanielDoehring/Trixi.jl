@@ -97,6 +97,7 @@ boundary_conditions_parabolic = Dict(:FarField => boundary_condition_free_stream
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
+                                             #solver_parabolic = ViscousFormulationLocalDG(),
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
@@ -114,7 +115,7 @@ restart_filename = joinpath("/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/
 
 tspan = (30 * t_c, 35 * t_c)
 tspan = (30 * t_c, 30.25 * t_c) # For testing only
-tspan = (30 * t_c, 30 * t_c) # Plot sol
+#tspan = (30 * t_c, 30 * t_c) # Plot sol
 
 #ode = semidiscretize(semi, tspan, restart_filename) # For split PERK
 ode = semidiscretize(semi, tspan, restart_filename; split_problem = false) # For non-split PERK Multi
@@ -162,14 +163,16 @@ cfl = 7.4 # PERRK_4 Multi E = 5, ..., 14
 #cfl = 2.5 # R-TS64
 #cfl = 2.6 # R-CKL54
 
-cfl = 7.6 # 7.6 # PERK2 unsplit/standard multi
-cfl = 8.7 # PERK2 split multi with same stages & distribution
+cfl = 7.6 # PERK2 unsplit/standard multi
+cfl = 5.1 # PERK2 unsplit/standard multi LDG
+
+#cfl = 8.7 # PERK2 split multi with same stages & distribution
 #cfl = 7.9 # PERK2 split multi with different stages (14, 10) & distribution
 
-cfl = 7.7 # PERK3 S = 14 unsplit/standard multi
-cfl = 6.4 # PERK3 S = 11 unsplit/standard multi
+#cfl = 7.7 # PERK3 S = 14 unsplit/standard multi
+#cfl = 6.4 # PERK3 S = 11 unsplit/standard multi
 
-cfl = 6.6 # PERK3 S = 11 split multi with different E & distribution
+#cfl = 6.6 # PERK3 S = 11 split multi with different E & distribution
 
 #cfl = 7.0 # PERK3 split multi with different stages (14, 11) & distribution
 
@@ -253,7 +256,7 @@ save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
 
 callbacks = CallbackSet(stepsize_callback, # For measurements: Fixed timestep (do not use this)
                         alive_callback, # Not needed for measurement run
-                        save_solution, # For plotting during measurement run
+                        #save_solution, # For plotting during measurement run
                         #save_restart, # For restart with measurements
                         analysis_callback,
                         summary_callback);
