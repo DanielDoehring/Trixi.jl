@@ -87,6 +87,7 @@ boundary_conditions_para = Dict(:FrontSphere => bc_spheres,
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
+                                             #solver_parabolic = ViscousFormulationLocalDG(),
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_para))
 
@@ -97,26 +98,26 @@ semi = SemidiscretizationHyperbolic(mesh, equations,
 =#
 
 # Strategy:
-# 1) 0 to 50: k2, p2, Euler only
+# 1) 0 to 50: k2, p2, Euler only ?
 # 2) 50 to 75: k3, p2
-# 3) 75 to 100: k3, p3
-# 4) 100 to 200: k4, p3
+# 3) 75 to 200: k4, p3
 t_star_end = 75
-#t_star_end = 200
-#t_star_end = 100.05
-
 t_end = t_star_end * D()/U()
+
+#=
 tspan = (0.0, t_end)
 #tspan = (0.0, 0.0) # Record "reference" drag coeffs
 #ode = semidiscretize(semi, tspan)
-#ode = semidiscretize(semi, tspan; split_problem = false)
-
+ode = semidiscretize(semi, tspan; split_problem = false)
+=#
 
 #restart_path = "out/"
 restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 #restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
-restart_file = "restart_ts50_h.h5"
+
+restart_file = "restart_ts25_hp.h5"
+#restart_file = "restart_ts75_hp_LDG.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
@@ -170,11 +171,14 @@ t_ramp_up() = 5.0
 
 # Hyp-Diff
 #cfl_max() = 13.5 # k = 2 p2
+
 cfl_max() = 9.0 # k = 3, p2
+#cfl_max() = 7.4 # k = 3, p2, LDG
 
 #cfl_max() = 6.0 # k = 4, p3
 
-#cfl_max() = 6.4 # k = 4, p3, (relaxation), restarted from ts = 100
+#cfl_max() = 6.4 # k = 4, p3, Multi
+#cfl_max() = 4.0 # k = 4, p3, Multi, LDG
 
 #cfl_max() = 6.7 # k = 4, p3 14-11 Split Multi
 #cfl_max() = 9.2 # k = 4, p3 14-11 Split
@@ -193,7 +197,7 @@ cfl = cfl_max()
 
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
-save_sol_interval = 5000
+save_sol_interval = 2000
 
 extra_node_variables = (:vorticity_magnitude,)
 function Trixi.get_node_variable(::Val{:vorticity_magnitude}, u, mesh, equations, dg, cache,
@@ -317,7 +321,7 @@ ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
                                             dtRatios, dtRatios_para)
 
 
-ode_alg = Trixi.PairedExplicitRK3Split(11, path_coeffs, path_coeffs_para)
+#ode_alg = Trixi.PairedExplicitRK3Split(11, path_coeffs, path_coeffs_para)
 =#
 
 sol = Trixi.solve(ode, ode_alg,
