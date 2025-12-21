@@ -65,6 +65,8 @@ function start_mpi_send!(mpi_cache::MPICache, mesh, equations, dg, cache)
     for rank in 1:length(mpi_cache.mpi_neighbor_ranks)
         send_buffer = mpi_cache.mpi_send_buffers[rank]
 
+        # NOTE: Propagate partitioning info into `mpi_neighbor_interfaces`, i.e., 
+        # store what interfaces need to be exchanged at each stage
         for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[rank])
             first = (index - 1) * data_size + 1
             last = (index - 1) * data_size + data_size
@@ -169,6 +171,8 @@ function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations, dg, cache)
     while data !== nothing
         recv_buffer = mpi_cache.mpi_recv_buffers[data]
 
+        # NOTE: Propagate partitioning info into `mpi_neighbor_interfaces`, i.e., 
+        # store what interfaces need to be exchanged at each stage
         for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[data])
             first = (index - 1) * data_size + 1
             last = (index - 1) * data_size + data_size
