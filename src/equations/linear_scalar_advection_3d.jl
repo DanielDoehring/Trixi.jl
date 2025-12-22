@@ -209,14 +209,13 @@ end
 # Convert conservative variables to entropy variables
 @inline cons2entropy(u, equation::LinearScalarAdvectionEquation3D) = u
 
-# Calculate entropy for a conservative state `cons`
-# For scalar advection, entropy (physical and mathematicl) is the same as energy
+# Calculate entropy for a conservative state `u`
 @inline entropy(u::Real, ::LinearScalarAdvectionEquation3D) = 0.5f0 * u^2
 @inline entropy(u, equation::LinearScalarAdvectionEquation3D) = entropy(u[1], equation)
 @inline entropy_math(u, equation::LinearScalarAdvectionEquation3D) = entropy(u,
                                                                              equation)
 
-# Calculate total energy for a conservative state `cons`
+# Calculate total energy for a conservative state `u`
 @inline energy_total(u::Real, ::LinearScalarAdvectionEquation3D) = 0.5f0 * u^2
 @inline function energy_total(u, equation::LinearScalarAdvectionEquation3D)
     return energy_total(u[1], equation)
