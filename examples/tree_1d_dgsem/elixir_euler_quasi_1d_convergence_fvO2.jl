@@ -73,9 +73,9 @@ surface_flux = (flux_lax_friedrichs, flux_nonconservative_chan_etal)
 end
 
 volume_integral = VolumeIntegralPureLGLFiniteVolumeO2(basis,
-                                                      volume_flux_fv = surface_flux,
+                                                      volume_flux_fv = (flux_chan_etal, flux_nonconservative_chan_etal),
                                                       reconstruction_mode = reconstruction_O2_full,
-                                                      slope_limiter = monotonized_central)
+                                                      slope_limiter = central_slope)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
