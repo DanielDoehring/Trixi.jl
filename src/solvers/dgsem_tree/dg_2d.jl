@@ -389,6 +389,92 @@ end
     return nothing
 end
 
+@inline function calcflux_fvO2!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u,
+                                mesh::TreeMesh{2},
+                                have_nonconservative_terms::True,
+                                equations, volume_flux_fv, dg::DGSEM, element, cache,
+                                x_interfaces, reconstruction_mode, slope_limiter)
+    volume_flux, nonconservative_flux = volume_flux_fv
+
+    for j in eachnode(dg), i in 2:nnodes(dg)
+        # We compute FV02 fluxes at the (nnodes(dg) - 1) subcell boundaries
+        # See `calcflux_fvO2!` in dg_1d.jl for a schematic of how it works
+
+        # The left subcell node values are labelled `_ll` (left-left) and `_lr` (left-right), while
+        # the right subcell node values are labelled `_rl` (right-left) and `_rr` (right-right).
+
+        ## Obtain unlimited values in primitive variables ##
+
+        # Note: If i - 2 = 0 we do not go to neighbor element, as one would do in a finite volume scheme.
+        # Here, we keep it purely cell-local, thus overshoots between elements are not strictly ruled out,
+        # **unless** `reconstruction_mode` is set to `reconstruction_O2_inner`
+        u_ll = cons2prim(get_node_vars(u, equations, dg, max(1, i - 2), j, element),
+                         equations)
+        u_lr = cons2prim(get_node_vars(u, equations, dg, i - 1, j, element),
+                         equations)
+        u_rl = cons2prim(get_node_vars(u, equations, dg, i, j, element),
+                         equations)
+        # Note: If i + 1 > nnodes(dg) we do not go to neighbor element, as one would do in a finite volume scheme.
+        # Here, we keep it purely cell-local, thus overshoots between elements are not strictly ruled out,
+        # **unless** `reconstruction_mode` is set to `reconstruction_O2_inner`
+        u_rr = cons2prim(get_node_vars(u, equations, dg, min(nnodes(dg), i + 1), j,
+                                       element), equations)
+
+        ## Reconstruct values at interfaces with limiting ##
+        u_l, u_r = reconstruction_mode(u_ll, u_lr, u_rl, u_rr,
+                                       x_interfaces, i,
+                                       slope_limiter, dg)
+
+        ## Convert primitive variables back to conservative variables ##
+        u_l_cons = prim2cons(u_l, equations)
+        u_r_cons = prim2cons(u_r, equations)
+        flux = volume_flux(u_l_cons, u_r_cons,
+                              1, equations) # orientation 1: x direction
+
+        # Compute nonconservative part
+        # Note the factor 0.5 necessary for the nonconservative fluxes based on
+        # the interpretation of global SBP operators coupled discontinuously via
+        # central fluxes/SATs
+        f1_L = flux + 0.5f0 * nonconservative_flux(u_l_cons, u_r_cons, 1, equations)
+        f1_R = flux + 0.5f0 * nonconservative_flux(u_r_cons, u_l_cons, 1, equations)
+
+        set_node_vars!(fstar1_L, f1_L, equations, dg, i, j)
+        set_node_vars!(fstar1_R, f1_R, equations, dg, i, j)
+    end
+
+    for j in 2:nnodes(dg), i in eachnode(dg)
+        u_ll = cons2prim(get_node_vars(u, equations, dg, i, max(1, j - 2), element),
+                         equations)
+        u_lr = cons2prim(get_node_vars(u, equations, dg, i, j - 1, element),
+                         equations)
+        u_rl = cons2prim(get_node_vars(u, equations, dg, i, j, element),
+                         equations)
+        u_rr = cons2prim(get_node_vars(u, equations, dg, i, min(nnodes(dg), j + 1),
+                                       element), equations)
+
+        u_l, u_r = reconstruction_mode(u_ll, u_lr, u_rl, u_rr,
+                                       x_interfaces, j,
+                                       slope_limiter, dg)
+
+        u_l_cons = prim2cons(u_l, equations)
+        u_r_cons = prim2cons(u_r, equations)
+        flux = volume_flux(u_l_cons, u_r_cons,
+                              2, equations) # orientation 2: y direction
+
+        # Compute nonconservative part
+        # Note the factor 0.5 necessary for the nonconservative fluxes based on
+        # the interpretation of global SBP operators coupled discontinuously via
+        # central fluxes/SATs
+        f2_L = flux + 0.5f0 * nonconservative_flux(u_l_cons, u_r_cons, 2, equations)
+        f2_R = flux + 0.5f0 * nonconservative_flux(u_r_cons, u_l_cons, 2, equations)
+
+        set_node_vars!(fstar2_L, f2_L, equations, dg, i, j)
+        set_node_vars!(fstar2_R, f2_R, equations, dg, i, j)
+    end
+
+    return nothing
+end
+
 @inline function fv_kernel!(du, u,
                             mesh::Union{TreeMesh{2}, StructuredMesh{2},
                                         UnstructuredMesh2D, P4estMesh{2},
