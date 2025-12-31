@@ -74,8 +74,11 @@ end
 
 volume_integral = VolumeIntegralPureLGLFiniteVolumeO2(basis,
                                                       volume_flux_fv = (flux_chan_etal, flux_nonconservative_chan_etal),
-                                                      reconstruction_mode = reconstruction_O2_full,
+                                                      reconstruction_mode = reconstruction_O2_inner,
                                                       slope_limiter = central_slope)
+
+#volume_integral = VolumeIntegralPureLGLFiniteVolume((flux_chan_etal, flux_nonconservative_chan_etal))            
+
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
