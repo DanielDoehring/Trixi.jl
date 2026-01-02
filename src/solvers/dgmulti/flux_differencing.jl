@@ -370,7 +370,24 @@ function create_cache(mesh::DGMultiMesh, equations, dg::DGMultiFluxDiff, RealT, 
     # interpolate geometric terms to both quadrature and face values for curved meshes
     (; Vq, Vf) = dg.basis
     interpolated_geometric_terms = map(x -> [Vq; Vf] * x, mesh.md.rstxyzJ)
-    J = rd.Vq * md.J
+    J = Vq * md.J
+
+    if dg.volume_integral isa VolumeIntegralAdaptive
+        # Need weak form datastructure
+        @unpack wq, Vq, M, Drst = rd
+        weak_differentiation_matrices = map(D -> -M \ ((Vq * D)' * Diagonal(wq)), Drst)
+
+        # For entropy change difference computation
+        du_values = copy(u_values)
+
+        return (; md, Qrst_skew, VhP, Ph,
+                invJ = inv.(J), dxidxhatj = interpolated_geometric_terms,
+                entropy_var_values, projected_entropy_var_values,
+                entropy_projected_u_values,
+                u_values, u_face_values, flux_face_values,
+                local_values_threaded, fluxdiff_local_threaded, rhs_local_threaded,
+                weak_differentiation_matrices, du_values)
+    end
 
     return (; md, Qrst_skew, VhP, Ph,
             invJ = inv.(J), dxidxhatj = interpolated_geometric_terms,
@@ -599,13 +616,109 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
     end
 end
 
+# version for affine meshes
+function calc_entropy_change_element(du_values, u_values, element,
+                                     mesh::DGMultiMesh, equations,
+                                     dg::DGMultiFluxDiff, cache)
+    @unpack md = mesh
+    rd = dg.basis
+
+    # Get views for this element
+    u_elem = view(u_values, :, element)
+    du_elem = view(du_values, :, element)
+
+    # Compute entropy change for this element
+    dS_dt_elem = zero(eltype(first(du_elem)))
+    for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
+        dS_dt_elem += dot(cons2entropy(u_elem[i], equations), du_elem[i]) * rd.wq[i]
+    end
+    dS_dt_elem *= md.J[1, element]  # Scale by element Jacobian
+
+    return dS_dt_elem
+end
+
+# version for affine meshes
 function calc_volume_integral!(du, u,
                                mesh::DGMultiMesh,
-                               have_nonconservative_terms, equations,
-                               volume_integral::Union{VolumeIntegralWeakForm,
-                                                      VolumeIntegralFD,
-                                                      Indicator},
-                               dg::DGMultiFluxDiff, cache) where {VolumeIntegralWeakForm, VolumeIntegralFD, Indicator}
+                               have_nonconservative_terms::False, equations,
+                               volume_integral::VolumeIntegralAdaptive{VolumeIntegralWeakForm,
+                                                                       VolumeIntegralFD,
+                                                                       Indicator},
+                               dg::DGMultiFluxDiff,
+                               cache) where {
+                                             VolumeIntegralFD <:
+                                             VolumeIntegralFluxDifferencing,
+                                             Indicator <: AbstractIndicator}
+    @unpack volume_integral_default, volume_integral_stabilized = volume_integral
+    @unpack threshold = volume_integral.indicator
+
+    # For weak form volume integral
+    rd = dg.basis
+    md = mesh.md
+    @unpack weak_differentiation_matrices, dxidxhatj, u_values, local_values_threaded = cache
+    @unpack rstxyzJ = md # geometric terms
+
+    # interpolate to quadrature points
+    apply_to_each_field(mul_by!(rd.Vq), u_values, u)
+
+    # interpolate du for entropy production calculation
+    @unpack du_values = cache
+    apply_to_each_field(mul_by!(rd.Vq), du_values, du)
+
+    # For VolumeIntegralFD
+    @unpack entropy_projected_u_values, Ph = cache
+    @unpack fluxdiff_local_threaded, rhs_local_threaded = cache
+
+    @threaded for e in eachelement(dg, cache)
+        du_elem = view(du, :, e)
+
+        # Try plain weak form first
+        flux_values = local_values_threaded[Threads.threadid()]
+        for i in eachdim(mesh)
+            # Here, the broadcasting operation does allocate
+            #flux_values .= flux.(view(u_values, :, e), i, equations)
+            # Use loop instead
+            for j in eachindex(flux_values)
+                flux_values[j] = flux(u_values[j, e], i, equations)
+            end
+            for j in eachdim(mesh)
+                apply_to_each_field(mul_by_accum!(weak_differentiation_matrices[j],
+                                                  dxidxhatj[i, j][1, e]),
+                                    du_elem, flux_values)
+            end
+        end
+
+        # Compute entropy production of this volume integral
+        entropy_delta = calc_entropy_change_element(du_values, u_values, e,
+                                                    mesh, equations,
+                                                    dg, cache)
+
+        if entropy_delta > threshold
+            # Reset bad volume integral 
+            du_elem .= zero.(du_elem)
+
+            # Recompute using stabilized version
+            fluxdiff_local = fluxdiff_local_threaded[Threads.threadid()]
+            fill!(fluxdiff_local, zero(eltype(fluxdiff_local)))
+            u_local = view(entropy_projected_u_values, :, e)
+
+            local_flux_differencing!(fluxdiff_local, u_local, e,
+                                     have_nonconservative_terms,
+                                     volume_integral.volume_flux,
+                                     has_sparse_operators(dg),
+                                     mesh, equations, dg, cache)
+
+            # convert fluxdiff_local::Vector{<:SVector} to StructArray{<:SVector} for faster
+            # apply_to_each_field performance.
+            rhs_local = rhs_local_threaded[Threads.threadid()]
+            for i in Base.OneTo(length(fluxdiff_local))
+                rhs_local[i] = fluxdiff_local[i]
+            end
+            apply_to_each_field(mul_by_accum!(Ph), du_elem, rhs_local)
+        end
+    end
+
+    return nothing
 end
 
 # Specialize since `u_values` isn't computed for DGMultiFluxDiffSBP solvers.
