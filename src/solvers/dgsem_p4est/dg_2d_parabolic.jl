@@ -6,7 +6,7 @@
 #! format: noindent
 
 #=
-Reusing `rhs_parabolic!` for `TreeMesh`es is not easily possible as
+Reusing `rhs_parabolic!` for `P4estMesh`es is not easily possible as
 for `P4estMesh`es we call
 
     ```
@@ -157,12 +157,9 @@ function calc_gradient!(gradients, u_transformed, t,
                         interface_indices = eachinterface(dg, cache),
                         boundary_indices = eachboundary(dg, cache),
                         mortar_indices = eachmortar(dg, cache))
-    gradients_x, gradients_y = gradients
-
     # Reset gradients
     @trixi_timeit timer() "reset gradients" begin
-        reset_du!(gradients_x, dg, cache, element_indices)
-        reset_du!(gradients_y, dg, cache, element_indices)
+        reset_gradients!(gradients, dg, cache, element_indices)
     end
 
     # Calculate volume integral
@@ -229,9 +226,7 @@ function calc_gradient!(gradients, u_transformed, t,
 
     # Apply Jacobian from mapping to reference element
     @trixi_timeit timer() "Jacobian" begin
-        apply_jacobian_parabolic!(gradients_x, mesh, equations_parabolic, dg,
-                                  cache, element_indices)
-        apply_jacobian_parabolic!(gradients_y, mesh, equations_parabolic, dg,
+        apply_jacobian_parabolic!(gradients, mesh, equations_parabolic, dg,
                                   cache, element_indices)
     end
 
@@ -245,7 +240,7 @@ end
 # interface in 2D) and flip the sign when storing the mortar fluxes back
 # into `surface_flux_values`.
 @inline function mortar_fluxes_to_elements!(surface_flux_values,
-                                            mesh::Union{P4estMesh{2}, T8codeMesh{2}},
+                                            mesh::P4estMesh{2},
                                             equations::AbstractEquationsParabolic,
                                             mortar_l2::LobattoLegendreMortarL2,
                                             dg::DGSEM, cache, mortar, fstar_primary,
@@ -298,8 +293,7 @@ end
 end
 
 function calc_gradient_interface_flux!(surface_flux_values,
-                                       mesh::Union{P4estMesh{2}, P4estMeshView{2},
-                                                   T8codeMesh{2}},
+                                       mesh::Union{P4estMesh{2}, P4estMeshView{2}},
                                        equations_parabolic,
                                        dg::DG, parabolic_scheme, cache,
                                        interface_indices = eachinterface(dg, cache))
@@ -595,7 +589,7 @@ function calc_interface_flux!(surface_flux_values, mesh::P4estMesh{2},
 end
 
 function prolong2mortars_divergence!(cache, flux_viscous,
-                                     mesh::Union{P4estMesh{2}, T8codeMesh{2}},
+                                     mesh::P4estMesh{2},
                                      equations,
                                      mortar_l2::LobattoLegendreMortarL2, dg::DGSEM,
                                      mortar_indices = eachmortar(dg, cache))
@@ -686,7 +680,7 @@ end
 # We specialize `calc_mortar_flux!` for the divergence part of
 # the parabolic terms.
 function calc_mortar_flux_divergence!(surface_flux_values,
-                                      mesh::Union{P4estMesh{2}, T8codeMesh{2}},
+                                      mesh::P4estMesh{2},
                                       equations::AbstractEquationsParabolic,
                                       mortar_l2::LobattoLegendreMortarL2,
                                       surface_integral, dg::DG, cache,
@@ -694,7 +688,6 @@ function calc_mortar_flux_divergence!(surface_flux_values,
     @unpack neighbor_ids, node_indices = cache.mortars
     @unpack contravariant_vectors = cache.elements
     @unpack fstar_primary_upper_threaded, fstar_primary_lower_threaded = cache
-    index_range = eachnode(dg)
 
     @threaded for mortar in mortar_indices
         # Choose thread-specific pre-allocated container
@@ -735,7 +728,7 @@ end
 # terms (e.g., we compute a viscous conservative "flux") and thus no
 # non-conservative terms are present.
 @inline function calc_mortar_flux!(fstar_primary, fstar_secondary,
-                                   mesh::Union{P4estMesh{2}, T8codeMesh{2}},
+                                   mesh::P4estMesh{2},
                                    have_nonconservative_terms::False,
                                    equations::AbstractEquationsParabolic,
                                    surface_integral, dg::DG, cache,
@@ -1130,7 +1123,7 @@ end
 # This is because the parabolic fluxes are assumed to be of the form
 #   `du/dt + df/dx = dg/dx + source(x,t)`,
 # where f(u) is the inviscid flux and g(u) is the viscous flux.
-function apply_jacobian_parabolic!(du, mesh::P4estMesh{2},
+function apply_jacobian_parabolic!(du::AbstractArray, mesh::P4estMesh{2},
                                    equations::AbstractEquationsParabolic,
                                    dg::DG, cache,
                                    element_indices = eachelement(dg, cache))
