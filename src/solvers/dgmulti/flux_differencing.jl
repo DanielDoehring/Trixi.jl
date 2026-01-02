@@ -599,6 +599,15 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
     end
 end
 
+function calc_volume_integral!(du, u,
+                               mesh::DGMultiMesh,
+                               have_nonconservative_terms, equations,
+                               volume_integral::Union{VolumeIntegralWeakForm,
+                                                      VolumeIntegralFD,
+                                                      Indicator},
+                               dg::DGMultiFluxDiff, cache) where {VolumeIntegralWeakForm, VolumeIntegralFD, Indicator}
+end
+
 # Specialize since `u_values` isn't computed for DGMultiFluxDiffSBP solvers.
 function calc_sources!(du, u, t, source_terms,
                        mesh, equations, dg::DGMultiFluxDiffSBP, cache)

@@ -12,7 +12,7 @@ surface_flux = FluxLaxFriedrichs(max_abs_speed_naive)
 volume_flux = flux_ranocha
 dg = DGMulti(polydeg = 3, element_type = Line(), approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(surface_flux),
-             volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+             volume_integral = VolumeIntegralWeakForm())
 
 equations = CompressibleEulerEquations1D(1.4)
 
@@ -36,7 +36,7 @@ save_solution = SaveSolutionCallback(interval = 100,
                                      solution_variables = cons2prim)
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        alive_callback, save_solution)
+                        alive_callback)
 
 ###############################################################################
 # run the simulation
