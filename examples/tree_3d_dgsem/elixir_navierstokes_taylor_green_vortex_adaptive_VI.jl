@@ -83,7 +83,8 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (energy_kinetic,
-                                                           enstrophy))
+                                                           enstrophy,
+                                                           entropy))
 
 alive_callback = AliveCallback(alive_interval = 50)
 

@@ -632,7 +632,8 @@ function calc_entropy_change_element(du_values, u_values, element,
     for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
         dS_dt_elem += dot(cons2entropy(u_elem[i], equations), du_elem[i]) * rd.wq[i]
     end
-    dS_dt_elem *= md.J[1, element]  # Scale by element Jacobian
+    #dS_dt_elem *= md.J[1, element]  # Scale by element Jacobian
+    dS_dt_elem *= cache.invJ[1, element]
 
     return dS_dt_elem
 end

@@ -51,12 +51,20 @@ mesh = DGMultiMesh(dg, cells_per_dimension; periodicity = true)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg)
 
 tspan = (0.0, 3.6)
+tspan = (0.0, 2.8) # For runtime comparison
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 alive_callback = AliveCallback(alive_interval = 50)
-analysis_interval = 250
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg))
+
+analysis_interval = 2000
+#analysis_interval = 1 # For entropy recording
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     uEltype = real(dg),
+                                     analysis_integrals = (entropy,),
+                                     analysis_errors = Symbol[],
+                                     save_analysis = true)
+
 save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      solution_variables = cons2prim)
 
