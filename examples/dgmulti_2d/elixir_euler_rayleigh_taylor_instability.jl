@@ -59,10 +59,24 @@ end
     return SVector(0.0, 0.0, g * rho, g * rho_v2)
 end
 
+
+volume_integral_weakform = VolumeIntegralWeakForm() # Does not make it to the end of the simulation
+volume_flux = flux_ranocha
+volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux) # Does also not make it to the end and is much more expensive
+
+# `threshold` governs the tolerated entropy increase due to the weak-form
+# volume integral before switching to the stabilized version
+indicator = IndicatorEntropyIncrease(threshold = 0)
+# Adaptive volume integral using the entropy increase indicator to perform the 
+# stabilized/EC volume integral when needed
+volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integral_weakform,
+                                         volume_integral_stabilized = volume_integral_fluxdiff,
+                                         indicator = indicator)
+
 # numerical parameters
 dg = DGMulti(polydeg = 3, element_type = Quad(), approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(flux_hll),
-             volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+             volume_integral = volume_integral)
 
 num_elements = 16
 cells_per_dimension = (num_elements, 4 * num_elements)
@@ -85,8 +99,10 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg))
+analysis_interval = 10
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     uEltype = real(dg),
+                                     analysis_errors = Symbol[])
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
@@ -95,7 +111,7 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        alive_callback, save_solution)
+                        alive_callback)
 
 ###############################################################################
 # run the simulation
