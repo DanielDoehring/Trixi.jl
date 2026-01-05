@@ -57,14 +57,18 @@ ode = semidiscretize(semi, tspan)
 summary_callback = SummaryCallback()
 alive_callback = AliveCallback(alive_interval = 50)
 
-analysis_interval = 2000
-#analysis_interval = 1 # For entropy recording
+analysis_interval = 1000
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     uEltype = real(dg),
+                                     analysis_errors = Symbol[])
+#=
+analysis_interval = 1 # For entropy recording
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      uEltype = real(dg),
                                      analysis_integrals = (entropy,),
                                      analysis_errors = Symbol[],
                                      save_analysis = true)
-
+=#
 save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      solution_variables = cons2prim)
 
