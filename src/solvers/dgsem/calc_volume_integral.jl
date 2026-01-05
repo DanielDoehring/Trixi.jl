@@ -101,7 +101,7 @@ function calc_entropy_change_element(du, u, element,
         dot(cons2entropy(u_node, equations), du_node)
     end
 
-    # Apply inverse Jacobian
+    # Apply inverse Jacobian TODO: What sign of the Jacobian here?
     @unpack inverse_jacobian = cache.elements
     factor = inverse_jacobian[element]
     return factor * dS_unscaled
@@ -116,7 +116,7 @@ function calc_entropy_change_element(du, u, element,
         dot(cons2entropy(u_node, equations), du_node)
     end
 
-    # Apply inverse Jacobian
+    # Apply inverse Jacobian TODO: What sign of the Jacobian here?
     @unpack inverse_jacobian = cache.elements
     factor = inverse_jacobian[element]
     return factor * dS_unscaled
