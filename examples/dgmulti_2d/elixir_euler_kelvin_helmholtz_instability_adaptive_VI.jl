@@ -51,7 +51,7 @@ mesh = DGMultiMesh(dg, cells_per_dimension; periodicity = true)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg)
 
 tspan = (0.0, 3.6)
-tspan = (0.0, 2.8) # For runtime comparison
+#tspan = (0.0, 2.8) # For runtime comparison
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
