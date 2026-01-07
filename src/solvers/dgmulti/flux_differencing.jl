@@ -649,9 +649,9 @@ function calc_volume_integral!(du, u,
                                cache) where {
                                              VolumeIntegralFD <:
                                              VolumeIntegralFluxDifferencing,
-                                             Indicator <: AbstractIndicator}
+                                             Indicator <: IndicatorEntropyDecay}
     @unpack volume_integral_default, volume_integral_stabilized = volume_integral
-    @unpack threshold = volume_integral.indicator
+    @unpack target_decay = volume_integral.indicator
 
     # For weak form volume integral
     rd = dg.basis
@@ -694,7 +694,7 @@ function calc_volume_integral!(du, u,
                                                     mesh, equations,
                                                     dg, cache)
 
-        if entropy_delta > threshold
+        if entropy_delta > target_decay
             # Reset bad volume integral 
             du_elem .= zero.(du_elem)
 
