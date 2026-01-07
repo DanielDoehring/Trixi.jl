@@ -31,7 +31,7 @@ function initial_condition_kelvin_helmholtz_instability(x, t,
 end
 initial_condition = initial_condition_kelvin_helmholtz_instability
 
-surface_flux = flux_lax_friedrichs
+surface_flux = flux_hllc
 volume_flux = flux_ranocha
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
@@ -39,17 +39,20 @@ basis = LobattoLegendreBasis(polydeg)
 volume_integral_weakform = VolumeIntegralWeakForm()
 volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux)
 
-# `threshold` governs the tolerated entropy increase due to the weak-form
-# volume integral before switching to the stabilized version
-indicator = IndicatorEntropyIncrease(threshold = 0)
-# Adaptive volume integral using the entropy increase indicator to perform the 
-# stabilized/EC volume integral when needed
+# This indicator compares the entropy production of the weak form to the 
+# entropy-conserving flux-differencing volume integral.
+# If the entropy production of the weak form is lower than that of the
+# flux-differencing form, we use the flux-differencing form to stabilize the solution.
+indicator = IndicatorEntropyComparison(equations, basis)
+
+# Adaptive volume integral using the entropy production comparison indicator to perform the 
+# stabilized/EC volume integral when needed and keeping the weak form if it is more diffusive.
 volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integral_weakform,
                                          volume_integral_stabilized = volume_integral_fluxdiff,
                                          indicator = indicator)
 
 #volume_integral = volume_integral_weakform # Crashes
-#volume_integral = volume_integral_fluxdiff # Runs, but is more expensive
+#volume_integral = volume_integral_fluxdiff # Crashes as well!
 
 solver = DGSEM(basis, surface_flux, volume_integral)
 
@@ -63,18 +66,19 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 3.25)
+tspan = (0.0, 5.25)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 10
+analysis_interval = 500
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     analysis_errors = Symbol[])
+                                     analysis_errors = Symbol[],
+                                     extra_analysis_integrals = (entropy,))
 
 alive_callback = AliveCallback(alive_interval = 200)
 
-stepsize_callback = StepsizeCallback(cfl = 1.3)
+stepsize_callback = StepsizeCallback(cfl = 1.8)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
