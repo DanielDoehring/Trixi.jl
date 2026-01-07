@@ -631,12 +631,13 @@ function calc_entropy_change_element(du_values, u_values, element,
     dS_dt_elem = zero(eltype(first(du_elem)))
     for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
         # minus sign as in `invert_jacobian!`
-        #dS_dt_elem -= dot(cons2entropy(u_elem[i], equations), du_elem[i] * cache.invJ[i, element]) * rd.wq[i] * md.J[i, element]
         dS_dt_elem -= dot(cons2entropy(u_elem[i], equations), du_elem[i]) * rd.wq[i]
     end
 
     return dS_dt_elem
 end
+
+# TODO: Version for IndicatorEntropyComparison
 
 # version for affine meshes
 function calc_volume_integral!(du, u,

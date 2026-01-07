@@ -67,6 +67,16 @@ volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux) # Does al
 # `threshold` governs the tolerated entropy increase due to the weak-form
 # volume integral before switching to the stabilized version
 indicator = IndicatorEntropyDecay(target_decay = 0)
+
+#=
+element_type = Quad()
+polydeg = 3
+approximation_type = Polynomial()
+
+basis = DGMultiBasis(element_type, polydeg; approximation_type = approximation_type)
+indicator = IndicatorEntropyComparison(equations, basis)
+=#
+
 # Adaptive volume integral using the entropy increase indicator to perform the 
 # stabilized/EC volume integral when needed
 volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integral_weakform,
@@ -74,7 +84,7 @@ volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integr
                                          indicator = indicator)
 
 # numerical parameters
-dg = DGMulti(polydeg = 3, element_type = Quad(), approximation_type = Polynomial(),
+dg = DGMulti(polydeg = polydeg, element_type = element_type, approximation_type = approximation_type,
              surface_integral = SurfaceIntegralWeakForm(flux_hll),
              volume_integral = volume_integral)
 
@@ -94,15 +104,16 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg;
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 3.0)
+tspan = (0.0, 5.0) # 3.6 for heuristic
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 10
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      uEltype = real(dg),
-                                     analysis_errors = Symbol[])
+                                     analysis_errors = Symbol[],
+                                     extra_analysis_integrals = (entropy,))
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
