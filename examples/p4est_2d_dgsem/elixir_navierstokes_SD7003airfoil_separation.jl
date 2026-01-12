@@ -68,10 +68,6 @@ mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/bd
 boundary_symbols = [:Airfoil, :FarField]
 mesh = P4estMesh{2}(mesh_file, boundary_symbols = boundary_symbols)
 
-restart_file = "restart_000190000.h5"
-restart_filename = joinpath("out", restart_file)
-mesh_file = load_mesh(restart_filename)
-
 boundary_condition_free_stream = BoundaryConditionDirichlet(initial_condition)
 
 velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0))
@@ -93,12 +89,14 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 t_c = airfoil_cord_length / U_inf()
-tspan = (0.0, 25 * t_c)
+tspan = (0.0, 5 * t_c)
 
-#ode = semidiscretize(semi, tspan)
+ode = semidiscretize(semi, tspan)
 
+#=
 tspan = (load_time(restart_filename), 25 * t_c)
 ode = semidiscretize(semi, tspan, restart_filename)
+=#
 
 summary_callback = SummaryCallback()
 
@@ -155,15 +153,12 @@ amr_callback = AMRCallback(semi, amr_controller,
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true)
 
-stepsize_callback = StepsizeCallback(cfl = 4.0)
-
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, 
                         alive_callback,
+                        #amr_callback,
                         save_solution,
-                        save_restart,
-                        stepsize_callback,
-                        amr_callback
+                        save_restart
                         )
 
 ###############################################################################
