@@ -166,6 +166,59 @@ end
 
 function calc_volume_integral!(du, u, mesh,
                                have_nonconservative_terms, equations,
+                               volume_integral::VolumeIntegralAdaptive{VolumeIntegralWeakForm,
+                                                                       VolumeIntegralSC,
+                                                                       Indicator},
+                               dg::DGSEM,
+                               cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = eachinterface(dg, cache),
+                               mortar_indices = eachmortar(dg, cache)) where {
+                                                                              Indicator <:
+                                                                              Nothing, # Indicator taken from `VolumeIntegralSC`
+                                                                              VolumeIntegralSC <:
+                                                                              VolumeIntegralShockCapturingHG
+                                                                              }
+    @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral.volume_integral_stabilized
+
+    # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
+    alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations,
+                                                               dg, cache,
+                                                               element_indices,
+                                                               interface_indices,
+                                                               mortar_indices)
+
+    # For `Float64`, this gives 1.8189894035458565e-12
+    # For `Float32`, this gives 1.1920929f-5
+    RealT = eltype(alpha)
+    atol = max(100 * eps(RealT), eps(RealT)^convert(RealT, 0.75f0))
+    @threaded for element in element_indices
+        alpha_element = alpha[element]
+        # Clip blending factor for values close to zero (-> pure DG)
+        dg_only = isapprox(alpha_element, 0, atol = atol)
+
+        if dg_only
+            weak_form_kernel!(du, u, element, mesh,
+                              have_nonconservative_terms, equations,
+                              dg, cache)
+        else
+            # Calculate DG volume integral contribution
+            flux_differencing_kernel!(du, u, element, mesh,
+                                      have_nonconservative_terms, equations,
+                                      volume_flux_dg, dg, cache, 1 - alpha_element)
+
+            # Calculate FV volume integral contribution
+            fv_kernel!(du, u, mesh,
+                       have_nonconservative_terms, equations,
+                       volume_flux_fv, dg, cache, element, alpha_element)
+        end
+    end
+
+    return nothing
+end
+
+function calc_volume_integral!(du, u, mesh,
+                               have_nonconservative_terms, equations,
                                volume_integral::VolumeIntegralPureLGLFiniteVolume,
                                dg::DGSEM, cache,
                                element_indices = eachelement(dg, cache),
