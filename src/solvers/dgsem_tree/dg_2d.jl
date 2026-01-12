@@ -70,8 +70,7 @@ function create_f_threaded(mesh::AbstractMesh{2}, equations,
 end
 
 function create_cache(mesh::TreeMesh{2}, equations,
-                      volume_integral::Union{AbstractVolumeIntegralPureLGLFiniteVolume,
-                                             VolumeIntegralShockCapturingHG},
+                      volume_integral::AbstractVolumeIntegralSubcell,
                       dg::DG, cache_containers, uEltype)
     fstar1_L_threaded, fstar1_R_threaded,
     fstar2_L_threaded, fstar2_R_threaded = create_f_threaded(mesh, equations, dg,
@@ -85,7 +84,6 @@ end
 # and called from the basic `create_cache` method at the top.
 function create_cache(mesh::TreeMesh{2}, equations,
                       mortar_l2::LobattoLegendreMortarL2, uEltype)
-    # TODO: Taal performance using different types
     MA2d = MArray{Tuple{nvariables(equations), nnodes(mortar_l2)},
                   uEltype, 2,
                   nvariables(equations) * nnodes(mortar_l2)}
@@ -296,14 +294,10 @@ end
 end
 
 function calc_volume_integral!(du, u,
-                               mesh::Union{TreeMesh{2},
-                                           P4estMesh{2},
-                                           T8codeMesh{2},
-                                           TreeMesh{3},
-                                           P4estMesh{3},
-                                           T8codeMesh{3}},
+                               mesh::Union{TreeMesh{2}, P4estMesh{2}, T8codeMesh{2},
+                                           TreeMesh{3}, P4estMesh{3}, T8codeMesh{3}},
                                nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralShockCapturingHG,
+                               volume_integral::VolumeIntegralShockCapturingHG, # TODO: RRG
                                dg::DGSEM, cache,
                                element_indices = eachelement(dg, cache),
                                interface_indices = eachinterface(dg, cache),
@@ -340,7 +334,7 @@ function calc_volume_integral!(du, u,
                        dg, cache, element, alpha_element)
         end
     end
-    
+
     return nothing
 end
 

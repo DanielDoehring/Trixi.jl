@@ -29,7 +29,7 @@ instead of
 =#
 function rhs_parabolic!(du, u, t, mesh::Union{P4estMesh{2}, P4estMesh{3}},
                         equations_parabolic::AbstractEquationsParabolic,
-                        boundary_conditions_parabolic, source_terms,
+                        boundary_conditions_parabolic, source_terms_parabolic,
                         dg::DG, parabolic_scheme, cache, cache_parabolic,
                         element_indices = eachelement(dg, cache),
                         interface_indices = eachinterface(dg, cache),
@@ -144,6 +144,13 @@ function rhs_parabolic!(du, u, t, mesh::Union{P4estMesh{2}, P4estMesh{3}},
     @trixi_timeit timer() "Jacobian" begin
         apply_jacobian_parabolic!(du, mesh, equations_parabolic, dg, cache,
                                   element_indices)
+    end
+
+    # Calculate source terms
+    @trixi_timeit timer() "source terms parabolic" begin
+        calc_sources_parabolic!(du, u, gradients, t, source_terms_parabolic,
+                                equations_parabolic, dg, cache,
+                                element_indices)
     end
 
     return nothing
@@ -382,7 +389,9 @@ end
     return nothing
 end
 
-# This is the version used when calculating the divergence of the viscous fluxes
+# This is the version used when calculating the divergence of the viscous fluxes.
+# Identical to weak-form volume integral/kernel for the purely hyperbolic case,
+# except that the fluxes are here already precomputed in `calc_viscous_fluxes!`
 function calc_volume_integral!(du, flux_viscous,
                                mesh::P4estMesh{2},
                                equations_parabolic::AbstractEquationsParabolic,

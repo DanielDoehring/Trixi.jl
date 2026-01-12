@@ -36,8 +36,7 @@ end
 # and called from the basic `create_cache` method at the top.
 
 function create_cache(mesh::Union{TreeMesh{1}, StructuredMesh{1}}, equations,
-                      volume_integral::Union{AbstractVolumeIntegralPureLGLFiniteVolume,
-                                             VolumeIntegralShockCapturingHG},
+                      volume_integral::AbstractVolumeIntegralSubcell,
                       dg::DG, cache_containers, uEltype)
     MA2d = MArray{Tuple{nvariables(equations), nnodes(dg) + 1},
                   uEltype, 2, nvariables(equations) * (nnodes(dg) + 1)}
@@ -215,7 +214,7 @@ end
 function calc_volume_integral!(du, u,
                                mesh::TreeMesh{1},
                                nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralShockCapturingHG,
+                               volume_integral::VolumeIntegralShockCapturingHG, # TODO: RRG
                                dg::DGSEM, cache,
                                element_indices = eachelement(dg, cache),
                                interface_indices = eachinterface(dg, cache))

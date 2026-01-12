@@ -8,7 +8,7 @@
 function calc_volume_integral!(du, u,
                                mesh::StructuredMesh,
                                nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralShockCapturingHG,
+                               volume_integral::VolumeIntegralShockCapturingHG, # TODO: RRG
                                dg::DGSEM, cache,
                                element_indices = eachelement(dg, cache))
     @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral
