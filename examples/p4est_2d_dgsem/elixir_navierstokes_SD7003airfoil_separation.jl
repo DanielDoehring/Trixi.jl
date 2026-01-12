@@ -89,14 +89,15 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 t_c = airfoil_cord_length / U_inf()
-tspan = (0.0, 5 * t_c)
-
-ode = semidiscretize(semi, tspan)
-
 #=
-tspan = (load_time(restart_filename), 25 * t_c)
-ode = semidiscretize(semi, tspan, restart_filename)
+tspan = (0.0, 25 * t_c)
+ode = semidiscretize(semi, tspan)
 =#
+
+restart_filename = "out/restart_000060604.h5"
+tspan = (load_time(restart_filename), 25 * t_c)
+ode = semidiscretize(semi, tspan, restart_filename, split_problem = false)
+
 
 summary_callback = SummaryCallback()
 
@@ -153,11 +154,14 @@ amr_callback = AMRCallback(semi, amr_controller,
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true)
 
+stepsize_callback = StepsizeCallback(cfl = 2.0)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, 
                         alive_callback,
-                        #amr_callback,
-                        save_solution,
+                        stepsize_callback,
+                        amr_callback,
+                        #save_solution,
                         save_restart
                         )
 
@@ -182,8 +186,11 @@ dtRatios_complete_p3 = reverse([
 1.14077944308519363403
 1.23392039851751178503] ./ 1.23392039851751178503)
 
-path = "/storage/home/daniel/Adaptive_VT/SD7003_TransonicSeparation/PERK_p3_Coeffs"
+path = "/storage/home/daniel/Adaptive_VT/SD7003_TransonicSeparation/PERK_p3_Coeffs/"
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
+
+sol = Trixi.solve(ode, ode_alg, dt = 42.0, 
+                  save_everystep = false, callback = callbacks);
 
 #=
 ode_algorithm = SSPRK43(thread = Trixi.True())
