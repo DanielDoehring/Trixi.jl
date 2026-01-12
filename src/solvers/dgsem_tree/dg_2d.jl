@@ -297,7 +297,7 @@ function calc_volume_integral!(du, u,
                                mesh::Union{TreeMesh{2}, P4estMesh{2}, T8codeMesh{2},
                                            TreeMesh{3}, P4estMesh{3}, T8codeMesh{3}},
                                nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralShockCapturingHG,
+                               volume_integral::VolumeIntegralShockCapturingHG, # TODO: RRG
                                dg::DGSEM, cache,
                                element_indices = eachelement(dg, cache),
                                interface_indices = eachinterface(dg, cache),
