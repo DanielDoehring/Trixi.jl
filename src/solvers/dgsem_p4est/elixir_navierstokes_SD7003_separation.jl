@@ -68,6 +68,10 @@ mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/bd
 boundary_symbols = [:Airfoil, :FarField]
 mesh = P4estMesh{2}(mesh_file, boundary_symbols = boundary_symbols)
 
+restart_file = "restart_000190000.h5"
+restart_filename = joinpath("out", restart_file)
+mesh_file = load_mesh(restart_filename)
+
 boundary_condition_free_stream = BoundaryConditionDirichlet(initial_condition)
 
 velocity_bc_airfoil = NoSlip((x, t, equations) -> SVector(0.0, 0.0))
@@ -92,9 +96,6 @@ t_c = airfoil_cord_length / U_inf()
 tspan = (0.0, 25 * t_c)
 
 #ode = semidiscretize(semi, tspan)
-
-restart_file = "restart_SD7003_separation_t5.h5"
-restart_filename = joinpath("out", restart_file)
 
 tspan = (load_time(restart_filename), 25 * t_c)
 ode = semidiscretize(semi, tspan, restart_filename)
@@ -154,19 +155,45 @@ amr_callback = AMRCallback(semi, amr_controller,
 save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true)
 
+stepsize_callback = StepsizeCallback(cfl = 4.0)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, 
                         alive_callback,
                         save_solution,
                         save_restart,
+                        stepsize_callback,
                         amr_callback
                         )
 
 ###############################################################################
 # run the simulation
 
+Stages_complete_p3 = reverse(collect(range(3, 16)))
+
+dtRatios_complete_p3 = reverse([
+0.13127150246873497963
+0.203093074960634112358
+0.267830466036684811115
+0.353251938358880579472
+0.41519365040585398674
+0.500231141922995448112
+0.585340263205580413342
+0.662512545241042971611
+0.756990342051722109318
+0.836318025831133127213
+0.946929757483303546906
+1.04593554686289280653
+1.14077944308519363403
+1.23392039851751178503] ./ 1.23392039851751178503)
+
+path = "/storage/home/daniel/Adaptive_VT/SD7003_TransonicSeparation/PERK_p3_Coeffs"
+ode_alg = Trixi.PairedExplicitRK3Multi(Stages_complete_p3, path, dtRatios_complete_p3)
+
+#=
 ode_algorithm = SSPRK43(thread = Trixi.True())
 
 sol = solve(ode, ode_algorithm;
             abstol = 1e-5, reltol = 1e-5,
             ode_default_options()..., callback = callbacks)
+=#
