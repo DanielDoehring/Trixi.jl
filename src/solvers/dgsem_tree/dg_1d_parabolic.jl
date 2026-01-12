@@ -130,7 +130,8 @@ function rhs_parabolic!(du, u, t, mesh::TreeMesh{1},
     # Calculate source terms
     @trixi_timeit timer() "source terms parabolic" begin
         calc_sources_parabolic!(du, u, gradients, t, source_terms_parabolic,
-                                equations_parabolic, dg, cache)
+                                equations_parabolic, dg, cache,
+                                element_indices)
     end
 
     return nothing
