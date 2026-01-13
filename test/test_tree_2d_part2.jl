@@ -26,6 +26,9 @@ isdir(outdir) && rm(outdir, recursive = true)
     # Compressible Euler Multicomponent
     include("test_tree_2d_eulermulti.jl")
 
+    # Compressible Euler Multi-Ion
+    include("test_tree_2d_eulermultiion.jl")
+
     # Compressible Polytropic Euler
     include("test_tree_2d_eulerpolytropic.jl")
 
