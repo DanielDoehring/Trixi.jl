@@ -203,7 +203,7 @@ function calc_correction_matrix(basis, ::Val{:g_ESFR}, c)
     g_derivative_matrix = zeros(RealT, N, 2)
 
     #eta_k = c * (2 * k + 1) * (a_k(k) * factorial(k))^2 # eq. (3.45)
-    #eta_k = c * (2 * k + 1) * a_k_mod(k)^2 # more stable version
+    eta_k = c * (2 * k + 1) * a_k_mod(k)^2 # more stable version
 
     for i in 1:N
         xi = nodes[i]
