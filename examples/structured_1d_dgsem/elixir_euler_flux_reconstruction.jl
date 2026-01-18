@@ -9,11 +9,10 @@ equations = CompressibleEulerEquations1D(1.4)
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 
-# Dissipation ensures entropy stability
 surface_flux = FluxPlusDissipation(flux_ranocha, DissipationMatrixWintersEtal())
 
 c_ = c_SD(polydeg) # parameter that recovers Spectral Difference correction function
-@assert c_ > c_min_ESFR(polydeg) # Required for energy stability
+@assert c_ > c_min_ESFR(polydeg) # c should be larger than minimum value for energy stability for advection
 correction_function = correction_function_ESFR(c_)
 surface_integral = SurfaceIntegralFluxReconstruction(basis,
                                                      surface_flux = surface_flux,
