@@ -58,7 +58,7 @@ basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 0.5,
                                             alpha_min = 0.001,
-                                            alpha_smooth = true, # true
+                                            alpha_smooth = true,
                                             variable = density_pressure)
 
 surface_flux = flux_lax_friedrichs
@@ -69,10 +69,20 @@ volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
                                                  volume_flux_fv = surface_flux)
 
 # NOTE: Flux Differencing is required, shock capturing not (at least not for simply running the code)
-volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
+volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux)
+
+# TODO: Need probably go to k = 3 for larger speedup
+# `target_decay` governs the tolerated entropy increase due to the weak-form
+# volume integral before switching to the stabilized version
+indicator = IndicatorEntropyDecay(target_decay = -1e-7)
+# Adaptive volume integral using the entropy increase indicator to perform the 
+# stabilized/EC volume integral when needed
+volume_integral = VolumeIntegralAdaptive(volume_integral_default = VolumeIntegralWeakForm(),
+                                         volume_integral_stabilized = volume_integral_fluxdiff,
+                                         indicator = indicator)
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
-               volume_integral = volume_integral)
+               volume_integral = volume_integral_fluxdiff)
 
 #mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
 mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
@@ -103,7 +113,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), load_time(restart_filename))
+tspan = (load_time(restart_filename), 6.05)
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -142,7 +152,7 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
                                                                         u_inf(equations)))
 
-analysis_interval = 100_000
+analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
@@ -265,9 +275,9 @@ cfl = 20.0 # PERK p2 2-16 mod2, safety_factor = 1.8
 
 # steady-state near (restarted 6.049)
 
-cfl = 31.0 # PERK p2 E16
+#cfl = 31.0 # PERK p2 E16
 
-cfl = 2.0 # SSPRK22
+#cfl = 2.0 # SSPRK22
 #cfl = 3.6 # ORK256
 #cfl = 9.4 # ParsaniKetchesonDeconinck3S82
 
@@ -309,7 +319,7 @@ stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        save_solution,
+                        #save_solution,
                         #save_restart,
                         stepsize_callback
                         );
@@ -321,7 +331,7 @@ callbacks = CallbackSet(summary_callback,
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2_mod)
 
-ode_alg = Trixi.PairedExplicitRK2(16, path)
+#ode_alg = Trixi.PairedExplicitRK2(16, path)
 
 ## k = 2, p = 3 ##
 
@@ -345,7 +355,7 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
 
-
+#=
 using OrdinaryDiffEqSSPRK
 using OrdinaryDiffEqLowStorageRK
 
@@ -355,3 +365,4 @@ ode_alg = SSPRK22(thread = Trixi.True())
 
 sol = solve(ode, ode_alg, dt = 42.0, save_start = false, adaptive = false,
             save_everystep = false, callback = callbacks);
+=#
