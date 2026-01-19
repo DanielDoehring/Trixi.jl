@@ -23,7 +23,7 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
 
     # Restore boundary values for parabolic equations
     # which overwrite the solution boundary values with the gradients
-    if equations isa AbstractEquationsHyperbolicParabolic
+    if equations isa AbstractEquationsParabolic
         prolong2boundaries!(cache, u, mesh, equations, dg)
     end
 
