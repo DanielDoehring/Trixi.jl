@@ -103,7 +103,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.05)
+tspan = (load_time(restart_filename), load_time(restart_filename))
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -155,12 +155,52 @@ alive_callback = AliveCallback(alive_interval = 50)
 
 save_sol_interval = analysis_interval
 
+#=
+# Add `:T` to `extra_node_variables` tuple ...
+extra_node_variables = (:T,)
+
+@inline function temperature(u, equations::CompressibleEulerEquations3D)
+    rho, rho_v1, rho_v2, rho_v3, rho_e = u
+
+    p = (equations.gamma - 1) * (rho_e - 0.5f0 * (rho_v1^2 + rho_v2^2 + rho_v3^2) / rho)
+    T = p / rho # Corresponds to a specific gas constant R = 1
+    return T
+end
+
+# ... and specify the function `get_node_variable` for this symbol, 
+# with first argument matching the symbol (turned into a type via `Val`) for dispatching.
+# Note that for parabolic(-extended) equations, `equations_parabolic` and `cache_parabolic`
+# must be declared as the last two arguments of the function to match the expected signature.
+function Trixi.get_node_variable(::Val{:T}, u, mesh, equations, dg, cache)
+    n_nodes = nnodes(dg)
+    n_elements = nelements(dg, cache)
+    # By definition, the variable must be provided at every node of every element!
+    # Otherwise, the `SaveSolutionCallback` will crash.
+    T_array = zeros(eltype(cache.elements),
+                            n_nodes, n_nodes, n_nodes, # equivalent: `ntuple(_ -> n_nodes, ndims(mesh))...,`
+                            n_elements)
+
+    # We can accelerate the computation by thread-parallelizing the loop over elements
+    # by using the `@threaded` macro.
+    Trixi.@threaded for element in eachelement(dg, cache)
+        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            
+            T_array[i, j, k, element] = temperature(u_node, equations)
+        end
+    end
+
+    return T_array
+end
+=#
+
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
-                                     save_initial_solution = false,
+                                     save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
                                      #output_directory="/storage/home/daniel/OneraM6/"
-                                     output_directory="out/"
+                                     output_directory="out/",
+                                     #extra_node_variables = extra_node_variables
                                      )
 
 save_restart = SaveRestartCallback(interval = save_sol_interval,
@@ -269,7 +309,7 @@ stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
-                        #save_solution,
+                        save_solution,
                         #save_restart,
                         stepsize_callback
                         );
@@ -301,10 +341,10 @@ ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages_complete_p3, path, dtRat
 #ode_alg = Trixi.RelaxationRK33(; relaxation_solver = newton)
 #ode_alg = Trixi.RK33()
 
-#=
+
 sol = Trixi.solve(ode, ode_alg, dt = 42.0, save_start = false,
                   save_everystep = false, callback = callbacks);
-=#
+
 
 using OrdinaryDiffEqSSPRK
 using OrdinaryDiffEqLowStorageRK
