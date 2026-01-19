@@ -185,7 +185,6 @@ cfl_max() = 9.0 # k = 3, p2
 
 #cfl_max() = 6.2 # k = 4, p3, S=14
 # TODO: Check relaxation standalone!
-# TODO: 11-Stage Split standalone
 
 #cfl_max() = 4.6 # DGLDDRK73_C
 #cfl_max() = 11.1 # ParsaniKetchesonDeconinck3S173
