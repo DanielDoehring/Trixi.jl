@@ -322,7 +322,7 @@ export load_mesh, load_time, load_timestep, load_timestep!, load_dt,
 
 export ControllerThreeLevel, ControllerThreeLevelCombined,
        IndicatorLöhner, IndicatorLoehner,
-       IndicatorMax, IndicatorClamp
+       IndicatorMax
 
 export PositivityPreservingLimiterZhangShu, EntropyBoundedLimiter
 

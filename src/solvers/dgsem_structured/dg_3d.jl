@@ -825,7 +825,7 @@ function apply_jacobian!(du,
             # Negative sign included to account for the negated surface and volume terms,
             # see e.g. the computation of `derivative_hat` in the basis setup and 
             # the comment in `calc_surface_integral!`.
-            factor = -cache.elementsinverse_jacobian[i, j, k, element]
+            factor = -cache.elements.inverse_jacobian[i, j, k, element]
 
             for v in eachvariable(equations)
                 du[v, i, j, k, element] *= factor
