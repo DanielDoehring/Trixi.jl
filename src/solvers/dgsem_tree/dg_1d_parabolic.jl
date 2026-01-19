@@ -167,7 +167,7 @@ function calc_volume_integral!(du, flux_viscous,
                                dg::DGSEM, cache,
                                element_indices = eachelement(dg, cache),
                                interface_indices = nothing)
-    @unpack derivative_dhat = dg.basis
+    @unpack derivative_hat = dg.basis
 
     @threaded for element in element_indices
         # Calculate volume terms in one element
@@ -176,7 +176,7 @@ function calc_volume_integral!(du, flux_viscous,
                                         element)
 
             for ii in eachnode(dg)
-                multiply_add_to_node_vars!(du, derivative_dhat[ii, i], flux_1_node,
+                multiply_add_to_node_vars!(du, derivative_hat[ii, i], flux_1_node,
                                            equations_parabolic, dg, ii, element)
             end
         end
@@ -404,7 +404,7 @@ function calc_gradient_volume_integral!(gradients, u_transformed,
                                         equations_parabolic::AbstractEquationsParabolic,
                                         dg::DGSEM, cache,
                                         element_indices = eachelement(dg, cache))
-    @unpack derivative_dhat = dg.basis
+    @unpack derivative_hat = dg.basis
 
     @threaded for element in element_indices
         # Calculate volume terms in one element,
@@ -414,7 +414,7 @@ function calc_gradient_volume_integral!(gradients, u_transformed,
                                    i, element)
 
             for ii in eachnode(dg)
-                multiply_add_to_node_vars!(gradients, derivative_dhat[ii, i],
+                multiply_add_to_node_vars!(gradients, derivative_hat[ii, i],
                                            u_node, equations_parabolic, dg,
                                            ii, element)
             end
@@ -467,7 +467,6 @@ function calc_gradient_surface_integral!(gradients,
     @unpack surface_flux_values = cache.elements
 
     # Note that all fluxes have been computed with outward-pointing normal vectors.
-    # Access the factors only once before beginning the loop to increase performance.
     # We also use explicit assignments instead of `+=` to let `@muladd` turn these
     # into FMAs (see comment at the top of the file).
     factor_1 = boundary_interpolation[1, 1]

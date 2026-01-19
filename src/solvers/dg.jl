@@ -274,13 +274,13 @@ end
     VolumeIntegralAdaptive(;
                            volume_integral_default = VolumeIntegralWeakForm(),
                            volume_integral_stabilized = VolumeIntegralFluxDifferencing(flux_central),
-                           indicator = IndicatorEntropyDecay())
+                           indicator = IndicatorEntropyComparison())
 
 !!! warning "Experimental code"
     This code is experimental and may change in any future release.
 
 Possible combinations:
-- [`VolumeIntegralWeakForm`](@ref), [`VolumeIntegralFluxDifferencing`](@ref), and [`IndicatorEntropyDecay`](@ref)
+- [`VolumeIntegralWeakForm`](@ref), [`VolumeIntegralFluxDifferencing`](@ref), and [`IndicatorEntropyComparison()`](@ref) or [`IndicatorEntropyDecay`](@ref)
 - [`VolumeIntegralWeakForm`](@ref), [`VolumeIntegralShockCapturingHG`](@ref), and `nothing` (indicator taken from `VolumeIntegralShockCapturingHG`)
 """
 struct VolumeIntegralAdaptive{VolumeIntegralDefault, VolumeIntegralStabilized,
@@ -293,7 +293,7 @@ end
 function VolumeIntegralAdaptive(;
                                 volume_integral_default = VolumeIntegralWeakForm(),
                                 volume_integral_stabilized = VolumeIntegralFluxDifferencing(flux_central),
-                                indicator = IndicatorEntropyDecay())
+                                indicator = IndicatorEntropyComparison())
     return VolumeIntegralAdaptive{typeof(volume_integral_default),
                                   typeof(volume_integral_stabilized),
                                   typeof(indicator)}(volume_integral_default,
@@ -919,9 +919,7 @@ end
         #     In fact, everything can be fast and fine for many cases but some parts
         #     of the RHS evaluation can take *exactly* (!) five seconds randomly...
         #     Hence, this version should only be used when `@threaded` is based on
-        #     `@batch` from Polyester.jl or something similar. Using Polyester.jl
-        #     is probably the best option since everything will be handed over to
-        #     Chris Elrod, one of the best performance software engineers for Julia.
+        #     `@batch` from Polyester.jl or something similar.
         PtrArray(pointer(u_ode),
                  (StaticInt(nvariables(equations)),
                   ntuple(_ -> StaticInt(nnodes(dg)), ndims(mesh))...,
