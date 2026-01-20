@@ -52,34 +52,29 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
     return flux
 end
 
-polydeg = 2
+polydeg = 3 # originally 2
 basis = LobattoLegendreBasis(polydeg)
 
 shock_indicator = IndicatorHennemannGassner(equations, basis,
-                                            alpha_max = 0.5,
-                                            alpha_min = 0.001,
-                                            alpha_smooth = true,
+                                            alpha_max = 1.0,
+                                            alpha_min = 1 - 1e-4,
+                                            alpha_smooth = false,
                                             variable = density_pressure)
 
 surface_flux = flux_lax_friedrichs
 volume_flux = flux_ranocha
 
-volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
-                                                 volume_flux_dg = volume_flux,
-                                                 volume_flux_fv = surface_flux)
+volume_integral_stabilized = VolumeIntegralShockCapturingHG(shock_indicator;
+                                                            volume_flux_dg = volume_flux,
+                                                            volume_flux_fv = surface_flux)
 
 # NOTE: Flux Differencing is required, shock capturing not (at least not for simply running the code)
 volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux)
 
 # TODO: Need probably go to k = 3 for larger speedup
-# `target_decay` governs the tolerated entropy increase due to the weak-form
-# volume integral before switching to the stabilized version
-indicator = IndicatorEntropyDecay(target_decay = -1e-7)
-# Adaptive volume integral using the entropy increase indicator to perform the 
-# stabilized/EC volume integral when needed
 volume_integral = VolumeIntegralAdaptive(volume_integral_default = VolumeIntegralWeakForm(),
-                                         volume_integral_stabilized = volume_integral_fluxdiff,
-                                         indicator = indicator)
+                                         volume_integral_stabilized = volume_integral_stabilized,
+                                         indicator = nothing) # taken from `volume_integral_stabilized`
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral_fluxdiff)
@@ -113,7 +108,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.05)
+tspan = (load_time(restart_filename), 6.04901) # 6.05
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -272,6 +267,8 @@ cfl_interval = 2
 cfl = 13.2 # PERK p2 2-16
 
 cfl = 20.0 # PERK p2 2-16 mod2, safety_factor = 1.8
+
+cfl = 10.0 # k = 3
 
 # steady-state near (restarted 6.049)
 

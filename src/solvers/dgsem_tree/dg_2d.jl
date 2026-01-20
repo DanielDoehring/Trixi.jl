@@ -338,6 +338,56 @@ function calc_volume_integral!(du, u,
     return nothing
 end
 
+# TODO: Quick & dirty hack!
+function calc_volume_integral!(du, u,
+                               mesh::Union{TreeMesh{2}, P4estMesh{2}, T8codeMesh{2},
+                                           TreeMesh{3}, P4estMesh{3}, T8codeMesh{3}},
+                               nonconservative_terms, equations,
+                               volume_integral::VolumeIntegralAdaptive{VolumeIntegralWeakForm,
+                                                                       VolumeIntegralSC,
+                                                                       Indicator},
+                               dg::DGSEM, cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = eachinterface(dg, cache),
+                               mortar_indices = eachmortar(dg, cache)) where {Indicator <: Nothing, # Indicator taken from `VolumeIntegralSC`
+                                             VolumeIntegralSC <:
+                                             VolumeIntegralShockCapturingHG}
+    @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral.volume_integral_stabilized
+
+    # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
+    alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations, dg,
+                                                               cache, element_indices,
+                                                               interface_indices,
+                                                               mortar_indices)
+
+    # Print the sum of alpha elements greater than 0
+    println("sum(alpha[alpha .> 0]) = ", sum(alpha[alpha .> 0]))
+
+    # For `Float64`, this gives 1.8189894035458565e-12
+    # For `Float32`, this gives 1.1920929f-5
+    RealT = eltype(alpha)
+    atol = max(100 * eps(RealT), eps(RealT)^convert(RealT, 0.75f0))
+    @threaded for element in element_indices
+        alpha_element = alpha[element]
+        # Clip blending factor for values close to zero (-> pure DG)
+        dg_only = isapprox(alpha_element, 0, atol = atol)
+
+        if dg_only
+            flux_differencing_kernel!(du, u, element, mesh,
+                                      nonconservative_terms, equations,
+                                      volume_flux_dg, dg, cache)
+        else
+            # CARE: Quick & dirty test for ONERA M6
+            # Calculate DG volume integral contribution
+            flux_differencing_kernel!(du, u, element, mesh,
+                                      nonconservative_terms, equations,
+                                      volume_flux_dg, dg, cache)
+        end
+    end
+
+    return nothing
+end
+
 @inline function fvO2_kernel!(du, u,
                               mesh::Union{TreeMesh{2}, StructuredMesh{2},
                                           UnstructuredMesh2D, P4estMesh{2},
