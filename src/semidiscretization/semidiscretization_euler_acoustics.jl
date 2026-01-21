@@ -75,9 +75,11 @@ function SemidiscretizationEulerAcoustics(semi_acoustics::SemiAcoustics,
                          level_info_elements_acc,
                          mesh_equations_solver_cache(semi_acoustics)...)
 
+    performance_counter = PerformanceCounter()
+
     return SemidiscretizationEulerAcoustics{typeof(semi_acoustics), typeof(semi_euler),
                                             typeof(cache)}(semi_acoustics, semi_euler,
-                                                           cache)
+                                                           cache, performance_counter)
 end
 
 function create_cache(::Type{SemidiscretizationEulerAcoustics}, source_region, weights,
