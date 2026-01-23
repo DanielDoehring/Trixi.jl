@@ -52,13 +52,19 @@ bc_farfield = BoundaryConditionDirichlet(initial_condition)
     return flux
 end
 
-polydeg = 3 # originally 2
+polydeg = 3 # originally 2, tested also with 3
 basis = LobattoLegendreBasis(polydeg)
+
+if polydeg == 2
+    alpha_min = 0.08
+elseif polydeg == 3
+    alpha_min = 0.01
+end
 
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 1.0,
-                                            alpha_min = 1 - 1e-4,
-                                            alpha_smooth = false,
+                                            alpha_min = alpha_min,
+                                            alpha_smooth = true,
                                             variable = density_pressure)
 
 surface_flux = flux_lax_friedrichs
@@ -71,7 +77,51 @@ volume_integral_stabilized = VolumeIntegralShockCapturingHG(shock_indicator;
 # NOTE: Flux Differencing is required, shock capturing not (at least not for simply running the code)
 volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux)
 
-# TODO: Need probably go to k = 3 for larger speedup
+
+# TODO: Quick & dirty hack reusing indicator HG but only FD!
+function Trixi.calc_volume_integral!(du, u,
+                               mesh::Union{TreeMesh{2}, P4estMesh{2}, T8codeMesh{2},
+                                           TreeMesh{3}, P4estMesh{3}, T8codeMesh{3}},
+                               nonconservative_terms, equations,
+                               volume_integral::VolumeIntegralAdaptive{VolumeIntegralWeakForm,
+                                                                       VolumeIntegralSC,
+                                                                       Indicator},
+                               dg::DGSEM, cache,
+                               element_indices = Trixi.eachelement(dg, cache),
+                               interface_indices = Trixi.eachinterface(dg, cache),
+                               mortar_indices = Trixi.eachmortar(dg, cache)) where {Indicator <: Nothing, # Indicator taken from `VolumeIntegralSC`
+                                             VolumeIntegralSC <:
+                                             VolumeIntegralShockCapturingHG}
+    @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral.volume_integral_stabilized
+
+    @unpack alpha = indicator.cache
+    #println("count(alpha .> 0) = ", count(>(0), alpha))
+
+    # For `Float64`, this gives 1.8189894035458565e-12
+    # For `Float32`, this gives 1.1920929f-5
+    RealT = eltype(alpha)
+    atol = max(100 * eps(RealT), eps(RealT)^convert(RealT, 0.75f0))
+    Trixi.@threaded for element in element_indices
+        alpha_element = alpha[element]
+        # Clip blending factor for values close to zero (-> pure DG)
+        dg_only = isapprox(alpha_element, 0, atol = atol)
+
+        if dg_only
+            Trixi.weak_form_kernel!(du, u, element, mesh,
+                              nonconservative_terms, equations,
+                              dg, cache)
+        else
+            # CARE: Quick & dirty test for ONERA M6
+            # Calculate DG volume integral contribution
+            Trixi.flux_differencing_kernel!(du, u, element, mesh,
+                                      nonconservative_terms, equations,
+                                      volume_flux_dg, dg, cache)
+        end
+    end
+
+    return nothing
+end
+
 volume_integral = VolumeIntegralAdaptive(volume_integral_default = VolumeIntegralWeakForm(),
                                          volume_integral_stabilized = volume_integral_stabilized,
                                          indicator = nothing) # taken from `volume_integral_stabilized`
@@ -108,7 +158,7 @@ restart_file = "restart_t605_undamped.h5"
 restart_filename = joinpath("/storage/home/daniel/OneraM6/", restart_file)
 #restart_filename = joinpath("/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/restart_files/k2/", restart_file)
 
-tspan = (load_time(restart_filename), 6.04901) # 6.05
+tspan = (load_time(restart_filename), 6.05) # 6.05
 
 ode = semidiscretize(semi, tspan, restart_filename)
 
@@ -156,7 +206,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory="out/"
                                      )
 
-alive_callback = AliveCallback(alive_interval = 50)
+alive_callback = AliveCallback(alive_interval = 20)
 
 save_sol_interval = analysis_interval
 
@@ -268,8 +318,6 @@ cfl = 13.2 # PERK p2 2-16
 
 cfl = 20.0 # PERK p2 2-16 mod2, safety_factor = 1.8
 
-cfl = 10.0 # k = 3
-
 # steady-state near (restarted 6.049)
 
 #cfl = 31.0 # PERK p2 E16
@@ -313,12 +361,62 @@ stepsize_callback = StepsizeCallback(cfl = 10.0, interval = cfl_interval) # PER(
 #stepsize_callback = StepsizeCallback(cfl = 2.8, interval = cfl_interval) # (R-)RK33
 =#
 
+path = base_path * "k3/p2/"
+
+dtRatios_complete_p2_mod = [ 
+    0.487036598101258259852,
+    0.440858029760420306074 / safety_factor,
+    0.394032015837728962588 / safety_factor,
+    0.342910405620932566377 / safety_factor,
+    0.307774601317942131065 / safety_factor,
+    0.274541171640157689442 / safety_factor,
+    0.238564100302755823847 / safety_factor,
+    0.202247733436524860514 / safety_factor,
+    0.160481546446681016716 / safety_factor,
+    0.134384183585643763331 / safety_factor,
+    0.108587534353137012282 / safety_factor,
+    0.0718968311324715587742 / safety_factor,
+    0.0300888860598206508947 / safety_factor
+                      ] ./ 0.487036598101258259852
+Stages_complete_p2 = reverse(collect(range(2, 14)))
+
+cfl = 10.0 # k = 3 optimized
+
+
+path = base_path * "k3/p4/"
+
+dtRatios_complete_p4_mod = [ 
+    0.460652348399162,
+    0.416693951487541 / safety_factor,
+    0.381378587856889 / safety_factor,
+    0.350212497711182 / safety_factor,
+    0.324112872034311 / safety_factor,
+    0.281054820492864 / safety_factor,
+    0.245423326268792 / safety_factor,
+    0.211017424166203 / safety_factor,
+    0.174579094536602 / safety_factor,
+    0.154489312693477 / safety_factor,
+    0.11951766833663 / safety_factor,
+    0.0794953770935535 / safety_factor,
+    0.0439409114420414 / safety_factor
+                      ] ./ 0.460652348399162
+Stages_complete_p4 = reverse(collect(range(5, 17)))
+
+ode_alg = Trixi.PairedExplicitRK4Multi(Stages_complete_p4, path, dtRatios_complete_p4_mod)
+
+cfl = 9.5 # k = 3 optimized
+
+stepsize_callback = StepsizeCallback(cfl = cfl, interval = cfl_interval)
+
+indicator_hg_callback = Trixi.IndicatorHGCallback(interval = 3)
+
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
                         #save_solution,
                         #save_restart,
-                        stepsize_callback
+                        stepsize_callback,
+                        #indicator_hg_callback
                         );
 
 # Run the simulation
@@ -326,7 +424,7 @@ callbacks = CallbackSet(summary_callback,
 
 ## k = 2, p = 2 ##
 
-ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2_mod)
+#ode_alg = Trixi.PairedExplicitRK2Multi(Stages_complete_p2, path, dtRatios_complete_p2_mod)
 
 #ode_alg = Trixi.PairedExplicitRK2(16, path)
 
