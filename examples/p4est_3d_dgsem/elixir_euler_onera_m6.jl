@@ -127,7 +127,7 @@ volume_integral = VolumeIntegralAdaptive(volume_integral_default = VolumeIntegra
                                          indicator = nothing) # taken from `volume_integral_stabilized`
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
-               volume_integral = volume_integral_fluxdiff)
+               volume_integral = volume_integral)
 
 #mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
 mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
@@ -197,7 +197,7 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                 SurfacePressureCoefficient(p_inf(), rho_inf(),
                                                                         u_inf(equations)))
 
-analysis_interval = 100
+analysis_interval = 10_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      analysis_errors = Symbol[],
                                      analysis_integrals = (lift_coefficient,),
@@ -250,7 +250,7 @@ end
 =#
 
 save_solution = SaveSolutionCallback(interval = save_sol_interval,
-                                     save_initial_solution = true,
+                                     save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
                                      #output_directory="/storage/home/daniel/OneraM6/"
@@ -412,11 +412,11 @@ indicator_hg_callback = Trixi.IndicatorHGCallback(interval = 3)
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
-                        analysis_callback,
-                        #save_solution,
+                        #analysis_callback,
+                        save_solution,
                         #save_restart,
                         stepsize_callback,
-                        #indicator_hg_callback
+                        indicator_hg_callback # NOTE: Required for `VolumeIntegralAdaptive`!
                         );
 
 # Run the simulation
