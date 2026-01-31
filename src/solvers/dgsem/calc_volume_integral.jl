@@ -257,14 +257,18 @@ function calc_volume_integral!(du, u, mesh,
                                                                        VolumeIntegralFD,
                                                                        Indicator},
                                dg::DGSEM,
-                               cache) where {
-                                             VolumeIntegralFD <:
-                                             VolumeIntegralFluxDifferencing,
-                                             Indicator <: IndicatorEntropyDecay}
+                               cache,
+                               element_indices = eachelement(dg, cache),
+                               interface_indices = nothing,
+                               mortar_indices = nothing) where {
+                                                                VolumeIntegralFD <:
+                                                                VolumeIntegralFluxDifferencing,
+                                                                Indicator <:
+                                                                IndicatorEntropyDecay}
     @unpack volume_integral_default, volume_integral_stabilized = volume_integral
     @unpack target_decay = volume_integral.indicator
 
-    @threaded for element in eachelement(dg, cache)
+    @threaded for element in element_indices
         # Try plain weak form first
         weak_form_kernel!(du, u, element, mesh,
                           have_nonconservative_terms, equations,
