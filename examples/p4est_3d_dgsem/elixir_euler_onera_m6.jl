@@ -127,7 +127,7 @@ volume_integral = VolumeIntegralAdaptive(volume_integral_default = VolumeIntegra
                                          indicator = nothing) # taken from `volume_integral_stabilized`
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
-               volume_integral = volume_integral)
+               volume_integral = volume_integral_fluxdiff)
 
 #mesh_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/OneraM6/NASA/"
 mesh_path = "/storage/home/daniel/PERRK/Data/OneraM6/"
@@ -403,8 +403,10 @@ dtRatios_complete_p4_mod = [
 Stages_complete_p4 = reverse(collect(range(5, 17)))
 
 ode_alg = Trixi.PairedExplicitRK4Multi(Stages_complete_p4, path, dtRatios_complete_p4_mod)
-
 cfl = 9.5 # k = 3 optimized
+
+ode_alg = Trixi.PairedExplicitRK4(12, path)
+cfl = 10.0
 
 stepsize_callback = StepsizeCallback(cfl = cfl, interval = cfl_interval)
 
@@ -416,7 +418,7 @@ callbacks = CallbackSet(summary_callback,
                         save_solution,
                         #save_restart,
                         stepsize_callback,
-                        indicator_hg_callback # NOTE: Required for `VolumeIntegralAdaptive`!
+                        #indicator_hg_callback # NOTE: Required for `VolumeIntegralAdaptive`!
                         );
 
 # Run the simulation
