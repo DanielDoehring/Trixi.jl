@@ -135,6 +135,46 @@ function analyze(::Val{:linf_divb}, du, u, t,
     return linf_divB
 end
 
+# calculate surface integral of func(u, normal_direction, equations) on the reference element.
+# For DGMulti, we loop over all faces of the element and integrate using face quadrature weights.
+function surface_integral(func::Func, u, element,
+                          mesh::DGMultiMesh, equations, dg::DGMulti, cache,
+                          args...) where {Func}
+    rd = dg.basis
+    md = mesh.md
+    @unpack Fmask, Nfq = rd
+    @unpack nxyzJ, Jf = md
+
+    # Initialize surface integral  
+    surface_integral = zero(eltype(u))
+
+    # Loop over all face nodes for this element
+    for i in 1:Nfq
+        # Get global face node index (across all elements' face nodes)
+        face_node_global = i + (element - 1) * Nfq
+
+        # Get the volume node index corresponding to this face node
+        volume_node_index = Fmask[i]
+
+        # Get solution at this face node (which is also a volume node on the boundary)
+        u_node = u[volume_node_index, element]
+
+        # Get face normal (nxyzJ is scaled by face Jacobian, so we divide by Jf to get unit normal)
+        # nxyzJ stores normals as (nxJ, nyJ, ...) where each is a vector indexed by global face node
+        normal_direction = SVector(getindex.(nxyzJ, face_node_global)) /
+                           Jf[face_node_global]
+
+        # Get face weight (already includes quadrature weight)
+        face_weight = rd.wf[i]
+
+        # Accumulate contribution (multiply by Jf to account for surface measure)
+        surface_integral += face_weight * Jf[face_node_global] *
+                            func(u_node, normal_direction, equations)
+    end
+
+    return surface_integral
+end
+
 function create_cache_analysis(analyzer, mesh::DGMultiMesh,
                                equations, dg::DGMulti, cache,
                                RealT, uEltype)
