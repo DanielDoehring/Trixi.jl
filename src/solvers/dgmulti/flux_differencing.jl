@@ -587,7 +587,7 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
                                                     mesh, equations,
                                                     dg, cache)
 
-        dS_true = surface_integral(entropy_potential, u_local, e,
+        dS_true = surface_integral(entropy_potential, entropy_projected_u_values, e,
                                    mesh, equations, dg, cache)
 
         println("Entropy delta: ", dS_WF - dS_true)
@@ -626,6 +626,7 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
 end
 
 # version for affine meshes
+#=
 function calc_entropy_change_element(du_values, u_values, element,
                                      mesh::DGMultiMesh, equations,
                                      dg::DGMultiFluxDiff, cache)
@@ -640,6 +641,22 @@ function calc_entropy_change_element(du_values, u_values, element,
     dS_dt_elem = zero(eltype(first(du_elem)))
     for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
         dS_dt_elem = dot(cons2entropy(u_elem[i], equations), du_elem[i]) * rd.wq[i]
+    end
+
+    return dS_dt_elem
+end
+=#
+
+function calc_entropy_change_element(du_local, u_local, element,
+                                     mesh::DGMultiMesh, equations,
+                                     dg::DGMultiFluxDiff, cache)
+    @unpack md = mesh
+    rd = dg.basis
+
+    # Compute entropy change for this element
+    dS_dt_elem = zero(eltype(first(du_local)))
+    for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
+        dS_dt_elem = dot(cons2entropy(u_local[i], equations), du_local[i]) * rd.wq[i]
     end
 
     return dS_dt_elem

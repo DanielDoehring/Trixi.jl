@@ -146,7 +146,8 @@ function surface_integral(func::Func, u, element,
     @unpack nxyzJ, Jf = md
 
     # Initialize surface integral  
-    surface_integral = zero(eltype(u))
+    #surface_integral = zero(eltype(u))
+    surface_integral = 0.0
 
     # Loop over all face nodes for this element
     for i in 1:Nfq
