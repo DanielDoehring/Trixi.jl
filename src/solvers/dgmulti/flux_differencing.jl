@@ -583,6 +583,15 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
                                  has_sparse_operators(dg),
                                  mesh, equations, dg, cache)
 
+        dS_WF = -calc_entropy_change_element(fluxdiff_local, u_local, e,
+                                                    mesh, equations,
+                                                    dg, cache)
+
+        dS_true = surface_integral(entropy_potential, u_local, e,
+                                   mesh, equations, dg, cache)
+
+        println("Entropy delta: ", dS_WF - dS_true)
+
         # convert fluxdiff_local::Vector{<:SVector} to StructArray{<:SVector} for faster
         # apply_to_each_field performance.
         rhs_local = rhs_local_threaded[Threads.threadid()]
@@ -630,8 +639,7 @@ function calc_entropy_change_element(du_values, u_values, element,
     # Compute entropy change for this element
     dS_dt_elem = zero(eltype(first(du_elem)))
     for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
-        # minus sign as in `invert_jacobian!`
-        dS_dt_elem -= dot(cons2entropy(u_elem[i], equations), du_elem[i]) * rd.wq[i]
+        dS_dt_elem = dot(cons2entropy(u_elem[i], equations), du_elem[i]) * rd.wq[i]
     end
 
     return dS_dt_elem
@@ -691,11 +699,15 @@ function calc_volume_integral!(du, u,
         end
 
         # Compute entropy production of this volume integral
-        entropy_delta = calc_entropy_change_element(du_values, u_values, e,
+        dS_WF = -calc_entropy_change_element(du_values, u_values, e,
                                                     mesh, equations,
                                                     dg, cache)
 
-        if entropy_delta > target_decay
+        dS_true = surface_integral(entropy_potential, u, e,
+                                   mesh, equations, dg, cache)
+
+        #if entropy_delta > target_decay
+        if dS_WF - dS_true > target_decay
             # Reset bad volume integral 
             du_elem .= zero.(du_elem)
 

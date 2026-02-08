@@ -8,7 +8,9 @@ using Trixi
 # To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
 # We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the 
 # `StepsizeCallback` (CFL-Condition) and less diffusion.
-dg = DGMulti(polydeg = 3, element_type = Quad(), approximation_type = SBP(),
+dg = DGMulti(polydeg = 3, element_type = Quad(),
+             #approximation_type = SBP(),
+             approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(FluxLaxFriedrichs(max_abs_speed_naive)),
              volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
 
@@ -55,7 +57,7 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      solution_variables = cons2prim)
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        alive_callback, save_solution)
+                        alive_callback)
 
 ###############################################################################
 # run the simulation
