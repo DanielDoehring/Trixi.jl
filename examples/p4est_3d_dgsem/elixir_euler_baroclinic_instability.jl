@@ -223,12 +223,29 @@ boundary_conditions = (; inside = boundary_condition_slip_wall,
 # This is a good estimate for the speed of sound in this example.
 # Other values between 300 and 400 should work as well.
 surface_flux = FluxLMARS(340)
+
+# NOTE: Kennedy-Gruber is NOT EC, only KEEP!
 volume_flux = flux_kennedy_gruber
+volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux)
+
+volume_integral_wf = VolumeIntegralWeakForm() # Crashes
+
+# TODO: Not sure if this indicator makes sense here, as KG is only KEEP, not EC.
+indicator = IndicatorEntropyChange(maximum_entropy_increase = 1e1)
+
+# Adaptive volume integral using the entropy change indicator to perform the 
+# stabilized/EC volume integral when needed and keeping the weak form if it is more diffusive.
+volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integral_wf,
+                                         volume_integral_stabilized = volume_integral_fluxdiff,
+                                         indicator = indicator)
+
 solver = DGSEM(polydeg = 5, surface_flux = surface_flux,
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+               volume_integral = volume_integral)
 
 # For optimal results, use (16, 8) here
-trees_per_cube_face = (8, 4)
+#trees_per_cube_face = (8, 4)
+trees_per_cube_face = (16, 8)
+
 inner_radius = 6.371229e6
 thickness = 30000.0 # thickness of the spherical shell, outer radius is `inner_radius + thickness`
 mesh = P4estMeshCubedSphere(trees_per_cube_face..., inner_radius, thickness,
@@ -270,6 +287,11 @@ let du_steady_state = similar(u_steady_state)
     end
 end
 u0 = compute_coefficients(tspan[1], semi)
+
+restart_file = "out/restart_000015000.h5"
+u0 = Trixi.load_restart_file(semi, restart_file)
+tspan = (load_time(restart_file), 10 * 24 * 60 * 60.0)
+
 ode = ODEProblem(corrected_rhs!, u0, tspan, semi)
 
 summary_callback = SummaryCallback()
@@ -277,23 +299,30 @@ summary_callback = SummaryCallback()
 analysis_interval = 5000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-alive_callback = AliveCallback(analysis_interval = analysis_interval)
+alive_callback = AliveCallback(alive_interval = 100)
 
 save_solution = SaveSolutionCallback(interval = 5000,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
+save_restart = SaveRestartCallback(interval = analysis_interval,
+                                   save_final_restart = true)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
-                        save_solution)
+                        save_restart
+                        #save_solution
+                        )
 
 ###############################################################################
 # run the simulation
 
 # Use a Runge-Kutta method with automatic (error based) time step size control
 # Enable threading of the RK method for better performance on multiple threads
+
+tols = 1e-6 # 1e-6
 sol = solve(ode, RDPK3SpFSAL49(thread = Trixi.True());
-            abstol = 1.0e-6, reltol = 1.0e-6,
+            abstol = tols, reltol = tols, dt = 4.4,
             ode_default_options()..., callback = callbacks);
