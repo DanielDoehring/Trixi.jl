@@ -291,6 +291,8 @@ end
 
 Possible combinations:
 - [`VolumeIntegralWeakForm`](@ref), [`VolumeIntegralFluxDifferencing`](@ref), and [`IndicatorEntropyChange()`](@ref)
+- [`VolumeIntegralWeakForm`](@ref), [`VolumeIntegralShockCapturingHG`](@ref), and `nothing` (indicator taken from `volume_integral_stabilized`)
+- [`VolumeIntegralWeakForm`](@ref), [`VolumeIntegralShockCapturingRRG`](@ref), and `nothing` (indicator taken from `volume_integral_stabilized`)
 """
 struct VolumeIntegralAdaptive{VolumeIntegralDefault, VolumeIntegralStabilized,
                               Indicator} <: AbstractVolumeIntegral
@@ -306,8 +308,10 @@ function VolumeIntegralAdaptive(;
     if !(volume_integral_default isa VolumeIntegralWeakForm)
         throw(ArgumentError("`volume_integral_default` must be of type `VolumeIntegralWeakForm`."))
     end
-    if !(volume_integral_stabilized isa VolumeIntegralFluxDifferencing)
-        throw(ArgumentError("`volume_integral_stabilized` must be of type `VolumeIntegralFluxDifferencing`."))
+    if !(volume_integral_stabilized isa VolumeIntegralFluxDifferencing ||
+         volume_integral_stabilized isa AbstractVolumeIntegralShockCapturing)
+        throw(ArgumentError("`volume_integral_stabilized` must be of type `VolumeIntegralFluxDifferencing` or 
+        `AbstractVolumeIntegralShockCapturing`, i.e., `VolumeIntegralShockCapturingHG` or `VolumeIntegralShockCapturingRRG`."))
     end
 
     return VolumeIntegralAdaptive{typeof(volume_integral_default),
@@ -337,6 +341,23 @@ function Base.show(io::IO, mime::MIME"text/plain",
         end
         summary_footer(io)
     end
+end
+
+function get_element_variables!(element_variables, u, mesh, equations,
+                                volume_integral::VolumeIntegralAdaptive{VolumeIntegralWeakForm,
+                                                                        VolumeIntegralSC,
+                                                                        Indicator},
+                                dg,
+                                cache) where {
+                                              VolumeIntegralSC <:
+                                              AbstractVolumeIntegralShockCapturing,
+                                              Indicator <: Nothing} # Indicator taken from `VolumeIntegralSC`
+    @unpack volume_integral_stabilized = volume_integral
+    @unpack indicator = volume_integral_stabilized
+
+    indicator(u, mesh, equations, dg, cache)
+    return get_element_variables!(element_variables, indicator,
+                                  volume_integral_stabilized)
 end
 
 # Abstract supertype for first-order `VolumeIntegralPureLGLFiniteVolume` and
