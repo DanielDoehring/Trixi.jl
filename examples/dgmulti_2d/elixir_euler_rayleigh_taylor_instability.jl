@@ -59,29 +59,6 @@ end
     return SVector(0.0, 0.0, g * rho, g * rho_v2)
 end
 
-volume_integral_weakform = VolumeIntegralWeakForm() # Does not make it to the end of the simulation
-volume_flux = flux_ranocha
-volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux) # Does also not make it to the end and is much more expensive
-
-# `threshold` governs the tolerated entropy increase due to the weak-form
-# volume integral before switching to the stabilized version
-indicator = IndicatorEntropyDecay(target_decay = 0)
-
-#=
-element_type = Quad()
-polydeg = 3
-approximation_type = Polynomial()
-
-basis = DGMultiBasis(element_type, polydeg; approximation_type = approximation_type)
-indicator = IndicatorEntropyComparison(equations, basis)
-=#
-
-# Adaptive volume integral using the entropy increase indicator to perform the 
-# stabilized/EC volume integral when needed
-volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integral_weakform,
-                                         volume_integral_stabilized = volume_integral_fluxdiff,
-                                         indicator = indicator)
-
 # numerical parameters
 dg = DGMulti(polydeg = polydeg, element_type = element_type,
              approximation_type = approximation_type,
@@ -104,16 +81,13 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg;
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 5.0) # 3.6 for heuristic
+tspan = (0.0, 3.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
 analysis_interval = 1000
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
-                                     uEltype = real(dg),
-                                     analysis_errors = Symbol[],
-                                     extra_analysis_integrals = (entropy,))
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg))
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
