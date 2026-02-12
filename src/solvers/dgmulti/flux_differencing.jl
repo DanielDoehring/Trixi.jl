@@ -616,9 +616,8 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
     end
 end
 
-# version for affine meshes
-function calc_volume_integral!(du, u,
-                               mesh::DGMultiMesh,
+# version for affine meshes (currently only one)
+function calc_volume_integral!(du, u, mesh::DGMultiMesh,
                                have_nonconservative_terms::False, equations,
                                volume_integral::VolumeIntegralAdaptive{VolumeIntegralWeakForm,
                                                                        VolumeIntegralFD,
@@ -637,19 +636,18 @@ function calc_volume_integral!(du, u,
     @unpack weak_differentiation_matrices, dxidxhatj, u_values, local_values_threaded = cache
     @unpack rstxyzJ = md # geometric terms
 
-    # interpolate to quadrature points
+    # interpolate to quadrature points, required for weak form trial
     apply_to_each_field(mul_by!(rd.Vq), u_values, u)
 
-    # interpolate du for entropy production calculation
+    # For entropy production computation
     @unpack du_values = cache
-    apply_to_each_field(mul_by!(rd.Vq), du_values, du)
 
     # For VolumeIntegralFD
     @unpack entropy_projected_u_values, Ph = cache
     @unpack fluxdiff_local_threaded, rhs_local_threaded = cache
 
     @threaded for e in eachelement(dg, cache)
-        du_elem = view(du, :, e)
+        du_elem = view(du, :, e) # Introduce alias due to repeated access
 
         # Try plain weak form first
         flux_values = local_values_threaded[Threads.threadid()]
@@ -667,6 +665,10 @@ function calc_volume_integral!(du, u,
             end
         end
 
+        # interpolate du for entropy production calculation
+        du_values_elem = view(du_values, :, e)
+        apply_to_each_field(mul_by!(rd.Vq), du_values_elem, du_elem)
+
         # Compute entropy production of this volume integral
         dS_WF = -calc_entropy_change_element(du_values, u_values, e,
                                              mesh, equations,
@@ -680,7 +682,7 @@ function calc_volume_integral!(du, u,
             # Reset bad volume integral 
             du_elem .= zero.(du_elem)
 
-            # Recompute using stabilized version
+            # Recompute using stabilized EC FD version
             fluxdiff_local = fluxdiff_local_threaded[Threads.threadid()]
             fill!(fluxdiff_local, zero(eltype(fluxdiff_local)))
             u_local = view(entropy_projected_u_values, :, e)

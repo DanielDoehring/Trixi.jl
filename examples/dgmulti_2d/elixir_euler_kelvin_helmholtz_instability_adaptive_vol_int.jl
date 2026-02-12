@@ -53,7 +53,8 @@ initial_condition = initial_condition_kelvin_helmholtz_instability
 cells_per_dimension = (32, 32)
 mesh = DGMultiMesh(dg, cells_per_dimension; periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg;
+                                    boundary_conditions = boundary_condition_periodic)
 
 tspan = (0.0, 20.0)
 ode = semidiscretize(semi, tspan)
