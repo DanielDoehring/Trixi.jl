@@ -18,7 +18,6 @@ volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integr
                                          indicator = indicator)
 
 dg = DGMulti(polydeg = 3,
-             #element_type = Quad(),
              element_type = Tri(),
              approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(flux_hllc),

@@ -60,10 +60,9 @@ end
 end
 
 # numerical parameters
-dg = DGMulti(polydeg = polydeg, element_type = element_type,
-             approximation_type = approximation_type,
+dg = DGMulti(polydeg = 3, element_type = Quad(), approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(flux_hll),
-             volume_integral = volume_integral)
+             volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
 
 num_elements = 16
 cells_per_dimension = (num_elements, 4 * num_elements)
@@ -86,7 +85,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg))
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
@@ -96,7 +95,7 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
-                        alive_callback)
+                        alive_callback, save_solution)
 
 ###############################################################################
 # run the simulation
