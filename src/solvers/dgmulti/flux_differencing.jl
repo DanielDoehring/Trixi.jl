@@ -636,15 +636,15 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
     @unpack weak_differentiation_matrices, dxidxhatj, u_values, local_values_threaded = cache
     @unpack rstxyzJ = md # geometric terms
 
-    # interpolate to quadrature points, required for weak form trial
-    apply_to_each_field(mul_by!(rd.Vq), u_values, u)
-
     # For entropy production computation
     @unpack du_values = cache
 
     # For VolumeIntegralFD
     @unpack entropy_projected_u_values, Ph = cache
     @unpack fluxdiff_local_threaded, rhs_local_threaded = cache
+
+    # interpolate to quadrature points, required for weak form trial
+    apply_to_each_field(mul_by!(rd.Vq), u_values, u)
 
     @threaded for e in eachelement(dg, cache)
         du_elem = view(du, :, e) # Introduce alias due to repeated access

@@ -6,19 +6,17 @@ volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(flux_ranocha)
 
 # This indicator compares the entropy production of the weak form to the 
 # true entropy evolution in that cell.
-# If the weak form dissipates more entropy than the true evolution
-# the indicator renders this admissible. Otherwise, the more stable
-# volume integral is to be used.
+# If the weak form does not increase entropy beyond `maximum_entropy_increase`,
+# we keep the weak form result. Otherwise, we switch to the stabilized/EC volume integral.
 indicator = IndicatorEntropyChange(maximum_entropy_increase = 5e-3)
 
 # Adaptive volume integral using the entropy production comparison indicator to perform the 
-# stabilized/EC volume integral when needed and keeping the weak form if it is more diffusive.
+# stabilized/EC volume integral when needed.
 volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integral_weakform,
                                          volume_integral_stabilized = volume_integral_fluxdiff,
                                          indicator = indicator)
 
-dg = DGMulti(polydeg = 3,
-             element_type = Tri(),
+dg = DGMulti(polydeg = 3, element_type = Tri(),
              approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(flux_hllc),
              volume_integral = volume_integral)

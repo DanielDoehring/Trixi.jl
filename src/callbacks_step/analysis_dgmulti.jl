@@ -141,11 +141,12 @@ function entropy_change_reference_element(du_local, u_local, element,
                                           dg::DGMultiFluxDiff, cache)
     @unpack md = mesh
     rd = dg.basis
+    @unpack Nq, wq = rd
 
     # Compute entropy change for this element
     dS_dt_elem = zero(eltype(first(du_local)))
-    for i in Base.OneTo(rd.Nq) # Loop over quadrature points in the element
-        dS_dt_elem += dot(cons2entropy(u_local[i], equations), du_local[i]) * rd.wq[i]
+    for i in Base.OneTo(Nq) # Loop over quadrature points in the element
+        dS_dt_elem += dot(cons2entropy(u_local[i], equations), du_local[i]) * wq[i]
     end
 
     return dS_dt_elem
@@ -158,13 +159,10 @@ function surface_integral(func::Func, u, element,
                           args...) where {Func}
     rd = dg.basis
     md = mesh.md
-    @unpack Fmask, Nfq = rd
+    @unpack Fmask, Nfq, wf = rd
     @unpack nxyzJ, Jf = md
 
-    # Initialize surface integral  
-    #surface_integral = zero(eltype(u))
-    surface_integral = 0.0
-
+    surface_integral = zero(eltype(first(u)))
     # Loop over all face nodes for this element
     for i in 1:Nfq
         # Get global face node index (across all elements' face nodes)
@@ -181,10 +179,10 @@ function surface_integral(func::Func, u, element,
         normal_direction = SVector(getindex.(nxyzJ, face_node_global)) /
                            Jf[face_node_global]
 
-        # Get face weight (already includes quadrature weight)
-        face_weight = rd.wf[i]
+        # Get face quadrature weight
+        face_weight = wf[i]
 
-        # Accumulate contribution (multiply by Jf to account for surface measure)
+        # Accumulate and multiply by Jf to account for surface measure (similar to contravariant vector for DGSEM)
         surface_integral += face_weight * Jf[face_node_global] *
                             func(u_node, normal_direction, equations)
     end
