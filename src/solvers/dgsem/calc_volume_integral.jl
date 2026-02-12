@@ -12,19 +12,6 @@ function create_cache(mesh, equations,
     return NamedTuple()
 end
 
-function create_cache(mesh, equations,
-                      volume_integral::VolumeIntegralAdaptive,
-                      dg::DG, cache_containers, uEltype)
-    cache_default = create_cache(mesh, equations,
-                                 volume_integral.volume_integral_default,
-                                 dg, cache_containers, uEltype)
-    cache_stabilized = create_cache(mesh, equations,
-                                    volume_integral.volume_integral_stabilized,
-                                    dg, cache_containers, uEltype)
-
-    return (; cache_default..., cache_stabilized...)
-end
-
 # The following `calc_volume_integral!` functions are
 # dimension and meshtype agnostic, i.e., valid for all 1D, 2D, and 3D meshes.
 
