@@ -694,6 +694,7 @@ function calc_volume_integral!(du, u,
                                              mesh, equations,
                                              dg, cache)
 
+        # TODO: Not sure if these are true/correct!
         dS_true = surface_integral(entropy_potential, u, e,
                                    mesh, equations, dg, cache)
 

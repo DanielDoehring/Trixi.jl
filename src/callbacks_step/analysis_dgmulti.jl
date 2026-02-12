@@ -143,7 +143,7 @@ function calc_entropy_change_element(du_local, u_local, element,
 
     # Compute entropy change for this element
     dS_dt_elem = zero(eltype(first(du_local)))
-    for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
+    for i in Base.OneTo(rd.Nq) # Loop over quadrature points in the element
         dS_dt_elem += dot(cons2entropy(u_local[i], equations), du_local[i]) * rd.wq[i]
     end
 
