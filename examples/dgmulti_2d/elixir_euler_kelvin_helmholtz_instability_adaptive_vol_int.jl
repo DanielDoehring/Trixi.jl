@@ -16,10 +16,10 @@ volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integr
                                          volume_integral_stabilized = volume_integral_fluxdiff,
                                          indicator = indicator)
 
-dg = DGMulti(polydeg = 3, element_type = Tri(),
+dg = DGMulti(polydeg = 3, element_type = Tri(), # `Tri()` to make flux differencing really expensive
              approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(flux_hllc),
-             volume_integral = volume_integral)
+             volume_integral = volume_integral_weakform)
 
 equations = CompressibleEulerEquations2D(1.4)
 
@@ -54,16 +54,26 @@ mesh = DGMultiMesh(dg, cells_per_dimension; periodicity = true)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg;
                                     boundary_conditions = boundary_condition_periodic)
 
-tspan = (0.0, 20.0)
+tspan = (0.0, 3.0) # WF still stable until this time, used for timings.
+tspan = (0.0, 20.0) # stable time for adaptive volume integral
+
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 alive_callback = AliveCallback(alive_interval = 50)
 
-analysis_interval = 100
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg))
 
+# For entropy recording run
+analysis_interval = 10
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg),
+                                     save_analysis = true,
+                                     analysis_errors = Symbol[],
+                                     extra_analysis_integrals = (entropy,))
+
 stepsize_callback = StepsizeCallback(cfl = 1.0)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
