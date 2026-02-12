@@ -652,9 +652,6 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
         # Try plain weak form first
         flux_values = local_values_threaded[Threads.threadid()]
         for i in eachdim(mesh)
-            # Here, the broadcasting operation does allocate
-            #flux_values .= flux.(view(u_values, :, e), i, equations)
-            # Use loop instead
             for j in eachindex(flux_values)
                 flux_values[j] = flux(u_values[j, e], i, equations)
             end
@@ -670,9 +667,9 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
         apply_to_each_field(mul_by!(rd.Vq), du_values_elem, du_elem)
 
         # Compute entropy production of this volume integral
-        dS_WF = -calc_entropy_change_element(du_values, u_values, e,
-                                             mesh, equations,
-                                             dg, cache)
+        dS_WF = -entropy_change_reference_element(du_values, u_values, e,
+                                                  mesh, equations,
+                                                  dg, cache)
 
         dS_true = surface_integral(entropy_potential, u, e,
                                    mesh, equations, dg, cache)

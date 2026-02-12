@@ -134,9 +134,11 @@ function analyze(::Val{:linf_divb}, du, u, t,
     return linf_divB
 end
 
-function calc_entropy_change_element(du_local, u_local, element,
-                                     mesh::DGMultiMesh, equations,
-                                     dg::DGMultiFluxDiff, cache)
+# Calculate ∫_e (∂S/∂u ⋅ ∂u/∂t) dΩ_e where the result on element 'e' is kept in reference space
+# Note that ∂S/∂u = w(u) with entropy variables w
+function entropy_change_reference_element(du_local, u_local, element,
+                                          mesh::DGMultiMesh, equations,
+                                          dg::DGMultiFluxDiff, cache)
     @unpack md = mesh
     rd = dg.basis
 
