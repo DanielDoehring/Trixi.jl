@@ -59,7 +59,6 @@ end
     return SVector(0.0, 0.0, g * rho, g * rho_v2)
 end
 
-
 volume_integral_weakform = VolumeIntegralWeakForm() # Does not make it to the end of the simulation
 volume_flux = flux_ranocha
 volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux) # Does also not make it to the end and is much more expensive
@@ -84,7 +83,8 @@ volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integr
                                          indicator = indicator)
 
 # numerical parameters
-dg = DGMulti(polydeg = polydeg, element_type = element_type, approximation_type = approximation_type,
+dg = DGMulti(polydeg = polydeg, element_type = element_type,
+             approximation_type = approximation_type,
              surface_integral = SurfaceIntegralWeakForm(flux_hll),
              volume_integral = volume_integral)
 

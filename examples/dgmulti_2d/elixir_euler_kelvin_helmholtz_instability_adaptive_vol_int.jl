@@ -9,7 +9,7 @@ volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(flux_ranocha)
 # If the weak form dissipates more entropy than the true evolution
 # the indicator renders this admissible. Otherwise, the more stable
 # volume integral is to be used.
-indicator = IndicatorEntropyChange(maximum_entropy_increase = 0.0)
+indicator = IndicatorEntropyChange(maximum_entropy_increase = 5e-3)
 
 # Adaptive volume integral using the entropy production comparison indicator to perform the 
 # stabilized/EC volume integral when needed and keeping the weak form if it is more diffusive.
@@ -22,7 +22,7 @@ dg = DGMulti(polydeg = 3,
              element_type = Tri(),
              approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(flux_hllc),
-             volume_integral = volume_integral_fluxdiff)
+             volume_integral = volume_integral)
 
 equations = CompressibleEulerEquations2D(1.4)
 
@@ -51,21 +51,21 @@ function initial_condition_kelvin_helmholtz_instability(x, t,
 end
 initial_condition = initial_condition_kelvin_helmholtz_instability
 
-cells_per_dimension = (32, 64)
+cells_per_dimension = (32, 32)
 mesh = DGMultiMesh(dg, cells_per_dimension; periodicity = true)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg)
 
-tspan = (0.0, 5.0)
+tspan = (0.0, 20.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
-alive_callback = AliveCallback(alive_interval = 10)
+alive_callback = AliveCallback(alive_interval = 50)
 
 analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg))
 
-stepsize_callback = StepsizeCallback(cfl = 1.3)
+stepsize_callback = StepsizeCallback(cfl = 1.0)
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
