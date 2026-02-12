@@ -672,11 +672,8 @@ function calc_volume_integral!(du, u,
                                              mesh, equations,
                                              dg, cache)
 
-        # TODO: Not sure if these are true/correct!
         dS_true = surface_integral(entropy_potential, u, e,
                                    mesh, equations, dg, cache)
-
-        #println("dS_WF: ", dS_WF, " dS_true: ", dS_true, " entropy delta: ", dS_WF - dS_true)
 
         entropy_change = dS_WF - dS_true
         if entropy_change > maximum_entropy_increase # Recompute using EC FD volume integral
