@@ -1178,5 +1178,4 @@ function calc_entropy_delta(du_element_wf, du_FD, u, element,
 
     return entropy_delta
 end
-
 end # @muladd

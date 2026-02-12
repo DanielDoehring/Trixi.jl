@@ -40,10 +40,11 @@ volume_integral_weakform = VolumeIntegralWeakForm()
 volume_integral_fluxdiff = VolumeIntegralFluxDifferencing(volume_flux)
 
 # This indicator compares the entropy production of the weak form to the 
-# entropy-conserving flux-differencing volume integral.
-# If the entropy production of the weak form is lower than that of the
-# flux-differencing form, we use the flux-differencing form to stabilize the solution.
-indicator = IndicatorEntropyComparison(equations, basis)
+# true entropy evolution in that cell.
+# If the weak form dissipates more entropy than the true evolution
+# the indicator renders this admissible. Otherwise, the more stable
+# volume integral is to be used.
+indicator = IndicatorEntropyChange(maximum_entropy_increase = 0.0)
 
 # Adaptive volume integral using the entropy production comparison indicator to perform the 
 # stabilized/EC volume integral when needed and keeping the weak form if it is more diffusive.

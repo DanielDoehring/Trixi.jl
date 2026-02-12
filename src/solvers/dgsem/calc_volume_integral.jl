@@ -136,6 +136,7 @@ function calc_volume_integral!(du, u, mesh,
 
     return nothing
 end
+=#
 
 function calc_volume_integral!(du, u, mesh,
                                have_nonconservative_terms, equations,
@@ -182,7 +183,6 @@ function calc_volume_integral!(du, u, mesh,
 
     return nothing
 end
-=#
 
 function calc_volume_integral!(du, u, mesh,
                                have_nonconservative_terms, equations,

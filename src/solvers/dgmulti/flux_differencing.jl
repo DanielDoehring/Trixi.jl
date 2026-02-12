@@ -583,15 +583,6 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
                                  has_sparse_operators(dg),
                                  mesh, equations, dg, cache)
 
-        dS_WF = -calc_entropy_change_element(fluxdiff_local, u_local, e,
-                                                    mesh, equations,
-                                                    dg, cache)
-
-        dS_true = surface_integral(entropy_potential, entropy_projected_u_values, e,
-                                   mesh, equations, dg, cache)
-
-        println("Entropy delta: ", dS_WF - dS_true)
-
         # convert fluxdiff_local::Vector{<:SVector} to StructArray{<:SVector} for faster
         # apply_to_each_field performance.
         rhs_local = rhs_local_threaded[Threads.threadid()]
@@ -647,23 +638,6 @@ function calc_entropy_change_element(du_values, u_values, element,
 end
 =#
 
-function calc_entropy_change_element(du_local, u_local, element,
-                                     mesh::DGMultiMesh, equations,
-                                     dg::DGMultiFluxDiff, cache)
-    @unpack md = mesh
-    rd = dg.basis
-
-    # Compute entropy change for this element
-    dS_dt_elem = zero(eltype(first(du_local)))
-    for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
-        dS_dt_elem = dot(cons2entropy(u_local[i], equations), du_local[i]) * rd.wq[i]
-    end
-
-    return dS_dt_elem
-end
-
-# TODO: Version for IndicatorEntropyComparison
-
 # version for affine meshes
 function calc_volume_integral!(du, u,
                                mesh::DGMultiMesh,
@@ -675,9 +649,9 @@ function calc_volume_integral!(du, u,
                                cache) where {
                                              VolumeIntegralFD <:
                                              VolumeIntegralFluxDifferencing,
-                                             Indicator <: IndicatorEntropyDecay}
+                                             Indicator <: IndicatorEntropyChange}
     @unpack volume_integral_default, volume_integral_stabilized = volume_integral
-    @unpack target_decay = volume_integral.indicator
+    @unpack maximum_entropy_increase = volume_integral.indicator
 
     # For weak form volume integral
     rd = dg.basis
@@ -717,14 +691,16 @@ function calc_volume_integral!(du, u,
 
         # Compute entropy production of this volume integral
         dS_WF = -calc_entropy_change_element(du_values, u_values, e,
-                                                    mesh, equations,
-                                                    dg, cache)
+                                             mesh, equations,
+                                             dg, cache)
 
         dS_true = surface_integral(entropy_potential, u, e,
                                    mesh, equations, dg, cache)
 
-        #if entropy_delta > target_decay
-        if dS_WF - dS_true > target_decay
+        #println("dS_WF: ", dS_WF, " dS_true: ", dS_true, " entropy delta: ", dS_WF - dS_true)
+
+        entropy_change = dS_WF - dS_true
+        if entropy_change > maximum_entropy_increase # Recompute using EC FD volume integral
             # Reset bad volume integral 
             du_elem .= zero.(du_elem)
 
@@ -735,7 +711,7 @@ function calc_volume_integral!(du, u,
 
             local_flux_differencing!(fluxdiff_local, u_local, e,
                                      have_nonconservative_terms,
-                                     volume_integral.volume_flux,
+                                     volume_integral_stabilized.volume_flux,
                                      has_sparse_operators(dg),
                                      mesh, equations, dg, cache)
 

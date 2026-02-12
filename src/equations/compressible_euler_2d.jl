@@ -2230,6 +2230,15 @@ end
     return energy_total(cons, equations) - energy_kinetic(cons, equations)
 end
 
+@inline function entropy_potential(u, orientation::Int,
+                                   equations::CompressibleEulerEquations2D)
+    if orientation == 1
+        return u[2]
+    else # if orientation == 2
+        return u[3]
+    end
+end
+
 @doc raw"""
     entropy_potential(u, normal_direction::AbstractVector, equations::AbstractCompressibleEulerEquations)
 

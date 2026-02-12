@@ -135,6 +135,21 @@ function analyze(::Val{:linf_divb}, du, u, t,
     return linf_divB
 end
 
+function calc_entropy_change_element(du_local, u_local, element,
+                                     mesh::DGMultiMesh, equations,
+                                     dg::DGMultiFluxDiff, cache)
+    @unpack md = mesh
+    rd = dg.basis
+
+    # Compute entropy change for this element
+    dS_dt_elem = zero(eltype(first(du_local)))
+    for i in Base.OneTo(rd.Nq)  # Loop over quadrature points in the element
+        dS_dt_elem += dot(cons2entropy(u_local[i], equations), du_local[i]) * rd.wq[i]
+    end
+
+    return dS_dt_elem
+end
+
 # calculate surface integral of func(u, normal_direction, equations) on the reference element.
 # For DGMulti, we loop over all faces of the element and integrate using face quadrature weights.
 function surface_integral(func::Func, u, element,
