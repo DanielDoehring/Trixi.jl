@@ -276,9 +276,11 @@ function Base.show(io::IO, ::MIME"text/plain", indicator::IndicatorMax)
 end
 
 @doc raw"""
-    IndicatorEntropyChange(; maximum_entropy_increase::Real=0.0)
+    IndicatorEntropyChange(; maximum_entropy_increase::Real = 0.0)
+
 This indicator checks the difference in mathematical [`entropy`](@ref) (``S``) due to the application
-of a volume integral (VI) compared to the true/analytical entropy evolution.
+of a volume integral (VI) compared to the true/analytical entropy evolution
+(without any dissipation inside the element).
 In particular, the indicator computes
 ```math
 \Delta S = \dot{S}_\mathrm{VI} - \dot{S}_\text{true} =
@@ -294,6 +296,7 @@ for the currently processed element/cell ``m``.
 Here, ``\dot{\boldsymbol u}_\mathrm{VI}`` is the change in the DG right-hand-side due to the volume integral only.
 ``\dot{S}_\text{true}`` is the true entropy evolution, which can be computed from the
 entropy potential ``\boldsymbol{\psi}`` (see also [`entropy_potential`](@ref)).
+
 This is discussed in more detail in
 - Chen, Shu (2017)
   "Entropy stable high order discontinuous Galerkin methods with suitable quadrature rules for hyperbolic conservation laws"
@@ -301,22 +304,30 @@ This is discussed in more detail in
 - Lin, Chan (2024)
   "High order entropy stable discontinuous Galerkin spectral element methods through subcell limiting"
   [DOI: 10.1016/j.jcp.2023.112677](https://doi.org/10.1016/j.jcp.2023.112677)
+
 For ``\Delta S < \sigma \leq 0`` with ``\sigma`` being set to `maximum_entropy_increase`,
 the e.g. [`VolumeIntegralWeakForm`](@ref) is more entropy-diffusive than the true entropy change
-(which could be recovered with the [`VolumeIntegralFluxDifferencing`](@ref)).
+(which could be recovered with the [`VolumeIntegralFluxDifferencing`](@ref) and an
+entropy-conservative flux such as [`flux_ranocha`](@ref), for instance).
+
 If ``\sigma > 0`` is set, i.e., `maximum_entropy_increase > 0`, the indicator allows for
 limited entropy increase, thereby allowing to use e.g. the cheaper weak-form volume integral
 even in slightly entropy-producing situations to reduce computational cost.
+
 Supposed to be used in conjunction with [`VolumeIntegralAdaptive`](@ref) which then selects
 a volume integral for every cell/element ``m``.
+
 The logic behind this indicator is similar to the "companion" scheme
 approach proposed in Chapter 5 of
+
 - Carpenter, Fisher, Nielsen, and Frankel (2014)
   "Entropy Stable Spectral Collocation Schemes for the Navier-Stokes Equations: Discontinuous Interfaces"
   [DOI: 10.1137/130932193](https://doi.org/10.1137/130932193)
+
 Here, we thus equip e.g. the flux-differencing volume integral with a "companion" weak-form
 volume integral.
 However, usage of the entropy potential allows for comparison with the true entropy change.
+
 !!! note
     This indicator is **not implemented as an AMR indicator**, i.e., it is **not
     possible** to employ this as the `indicator` in [`ControllerThreeLevel`](@ref),
