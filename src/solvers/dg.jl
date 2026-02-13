@@ -135,6 +135,8 @@ function Base.show(io::IO, ::MIME"text/plain", integral::VolumeIntegralFluxDiffe
     end
 end
 
+create_cache(mesh, equations, ::VolumeIntegralFluxDifferencing, dg, uEltype) = NamedTuple()
+
 # Abstract supertype for DG subcell-based volume integrals with
 # finite volume schemes on the subcells.
 abstract type AbstractVolumeIntegralSubcell <: AbstractVolumeIntegral end
@@ -282,8 +284,8 @@ end
 
 """
     VolumeIntegralAdaptive(;
-                           volume_integral_default = VolumeIntegralWeakForm(),
-                           volume_integral_stabilized = VolumeIntegralFluxDifferencing(flux_central),
+                           volume_integral_default,
+                           volume_integral_stabilized,
                            indicator = IndicatorEntropyChange())
 
 !!! warning "Experimental code"
@@ -302,8 +304,8 @@ struct VolumeIntegralAdaptive{VolumeIntegralDefault, VolumeIntegralStabilized,
 end
 
 function VolumeIntegralAdaptive(;
-                                volume_integral_default = VolumeIntegralWeakForm(),
-                                volume_integral_stabilized = VolumeIntegralFluxDifferencing(flux_central),
+                                volume_integral_default,
+                                volume_integral_stabilized,
                                 indicator = IndicatorEntropyChange())
     if !(volume_integral_default isa VolumeIntegralWeakForm)
         throw(ArgumentError("`volume_integral_default` must be of type `VolumeIntegralWeakForm`."))
@@ -324,21 +326,26 @@ end
 function Base.show(io::IO, mime::MIME"text/plain",
                    integral::VolumeIntegralAdaptive)
     @nospecialize integral # reduce precompilation time
+    @unpack volume_integral_default, volume_integral_stabilized, indicator = integral
 
     if get(io, :compact, false)
         show(io, integral)
     else
         summary_header(io, "VolumeIntegralAdaptive")
+
         summary_line(io, "volume integral default",
-                     integral.volume_integral_default)
-        summary_line(io, "volume integral stabilized",
-                     integral.volume_integral_stabilized)
-        if integral.indicator === nothing
-            summary_line(io, "indicator", integral.indicator)
-        else
-            summary_line(io, "indicator", integral.indicator |> typeof |> nameof)
-            show(increment_indent(io), mime, integral.indicator)
+                     volume_integral_default |> typeof |> nameof)
+        if !(volume_integral_default isa VolumeIntegralWeakForm)
+            show(increment_indent(io), mime, volume_integral_default)
         end
+
+        summary_line(io, "volume integral stabilized",
+                     volume_integral_stabilized |> typeof |> nameof)
+        show(increment_indent(io), mime, volume_integral_stabilized)
+
+        summary_line(io, "indicator", indicator |> typeof |> nameof)
+        show(increment_indent(io), mime, indicator)
+
         summary_footer(io)
     end
 end
@@ -358,6 +365,19 @@ function get_element_variables!(element_variables, u, mesh, equations,
     indicator(u, mesh, equations, dg, cache)
     return get_element_variables!(element_variables, indicator,
                                   volume_integral_stabilized)
+end
+
+function create_cache(mesh, equations,
+                      volume_integral::VolumeIntegralAdaptive,
+                      dg, cache_containers, uEltype)
+    cache_default = create_cache(mesh, equations,
+                                 volume_integral.volume_integral_default,
+                                 dg, cache_containers, uEltype)
+    cache_stabilized = create_cache(mesh, equations,
+                                    volume_integral.volume_integral_stabilized,
+                                    dg, cache_containers, uEltype)
+
+    return (; cache_default..., cache_stabilized...)
 end
 
 # Abstract supertype for first-order `VolumeIntegralPureLGLFiniteVolume` and
