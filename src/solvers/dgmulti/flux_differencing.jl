@@ -676,7 +676,9 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
 
         entropy_change = dS_WF - dS_true
         if entropy_change > maximum_entropy_increase # Recompute using EC FD volume integral
-            # Reset bad volume integral 
+            # Reset default volume integral contribution.
+            # Note that this assumes that the volume terms are computed first,
+            # before any surface terms are added.
             du_elem .= zero.(du_elem)
 
             # Recompute using stabilized EC FD version
