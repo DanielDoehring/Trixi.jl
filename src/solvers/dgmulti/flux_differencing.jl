@@ -370,7 +370,24 @@ function create_cache(mesh::DGMultiMesh, equations, dg::DGMultiFluxDiff, RealT, 
     # interpolate geometric terms to both quadrature and face values for curved meshes
     (; Vq, Vf) = dg.basis
     interpolated_geometric_terms = map(x -> [Vq; Vf] * x, mesh.md.rstxyzJ)
-    J = rd.Vq * md.J
+    J = Vq * md.J
+
+    if dg.volume_integral isa VolumeIntegralAdaptive
+        # Need weak form datastructure
+        @unpack wq, Vq, M, Drst = rd
+        weak_differentiation_matrices = map(D -> -M \ ((Vq * D)' * Diagonal(wq)), Drst)
+
+        # For entropy change difference computation
+        du_values = copy(u_values)
+
+        return (; md, Qrst_skew, VhP, Ph,
+                invJ = inv.(J), dxidxhatj = interpolated_geometric_terms,
+                entropy_var_values, projected_entropy_var_values,
+                entropy_projected_u_values,
+                u_values, u_face_values, flux_face_values,
+                local_values_threaded, fluxdiff_local_threaded, rhs_local_threaded,
+                weak_differentiation_matrices, du_values)
+    end
 
     return (; md, Qrst_skew, VhP, Ph,
             invJ = inv.(J), dxidxhatj = interpolated_geometric_terms,
@@ -609,6 +626,87 @@ end
 
     for i in each_quad_node(mesh, dg, cache)
         du[i, element] = du[i, element] + fluxdiff_local[i] * inv_wq[i]
+    end
+
+    return nothing
+end
+
+# version for affine meshes (currently only one)
+function calc_volume_integral!(du, u, mesh::DGMultiMesh,
+                               have_nonconservative_terms::False, equations,
+                               volume_integral::VolumeIntegralAdaptive{<:IndicatorEntropyChange},
+                               dg::DGMultiFluxDiff, cache)
+    @unpack volume_integral_default, volume_integral_stabilized = volume_integral
+    @unpack maximum_entropy_increase = volume_integral.indicator
+
+    # For weak form volume integral
+    rd = dg.basis
+    @unpack weak_differentiation_matrices, dxidxhatj, u_values, local_values_threaded = cache
+
+    # For entropy production computation
+    @unpack du_values = cache
+
+    # For VolumeIntegralFD
+    @unpack entropy_projected_u_values, Ph = cache
+    @unpack fluxdiff_local_threaded, rhs_local_threaded = cache
+
+    # interpolate to quadrature points, required for weak form trial
+    apply_to_each_field(mul_by!(rd.Vq), u_values, u)
+
+    @threaded for e in eachelement(dg, cache)
+        du_elem = view(du, :, e) # Introduce alias due to repeated access
+
+        # Try plain weak form first
+        flux_values = local_values_threaded[Threads.threadid()]
+        for i in eachdim(mesh)
+            for j in eachindex(flux_values)
+                flux_values[j] = flux(u_values[j, e], i, equations)
+            end
+            for j in eachdim(mesh)
+                apply_to_each_field(mul_by_accum!(weak_differentiation_matrices[j],
+                                                  dxidxhatj[i, j][1, e]),
+                                    du_elem, flux_values)
+            end
+        end
+
+        # interpolate du for entropy production calculation
+        du_values_elem = view(du_values, :, e)
+        apply_to_each_field(mul_by!(rd.Vq), du_values_elem, du_elem)
+
+        # Compute entropy production of this volume integral
+        dS_WF = -entropy_change_reference_element(du_values, u_values, e,
+                                                  mesh, equations,
+                                                  dg, cache)
+
+        dS_true = surface_integral_reference_element(entropy_potential, u, e,
+                                                     mesh, equations, dg, cache)
+
+        entropy_change = dS_WF - dS_true
+        if entropy_change > maximum_entropy_increase # Recompute using EC FD volume integral
+            # Reset default volume integral contribution.
+            # Note that this assumes that the volume terms are computed first,
+            # before any surface terms are added.
+            du_elem .= zero.(du_elem)
+
+            # Recompute using stabilized EC FD version
+            fluxdiff_local = fluxdiff_local_threaded[Threads.threadid()]
+            fill!(fluxdiff_local, zero(eltype(fluxdiff_local)))
+            u_local = view(entropy_projected_u_values, :, e)
+
+            local_flux_differencing!(fluxdiff_local, u_local, e,
+                                     have_nonconservative_terms,
+                                     volume_integral_stabilized.volume_flux,
+                                     has_sparse_operators(dg),
+                                     mesh, equations, dg, cache)
+
+            # convert fluxdiff_local::Vector{<:SVector} to StructArray{<:SVector} for faster
+            # apply_to_each_field performance.
+            rhs_local = rhs_local_threaded[Threads.threadid()]
+            for i in Base.OneTo(length(fluxdiff_local))
+                rhs_local[i] = fluxdiff_local[i]
+            end
+            apply_to_each_field(mul_by_accum!(Ph), du_elem, rhs_local)
+        end
     end
 
     return nothing
