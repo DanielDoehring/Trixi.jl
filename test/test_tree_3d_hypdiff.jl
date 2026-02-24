@@ -58,6 +58,32 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15000)
 end
 
+@trixi_testset "elixir_hypdiff_lax_friedrichs.jl (Gauss-Legendre)" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_hypdiff_lax_friedrichs.jl"),
+                        solver=DGSEM(GaussLegendreBasis(3), flux_lax_friedrichs),
+                        cfl=1.5,
+                        l2=[
+                            0.0009496056031665098,
+                            0.006502882794733499,
+                            0.006433637980660486,
+                            0.00647024815353343
+                        ],
+                        linf=[
+                            0.009384711815010549,
+                            0.057341845365549204,
+                            0.05343650704282066,
+                            0.055569867593871614
+                        ],
+                        initial_refinement_level=2)
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom 
+    # integrator which are not *recorded* for the methods from 
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15000)
+end
+
 @trixi_testset "elixir_hypdiff_nonperiodic.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_hypdiff_nonperiodic.jl"),
                         l2=[
