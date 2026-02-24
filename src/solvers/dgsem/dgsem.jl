@@ -11,16 +11,6 @@ include("l2projection.jl")
 include("basis_lobatto_legendre.jl")
 include("basis_gauss_legendre.jl")
 
-"""
-    DGSEM(; RealT=Float64, polydeg::Integer,
-            basis = LobattoLegendreBasis(RealT, polydeg)
-            surface_flux=flux_central,
-            surface_integral=SurfaceIntegralWeakForm(surface_flux),
-            volume_integral=VolumeIntegralWeakForm())
-
-Create a discontinuous Galerkin spectral element method (DGSEM) using a
-[`LobattoLegendreBasis`](@ref) with polynomials of degree `polydeg`.
-"""
 const DGSEM = DG{Basis} where {Basis <: AbstractBasisSBP}
 
 # This API is no longer documented, and we recommend avoiding its public use.
@@ -61,12 +51,29 @@ end
 # The constructor using only keyword arguments is convenient for elixirs since
 # it allows to modify the polynomial degree and other parameters via
 # `trixi_include`.
+"""
+    DGSEM(; RealT=Float64, polydeg::Integer,
+            node_type = :lobatto,
+            surface_flux=flux_central,
+            surface_integral=SurfaceIntegralWeakForm(surface_flux),
+            volume_integral=VolumeIntegralWeakForm())
+
+Create a discontinuous Galerkin spectral element method (DGSEM) using a
+[`LobattoLegendreBasis`](@ref) or a [`GaussLegendreBasis`](@ref) with polynomials of degree `polydeg`.
+"""
 function DGSEM(; RealT = Float64,
                polydeg::Integer,
-               basis = LobattoLegendreBasis(RealT, polydeg),
+               basis_type = :lobatto,
                surface_flux = flux_central,
                surface_integral = SurfaceIntegralWeakForm(surface_flux),
                volume_integral = VolumeIntegralWeakForm())
+    if basis_type == :lobatto
+        basis = LobattoLegendreBasis(RealT, polydeg)
+    elseif basis_type == :gauss
+        basis = GaussLegendreBasis(RealT, polydeg)
+    else
+        throw(ArgumentError("Invalid basis_type: $basis_type"))
+    end
     return DGSEM(basis, surface_integral, volume_integral)
 end
 
