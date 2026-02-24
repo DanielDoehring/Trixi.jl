@@ -557,6 +557,71 @@ function prolong2interfaces!(cache, u, mesh::TreeMesh{3}, equations, dg::DG)
     return nothing
 end
 
+function prolong2interfaces!(cache, u, mesh::TreeMesh{3}, equations,
+                             dg::DG{<:GaussLegendreBasis})
+    @unpack interfaces = cache
+    @unpack orientations, neighbor_ids = interfaces
+    @unpack boundary_interpolation = dg.basis
+    interfaces_u = interfaces.u
+
+    @threaded for interface in eachinterface(dg, cache)
+        left_element = neighbor_ids[1, interface]
+        right_element = neighbor_ids[2, interface]
+
+        if orientations[interface] == 1
+            # interface in x-direction
+            for k in eachnode(dg), j in eachnode(dg), v in eachvariable(equations)
+                interfaces_u[1, v, j, k, interface] = zero(eltype(interfaces_u))
+                interfaces_u[2, v, j, k, interface] = zero(eltype(interfaces_u))
+                for ii in eachnode(dg)
+                    interfaces_u[1, v, j, k, interface] += (u[v, ii, j, k,
+                                                               left_element] *
+                                                            boundary_interpolation[ii,
+                                                                                   2])
+                    interfaces_u[2, v, j, k, interface] += (u[v, ii, j, k,
+                                                               right_element] *
+                                                            boundary_interpolation[ii,
+                                                                                   1])
+                end
+            end
+        elseif orientations[interface] == 2
+            # interface in y-direction
+            for k in eachnode(dg), i in eachnode(dg), v in eachvariable(equations)
+                interfaces_u[1, v, i, k, interface] = zero(eltype(interfaces_u))
+                interfaces_u[2, v, i, k, interface] = zero(eltype(interfaces_u))
+                for jj in eachnode(dg)
+                    interfaces_u[1, v, i, k, interface] += (u[v, i, jj, k,
+                                                               left_element] *
+                                                            boundary_interpolation[jj,
+                                                                                   2])
+                    interfaces_u[2, v, i, k, interface] += (u[v, i, jj, k,
+                                                               right_element] *
+                                                            boundary_interpolation[jj,
+                                                                                   1])
+                end
+            end
+        else # if orientations[interface] == 3
+            # interface in z-direction
+            for j in eachnode(dg), i in eachnode(dg), v in eachvariable(equations)
+                interfaces_u[1, v, i, j, interface] = zero(eltype(interfaces_u))
+                interfaces_u[2, v, i, j, interface] = zero(eltype(interfaces_u))
+                for kk in eachnode(dg)
+                    interfaces_u[1, v, i, j, interface] += (u[v, i, j, kk,
+                                                               left_element] *
+                                                            boundary_interpolation[kk,
+                                                                                   2])
+                    interfaces_u[2, v, i, j, interface] += (u[v, i, j, kk,
+                                                               right_element] *
+                                                            boundary_interpolation[kk,
+                                                                                   1])
+                end
+            end
+        end
+    end
+
+    return nothing
+end
+
 function calc_interface_flux!(surface_flux_values,
                               mesh::TreeMesh{3},
                               have_nonconservative_terms::False, equations,
@@ -1384,6 +1449,75 @@ function calc_surface_integral!(du, u, mesh::Union{TreeMesh{3}, StructuredMesh{3
                                                     surface_flux_values[v, l, m, 6,
                                                                         element] *
                                                     factor)
+            end
+        end
+    end
+
+    return nothing
+end
+
+function calc_surface_integral!(du, u, mesh::Union{TreeMesh{3}, StructuredMesh{3}},
+                                equations, surface_integral::SurfaceIntegralWeakForm,
+                                dg::DG{<:GaussLegendreBasis}, cache)
+    @unpack boundary_interpolation_inverse_weights = dg.basis
+    @unpack surface_flux_values = cache.elements
+
+    # This computes the **negative** surface integral contribution,
+    # i.e., M^{-1} * boundary_interpolation^T (which is for Gauss-Legendre DGSEM M^{-1} * L)
+    # and the missing "-" is taken care of by `apply_jacobian!`.
+    #
+    # We also use explicit assignments instead of `+=` and `-=` to let `@muladd`
+    # turn these into FMAs (see comment at the top of the file).
+    @threaded for element in eachelement(dg, cache)
+        for m in eachnode(dg), l in eachnode(dg)
+            for v in eachvariable(equations)
+                for ii in eachnode(dg)
+                    # surface at -x
+                    du[v, ii, l, m, element] = (du[v, ii, l, m, element] -
+                                                surface_flux_values[v, l, m, 1,
+                                                                    element] *
+                                                boundary_interpolation_inverse_weights[ii,
+                                                                                       1])
+
+                    # surface at +x
+                    du[v, ii, l, m, element] = (du[v, ii, l, m, element] +
+                                                surface_flux_values[v, l, m, 2,
+                                                                    element] *
+                                                boundary_interpolation_inverse_weights[ii,
+                                                                                       2])
+                end
+
+                for jj in eachnode(dg)
+                    # surface at -y
+                    du[v, l, jj, m, element] = (du[v, l, jj, m, element] -
+                                                surface_flux_values[v, l, m, 3,
+                                                                    element] *
+                                                boundary_interpolation_inverse_weights[jj,
+                                                                                       1])
+
+                    # surface at +y
+                    du[v, l, jj, m, element] = (du[v, l, jj, m, element] +
+                                                surface_flux_values[v, l, m, 4,
+                                                                    element] *
+                                                boundary_interpolation_inverse_weights[jj,
+                                                                                       2])
+                end
+
+                for kk in eachnode(dg)
+                    # surface at -z
+                    du[v, l, m, kk, element] = (du[v, l, m, kk, element] -
+                                                surface_flux_values[v, l, m, 5,
+                                                                    element] *
+                                                boundary_interpolation_inverse_weights[kk,
+                                                                                       1])
+
+                    # surface at +z
+                    du[v, l, m, kk, element] = (du[v, l, m, kk, element] +
+                                                surface_flux_values[v, l, m, 6,
+                                                                    element] *
+                                                boundary_interpolation_inverse_weights[kk,
+                                                                                       2])
+                end
             end
         end
     end
