@@ -48,18 +48,34 @@ function calc_interface_flux!(surface_flux_values, mesh::StructuredMesh{1},
     return nothing
 end
 
+function prolong2boundaries!(cache, u, mesh::StructuredMesh{1}, equations, dg::DG)
+    @unpack interfaces_u, boundaries_u = cache.elements
+
+    # Direction 1 (negative x): boundary face 1 -> first element, direction 1
+    for v in eachvariable(equations)
+        boundaries_u[v, 1] = interfaces_u[v, 1, 1]
+    end
+
+    # Direction 2 (positive x): boundary face 2 -> last element, direction 2
+    for v in eachvariable(equations)
+        boundaries_u[v, 2] = interfaces_u[v, 2, nelements(dg, cache)]
+    end
+
+    return nothing
+end
+
 function calc_boundary_flux!(cache, t, boundary_conditions::NamedTuple,
                              mesh::StructuredMesh{1}, equations, surface_integral,
                              dg::DG)
     @unpack surface_flux = surface_integral
-    @unpack surface_flux_values, node_coordinates, interfaces_u = cache.elements
+    @unpack surface_flux_values, node_coordinates, boundaries_u = cache.elements
 
     orientation = 1
 
     # Negative x-direction
     direction = 1
 
-    u_rr = get_node_vars(interfaces_u, equations, dg, direction, 1)
+    u_rr = get_node_vars(boundaries_u, equations, dg, direction)
     x = get_node_coords(node_coordinates, equations, dg, 1, 1)
 
     flux = boundary_conditions[direction](u_rr, orientation, direction, x, t,
@@ -72,7 +88,7 @@ function calc_boundary_flux!(cache, t, boundary_conditions::NamedTuple,
     # Positive x-direction
     direction = 2
 
-    u_rr = get_node_vars(interfaces_u, equations, dg, direction, nelements(dg, cache))
+    u_rr = get_node_vars(boundaries_u, equations, dg, direction)
     x = get_node_coords(node_coordinates, equations, dg, nnodes(dg),
                         nelements(dg, cache))
 

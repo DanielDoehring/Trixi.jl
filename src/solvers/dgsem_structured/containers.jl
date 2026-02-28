@@ -25,6 +25,9 @@ struct StructuredElementContainer{NDIMS, RealT <: Real, uEltype <: Real,
     # Buffer for solution values at interfaces (filled by `prolong2interfaces!`)
     interfaces_u::Array{uEltype, NDIMSP2} # [variable, i, j, direction, element]
 
+    # Buffer for solution values at boundaries (filled by `prolong2boundaries!`)
+    boundaries_u::Array{uEltype, NDIMSP1} # [variable, i, j, boundary_face]
+
     # Buffer for calculated surface flux
     surface_flux_values::Array{uEltype, NDIMSP2} # [variable, i, j, direction, element]
 end
@@ -36,21 +39,35 @@ function init_elements(mesh::Union{StructuredMesh{NDIMS, RealT},
                        basis,
                        ::Type{uEltype}) where {NDIMS, RealT <: Real, uEltype <: Real}
     nelements = prod(size(mesh))
+
     node_coordinates = Array{RealT, NDIMS + 2}(undef, NDIMS,
                                                ntuple(_ -> nnodes(basis), NDIMS)...,
                                                nelements)
+
     left_neighbors = Array{Int, 2}(undef, NDIMS, nelements)
+
     jacobian_matrix = Array{RealT, NDIMS + 3}(undef, NDIMS, NDIMS,
                                               ntuple(_ -> nnodes(basis), NDIMS)...,
                                               nelements)
+
     contravariant_vectors = similar(jacobian_matrix)
     inverse_jacobian = Array{RealT, NDIMS + 1}(undef,
                                                ntuple(_ -> nnodes(basis), NDIMS)...,
                                                nelements)
+
     interfaces_u = Array{uEltype, NDIMS + 2}(undef, nvariables(equations),
                                              ntuple(_ -> nnodes(basis),
                                                     NDIMS - 1)..., NDIMS * 2,
                                              nelements)
+
+    # Only boundary faces are stored: 2 faces per orientation, each face spans all
+    # elements in the perpendicular dimensions.
+    n_boundary_faces = 2 * sum(d -> div(nelements, size(mesh, d)), 1:NDIMS)
+    boundaries_u = Array{uEltype, NDIMS + 1}(undef, nvariables(equations),
+                                                ntuple(_ -> nnodes(basis),
+                                                       NDIMS - 1)...,
+                                                n_boundary_faces)
+
     surface_flux_values = Array{uEltype, NDIMS + 2}(undef, nvariables(equations),
                                                     ntuple(_ -> nnodes(basis),
                                                            NDIMS - 1)..., NDIMS * 2,
@@ -63,6 +80,7 @@ function init_elements(mesh::Union{StructuredMesh{NDIMS, RealT},
                                                                            contravariant_vectors,
                                                                            inverse_jacobian,
                                                                            interfaces_u,
+                                                                           boundaries_u,
                                                                            surface_flux_values)
 
     init_elements!(elements, mesh, basis)
