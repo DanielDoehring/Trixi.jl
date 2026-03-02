@@ -28,9 +28,18 @@ struct MulByAccumUniformScaling end
 mul_by!(A::UniformScaling) = MulByUniformScaling()
 mul_by_accum!(A::UniformScaling) = MulByAccumUniformScaling()
 
+# Ensure that arrays of SVectors are wrapped as StructArrays so that
+# `StructArrays.foreachfield` can apply operations field-by-field.
+# A plain `AbstractArray{<:SVector}` (e.g. a `Vector{SVector}` or a
+# `StrideArraysCore.PtrArray{<:SVector}` obtained via `view`) is not a
+# `StructArray`, so we wrap it on the fly.  `StructArray`s are left as-is.
+@inline _to_structarray(x::StructArrays.StructArray) = x
+@inline _to_structarray(x::AbstractArray) = StructArrays.StructArray(x)
+@inline _to_structarray(x) = x  # scalars / non-array arguments pass through unchanged
+
 # StructArray fallback
 @inline function apply_to_each_field(f::F, args::Vararg{Any, N}) where {F, N}
-    return StructArrays.foreachfield(f, args...)
+    return StructArrays.foreachfield(f, _to_structarray.(args)...)
 end
 
 # specialize for UniformScaling types: works for either StructArray{SVector} or Matrix{SVector}
