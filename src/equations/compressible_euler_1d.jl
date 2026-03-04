@@ -43,7 +43,7 @@ struct CompressibleEulerEquations1D{RealT <: Real} <:
 end
 
 function varnames(::typeof(cons2cons), ::CompressibleEulerEquations1D)
-    return ("rho", "rho_v1", "rho_e_total")
+    return ("rho", "rho_v1", "rho_e")
 end
 varnames(::typeof(cons2prim), ::CompressibleEulerEquations1D) = ("rho", "v1", "p")
 

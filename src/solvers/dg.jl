@@ -443,10 +443,11 @@ function VolumeIntegralAdaptive(;
                                 indicator = IndicatorEntropyChange(),
                                 volume_integral_default,
                                 volume_integral_stabilized)
+    #=
     if !(indicator isa IndicatorEntropyChange)
         throw(ArgumentError("`indicator` must be of type `IndicatorEntropyChange`."))
     end
-
+    =#
     return VolumeIntegralAdaptive{typeof(indicator),
                                   typeof(volume_integral_default),
                                   typeof(volume_integral_stabilized)}(indicator,
