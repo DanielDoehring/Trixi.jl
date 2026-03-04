@@ -236,7 +236,7 @@ export boundary_condition_do_nothing,
        boundary_condition_wall,
        BoundaryConditionNavierStokesWall, NoSlip, Slip,
        Adiabatic, Isothermal,
-       BoundaryConditionCoupled, BoundaryConditionCoupledP4est
+       BoundaryConditionCoupled, BoundaryConditionCoupledP4est,
        BoundaryConditionVRMHDWall, Isomagnetic, Insulating
 
 export initial_condition_convergence_test, source_terms_convergence_test,
