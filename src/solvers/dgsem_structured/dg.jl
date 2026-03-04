@@ -47,7 +47,7 @@ function rhs!(du, u, t,
               boundary_indices = nothing,
               mortar_indices = nothing) where {Source}
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache, element_indices)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache, element_indices)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin

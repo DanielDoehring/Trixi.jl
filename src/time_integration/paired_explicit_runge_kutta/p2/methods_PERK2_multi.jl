@@ -258,7 +258,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK2Multi;
                              n_levels, semi, alg) # Mesh-only based part.
     #n_levels, semi, alg, u0) # Mesh+solution (CFL) based part.
     else
-        if mesh isa ParallelP4estMesh
+        if mesh isa P4estMeshParallel
             # Get cell distribution for standard partitioning
             global_first_quadrant = unsafe_wrap(Array,
                                                 unsafe_load(mesh.p4est).global_first_quadrant,

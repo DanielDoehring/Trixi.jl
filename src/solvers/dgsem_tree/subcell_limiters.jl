@@ -229,6 +229,8 @@ end
 function create_cache(limiter::Type{SubcellLimiterIDP},
                       equations::AbstractEquations{NDIMS},
                       basis::LobattoLegendreBasis, bound_keys) where {NDIMS}
+    # The number of elements is not yet known here. So, we initialize the container with 0 elements
+    # and resize it later while initializing the time integration method in `methods_SSP.jl`.
     subcell_limiter_coefficients = Trixi.ContainerSubcellLimiterIDP{NDIMS, real(basis)}(0,
                                                                                         nnodes(basis),
                                                                                         bound_keys)
@@ -265,8 +267,7 @@ function (limiter::SubcellLimiterIDP)(u, semi, equations, dg::DGSEM,
                                       t, dt;
                                       kwargs...)
     @unpack alpha = limiter.cache.subcell_limiter_coefficients
-    # TODO: Do not abuse `reset_du!` but maybe implement a generic `set_zero!`
-    @trixi_timeit timer() "reset alpha" reset_du!(alpha, dg, semi.cache)
+    @trixi_timeit timer() "reset alpha" set_zero!(alpha, dg, semi.cache)
 
     if limiter.local_twosided
         @trixi_timeit timer() "local twosided" idp_local_twosided!(alpha, limiter,

@@ -83,15 +83,9 @@ function Trixi.calc_volume_integral!(du, u,
                                mesh::Union{TreeMesh{2}, P4estMesh{2}, T8codeMesh{2},
                                            TreeMesh{3}, P4estMesh{3}, T8codeMesh{3}},
                                nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralAdaptive{VolumeIntegralWeakForm,
-                                                                       VolumeIntegralSC,
-                                                                       Indicator},
+                               volume_integral::VolumeIntegralAdaptive{<:IndicatorEntropyChange},
                                dg::DGSEM, cache,
-                               element_indices = Trixi.eachelement(dg, cache),
-                               interface_indices = Trixi.eachinterface(dg, cache),
-                               mortar_indices = Trixi.eachmortar(dg, cache)) where {Indicator <: Nothing, # Indicator taken from `VolumeIntegralSC`
-                                             VolumeIntegralSC <:
-                                             VolumeIntegralShockCapturingHG}
+                               element_indices = Trixi.eachelement(dg, cache))
     @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral.volume_integral_stabilized
 
     @unpack alpha = indicator.cache

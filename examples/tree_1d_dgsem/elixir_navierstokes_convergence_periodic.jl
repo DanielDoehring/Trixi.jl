@@ -108,12 +108,13 @@ refinement_patches = ((type = "box", coordinates_min = (-0.5,),
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                refinement_patches = refinement_patches,
-                n_cells_max = 100_000)
+                n_cells_max = 100_000, periodicity = true)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                             initial_condition, solver,
-                                             source_terms = source_terms_navier_stokes_convergence_test)
+                                             initial_condition, solver;
+                                             source_terms = source_terms_navier_stokes_convergence_test,
+                                             boundary_conditions = (boundary_condition_periodic,
+                                                                    boundary_condition_periodic))
 
 ###############################################################################
 # ODE solvers, callbacks etc.

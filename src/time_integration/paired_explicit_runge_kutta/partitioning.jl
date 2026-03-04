@@ -296,7 +296,7 @@ function partition_variables!(level_info_elements,
                               # MPI additions
                               level_info_mpi_interfaces_acc,
                               level_info_mpi_mortars_acc,
-                              n_levels, mesh::ParallelTreeMesh{2}, dg, cache,
+                              n_levels, mesh::TreeMeshParallel{2}, dg, cache,
                               alg)
     @unpack elements, interfaces, mpi_interfaces, boundaries = cache
 
@@ -558,7 +558,7 @@ end
 
 # Assign number of stage evaluations to elements for stage-evaluations weighted MPI load balancing.
 function partition_variables!(level_info_elements, n_levels,
-                              mesh::ParallelP4estMesh, dg, cache,
+                              mesh::P4estMeshParallel, dg, cache,
                               alg)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
@@ -601,7 +601,7 @@ function partition_variables!(level_info_elements,
                               # MPI additions
                               level_info_mpi_interfaces_acc,
                               level_info_mpi_mortars_acc,
-                              n_levels, mesh::ParallelP4estMesh, dg, cache,
+                              n_levels, mesh::P4estMeshParallel, dg, cache,
                               alg)
     @unpack elements, interfaces, boundaries, mortars = cache
     @unpack mpi_interfaces, mpi_mortars = cache
@@ -1279,7 +1279,7 @@ function get_rhs_per_element(dg, cache,
     return rhs_per_element
 end
 
-function balance_p4est_perk!(mesh::ParallelP4estMesh, dg, cache,
+function balance_p4est_perk!(mesh::P4estMeshParallel, dg, cache,
                              level_info_elements, stages)
     rhs_per_element = get_rhs_per_element(dg, cache, level_info_elements, stages)
 

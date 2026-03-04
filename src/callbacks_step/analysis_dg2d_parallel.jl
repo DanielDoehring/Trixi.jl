@@ -6,7 +6,7 @@
 #! format: noindent
 
 function calc_error_norms(func, u, t, analyzer,
-                          mesh::ParallelTreeMesh{2}, equations, initial_condition,
+                          mesh::TreeMeshParallel{2}, equations, initial_condition,
                           dg::DGSEM, cache, cache_analysis)
     l2_errors, linf_errors, l1_errors = calc_error_norms_per_element(func, u, t,
                                                                      analyzer,
@@ -66,7 +66,7 @@ function calc_error_norms(func, u, t, analyzer,
 end
 
 function calc_error_norms_per_element(func, u, t, analyzer,
-                                      mesh::ParallelTreeMesh{2}, equations,
+                                      mesh::TreeMeshParallel{2}, equations,
                                       initial_condition,
                                       dg::DGSEM, cache, cache_analysis)
     @unpack vandermonde, weights = analyzer
@@ -106,7 +106,7 @@ function calc_error_norms_per_element(func, u, t, analyzer,
 end
 
 function calc_error_norms(func, u, t, analyzer,
-                          mesh::Union{ParallelP4estMesh{2}, ParallelT8codeMesh{2}},
+                          mesh::Union{P4estMeshParallel{2}, T8codeMeshParallel{2}},
                           equations,
                           initial_condition, dg::DGSEM, cache, cache_analysis)
     @unpack vandermonde, weights = analyzer
@@ -171,7 +171,7 @@ function calc_error_norms(func, u, t, analyzer,
 end
 
 function integrate_via_indices(func::Func, u,
-                               mesh::ParallelTreeMesh{2}, equations, dg::DGSEM, cache,
+                               mesh::TreeMeshParallel{2}, equations, dg::DGSEM, cache,
                                args...; normalize = true) where {Func}
     # call the method accepting a general `mesh::TreeMesh{2}`
     # TODO: MPI, we should improve this; maybe we should dispatch on `u`
@@ -196,7 +196,7 @@ function integrate_via_indices(func::Func, u,
 end
 
 function integrate_via_indices(func::Func, u,
-                               mesh::Union{ParallelP4estMesh{2}, ParallelT8codeMesh{2}},
+                               mesh::Union{P4estMeshParallel{2}, T8codeMeshParallel{2}},
                                equations,
                                dg::DGSEM, cache, args...; normalize = true) where {Func}
     @unpack weights = dg.basis

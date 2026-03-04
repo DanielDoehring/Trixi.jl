@@ -44,14 +44,14 @@ function rhs!(du, u, t,
               boundary_indices = eachboundary(dg, cache),
               mortar_indices = nothing) where {Source}
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache, element_indices)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache, element_indices)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, u, mesh,
                               have_nonconservative_terms(equations), equations,
                               dg.volume_integral, dg, cache,
-                              element_indices, interface_indices)
+                              element_indices)
     end
 
     # Prolong solution to interfaces
@@ -93,48 +93,6 @@ function rhs!(du, u, t,
     @trixi_timeit timer() "source terms" begin
         calc_sources!(du, u, t, source_terms, equations, dg, cache,
                       element_indices)
-    end
-
-    return nothing
-end
-
-function calc_volume_integral!(du, u,
-                               mesh::UnstructuredMesh2D,
-                               nonconservative_terms, equations,
-                               volume_integral::VolumeIntegralShockCapturingHG, # TODO: RRG
-                               dg::DGSEM, cache,
-                               element_indices = eachelement(dg, cache),
-                               interface_indices = eachinterface(dg, cache))
-    @unpack volume_flux_dg, volume_flux_fv, indicator = volume_integral
-
-    # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
-    alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations, dg,
-                                                               cache, element_indices,
-                                                               interface_indices)
-
-    # For `Float64`, this gives 1.8189894035458565e-12
-    # For `Float32`, this gives 1.1920929f-5
-    RealT = eltype(alpha)
-    atol = max(100 * eps(RealT), eps(RealT)^convert(RealT, 0.75f0))
-    @threaded for element in element_indices
-        alpha_element = alpha[element]
-        # Clip blending factor for values close to zero (-> pure DG)
-        dg_only = isapprox(alpha_element, 0, atol = atol)
-
-        if dg_only
-            flux_differencing_kernel!(du, u, element, mesh,
-                                      nonconservative_terms, equations,
-                                      volume_flux_dg, dg, cache)
-        else
-            # Calculate DG volume integral contribution
-            flux_differencing_kernel!(du, u, element, mesh,
-                                      nonconservative_terms, equations,
-                                      volume_flux_dg, dg, cache, 1 - alpha_element)
-
-            # Calculate FV volume integral contribution
-            fv_kernel!(du, u, mesh, nonconservative_terms, equations, volume_flux_fv,
-                       dg, cache, element, alpha_element)
-        end
     end
 
     return nothing
@@ -365,8 +323,7 @@ function prolong2boundaries!(cache, u,
 end
 
 function calc_boundary_flux!(cache, t, boundary_condition::BoundaryConditionPeriodic,
-                             mesh::Union{UnstructuredMesh2D, P4estMesh, P4estMeshView,
-                                         T8codeMesh},
+                             mesh::Union{UnstructuredMesh2D, P4estMesh, T8codeMesh},
                              equations, surface_integral, dg::DG)
     @assert isempty(eachboundary(dg, cache))
 
@@ -375,8 +332,7 @@ end
 
 # Function barrier for type stability
 function calc_boundary_flux!(cache, t, boundary_conditions,
-                             mesh::Union{UnstructuredMesh2D, P4estMesh, P4estMeshView,
-                                         T8codeMesh},
+                             mesh::Union{UnstructuredMesh2D, P4estMesh, T8codeMesh},
                              equations, surface_integral, dg::DG)
     @unpack boundary_condition_types, boundary_indices = boundary_conditions
 
@@ -536,34 +492,34 @@ end
 function calc_surface_integral!(du, u, mesh::UnstructuredMesh2D,
                                 equations, surface_integral, dg::DGSEM, cache,
                                 element_indices = eachelement(dg, cache))
-    @unpack boundary_interpolation = dg.basis
+    @unpack inverse_weights = dg.basis
     @unpack surface_flux_values = cache.elements
 
     # Note that all fluxes have been computed with outward-pointing normal vectors.
     # This computes the **negative** surface integral contribution,
-    # i.e., M^{-1} * boundary_interpolation^T (which is for DGSEM just M^{-1} * B)
+    # i.e., M^{-1} * boundary_interpolation^T 
     # and the missing "-" is taken care of by `apply_jacobian!`.
     #
-    # We also use explicit assignments instead of `+=` to let `@muladd` turn these
-    # into FMAs (see comment at the top of the file).
-    factor_1 = boundary_interpolation[1, 1]
-    factor_2 = boundary_interpolation[nnodes(dg), 2]
+    # We also use explicit assignments instead of `+=` and `-=` to let `@muladd`
+    # turn these into FMAs (see comment at the top of the file).
+    factor = inverse_weights[1] # For LGL basis: Identical to weighted boundary interpolation at x = ±1
     @threaded for element in element_indices
         for l in eachnode(dg), v in eachvariable(equations)
             # surface contribution along local sides 2 and 4 (fixed x and y varies)
             du[v, 1, l, element] = du[v, 1, l, element] +
                                    surface_flux_values[v, l, 4, element] *
-                                   factor_1
+                                   factor
             du[v, nnodes(dg), l, element] = du[v, nnodes(dg), l, element] +
                                             surface_flux_values[v, l, 2, element] *
-                                            factor_2
+                                            factor
+
             # surface contribution along local sides 1 and 3 (fixed y and x varies)
             du[v, l, 1, element] = du[v, l, 1, element] +
                                    surface_flux_values[v, l, 1, element] *
-                                   factor_1
+                                   factor
             du[v, l, nnodes(dg), element] = du[v, l, nnodes(dg), element] +
                                             surface_flux_values[v, l, 3, element] *
-                                            factor_2
+                                            factor
         end
     end
 

@@ -258,7 +258,7 @@ function init(ode::ODEProblem, alg::PairedExplicitRK4Multi;
                              level_info_mortars_acc,
                              n_levels, semi, alg)
     else
-        if mesh isa ParallelP4estMesh
+        if mesh isa P4estMeshParallel
             # Get cell distribution for standard partitioning
             global_first_quadrant = unsafe_wrap(Array,
                                                 unsafe_load(mesh.p4est).global_first_quadrant,

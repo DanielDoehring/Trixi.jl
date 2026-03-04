@@ -248,7 +248,7 @@ end
 # This method is called when a SemidiscretizationHyperbolic is constructed.
 # It constructs the basic `cache` used throughout the simulation to compute
 # the RHS etc.
-function create_cache(mesh::ParallelTreeMesh{2}, equations,
+function create_cache(mesh::TreeMeshParallel{2}, equations,
                       dg::DG, RealT, ::Type{uEltype}) where {uEltype <: Real}
     # Get cells for which an element needs to be created (i.e. all leaf cells)
     leaf_cell_ids = local_leaf_cells(mesh.tree)
@@ -259,7 +259,7 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
 
     mpi_interfaces = init_mpi_interfaces(leaf_cell_ids, mesh, elements)
 
-    boundaries = init_boundaries(leaf_cell_ids, mesh, elements)
+    boundaries = init_boundaries(leaf_cell_ids, mesh, elements, dg.basis)
 
     mortars = init_mortars(leaf_cell_ids, mesh, elements, dg.mortar)
 
@@ -457,8 +457,8 @@ function init_mpi_neighbor_connectivity(elements, mpi_interfaces, mpi_mortars,
 end
 
 function rhs!(du, u, t,
-              mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2},
-                          ParallelT8codeMesh{2}}, equations,
+              mesh::Union{TreeMeshParallel{2}, P4estMeshParallel{2},
+                          T8codeMeshParallel{2}}, equations,
               boundary_conditions, source_terms::Source,
               dg::DG, cache,
               element_indices = eachelement(dg, cache),
@@ -493,14 +493,14 @@ function rhs!(du, u, t,
     end
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache, element_indices)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache, element_indices)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(du, u, mesh,
                               have_nonconservative_terms(equations), equations,
                               dg.volume_integral, dg, cache,
-                              element_indices, interface_indices, mortar_indices)
+                              element_indices)
     end
 
     # Prolong solution to interfaces
@@ -588,7 +588,7 @@ function rhs!(du, u, t,
 end
 
 function prolong2mpiinterfaces!(cache, u,
-                                mesh::ParallelTreeMesh{2},
+                                mesh::TreeMeshParallel{2},
                                 equations, surface_integral, dg::DG,
                                 mpiinterface_indices = eachmpiinterface(dg, cache))
     @unpack mpi_interfaces = cache
@@ -625,7 +625,7 @@ function prolong2mpiinterfaces!(cache, u,
 end
 
 function prolong2mpimortars!(cache, u,
-                             mesh::ParallelTreeMesh{2}, equations,
+                             mesh::TreeMeshParallel{2}, equations,
                              mortar_l2::LobattoLegendreMortarL2,
                              dg::DGSEM,
                              mpimortar_indices = eachmpimortar(dg, cache))
@@ -752,7 +752,7 @@ function prolong2mpimortars!(cache, u,
 end
 
 function calc_mpi_interface_flux!(surface_flux_values,
-                                  mesh::ParallelTreeMesh{2},
+                                  mesh::TreeMeshParallel{2},
                                   have_nonconservative_terms::False, equations,
                                   surface_integral, dg::DG, cache,
                                   mpiinterface_indices = eachmpiinterface(dg, cache))
@@ -794,7 +794,7 @@ function calc_mpi_interface_flux!(surface_flux_values,
 end
 
 function calc_mpi_mortar_flux!(surface_flux_values,
-                               mesh::ParallelTreeMesh{2},
+                               mesh::TreeMeshParallel{2},
                                have_nonconservative_terms::False, equations,
                                mortar_l2::LobattoLegendreMortarL2,
                                surface_integral, dg::DG, cache,
@@ -832,7 +832,7 @@ function calc_mpi_mortar_flux!(surface_flux_values,
 end
 
 @inline function mpi_mortar_fluxes_to_elements!(surface_flux_values,
-                                                mesh::ParallelTreeMesh{2}, equations,
+                                                mesh::TreeMeshParallel{2}, equations,
                                                 mortar_l2::LobattoLegendreMortarL2,
                                                 dg::DGSEM, cache,
                                                 mortar, fstar_primary_upper,
