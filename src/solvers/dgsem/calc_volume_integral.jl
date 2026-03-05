@@ -155,4 +155,20 @@ function calc_volume_integral!(du, u, mesh,
 
     return nothing
 end
+
+function calc_volume_integral!(du, u,
+                               mesh::TreeMesh{1},
+                               have_nonconservative_terms::False, equations,
+                               volume_integral::VolumeIntegralStrongForm,
+                               dg::DGSEM, cache)
+    derivative_matrix = dg.basis.derivative_matrix
+
+    @threaded for element in eachelement(dg, cache)
+        strong_form_kernel!(du, u, element, mesh,
+                          have_nonconservative_terms, equations,
+                          derivative_matrix, dg, cache)
+    end
+
+    return nothing
+end
 end # @muladd
