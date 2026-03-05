@@ -537,7 +537,7 @@ function calc_gradient!(gradients, u_transformed, t, mesh::TreeMesh{1},
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
-        calc_gradient_volume_integral!(gradients, u_transformed,
+        calc_volume_integral_gradient!(gradients, u_transformed,
                                        mesh, equations_parabolic, dg, cache,
                                        element_indices)
     end
@@ -553,7 +553,7 @@ function calc_gradient!(gradients, u_transformed, t, mesh::TreeMesh{1},
     # Calculate interface fluxes
     @trixi_timeit timer() "interface flux" begin
         @unpack surface_flux_values = cache.elements
-        calc_gradient_interface_flux!(surface_flux_values, mesh, equations_parabolic,
+        calc_interface_flux_gradient!(surface_flux_values, mesh, equations_parabolic,
                                       dg, parabolic_scheme, cache, interface_indices)
     end
 
@@ -574,7 +574,7 @@ function calc_gradient!(gradients, u_transformed, t, mesh::TreeMesh{1},
 
     # Calculate surface integrals
     @trixi_timeit timer() "surface integral" begin
-        calc_gradient_surface_integral!(gradients, mesh, equations_parabolic,
+        calc_surface_integral_gradient!(gradients, mesh, equations_parabolic,
                                         dg, cache, element_indices)
     end
 
