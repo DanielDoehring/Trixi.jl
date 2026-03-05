@@ -67,8 +67,8 @@ boundary_symbols = [:Airfoil, :FarField]
 
 mesh = P4estMesh{2}(mesh_file, boundary_symbols = boundary_symbols)
 
-boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
-                           :Airfoil => boundary_condition_slip_wall)
+boundary_conditions = (FarField = boundary_condition_free_stream,
+                       Airfoil = boundary_condition_slip_wall)
 
 # For sparsity detection
 @inline function bc_symmetry(u_inner, normal_direction::AbstractVector, x, t,
@@ -92,8 +92,8 @@ boundary_conditions = Dict(:FarField => boundary_condition_free_stream,
     return flux
 end
 
-boundary_conditions_parabolic = Dict(:FarField => boundary_condition_free_stream,
-                                     :Airfoil => boundary_condition_airfoil)
+boundary_conditions_parabolic = (FarField = boundary_condition_free_stream,
+                                 Airfoil = boundary_condition_airfoil)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
@@ -164,7 +164,7 @@ cfl = 7.4 # PERRK_4 Multi E = 5, ..., 14
 #cfl = 2.6 # R-CKL54
 
 cfl = 7.6 # PERK2 unsplit/standard multi
-cfl = 5.1 # PERK2 unsplit/standard multi LDG
+#cfl = 5.1 # PERK2 unsplit/standard multi LDG
 
 #cfl = 8.7 # PERK2 split multi with same stages & distribution
 #cfl = 7.9 # PERK2 split multi with different stages (14, 10) & distribution
