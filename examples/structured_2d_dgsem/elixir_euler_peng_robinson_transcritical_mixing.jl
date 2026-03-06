@@ -50,15 +50,21 @@ function initial_condition_transcritical_mixing(x, t,
     v1 = u0 * (1 + convert(RealT, 0.2) * tanh(y / delta)) + dv
     v2 = dv
 
-    return prim2cons(SVector(V, v1, v2, T), equations)
+    return thermo2cons(SVector(V, v1, v2, T), equations)
 end
 
 initial_condition = initial_condition_transcritical_mixing
 
 volume_flux = flux_terashima_etal
-volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
-solver = DGSEM(polydeg = 3, volume_integral = volume_integral,
-               surface_flux = flux_lax_friedrichs)
+surface_flux = FluxPlusDissipation(volume_flux, DissipationLocalLaxFriedrichs())
+
+basis = LobattoLegendreBasis(3)
+volume_integral_default = VolumeIntegralFluxDifferencing(volume_flux)
+volume_integral_entropy_stable = VolumeIntegralPureLGLFiniteVolume(surface_flux)
+volume_integral = VolumeIntegralAdaptive(IndicatorEntropyCorrection(equations, basis),
+                                         volume_integral_default,
+                                         volume_integral_entropy_stable)
+solver = DGSEM(basis, surface_flux, volume_integral)
 
 cells_per_dimension = (32, 16)
 coordinates_min = (-0.5, -0.25)

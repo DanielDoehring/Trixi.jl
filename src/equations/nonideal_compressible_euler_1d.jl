@@ -63,7 +63,7 @@ varnames(::typeof(cons2prim), ::NonIdealCompressibleEulerEquations1D) = ("rho",
                                                                          "p")
 
 """
-    cons2thermo(u, equations::NonIdealCompressibleEulerEquations1D)
+    cons2thermo(u, equations::AbstractNonIdealCompressibleEulerEquations)
 
 Convert conservative variables to specific volume, velocity, and temperature
 variables `V, v1, T`. These are referred to as "thermodynamic" variables since
@@ -294,10 +294,16 @@ end
     return inv(T) * SVector(gibbs - 0.5f0 * v1^2, v1, -1)
 end
 
-# Convert primitive to conservative variables
-@inline function prim2cons(prim, equations::NonIdealCompressibleEulerEquations1D)
+# Convert thermodynamic variables `V, v1, T` to conservative variables
+"""
+    thermo2cons(thermo, equations::AbstractNonIdealCompressibleEulerEquations)
+
+Convert "thermodynamic" variables (specific volume, velocity, and temperature) to
+conserved variables (density, momentum, and total energy).
+"""
+@inline function thermo2cons(thermo, equations::NonIdealCompressibleEulerEquations1D)
     eos = equations.equation_of_state
-    V, v1, T = prim
+    V, v1, T = thermo
     rho = inv(V)
     rho_v1 = rho * v1
     e_internal = energy_internal_specific(V, T, eos)
@@ -321,5 +327,20 @@ end
     rho, rho_v1, rho_e_total = u
     rho_e_internal = rho_e_total - 0.5f0 * rho_v1^2 / rho
     return rho_e_internal
+end
+
+"""
+    entropy_potential(u, orientation_or_normal_direction,
+                      equations::AbstractNonIdealCompressibleEulerEquations)
+
+Calculate the entropy potential, which for the compressible Euler equations with general
+EOS is ``p v_{\text{normal}} / T`` for the choice of [`entropy`](@ref) ``S(u) = -\rho s``. 
+"""
+@inline function entropy_potential(u, orientation::Int,
+                                   equations::NonIdealCompressibleEulerEquations1D)
+    eos = equations.equation_of_state
+    V, v1, T = cons2thermo(u, equations)
+    p = pressure(V, T, eos)
+    return p * v1 / T
 end
 end # @muladd

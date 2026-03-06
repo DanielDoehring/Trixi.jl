@@ -94,6 +94,24 @@ end
                                             n_cells_max = 10_000,
                                             periodicity = true)
     end
+
+    @testset "helper functions" begin
+        coordinates_min = (-0.5, -0.5, -0.5)
+        coordinates_max = (0.5, 0.5, 0.5)
+
+        for ndims in 1:3
+            coords_min = coordinates_min[1:ndims]
+            coords_max = coordinates_max[1:ndims]
+            for ref_level in 0:2
+                mesh = TreeMesh(coords_min, coords_max,
+                                initial_refinement_level = ref_level,
+                                n_cells_max = 10_000, periodicity = true)
+
+                @test Trixi.ndims(mesh) == ndims
+                @test Trixi.ncells(mesh) == (2^ndims)^ref_level
+            end
+        end
+    end
 end
 
 @timed_testset "TreeMeshParallel" begin
@@ -298,10 +316,12 @@ end
             nodes = basis.nodes
             weights = basis.weights
 
-            Lhat_minus1 = Trixi.calc_Lhat(-1.0, nodes, weights)
+            L_minus1 = Trixi.calc_L(-1.0, nodes, weights)
+            Lhat_minus1 = Trixi.calc_Lhat(L_minus1, weights)
             @test basis.inverse_weights[1] == Lhat_minus1[1]
 
-            Lhat_plus1 = Trixi.calc_Lhat(1.0, nodes, weights)
+            L_plus1 = Trixi.calc_L(1.0, nodes, weights)
+            Lhat_plus1 = Trixi.calc_Lhat(L_plus1, weights)
             @test basis.inverse_weights[p + 1] == Lhat_plus1[p + 1]
         end
     end
@@ -341,6 +361,16 @@ end
         @test isapprox(Trixi.calc_reverse_lower(2, Val(:gauss_lobatto)),
                        [[0.5, 0.0] [0.25, 0.25]])
     end
+end
+
+@timed_testset "GaussLegendreBasis" begin
+    basis = GaussLegendreBasis(3)
+    @test nnodes(basis) == 4
+    @test_nowarn show(stdout, "text/plain", basis)
+
+    solution_analyzer = Trixi.SolutionAnalyzer(basis)
+    @test nnodes(solution_analyzer) == 7
+    @test_nowarn show(stdout, "text/plain", solution_analyzer)
 end
 
 @testset "containers" begin
@@ -478,6 +508,10 @@ end
 
     indicator_max = IndicatorMax("variable", (; cache = nothing))
     @test_nowarn show(stdout, indicator_max)
+
+    indicator_ec = IndicatorEntropyCorrection(CompressibleEulerEquations1D(1.4),
+                                              LobattoLegendreBasis(3))
+    @test_nowarn show(stdout, indicator_ec)
 end
 
 @timed_testset "LBM 2D constructor" begin
@@ -794,7 +828,7 @@ end
           "NonIdealCompressibleEulerEquations1D{VanDerWaals}"
     q = SVector(2.0, 0.1, 10.0)
     V, v1, T = q
-    u = prim2cons(q, equations)
+    u = thermo2cons(q, equations)
 
     @test density(u, equations) ≈ 0.5
     @test velocity(u, equations) ≈ 0.1
@@ -811,7 +845,7 @@ end
 
     # check that the fallback temperature and specialized temperature
     # return the same value
-    V, v1, T = Trixi.cons2thermo(u, equations)
+    V, v1, T = cons2thermo(u, equations)
     e_internal = energy_internal_specific(V, T, eos)
     @test temperature(V, e_internal, eos) ≈
           invoke(temperature, Tuple{Any, Any, Trixi.AbstractEquationOfState}, V,
@@ -833,7 +867,7 @@ end
     equations = NonIdealCompressibleEulerEquations2D(eos)
     q = SVector(2.0, 0.1, 0.2, 10.0)
     V, v1, v2, T = q
-    u = prim2cons(q, equations)
+    u = thermo2cons(q, equations)
 
     @test density(u, equations) ≈ 0.5
     @test velocity(u, equations) ≈ SVector(0.1, 0.2)
@@ -860,7 +894,7 @@ end
           flux(u, 2, equations) * normal_direction[2]
 
     u_ll = u
-    u_rr = prim2cons(SVector(2.5, 0.2, 0.1, 8.0), equations)
+    u_rr = thermo2cons(SVector(2.5, 0.2, 0.1, 8.0), equations)
     @test flux_terashima_etal(u_ll, u_rr, normal_direction, equations) ≈
           flux_terashima_etal(u_ll, u_rr, 1, equations) * normal_direction[1] +
           flux_terashima_etal(u_ll, u_rr, 2, equations) * normal_direction[2]
@@ -888,7 +922,7 @@ end
 
     # check that the fallback temperature and specialized temperature 
     # return the same value 
-    V, v1, v2, T = cons2prim(u, equations)
+    V, v1, v2, T = cons2thermo(u, equations)
     e = energy_internal_specific(V, T, eos)
     @test temperature(V, e, eos) ≈
           invoke(temperature, Tuple{Any, Any, Trixi.AbstractEquationOfState}, V, e, eos)
@@ -2409,6 +2443,12 @@ end
         for orientation in [1, 2]
             @test max_abs_speed_naive(u_ll, u_rr, orientation, equations) ≈
                   max_abs_speed(u_ll, u_rr, orientation, equations)
+        end
+
+        normal_directions = [SVector(1.0, 0.0), SVector(0.0, 1.0), SVector(0.5, -0.5)]
+        for normal_direction in normal_directions
+            @test max_abs_speed_naive(u_ll, u_rr, normal_direction, equations) ≈
+                  max_abs_speed(u_ll, u_rr, normal_direction, equations)
         end
     end
 

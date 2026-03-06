@@ -39,14 +39,16 @@ function Trixi.initial_condition_density_wave(x, t,
         @warn "Solver for temperature(V, p) did not converge"
     end
 
-    return prim2cons(SVector(V, v1, v2, T), equations)
+    return thermo2cons(SVector(V, v1, v2, T), equations)
 end
 initial_condition = initial_condition_density_wave
 
+polydeg = 3
+basis = LobattoLegendreBasis(polydeg)
 volume_flux = flux_terashima_etal
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
-solver = DGSEM(polydeg = 3, volume_integral = volume_integral,
-               surface_flux = flux_lax_friedrichs)
+surface_flux = flux_lax_friedrichs
+solver = DGSEM(basis, surface_flux, volume_integral)
 
 coordinates_min = (-1.0, -1.0)
 coordinates_max = (1.0, 1.0)

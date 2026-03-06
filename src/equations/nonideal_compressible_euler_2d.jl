@@ -503,13 +503,6 @@ end
     return (abs(v1) + c, abs(v2) + c)
 end
 
-"""
-    cons2thermo(u, equations::NonIdealCompressibleEulerEquations2D)
-        
-Convert conservative variables to specific volume, velocity, and temperature 
-variables `V, v1, v2, T`. These are referred to as "thermodynamic" variables since
-equation of state routines are assumed to be evaluated in terms of `V` and `T`. 
-"""
 @inline function cons2thermo(u, equations::NonIdealCompressibleEulerEquations2D)
     eos = equations.equation_of_state
     rho, rho_v1, rho_v2, rho_e_total = u
@@ -531,10 +524,10 @@ end
     return inv(T) * SVector(gibbs - 0.5f0 * (v1^2 + v2^2), v1, v2, -1)
 end
 
-# Convert primitive to conservative variables
-@inline function prim2cons(prim, equations::NonIdealCompressibleEulerEquations2D)
+# Convert thermodynamic variables `V, v1, T` to conservative variables
+@inline function thermo2cons(thermo, equations::NonIdealCompressibleEulerEquations2D)
     eos = equations.equation_of_state
-    V, v1, v2, T = prim
+    V, v1, v2, T = thermo
     rho = inv(V)
     rho_v1 = rho * v1
     rho_v2 = rho * v2
@@ -567,5 +560,26 @@ end
     rho, rho_v1, rho_v2, rho_e_total = u
     rho_e_internal = rho_e_total - 0.5f0 * (rho_v1^2 + rho_v2^2) / rho
     return rho_e_internal
+end
+
+@inline function entropy_potential(u, orientation::Int,
+                                   equations::NonIdealCompressibleEulerEquations2D)
+    eos = equations.equation_of_state
+    V, v1, v2, T = cons2thermo(u, equations)
+    p = pressure(V, T, eos)
+    if orientation == 1
+        return p * v1 / T
+    else # if orientation == 2
+        return p * v2 / T
+    end
+end
+
+@inline function entropy_potential(u, normal_direction,
+                                   equations::NonIdealCompressibleEulerEquations2D)
+    eos = equations.equation_of_state
+    V, v1, v2, T = cons2thermo(u, equations)
+    v_normal = v1 * normal_direction[1] + v2 * normal_direction[2]
+    p = pressure(V, T, eos)
+    return p * v_normal / T
 end
 end # @muladd
