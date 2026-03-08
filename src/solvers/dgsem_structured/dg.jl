@@ -59,7 +59,7 @@ function rhs!(du, u, t,
     # Prolong solution to interfaces
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache, u, mesh, equations, dg,
-        element_indices)
+                            element_indices)
     end
 
     # Calculate interface fluxes

@@ -72,7 +72,8 @@ function (indicator_callback::IndicatorHGCallback)(u, t, integrator)
     #    (total #steps)       (#accepted steps)
     # We need to check the number of accepted steps since callbacks are not
     # activated after a rejected step.
-    return interval > 0 && (integrator.stats.naccept % interval == 0 || isfinished(integrator))
+    return interval > 0 &&
+           (integrator.stats.naccept % interval == 0 || isfinished(integrator))
 end
 
 # this method is called when the callback is activated
