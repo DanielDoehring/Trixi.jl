@@ -370,7 +370,32 @@ function create_cache(mesh::DGMultiMesh, equations, dg::DGMultiFluxDiff, RealT, 
     # interpolate geometric terms to both quadrature and face values for curved meshes
     (; Vq, Vf) = dg.basis
     interpolated_geometric_terms = map(x -> [Vq; Vf] * x, mesh.md.rstxyzJ)
-    J = rd.Vq * md.J
+    J = Vq * md.J
+
+    if dg.volume_integral isa VolumeIntegralAdaptive
+        # Need weak form datastructure
+        @unpack wq, Vq, M, Drst = rd
+        weak_differentiation_matrices = map(D -> -M \ ((Vq * D)' * Diagonal(wq)), Drst)
+
+        # For entropy change difference computation
+        du_values = copy(u_values)
+
+        # Thread-local buffer for face interpolation, which is required 
+        # for computation of entropy potential at interpolated face nodes 
+        u_face_local_threaded = [allocate_nested_array(uEltype, nvars, (rd.Nfq,), dg)
+                                 for _ in 1:Threads.maxthreadid()]
+
+        return (; md, Qrst_skew, VhP, Ph,
+                invJ = inv.(J), dxidxhatj = interpolated_geometric_terms,
+                entropy_var_values, projected_entropy_var_values,
+                entropy_projected_u_values,
+                u_values, u_face_values, flux_face_values,
+                local_values_threaded, fluxdiff_local_threaded, rhs_local_threaded,
+                # Weak form additions
+                weak_differentiation_matrices, du_values,
+                # Required for entropy change difference computation
+                u_face_local_threaded)
+    end
 
     return (; md, Qrst_skew, VhP, Ph,
             invJ = inv.(J), dxidxhatj = interpolated_geometric_terms,
@@ -609,6 +634,61 @@ end
 
     for i in each_quad_node(mesh, dg, cache)
         du[i, element] = du[i, element] + fluxdiff_local[i] * inv_wq[i]
+    end
+
+    return nothing
+end
+
+# version for affine meshes (currently only one)
+function calc_volume_integral!(du, u, mesh::DGMultiMesh,
+                               have_nonconservative_terms::False, equations,
+                               volume_integral::VolumeIntegralAdaptive{<:IndicatorEntropyChange},
+                               dg::DGMultiFluxDiff, cache)
+    @unpack volume_integral_default, volume_integral_stabilized = volume_integral
+    @unpack maximum_entropy_increase = volume_integral.indicator
+
+    # For weak form integral
+    @unpack u_values = cache
+
+    # For entropy production computation
+    rd = dg.basis
+    @unpack du_values = cache
+
+    # interpolate to quadrature points
+    apply_to_each_field(mul_by!(rd.Vq), u_values, u) # required for weak form trial
+
+    @threaded for e in eachelement(dg, cache)
+        # Try default volume integral first
+        volume_integral_kernel!(du, u, e, mesh,
+                                have_nonconservative_terms, equations,
+                                volume_integral_default, dg, cache)
+
+        # Interpolate `du` to quadrature points after WF integral for entropy production calculation
+        du_local = view(du, :, e)
+        du_values_local = view(du_values, :, e)
+        apply_to_each_field(mul_by!(rd.Vq), du_values_local, du_local) # required for entropy production calculation
+
+        # Compute entropy production of this volume integral
+        u_values_local = view(u_values, :, e)
+        dS_WF = -entropy_change_reference_element(du_values_local, u_values_local,
+                                                  mesh, equations,
+                                                  dg, cache)
+
+        dS_true = surface_integral_reference_element(entropy_potential, u, e,
+                                                     mesh, equations, dg, cache)
+
+        entropy_change = dS_WF - dS_true
+        if entropy_change > maximum_entropy_increase # Recompute using EC FD volume integral
+            # Reset default volume integral contribution.
+            # Note that this assumes that the volume terms are computed first,
+            # before any surface terms are added.
+            fill!(du_local, zero(eltype(du_local)))
+
+            # Recompute using stabilized volume integral
+            volume_integral_kernel!(du, u, e, mesh,
+                                    have_nonconservative_terms, equations,
+                                    volume_integral_stabilized, dg, cache)
+        end
     end
 
     return nothing
