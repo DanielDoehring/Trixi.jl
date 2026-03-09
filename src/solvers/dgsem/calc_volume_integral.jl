@@ -332,18 +332,4 @@ function calc_volume_integral!(du, u, mesh,
 
     return nothing
 end
-
-function calc_volume_integral!(du, u,
-                               mesh::TreeMesh{1},
-                               have_nonconservative_terms::False, equations,
-                               volume_integral::VolumeIntegralStrongForm,
-                               dg::DGSEM, cache)
-    @threaded for element in eachelement(dg, cache)
-        volume_integral_kernel!(du, u, element, mesh,
-                            have_nonconservative_terms, equations,
-                            volume_integral, dg, cache)
-    end
-
-    return nothing
-end
 end # @muladd

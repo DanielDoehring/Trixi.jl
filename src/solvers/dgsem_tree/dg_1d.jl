@@ -752,32 +752,6 @@ function calc_surface_integral!(du, u, mesh::Union{TreeMesh{1}, StructuredMesh{1
     return nothing
 end
 
-function calc_surface_integral!(du, u, mesh::TreeMesh{1},
-                                equations, surface_integral::SurfaceIntegralStrongForm,
-                                dg::DGSEM, cache)
-    inv_weight_left = inv(left_boundary_weight(dg.basis))
-    inv_weight_right = inv(right_boundary_weight(dg.basis))
-    @unpack surface_flux_values = cache.elements
-
-    @threaded for element in eachelement(dg, cache)
-        # surface at -x
-        u_node = get_node_vars(u, equations, dg, 1, element)
-        f_node = flux(u_node, 1, equations)
-        f_num = get_node_vars(surface_flux_values, equations, dg, 1, element)
-        multiply_add_to_node_vars!(du, inv_weight_left, -(f_num - f_node),
-                                   equations, dg, 1, element)
-
-        # surface at +x
-        u_node = get_node_vars(u, equations, dg, nnodes(dg), element)
-        f_node = flux(u_node, 1, equations)
-        f_num = get_node_vars(surface_flux_values, equations, dg, 2, element)
-        multiply_add_to_node_vars!(du, inv_weight_right, +(f_num - f_node),
-                                   equations, dg, nnodes(dg), element)
-    end
-
-    return nothing
-end
-
 function apply_jacobian!(du, mesh::TreeMesh{1},
                          equations, dg::DG, cache)
     @unpack inverse_jacobian = cache.elements
