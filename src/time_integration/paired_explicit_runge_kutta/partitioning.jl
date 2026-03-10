@@ -450,8 +450,8 @@ function partition_variables!(level_info_elements,
                                                          n_elements, nnodes)
     end
 
-    println("hmin: ", hmin, " hmax: ", hmax)
-    println("hmax/hmin: ", hmax / hmin, "\n")
+    #println("hmin: ", hmin, " hmax: ", hmax)
+    #println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
         h = hmin_per_element_[element_id]
@@ -543,6 +543,13 @@ function partition_variables!(level_info_elements,
             push!(level_info_mortars_acc[l], mortar_id)
         end
     end
+
+    #=
+    for i in 1:n_levels
+        println("Number Elements integrated with level $i: ",
+                length(level_info_elements[i]))
+    end
+    =#
 
     return nothing
 end
