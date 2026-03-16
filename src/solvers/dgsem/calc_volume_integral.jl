@@ -177,6 +177,17 @@ end
     return nothing
 end
 
+@inline function volume_integral_kernel!(du, u, element, mesh,
+                                         have_nonconservative_terms, equations,
+                                         volume_integral::VolumeIntegralStrongForm,
+                                         dg::DGSEM, cache, alpha = true)
+    strong_form_kernel!(du, u, element, mesh,
+                        have_nonconservative_terms, equations,
+                        dg, cache, alpha)
+
+    return nothing
+end
+
 function calc_volume_integral!(du, u, mesh,
                                have_nonconservative_terms, equations,
                                volume_integral, dg::DGSEM, cache)
