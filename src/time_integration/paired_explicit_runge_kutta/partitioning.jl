@@ -450,8 +450,8 @@ function partition_variables!(level_info_elements,
                                                          n_elements, nnodes)
     end
 
-    #println("hmin: ", hmin, " hmax: ", hmax)
-    #println("hmax/hmin: ", hmax / hmin, "\n")
+    println("hmin: ", hmin, " hmax: ", hmax)
+    println("hmax/hmin: ", hmax / hmin, "\n")
 
     for element_id in 1:n_elements
         h = hmin_per_element_[element_id]
