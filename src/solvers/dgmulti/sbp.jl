@@ -32,8 +32,8 @@ function DGMulti(element_type::AbstractElemShape,
                  volume_integral,
                  surface_integral;
                  kwargs...)
-    DGMulti(approximation_type, element_type = element_type,
-            surface_integral = surface_integral, volume_integral = volume_integral)
+    return DGMulti(approximation_type, element_type = element_type,
+                   surface_integral = surface_integral, volume_integral = volume_integral)
 end
 
 # type alias for specializing on a periodic SBP operator
@@ -135,8 +135,8 @@ function DGMultiMesh(dg::DGMultiPeriodicFDSBP{NDIMS};
                   periodicity)
 
     boundary_faces = []
-    return DGMultiMesh{NDIMS, rd.element_type, typeof(md), typeof(boundary_faces)}(md,
-                                                                                   boundary_faces)
+    return DGMultiMesh{NDIMS, rd.element_type, typeof(md),
+                       typeof(boundary_faces)}(md, boundary_faces)
 end
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
@@ -154,11 +154,10 @@ function estimate_dt(mesh::DGMultiMesh, dg::DGMultiPeriodicFDSBP)
 end
 
 # do nothing for interface terms if using a periodic operator
-# We pass the `surface_integral` argument solely for dispatch
-function prolong2interfaces!(cache, u, mesh::DGMultiMesh, equations,
-                             surface_integral, dg::DGMultiPeriodicFDSBP)
+function prolong2interfaces!(cache, u,
+                             mesh::DGMultiMesh, equations, dg::DGMultiPeriodicFDSBP)
     @assert nelements(mesh, dg, cache) == 1
-    nothing
+    return nothing
 end
 
 function calc_interface_flux!(cache, surface_integral::SurfaceIntegralWeakForm,
@@ -166,24 +165,23 @@ function calc_interface_flux!(cache, surface_integral::SurfaceIntegralWeakForm,
                               have_nonconservative_terms::False, equations,
                               dg::DGMultiPeriodicFDSBP)
     @assert nelements(mesh, dg, cache) == 1
-    nothing
+    return nothing
 end
 
 function calc_surface_integral!(du, u, mesh::DGMultiMesh, equations,
                                 surface_integral::SurfaceIntegralWeakForm,
                                 dg::DGMultiPeriodicFDSBP, cache)
     @assert nelements(mesh, dg, cache) == 1
-    nothing
+    return nothing
 end
 
 function create_cache(mesh::DGMultiMesh, equations,
                       dg::DGMultiFluxDiffPeriodicFDSBP, RealT, uEltype)
     md = mesh.md
 
-    # storage for volume quadrature values, face quadrature values, flux values
-    nvars = nvariables(equations)
-    u_values = allocate_nested_array(uEltype, nvars, size(md.xq), dg)
-    return (; u_values, invJ = inv.(md.J))
+    solution_container = initialize_dgmulti_solution_container(mesh, equations, dg,
+                                                               uEltype)
+    return (; solution_container, invJ = inv.(md.J))
 end
 
 # Specialize calc_volume_integral for periodic SBP operators (assumes the operator is sparse).
@@ -206,7 +204,7 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
             #       `= ∑_j (1 / M[i,i] * Q[i,j]) * volume_flux(u[i], u[j])`
             #       `= ∑_j        D[i,j]         * volume_flux(u[i], u[j])`
             # TODO: DGMulti.
-            # This would have to be changed if `has_nonconservative_terms = False()`
+            # This would have to be changed if `have_nonconservative_terms = False()`
             # because then `volume_flux` is non-symmetric.
             A = dg.basis.Drst[dim]
 
@@ -221,7 +219,10 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
                 for id in nzrange(A_base, i)
                     j = rows[id]
                     u_j = u[j]
-                    A_ij = vals[id]
+
+                    # we use the negative of A_ij since A is skew-symmetric, 
+                    # and we are accessing the transpose of A. 
+                    A_ij = -vals[id]
                     AF_ij = 2 * A_ij *
                             volume_flux(u_i, u_j, normal_direction, equations)
                     du_i = du_i + AF_ij
@@ -240,12 +241,14 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
 
             A = dg.basis.Drst[dim]
 
-            # since has_nonconservative_terms::False,
+            # since have_nonconservative_terms::False,
             # the volume flux is symmetric.
             flux_is_symmetric = True()
             hadamard_sum!(du, A, flux_is_symmetric, volume_flux,
                           normal_direction, u, equations)
         end
     end
+
+    return nothing
 end
 end # @muladd

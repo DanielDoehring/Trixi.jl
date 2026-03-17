@@ -1,5 +1,4 @@
-
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK
 using Trixi
 
 ###############################################################################
@@ -18,7 +17,8 @@ A medium blast wave taken from
 function initial_condition_blast_wave(x, t, equations::CompressibleEulerEquations1D)
     # Modified From Hennemann & Gassner JCP paper 2020 (Sec. 6.3) -> "medium blast wave"
     # Set up polar coordinates
-    inicenter = SVector(0.0)
+    RealT = eltype(x)
+    inicenter = SVector(0)
     x_norm = x[1] - inicenter[1]
     r = abs(x_norm)
     # The following code is equivalent to
@@ -28,9 +28,9 @@ function initial_condition_blast_wave(x, t, equations::CompressibleEulerEquation
     cos_phi = x_norm > 0 ? one(x_norm) : -one(x_norm)
 
     # Calculate primitive variables
-    rho = r > 0.5 ? 1.0 : 1.1691
-    v1 = r > 0.5 ? 0.0 : 0.1882 * cos_phi
-    p = r > 0.5 ? 1.0E-3 : 1.245
+    rho = r > 0.5f0 ? one(RealT) : RealT(1.1691)
+    v1 = r > 0.5f0 ? zero(RealT) : RealT(0.1882) * cos_phi
+    p = r > 0.5f0 ? RealT(1.0E-3) : RealT(1.245)
 
     return prim2cons(SVector(rho, v1, p), equations)
 end
@@ -44,9 +44,10 @@ coordinates_min = (-2.0,)
 coordinates_max = (2.0,)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 6,
-                n_cells_max = 10_000)
+                n_cells_max = 10_000, periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -75,6 +76,5 @@ stage_limiter! = EntropyBoundedLimiter()
 
 sol = solve(ode, SSPRK33(stage_limiter!);
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()...,
             callback = callbacks);
-
-summary_callback() # print the timer summary

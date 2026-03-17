@@ -9,21 +9,23 @@
 include("interpolation.jl")
 include("l2projection.jl")
 include("basis_lobatto_legendre.jl")
+include("basis_gauss_legendre.jl")
 
 """
-    DGSEM(; RealT=Float64, polydeg::Integer,
+    DGSEM(; RealT=Float64,
+            polydeg::Integer,
+            basis_type = LobattoLegendreBasis,
             surface_flux=flux_central,
             surface_integral=SurfaceIntegralWeakForm(surface_flux),
-            volume_integral=VolumeIntegralWeakForm(),
-            mortar=MortarL2(basis))
+            volume_integral=VolumeIntegralWeakForm())
 
 Create a discontinuous Galerkin spectral element method (DGSEM) using a
-[`LobattoLegendreBasis`](@ref) with polynomials of degree `polydeg`.
+[`LobattoLegendreBasis`](@ref) or a [`GaussLegendreBasis`](@ref) with polynomials of degree `polydeg`.
 """
-const DGSEM = DG{Basis} where {Basis <: LobattoLegendreBasis}
+const DGSEM = DG{Basis} where {Basis <: AbstractBasisSBP}
 
-# TODO: Deprecated in v0.3 (no longer documented)
-function DGSEM(basis::LobattoLegendreBasis,
+# This API is no longer documented, and we recommend avoiding its public use.
+function DGSEM(basis::AbstractBasisSBP,
                surface_flux = flux_central,
                volume_integral = VolumeIntegralWeakForm(),
                mortar = MortarL2(basis))
@@ -32,8 +34,8 @@ function DGSEM(basis::LobattoLegendreBasis,
               typeof(volume_integral)}(basis, mortar, surface_integral, volume_integral)
 end
 
-# TODO: Deprecated in v0.3 (no longer documented)
-function DGSEM(basis::LobattoLegendreBasis,
+# This API is no longer documented, and we recommend avoiding its public use.
+function DGSEM(basis::AbstractBasisSBP,
                surface_integral::AbstractSurfaceIntegral,
                volume_integral = VolumeIntegralWeakForm(),
                mortar = MortarL2(basis))
@@ -41,7 +43,7 @@ function DGSEM(basis::LobattoLegendreBasis,
               typeof(volume_integral)}(basis, mortar, surface_integral, volume_integral)
 end
 
-# TODO: Deprecated in v0.3 (no longer documented)
+# This API is no longer documented, and we recommend avoiding its public use.
 function DGSEM(RealT, polydeg::Integer,
                surface_flux = flux_central,
                volume_integral = VolumeIntegralWeakForm(),
@@ -51,9 +53,10 @@ function DGSEM(RealT, polydeg::Integer,
     return DGSEM(basis, surface_flux, volume_integral, mortar)
 end
 
-function DGSEM(polydeg, surface_flux = flux_central,
+# This API is no longer documented, and we recommend avoiding its public use.
+function DGSEM(polydeg::Integer, surface_flux = flux_central,
                volume_integral = VolumeIntegralWeakForm())
-    DGSEM(Float64, polydeg, surface_flux, volume_integral)
+    return DGSEM(Float64, polydeg, surface_flux, volume_integral)
 end
 
 # The constructor using only keyword arguments is convenient for elixirs since
@@ -61,14 +64,23 @@ end
 # `trixi_include`.
 function DGSEM(; RealT = Float64,
                polydeg::Integer,
+               basis_type = LobattoLegendreBasis,
                surface_flux = flux_central,
                surface_integral = SurfaceIntegralWeakForm(surface_flux),
                volume_integral = VolumeIntegralWeakForm())
-    basis = LobattoLegendreBasis(RealT, polydeg)
+    basis = basis_type(RealT, polydeg)
     return DGSEM(basis, surface_integral, volume_integral)
 end
 
 @inline polydeg(dg::DGSEM) = polydeg(dg.basis)
 
 Base.summary(io::IO, dg::DGSEM) = print(io, "DGSEM(polydeg=$(polydeg(dg)))")
+
+include("compute_u_mean.jl")
+
+include("containers.jl")
+
+include("indicators.jl")
+include("special_volume_integrals.jl")
+include("calc_volume_integral.jl")
 end # @muladd

@@ -51,14 +51,14 @@ The corresponding opposite directions are:
 
 The main sources for the base implementation were
 1. Misun Min, Taehun Lee, **A spectral-element discontinuous Galerkin lattice Boltzmann method for
-   nearly incompressible flows**, J Comput Phys 230(1), 2011
+   nearly incompressible flows**, Journal of Computational Physics 230(1), 2011
    [doi:10.1016/j.jcp.2010.09.024](https://doi.org/10.1016/j.jcp.2010.09.024)
 2. Karsten Golly, **Anwendung der Lattice-Boltzmann Discontinuous Galerkin Spectral Element Method
    (LB-DGSEM) auf laminare und turbulente nahezu inkompressible Strömungen im dreidimensionalen
    Raum**, Master Thesis, University of Cologne, 2018.
 3. Dieter Hänel, **Molekulare Gasdynamik**, Springer-Verlag Berlin Heidelberg, 2004
    [doi:10.1007/3-540-35047-0](https://doi.org/10.1007/3-540-35047-0)
-4. Dieter Krüger et al., **The Lattice Boltzmann Method**, Springer International Publishing, 2017
+4. Timm Krüger et al., **The Lattice Boltzmann Method**, Springer International Publishing, 2017
    [doi:10.1007/978-3-319-44649-3](https://doi.org/10.1007/978-3-319-44649-3)
 """
 struct LatticeBoltzmannEquations2D{RealT <: Real, CollisionOp} <:
@@ -128,19 +128,24 @@ function LatticeBoltzmannEquations2D(; Ma, Re, collision_op = collision_bgk,
     v_alpha1 = SVector{9, RealT}(c, 0, -c, 0, c, -c, -c, c, 0)
     v_alpha2 = SVector{9, RealT}(0, c, 0, -c, c, c, -c, -c, 0)
 
-    LatticeBoltzmannEquations2D(c, c_s, rho0, Ma, u0, Re, L, nu,
-                                weights, v_alpha1, v_alpha2,
-                                collision_op)
+    return LatticeBoltzmannEquations2D(c, c_s, rho0, Ma, u0, Re, L, nu,
+                                       weights, v_alpha1, v_alpha2,
+                                       collision_op)
 end
 
 function varnames(::typeof(cons2cons), equations::LatticeBoltzmannEquations2D)
-    ntuple(v -> "pdf" * string(v), nvariables(equations))
+    return ntuple(v -> "pdf" * string(v), nvariables(equations))
 end
 function varnames(::typeof(cons2prim), equations::LatticeBoltzmannEquations2D)
-    varnames(cons2cons, equations)
+    return varnames(cons2cons, equations)
 end
 
-# Convert conservative variables to macroscopic
+"""
+    cons2macroscopic(u, equations::LatticeBoltzmannEquations2D)
+
+Convert the conservative variables `u` (the particle distribution functions)
+to the macroscopic variables (density, velocity_1, velocity_2, pressure).
+"""
 @inline function cons2macroscopic(u, equations::LatticeBoltzmannEquations2D)
     rho = density(u, equations)
     v1, v2 = velocity(u, equations)
@@ -148,7 +153,7 @@ end
     return SVector(rho, v1, v2, p)
 end
 function varnames(::typeof(cons2macroscopic), ::LatticeBoltzmannEquations2D)
-    ("rho", "v1", "v2", "p")
+    return ("rho", "v1", "v2", "p")
 end
 
 # Set initial conditions at physical location `x` for time `t`
@@ -235,10 +240,7 @@ No-slip wall boundary condition using the bounce-back approach.
     return flux
 end
 
-# Pre-defined source terms should be implemented as
-# function source_terms_WHATEVER(u, x, t, equations::LatticeBoltzmannEquations2D)
-
-# Calculate 1D flux in for a single point
+# Calculate 1D flux for a single point
 @inline function flux(u, orientation::Integer, equations::LatticeBoltzmannEquations2D)
     if orientation == 1
         v_alpha = equations.v_alpha1
@@ -248,11 +250,12 @@ end
     return v_alpha .* u
 end
 
-# Calculate maximum wave speed for local Lax-Friedrichs-type dissipation
-# @inline function max_abs_speed_naive(u_ll, u_rr, orientation::Integer, equations::LatticeBoltzmannEquations2D)
-#   λ_max =
-# end
+"""
+    flux_godunov(u_ll, u_rr, orientation, 
+                 equations::LatticeBoltzmannEquations2D)
 
+Godunov (upwind) flux for the 2D Lattice-Boltzmann equations.
+"""
 @inline function flux_godunov(u_ll, u_rr, orientation::Integer,
                               equations::LatticeBoltzmannEquations2D)
     if orientation == 1
@@ -302,18 +305,21 @@ Calculate the macroscopic velocity vector from the particle distribution functio
                    dot(v_alpha2, u) / rho)
 end
 
-"""
+@doc raw"""
     pressure(rho::Real, equations::LatticeBoltzmannEquations2D)
     pressure(u, equations::LatticeBoltzmannEquations2D)
 
 Calculate the macroscopic pressure from the density `rho` or the  particle distribution functions
-`u`.
+`u` as
+```math
+p = \rho c_s^2
+```
 """
 @inline function pressure(rho::Real, equations::LatticeBoltzmannEquations2D)
-    rho * equations.c_s^2
+    return rho * equations.c_s^2
 end
 @inline function pressure(u, equations::LatticeBoltzmannEquations2D)
-    pressure(density(u, equations), equations)
+    return pressure(density(u, equations), equations)
 end
 
 """
@@ -368,6 +374,15 @@ Collision operator for the Bhatnagar, Gross, and Krook (BGK) model.
     return -(u - equilibrium_distribution(u, equations)) / (tau + 0.5f0)
 end
 
+"""
+    have_constant_speed(::LatticeBoltzmannEquations2D)
+
+Indicates whether the characteristic speeds are constant, i.e., independent of the solution.
+Queried in the timestep computation [`StepsizeCallback`](@ref) and [`linear_structure`](@ref).
+
+# Returns
+- `True()`
+"""
 @inline have_constant_speed(::LatticeBoltzmannEquations2D) = True()
 
 @inline function max_abs_speeds(equations::LatticeBoltzmannEquations2D)

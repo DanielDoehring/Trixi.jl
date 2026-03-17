@@ -30,7 +30,7 @@
 # Therefore, subcell limiting with the IDP limiter requires the use of a Trixi-intern
 # time integration SSPRK method called with
 # ````julia
-# Trixi.solve(ode, method(stage_callbacks = stage_callbacks); ...)
+# Trixi.solve(ode, method(stage_callbacks = stage_callbacks); ...);
 # ````
 #-
 # Right now, only the canonical three-stage, third-order SSPRK method (Shu-Osher)
@@ -115,8 +115,8 @@ local_twosided_variables_cons = ["rho"]
 
 # To limit non-linear variables locally, pass the variable function combined with the requested
 # bound (`min` or `max`) as a tuple. For instance, to impose a lower local bound on the modified
-# specific entropy [`Trixi.entropy_guermond_etal`](@ref), use
-local_onesided_variables_nonlinear = [(Trixi.entropy_guermond_etal, min)]
+# specific entropy [`entropy_guermond_etal`](@ref), use
+local_onesided_variables_nonlinear = [(entropy_guermond_etal, min)]
 
 # ## Exemplary simulation
 # How to set up a simulation using the IDP limiting becomes clearer when looking at an exemplary
@@ -124,7 +124,6 @@ local_onesided_variables_nonlinear = [(Trixi.entropy_guermond_etal, min)]
 # Since the setup is mostly very similar to a pure DGSEM setup as in
 # `tree_2d_dgsem/elixir_euler_blast_wave.jl`, the equivalent parts are used without any explanation
 # here.
-using OrdinaryDiffEq
 using Trixi
 
 equations = CompressibleEulerEquations2D(1.4)
@@ -180,9 +179,11 @@ coordinates_min = (-2.0, -2.0)
 coordinates_max = (2.0, 2.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 5,
-                n_cells_max = 10_000)
+                n_cells_max = 10_000,
+                periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 tspan = (0.0, 2.0)
 ode = semidiscretize(semi, tspan)
@@ -217,8 +218,6 @@ stage_callbacks = (SubcellLimiterIDPCorrection(),)
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
                   dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
                   callback = callbacks);
-summary_callback() # print the timer summary
-
 
 # ## Visualization
 # As for a standard simulation in Trixi.jl, it is possible to visualize the solution using the
@@ -230,8 +229,6 @@ plot(sol)
 # approach using the [`SaveSolutionCallback`](@ref), [`Trixi2Vtk`](https://github.com/trixi-framework/Trixi2Vtk.jl)
 # and [ParaView](https://www.paraview.org/download/). More details about this procedure
 # can be found in the [visualization documentation](@ref visualization).
-# Unfortunately, the support for subcell limiting data is not yet merged into the main branch
-# of Trixi2Vtk but lies in the branch [`bennibolm/node-variables`](https://github.com/bennibolm/Trixi2Vtk.jl/tree/node-variables).
 #-
 # With that implementation and the standard procedure used for Trixi2Vtk you get the following
 # dropdown menu in ParaView.
@@ -246,7 +243,6 @@ plot(sol)
 # You can disable this functionality with `reinterpolate=false` within the call of `trixi2vtk(...)`
 # and get the following visualization.
 # ![blast_wave_paraview_reinterpolate=false](https://github.com/trixi-framework/Trixi.jl/assets/74359358/39274f18-0064-469c-b4da-bac4b843e116)
-
 
 # ## [Bounds checking](@id subcell_bounds_check)
 # Subcell limiting is based on the fulfillment of target bounds - either global or local.

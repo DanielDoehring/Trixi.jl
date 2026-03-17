@@ -5,7 +5,7 @@ using Trixi
 
 include("test_trixi.jl")
 
-EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_3d_dgsem")
+EXAMPLES_DIR = joinpath(examples_dir(), "tree_3d_dgsem")
 
 @testset "MHD" begin
 #! format: noindent
@@ -36,12 +36,7 @@ EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_3d_dgsem")
                         ])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
 @trixi_testset "elixir_mhd_ec.jl with initial_condition=initial_condition_constant" begin
@@ -72,12 +67,7 @@ end
                         initial_condition=initial_condition_constant)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
 @trixi_testset "elixir_mhd_alfven_wave.jl" begin
@@ -106,12 +96,7 @@ end
                         ])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
 @trixi_testset "elixir_mhd_alfven_wave.jl with flux_derigs_etal" begin
@@ -141,50 +126,42 @@ end
                         volume_flux=(flux_derigs_etal, flux_nonconservative_powell))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
 @trixi_testset "elixir_mhd_alfven_wave_mortar.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave_mortar.jl"),
                         l2=[
-                            0.001879021634926363,
-                            0.007032724521848316,
-                            0.0032793932234187325,
-                            0.009056594733320348,
-                            0.007514150120617965,
-                            0.007328739509868727,
-                            0.00309794018112387,
-                            0.009026356949274878,
-                            0.0035732583778049776
+                            0.002117092205724962,
+                            0.0082287162318041,
+                            0.0034356818644221947,
+                            0.009802676239657889,
+                            0.008065655848544878,
+                            0.00822223011240085,
+                            0.0033142782650662905,
+                            0.009782724705061424,
+                            0.003818346240751859
                         ],
                         linf=[
-                            0.013734346970999622,
-                            0.06173467158736011,
-                            0.02183946452704291,
-                            0.06258216169457917,
-                            0.03672304497348122,
-                            0.055120532123884625,
-                            0.018202716205672487,
-                            0.06133688282205586,
-                            0.019888161885935608
+                            0.01498490966057986,
+                            0.1168609357063561,
+                            0.024026660552548984,
+                            0.09909160811731985,
+                            0.06507407924731945,
+                            0.09999894905805326,
+                            0.029292103110423517,
+                            0.09399116188535625,
+                            0.031263077562076205
                         ],
                         tspan=(0.0, 0.25))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
 @trixi_testset "elixir_mhd_alfven_wave.jl with Orszag-Tang setup + flux_hlle" begin
+    using Trixi: prim2cons, flux_hlle, flux_nonconservative_powell, flux_central,
+                 SVector
     # OBS! This setup does not make much sense and is only used to exercise all components of the
     # flux_hlle implementation
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave.jl"),
@@ -230,15 +207,6 @@ end
                             psi = 0.0
                             return prim2cons(SVector(rho, v1, v2, v3, p, B1, B2, B3,
                                                      psi), equations)
-                            # Ensure that we do not have excessive memory allocations
-                            # (e.g., from type instabilities)
-                            let
-                                t = sol.t[end]
-                                u_ode = sol.u[end]
-                                du_ode = similar(u_ode)
-                                @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) <
-                                      1000
-                            end
                         end,
                         surface_flux=(flux_hlle,
                                       flux_nonconservative_powell),
@@ -250,12 +218,7 @@ end
                         tspan=(0.0, 0.06))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
 @trixi_testset "elixir_mhd_ec_shockcapturing.jl" begin
@@ -284,12 +247,7 @@ end
                         ])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 end
 

@@ -10,7 +10,7 @@ function calc_error_norms(func, u, t, analyzer,
                           dg::DGMulti{NDIMS}, cache, cache_analysis) where {NDIMS}
     rd = dg.basis
     md = mesh.md
-    @unpack u_values = cache
+    (; u_values) = cache.solution_container
 
     # interpolate u to quadrature points
     apply_to_each_field(mul_by!(rd.Vq), u_values, u)
@@ -27,12 +27,11 @@ function calc_error_norms(func, u, t, analyzer,
     return sqrt.(component_l2_errors ./ total_volume), component_linf_errors
 end
 
-function integrate(func::Func, u,
-                   mesh::DGMultiMesh,
+function integrate(func::Func, u, mesh::DGMultiMesh,
                    equations, dg::DGMulti, cache; normalize = true) where {Func}
     rd = dg.basis
     md = mesh.md
-    @unpack u_values = cache
+    (; u_values) = cache.solution_container
 
     # interpolate u to quadrature points
     apply_to_each_field(mul_by!(rd.Vq), u_values, u)
@@ -48,7 +47,7 @@ function analyze(::typeof(entropy_timederivative), du, u, t,
                  mesh::DGMultiMesh, equations, dg::DGMulti, cache)
     rd = dg.basis
     md = mesh.md
-    @unpack u_values = cache
+    (; u_values) = cache.solution_container
 
     # interpolate u, du to quadrature points
     du_values = similar(u_values) # Todo: DGMulti. Can we move this to the analysis cache somehow?
@@ -125,7 +124,7 @@ function analyze(::Val{:linf_divb}, du, u, t,
     uEltype = eltype(B1)
     linf_divB = zero(uEltype)
     local_divB = zeros(uEltype, size(B1, 1))
-    for e in eachelement(mesh, dg, cache)
+    @batch reduction=(max, linf_divb) for e in eachelement(mesh, dg, cache)
         compute_local_divergence!(local_divB, e, view.(B, :, e), mesh, dg, cache)
 
         # compute maximum norm
@@ -135,50 +134,62 @@ function analyze(::Val{:linf_divb}, du, u, t,
     return linf_divB
 end
 
-function integrate(func::typeof(enstrophy), u,
-                   mesh::DGMultiMesh,
-                   equations, equations_parabolic::CompressibleNavierStokesDiffusion3D,
-                   dg::DGMulti,
-                   cache, cache_parabolic; normalize = true)
-    gradients_x, gradients_y, gradients_z = cache_parabolic.gradients
+# Calculate ∫_e (∂S/∂u ⋅ ∂u/∂t) dΩ_e where the result on element 'e' is kept in reference space
+# Note that ∂S/∂u = w(u) with entropy variables w.
+# This assumes that both du and u are already interpolated to the quadrature points
+function entropy_change_reference_element(du_values_local, u_values_local,
+                                          mesh::DGMultiMesh, equations,
+                                          dg::DGMulti, cache)
+    rd = dg.basis
+    @unpack Nq, wq = rd
 
-    # allocate local storage for gradients.
-    # TODO: can we avoid allocating here?
-    local_gradient_quadrature_values = ntuple(_ -> similar(cache_parabolic.local_u_values_threaded),
-                                              3)
-
-    integral = zero(eltype(u))
-    for e in eachelement(mesh, dg)
-        u_quadrature_values = cache_parabolic.local_u_values_threaded[Threads.threadid()]
-        gradient_x_quadrature_values = local_gradient_quadrature_values[1][Threads.threadid()]
-        gradient_y_quadrature_values = local_gradient_quadrature_values[2][Threads.threadid()]
-        gradient_z_quadrature_values = local_gradient_quadrature_values[3][Threads.threadid()]
-
-        # interpolate to quadrature on each element
-        apply_to_each_field(mul_by!(dg.basis.Vq), u_quadrature_values, view(u, :, e))
-        apply_to_each_field(mul_by!(dg.basis.Vq), gradient_x_quadrature_values,
-                            view(gradients_x, :, e))
-        apply_to_each_field(mul_by!(dg.basis.Vq), gradient_y_quadrature_values,
-                            view(gradients_y, :, e))
-        apply_to_each_field(mul_by!(dg.basis.Vq), gradient_z_quadrature_values,
-                            view(gradients_z, :, e))
-
-        # integrate over the element
-        for i in eachindex(u_quadrature_values)
-            gradients_i = SVector(gradient_x_quadrature_values[i],
-                                  gradient_y_quadrature_values[i],
-                                  gradient_z_quadrature_values[i])
-            integral += mesh.md.wJq[i, e] *
-                        func(u_quadrature_values[i], gradients_i, equations)
-        end
+    # Compute entropy change for this element
+    dS_dt_elem = zero(eltype(first(du_values_local)))
+    for i in Base.OneTo(Nq) # Loop over quadrature points in the element
+        dS_dt_elem += dot(cons2entropy(u_values_local[i], equations),
+                          du_values_local[i]) * wq[i]
     end
-    return integral
+
+    return dS_dt_elem
+end
+
+# calculate surface integral of func(u, normal_direction, equations) on the reference element.
+# For DGMulti, we loop over all faces of the element and integrate using face quadrature weights.
+# Restricted to `Polynomial` approximation type which requires interpolation to face quadrature nodes
+function surface_integral_reference_element(func::Func, u, element,
+                                            mesh::DGMultiMesh, equations,
+                                            dg::DGMulti,
+                                            cache, args...) where {Func}
+    rd = dg.basis
+    @unpack Nfq, wf, Vf = rd
+    md = mesh.md
+    @unpack nxyzJ = md
+
+    # Interpolate volume solution to face quadrature nodes for this element
+    @unpack u_face_local_threaded = cache
+    u_face_local = u_face_local_threaded[Threads.threadid()]
+    u_elem = view(u, :, element)
+    apply_to_each_field(mul_by!(Vf), u_face_local, u_elem)
+
+    surface_integral = zero(eltype(first(u)))
+    # Loop over all face nodes for this element
+    for i in 1:Nfq
+        # Get solution at this face node
+        u_node = u_face_local[i]
+
+        # Get face normal; nxyzJ stores components as (nxJ, nyJ, nxJ)
+        normal_direction = SVector(getindex.(nxyzJ, i, element))
+
+        # Multiply with face quadrature weight and accumulate
+        surface_integral += wf[i] * func(u_node, normal_direction, equations)
+    end
+
+    return surface_integral
 end
 
 function create_cache_analysis(analyzer, mesh::DGMultiMesh,
                                equations, dg::DGMulti, cache,
                                RealT, uEltype)
-    md = mesh.md
     return (;)
 end
 
@@ -189,7 +200,7 @@ function nelementsglobal(mesh::DGMultiMesh, solver::DGMulti, cache)
     if mpi_isparallel()
         error("`nelementsglobal` is not implemented for `DGMultiMesh` when used in parallel with MPI")
     else
-        return ndofs(mesh, solver, cache)
+        return nelements(mesh, solver)
     end
 end
 function ndofsglobal(mesh::DGMultiMesh, solver::DGMulti, cache)

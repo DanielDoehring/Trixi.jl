@@ -4,7 +4,6 @@
 # and its implementation in [Trixi.jl](https://github.com/trixi-framework/Trixi.jl).
 # In the second part, an implementation of a positivity preserving limiter is added to the simulation.
 
-
 # # Shock capturing with flux differencing
 
 # The following rough explanation is on a very basic level. More information about an entropy stable
@@ -13,9 +12,10 @@
 # [Hennemann et al. (2021)](https://doi.org/10.1016/j.jcp.2020.109935). In
 # [Rueda-Ramírez et al. (2021)](https://doi.org/10.1016/j.jcp.2021.110580) you find the extension to
 # the systems with non-conservative terms, such as the compressible magnetohydrodynamics (MHD) equations.
+# Furthermore, the latter paper introduces also second-order subcell finite volume stabilization.
 
 # The strategy for a shock-capturing method presented by Hennemann et al. is based on a hybrid blending
-# of a high-order DG method with a low-order variant. The low-order subcell finite volume (FV) method is created
+# of a high-order DG method with a low-order variant. The low-order subcell first order finite volume (FV) method is created
 # directly with the Legendre-Gauss-Lobatto (LGL) nodes already used for the high-order DGSEM.
 # Then, the final method is a convex combination with regulating indicator $\alpha$ of these two methods.
 
@@ -36,17 +36,28 @@
 #                                                  volume_flux_fv=volume_flux_fv)
 # ````
 
+# The volume integral employing second-order FV stabilization is constructed similarly:
+# ````julia
+# volume_integral = VolumeIntegralShockCapturingRRG(basis, indicator_sc;
+#                                                   volume_flux_dg=flux_central,
+#                                                   volume_flux_fv=flux_lax_friedrichs,
+#                                                   slope_limiter=minmod)
+# ````
+# In addition to the parameters of the HG method, the DG `basis` **must** be supplied here.
+# The `slope_limiter` keyword argument is optional and defaults to `minmod`.
+# A list of supported slope limiters can be found in the reference of [`VolumeIntegralShockCapturingRRG`](@ref).
 
-# We now focus on a choice of the shock capturing indicator `indicator_sc`.
+# We now focus on a choice of the shock capturing indicator `indicator_sc`, which can be used for both
+# the first-order and the second-order FV stabilization.
 # A possible indicator is $\alpha_{HG}$ presented by Hennemann et al. (p.10), which depends on the
 # current approximation with modal coefficients $\{m_j\}_{j=0}^N$ of a given `variable`.
 
 # The indicator is calculated for every DG element by itself. First, we calculate a smooth $\alpha$ by
 # ```math
-# \alpha = \frac{1}{1+\exp(-\frac{-s}{\mathbb{T}}(\mathbb{E}-\mathbb{T}))}
+# \alpha = \frac{1}{1+\exp(-\frac{s}{\mathbb{T}}(\mathbb{E}-\mathbb{T}))}
 # ```
 # with the total energy $\mathbb{E}=\max\big(\frac{m_N^2}{\sum_{j=0}^N m_j^2}, \frac{m_{N-1}^2}{\sum_{j=0}^{N-1} m_j^2}\big)$,
-# threshold $\mathbb{T}= 0.5 * 10^{-1.8*(N+1)^{1/4}}$ and parameter $s=ln\big(\frac{1-0.0001}{0.0001}\big)\approx 9.21024$.
+# threshold $\mathbb{T}= 0.5 * 10^{-1.8*(N+1)^{1/4}}$ and parameter $s=\ln\big(\frac{1-0.0001}{0.0001}\big)\approx 9.21024$.
 
 # For computational efficiency, $\alpha_{min}$ is introduced and used for
 # ```math
@@ -83,8 +94,6 @@
 #                                          alpha_smooth=true,
 #                                          variable=variable)
 # ````
-
-
 
 # # Positivity preserving limiter
 
@@ -132,37 +141,37 @@
 # SSPRK43(stage_limiter!).
 # ````
 
-
 # # Simulation with shock capturing and positivity preserving
 
 # Now, we can run a simulation using the described methods of shock capturing and positivity
 # preserving limiters. We want to give an example for the 2D compressible Euler equations.
-using OrdinaryDiffEq, Trixi
+using OrdinaryDiffEqLowStorageRK
+using Trixi
 
 equations = CompressibleEulerEquations2D(1.4)
 
 # As our initial condition we use the Sedov blast wave setup.
 function initial_condition_sedov_blast_wave(x, t, equations::CompressibleEulerEquations2D)
-  ## Set up polar coordinates
-  inicenter = SVector(0.0, 0.0)
-  x_norm = x[1] - inicenter[1]
-  y_norm = x[2] - inicenter[2]
-  r = sqrt(x_norm^2 + y_norm^2)
+    ## Set up polar coordinates
+    inicenter = SVector(0.0, 0.0)
+    x_norm = x[1] - inicenter[1]
+    y_norm = x[2] - inicenter[2]
+    r = sqrt(x_norm^2 + y_norm^2)
 
-  r0 = 0.21875 # = 3.5 * smallest dx (for domain length=4 and max-ref=6)
-  ## r0 = 0.5 # = more reasonable setup
-  E = 1.0
-  p0_inner = 3 * (equations.gamma - 1) * E / (3 * pi * r0^2)
-  p0_outer = 1.0e-5 # = true Sedov setup
-  ## p0_outer = 1.0e-3 # = more reasonable setup
+    r0 = 0.21875 # = 3.5 * smallest dx (for domain length=4 and max-ref=6)
+    ## r0 = 0.5 # = more reasonable setup
+    E = 1.0
+    p0_inner = 3 * (equations.gamma - 1) * E / (3 * pi * r0^2)
+    p0_outer = 1.0e-5 # = true Sedov setup
+    ## p0_outer = 1.0e-3 # = more reasonable setup
 
-  ## Calculate primitive variables
-  rho = 1.0
-  v1  = 0.0
-  v2  = 0.0
-  p   = r > r0 ? p0_outer : p0_inner
+    ## Calculate primitive variables
+    rho = 1.0
+    v1 = 0.0
+    v2 = 0.0
+    p = r > r0 ? p0_outer : p0_inner
 
-  return prim2cons(SVector(rho, v1, v2, p), equations)
+    return prim2cons(SVector(rho, v1, v2, p), equations)
 end
 initial_condition = initial_condition_sedov_blast_wave
 #-
@@ -171,7 +180,7 @@ basis = LobattoLegendreBasis(3)
 # We set the numerical fluxes and divide between the surface flux and the two volume fluxes for the DG
 # and FV method. Here, we are using [`flux_lax_friedrichs`](@ref) and [`flux_ranocha`](@ref).
 surface_flux = flux_lax_friedrichs
-volume_flux  = flux_ranocha
+volume_flux = flux_ranocha
 
 # Now, we specify the shock capturing indicator $\alpha$.
 
@@ -180,47 +189,49 @@ volume_flux  = flux_ranocha
 # Since density and pressure are the critical variables in this example, we use
 # `density_pressure = density * pressure = rho * p` as indicator variable.
 indicator_sc = IndicatorHennemannGassner(equations, basis,
-                                         alpha_max=0.5,
-                                         alpha_min=0.001,
-                                         alpha_smooth=true,
-                                         variable=density_pressure)
+                                         alpha_max = 0.5,
+                                         alpha_min = 0.001,
+                                         alpha_smooth = true,
+                                         variable = density_pressure)
 
 # Now, we can use the defined fluxes and the indicator to implement the volume integral using shock
 # capturing.
 volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
-                                                 volume_flux_dg=volume_flux,
-                                                 volume_flux_fv=surface_flux)
+                                                 volume_flux_dg = volume_flux,
+                                                 volume_flux_fv = surface_flux)
 
 # We finalize the discretization by implementing Trixi.jl's `solver`, `mesh`, `semi` and `ode`,
 # while `solver` now has the extra parameter `volume_integral`.
 solver = DGSEM(basis, surface_flux, volume_integral)
 
 coordinates_min = (-2.0, -2.0)
-coordinates_max = ( 2.0,  2.0)
+coordinates_max = (2.0, 2.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=6,
-                n_cells_max=10_000)
+                initial_refinement_level = 6,
+                n_cells_max = 10_000,
+                periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 tspan = (0.0, 1.0)
 ode = semidiscretize(semi, tspan);
 
 # We add some callbacks to get an solution analysis and use a CFL-based time step size calculation.
-analysis_callback = AnalysisCallback(semi, interval=100)
+analysis_callback = AnalysisCallback(semi, interval = 100)
 
-stepsize_callback = StepsizeCallback(cfl=0.8)
+stepsize_callback = StepsizeCallback(cfl = 0.8)
 
 callbacks = CallbackSet(analysis_callback, stepsize_callback);
 
 # We now run the simulation using the positivity preserving limiter of Zhang and Shu for the variables
 # density and pressure.
-stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
-                                                     variables=(Trixi.density, pressure))
+stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds = (5.0e-6, 5.0e-6),
+                                                     variables = (Trixi.density, pressure))
 
-sol = solve(ode, CarpenterKennedy2N54(stage_limiter!, williamson_condition=false),
-            dt=1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep=false, callback=callbacks);
+sol = solve(ode, CarpenterKennedy2N54(stage_limiter!, williamson_condition = false);
+            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);
 
 using Plots
 plot(sol)
@@ -229,15 +240,15 @@ plot(sol)
 
 # As argued in the description of the positivity preserving limiter above it might sometimes be
 # necessary to apply advanced techniques to ensure a physically meaningful solution.
-# Apart from the positivity of pressure and density, the physical entropy of the system should increase 
-# over the course of a simulation, see e.g. [this](https://doi.org/10.1016/0168-9274(86)90029-2) paper by Tadmor where this property is 
+# Apart from the positivity of pressure and density, the physical entropy of the system should increase
+# over the course of a simulation, see e.g. [this](https://doi.org/10.1016/0168-9274(86)90029-2) paper by Tadmor where this property is
 # shown for the compressible Euler equations.
-# As this is not necessarily the case for the numerical approximation (especially for the high-order, non-diffusive DG discretizations), 
+# As this is not necessarily the case for the numerical approximation (especially for the high-order, non-diffusive DG discretizations),
 # Lv and Ihme devised an a-posteriori limiter in [this paper](https://doi.org/10.1016/j.jcp.2015.04.026) which can be applied after each Runge-Kutta stage.
-# This limiter enforces a non-decrease in the physical, thermodynamic entropy $S$ 
+# This limiter enforces a non-decrease in the physical, thermodynamic entropy $S$
 # by bounding the entropy decrease (entropy increase is always tolerated) $\Delta S$ in each grid cell.
-# 
-# This translates into a requirement that the entropy of the limited approximation $S\Big(\mathcal{L}\big[\boldsymbol u(\Delta t) \big] \Big)$ should be 
+#
+# This translates into a requirement that the entropy of the limited approximation $S\Big(\mathcal{L}\big[\boldsymbol u(\Delta t) \big] \Big)$ should be
 # greater or equal than the previous iterates' entropy $S\big(\boldsymbol u(0) \big)$, enforced at each quadrature point:
 # ```math
 # S\Big(\mathcal{L}\big[\boldsymbol u(\Delta t, \boldsymbol{x}_i) \big] \Big) \overset{!}{\geq} S\big(\boldsymbol u(0, \boldsymbol{x}_i) \big), \quad i = 1, \dots, (k+1)^d
@@ -251,21 +262,21 @@ plot(sol)
 # ```math
 # p(\boldsymbol{x}_i) - e^{ S\big(\boldsymbol u(0, \boldsymbol{x}_i) \big)} \cdot \rho(\boldsymbol{x}_i)^\gamma \overset{!}{\geq} 0, \quad i = 1, \dots, (k+1)^d \: .
 # ```
-# In a practical simulation, we might tolerate a maximum (exponentiated) entropy decrease per element, i.e., 
+# In a practical simulation, we might tolerate a maximum (exponentiated) entropy decrease per element, i.e.,
 # ```math
 # \Delta e^S \coloneqq \min_{i} \left\{ p(\boldsymbol{x}_i) - e^{ S\big(\boldsymbol u(0, \boldsymbol{x}_i) \big)} \cdot \rho(\boldsymbol{x}_i)^\gamma \right\} < c
 # ```
 # with hyper-parameter $c$ which is to be specified by the user.
-# The default value for the corresponding parameter $c=$ `exp_entropy_decrease_max` is set to $-10^{-13}$, i.e., slightly less than zero to 
+# The default value for the corresponding parameter $c=$ `exp_entropy_decrease_max` is set to $-10^{-13}$, i.e., slightly less than zero to
 # avoid spurious limiter actions for cells in which the entropy remains effectively constant.
 # Other values can be specified by setting the `exp_entropy_decrease_max` keyword in the constructor of the limiter:
-# ```julia
+# ````julia
 # stage_limiter! = EntropyBoundedLimiter(exp_entropy_decrease_max=-1e-9)
-# ```
+# ````
 # Smaller values (larger in absolute value) for `exp_entropy_decrease_max` relax the entropy increase requirement and are thus less diffusive.
 # On the other hand, for larger values (smaller in absolute value) of `exp_entropy_decrease_max` the limiter acts more often and the solution becomes more diffusive.
 #
-# In particular, we compute again a limiting parameter $\vartheta \in [0, 1]$ which is then used to blend the 
+# In particular, we compute again a limiting parameter $\vartheta \in [0, 1]$ which is then used to blend the
 # unlimited nodal values $\boldsymbol u$ with the mean value $\boldsymbol u_{\text{mean}}$ of the element:
 # ```math
 # \mathcal{L} [\boldsymbol u](\vartheta) \coloneqq (1 - \vartheta) \boldsymbol u + \vartheta \cdot \boldsymbol u_{\text{mean}}
@@ -274,9 +285,9 @@ plot(sol)
 # Note that therein the limiting parameter is denoted by $\epsilon$, which is not to be confused with the threshold $\varepsilon$ of the Zhang-Shu limiter.
 
 # As for the positivity preserving limiter, the entropy bounded limiter may be applied after every Runge-Kutta stage.
-# Both fixed timestep methods such as [`CarpenterKennedy2N54`](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/) and 
+# Both fixed timestep methods such as [`CarpenterKennedy2N54`](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/) and
 # adaptive timestep methods such as [`SSPRK43`](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/) are supported.
-# We would like to remark that of course every `stage_limiter!` can also be used as a `step_limiter!`, i.e., 
+# We would like to remark that of course every `stage_limiter!` can also be used as a `step_limiter!`, i.e.,
 # acting only after the full time step has been taken.
 
 # As an example, we consider a variant of the [1D medium blast wave example](https://github.com/trixi-framework/Trixi.jl/blob/main/examples/tree_1d_dgsem/elixir_euler_blast_wave.jl)
@@ -288,7 +299,7 @@ solver = DGSEM(polydeg = 3, surface_flux = flux_hllc)
 
 # The remaining setup is the same as in the standard example:
 
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -320,9 +331,11 @@ coordinates_min = (-2.0,)
 coordinates_max = (2.0,)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 6,
-                n_cells_max = 10_000)
+                n_cells_max = 10_000,
+                periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -365,5 +378,5 @@ using InteractiveUtils
 versioninfo()
 
 using Pkg
-Pkg.status(["Trixi", "OrdinaryDiffEq", "Plots"],
-           mode=PKGMODE_MANIFEST)
+Pkg.status(["Trixi", "OrdinaryDiffEqLowStorageRK", "OrdinaryDiffEqSSPRK", "Plots"],
+           mode = PKGMODE_MANIFEST)

@@ -6,9 +6,9 @@
 #! format: noindent
 
 function save_restart_file(u, time, dt, timestep,
-                           mesh::Union{SerialTreeMesh, StructuredMesh,
-                                       UnstructuredMesh2D, SerialP4estMesh,
-                                       SerialT8codeMesh},
+                           mesh::Union{TreeMeshSerial, StructuredMesh,
+                                       UnstructuredMesh2D, P4estMeshSerial,
+                                       T8codeMeshSerial},
                            equations, dg::DG, cache,
                            restart_callback)
     @unpack output_directory = restart_callback
@@ -47,8 +47,9 @@ function save_restart_file(u, time, dt, timestep,
     return filename
 end
 
-function load_restart_file(mesh::Union{SerialTreeMesh, StructuredMesh,
-                                       UnstructuredMesh2D, SerialP4estMesh},
+function load_restart_file(mesh::Union{TreeMeshSerial, StructuredMesh,
+                                       UnstructuredMesh2D, P4estMeshSerial,
+                                       T8codeMeshSerial},
                            equations, dg::DG, cache, restart_file)
 
     # allocate memory
@@ -88,7 +89,8 @@ function load_restart_file(mesh::Union{SerialTreeMesh, StructuredMesh,
 end
 
 function save_restart_file(u, time, dt, timestep,
-                           mesh::Union{ParallelTreeMesh, ParallelP4estMesh}, equations,
+                           mesh::Union{TreeMeshParallel, P4estMeshParallel,
+                                       T8codeMeshParallel}, equations,
                            dg::DG, cache,
                            restart_callback)
     @unpack output_directory = restart_callback
@@ -105,7 +107,8 @@ function save_restart_file(u, time, dt, timestep,
 end
 
 function save_restart_file_parallel(u, time, dt, timestep,
-                                    mesh::Union{ParallelTreeMesh, ParallelP4estMesh},
+                                    mesh::Union{TreeMeshParallel, P4estMeshParallel,
+                                                T8codeMeshParallel},
                                     equations, dg::DG, cache,
                                     filename)
 
@@ -151,7 +154,8 @@ function save_restart_file_parallel(u, time, dt, timestep,
 end
 
 function save_restart_file_on_root(u, time, dt, timestep,
-                                   mesh::Union{ParallelTreeMesh, ParallelP4estMesh},
+                                   mesh::Union{TreeMeshParallel, P4estMeshParallel,
+                                               T8codeMeshParallel},
                                    equations, dg::DG, cache,
                                    filename)
 
@@ -204,7 +208,8 @@ function save_restart_file_on_root(u, time, dt, timestep,
     return filename
 end
 
-function load_restart_file(mesh::Union{ParallelTreeMesh, ParallelP4estMesh}, equations,
+function load_restart_file(mesh::Union{TreeMeshParallel, P4estMeshParallel,
+                                       T8codeMeshParallel}, equations,
                            dg::DG, cache, restart_file)
     if HDF5.has_parallel()
         load_restart_file_parallel(mesh, equations, dg, cache, restart_file)
@@ -213,7 +218,8 @@ function load_restart_file(mesh::Union{ParallelTreeMesh, ParallelP4estMesh}, equ
     end
 end
 
-function load_restart_file_parallel(mesh::Union{ParallelTreeMesh, ParallelP4estMesh},
+function load_restart_file_parallel(mesh::Union{TreeMeshParallel, P4estMeshParallel,
+                                                T8codeMeshParallel},
                                     equations, dg::DG, cache, restart_file)
 
     # Calculate element and node counts by MPI rank
@@ -264,7 +270,8 @@ function load_restart_file_parallel(mesh::Union{ParallelTreeMesh, ParallelP4estM
     return u_ode
 end
 
-function load_restart_file_on_root(mesh::Union{ParallelTreeMesh, ParallelP4estMesh},
+function load_restart_file_on_root(mesh::Union{TreeMeshParallel, P4estMeshParallel,
+                                               T8codeMeshParallel},
                                    equations, dg::DG, cache, restart_file)
 
     # Calculate element and node counts by MPI rank
