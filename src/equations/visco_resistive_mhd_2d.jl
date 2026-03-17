@@ -50,7 +50,7 @@ For more details see e.g. arXiv:2012.12040.
 """
 struct ViscoResistiveMhdDiffusion2D{GradientVariables, RealT <: Real, Mu,
                                     E <: AbstractIdealGlmMhdEquations{2}} <:
-       AbstractViscoResistiveMhdDiffusion{2, 9}
+       AbstractViscoResistiveMhdDiffusion{2, 9, GradientVariables}
     gamma::RealT               # ratio of specific heats
     inv_gamma_minus_one::RealT # = inv(gamma - 1); can be used to write slow divisions as fast multiplications
     mu::Mu                     # viscosity of the fluid
@@ -69,14 +69,15 @@ function ViscoResistiveMhdDiffusion2D(equations::IdealGlmMhdEquations2D;
     inv_gamma_minus_one = equations.inv_gamma_minus_one
 
     # Under the assumption of constant Prandtl number the thermal conductivity
-    # constant is kappa = gamma μ / ((gamma-1) Pr).
+    # constant is kappa = gamma μ / ((gamma-1) Prandtl).
     # Important note! Factor of μ is accounted for later in `flux`.
-    kappa = gamma * inv_gamma_minus_one / Pr
+    # This avoids recomputation of kappa for non-constant μ.
+    kappa = gamma * inv_gamma_minus_one / Prandtl
 
     ViscoResistiveMhdDiffusion2D{typeof(gradient_variables), typeof(gamma),
                                  typeof(mu),
                                  typeof(equations)}(gamma, inv_gamma_minus_one,
-                                                    mu, Pr, eta, kappa,
+                                                    mu, Prandtl, eta, kappa,
                                                     equations, gradient_variables)
 end
 
