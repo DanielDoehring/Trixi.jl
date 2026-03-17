@@ -5,11 +5,11 @@ using OrdinaryDiffEqLowStorageRK
 # Semidiscretization of the compressible Euler equations
 
 # Fluid parameters
-gamma() = 1.4
+gamma() = 2.0
 prandtl_number() = 0.72
 
-mu() = 5e-5
-eta() = 5e-5
+mu() = 5e-3
+eta() = 5e-3
 
 equations = IdealGlmMhdEquations2D(gamma())
 equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
@@ -48,7 +48,7 @@ function source_terms_convergence(u, x, t, equations)
     s_8 = 0.0
     s_9 = 0.0
 
-    return SVector(s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8, s_9)
+    return -SVector(s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8, s_9)
 end
 
 surface_flux = (flux_hll, flux_nonconservative_powell)
@@ -78,17 +78,30 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span `tspan`
-tspan = (0.0, 1.0)
+tspan = (0.0, 0.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
-alive_callback = AliveCallback(alive_interval = 10)
-analysis_interval = 100
+
+analysis_interval = 50
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
-callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
+
+alive_callback = AliveCallback(analysis_interval = analysis_interval)
+
+cfl = 0.1
+stepsize_callback = StepsizeCallback(cfl = cfl)
+
+glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
+
+callbacks = CallbackSet(summary_callback,
+                        analysis_callback,
+                        alive_callback,
+                        stepsize_callback,
+                        glm_speed_callback)
 
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, RDPK3SpFSAL49();
-            ode_default_options()..., callback = callbacks)
+sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
+            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

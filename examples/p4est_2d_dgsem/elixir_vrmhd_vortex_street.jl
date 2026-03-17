@@ -161,7 +161,7 @@ boundary_conditions_para = Dict(:Circle => boundary_condition_cylinder, # top ha
 surface_flux = (flux_hll, flux_nonconservative_powell)
 volume_flux = (flux_hindenlang_gassner, flux_nonconservative_powell)
 
-polydeg = 4 # 3 for PERRK paper
+polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 
 indicator_sc = IndicatorHennemannGassner(equations, basis,
@@ -187,18 +187,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 tspan = (0.0, 120.0)
 
-ode = semidiscretize(semi, tspan) # Standard or split-PERK Multirate
-#ode = semidiscretize(semi, tspan; split_problem = false) # PER(R)K Multirate
-
-
-# For finding final CFL
-#=
-restart_file = "restart_000000531.h5"
-restart_filename = joinpath("out", restart_file)
-
-tspan = (10.0, 120.0)
-ode = semidiscretize(semi, tspan, restart_filename)
-=#
+ode = semidiscretize(semi, tspan)
 
 # Callbacks
 summary_callback = SummaryCallback()
@@ -215,93 +204,10 @@ save_solution = SaveSolutionCallback(interval = analysis_interval,
                                      save_initial_solution = false,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
-
-##### k = 3 #####
-#=
-### Initial CFL ###                                     
-cfl_0() = 1.4 # PE (Relaxation) RK 4 13, 8, 6, 5
-#cfl_0() = 1.4 # PE (Relaxation) RK 4 13 (Standalone)
-
-#cfl_0() = 1.3 # R-RK44
-#cfl_0() = 1.3 # R-TS64
-#cfl_0() = 2.2 # R-CKL54
-
-### Restarted CFL ###
-
-cfl_max() = 6.5 # PER(R)K4 13, 8, 6, 5
-#cfl_max() = 7.3 # Standalone PERRK4 13
-
-#cfl_max() = 1.5 # R-RK44
-#cfl_max() = 2.1 # R-TS64
-#cfl_max() = 2.7 # R-CKL54
-=#
-
-### Ramp-Up CFL ###
-t_ramp_up() = 4.40 # PER(R)K4 4 13, 8, 6, 5 
-
-t_ramp_up() = 5.00 # Standalone PERRK4 13
-
-#t_ramp_up() = 0.75 # R-RK44
-#t_ramp_up() = 2.40 # R-TS64
-t_ramp_up() = 1.10 # R-CKL54
-
-##### k = 4 #####
-
-### Initial CFL ###                                     
-cfl_0() = 1.0 # PE (Relaxation) RK 4 13, 8, 6, 5
-cfl_0() = 1.0 # PE (Relaxation) RK 4 13 (Standalone)
-
-cfl_0() = 0.5 # R-RK44
-cfl_0() = 0.5 # R-TS64
-#cfl_0() = 0.5 # R-CKL54
-
-### Restarted CFL ###
-
-#cfl_max() = 5.1 # PER(R)K4 13, 8, 6, 5 => roughly 320 sec on 8 threads
-#cfl_max() = 5.5 # Standalone PERRK4 13
-
-cfl_max() = 1.0 # R-RK44
-cfl_max() = 1.4 # R-TS64
-#cfl_max() = 1.8 # R-CKL54
-
-### Ramp-Up CFL ###
-#t_ramp_up() = 4.40 # PER(R)K4 4 13, 8, 6, 5 
-
-#t_ramp_up() = 5.00 # Standalone PERRK4 13
-
-#t_ramp_up() = 1.0 # R-RK44
-t_ramp_up() = 3.0 # R-TS64
-#t_ramp_up() = 3.0 # R-CKL54
-
-### Split schemes ###
-#=
-cfl_0() = 1.0
-
-# PERKS 4 without quadratic scaling for viscous part partitioning
-# => Roughly 400 sec on 8 threads
-cfl_max() = 4.1
-
-t_ramp_up() = 5.0
-=#
-
-cfl(t) = min(cfl_max(), cfl_0() + t/t_ramp_up() * (cfl_max() - cfl_0()))
-
+cfl = 2.2
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
-
-#=
-magnetic_magnitude(u, equations) = norm(magnetic_field(u, equations))
-amr_indicator = IndicatorLöhner(semi, variable = magnetic_magnitude)
-
-amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level = 0,
-                                      med_level = 1, med_threshold = 0.1,
-                                      max_level = 2, max_threshold = 0.2)
-
-amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 40)
-=#
 
 save_restart = SaveRestartCallback(interval = 1_000_000, # Only at end
                                    save_final_restart = true)
@@ -310,74 +216,9 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
                         glm_speed_callback,
-                        #amr_callback,
                         stepsize_callback,
-                        #save_restart, # For finding max CFL
                         save_solution
                         )
 
 ###############################################################################
 # run the simulation
-
-base_path = "/home/daniel/git/Paper_PERRK/Data/Cylinder_VortexStreet/VRMHD/"
-relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 4, root_tol = 1e-13, gamma_tol = 1e-12)
-
-
-# p = 4
-path = base_path * "p4/"
-
-#=
-dtRatios = [0.0771545666269958, # 13
-            0.0362618269398808, #  8
-            0.0154481055215001, #  6
-            0.00702102510258555] / 0.0771545666269958 # 5
-Stages = [13, 8, 6, 5]
-=#
-
-dtRatios = [0.0771545666269958, # 13
-            0.0362618269398808, #  8
-            0.0257803434506059, #  7
-            0.0154481055215001, #  6
-            0.00702102510258555] / 0.0771545666269958 # 5
-Stages = [13, 8, 7, 6, 5]
-
-#ode_algorithm = Trixi.PairedExplicitRK4Multi(Stages, path, dtRatios)
-#ode_algorithm = Trixi.PairedExplicitRK4(Stages[1], path)
-
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4Multi(Stages, path, dtRatios; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.PairedExplicitRelaxationRK4(Stages[1], path; relaxation_solver = relaxation_solver)
-
-
-#ode_algorithm = Trixi.RelaxationRK44(; relaxation_solver = relaxation_solver)
-ode_algorithm = Trixi.RelaxationTS64(; relaxation_solver = relaxation_solver)
-#ode_algorithm = Trixi.RelaxationCKL54(; relaxation_solver = relaxation_solver)
-
-### Split schemes ###
-
-#=
-Stages_para = [10, 8, 6, 5]
-dtRatios_para = [312.83020308753, # 10
-    152.879047415621, #  8
-    61.6046703927691, #  6
-    27.9645800405075] / 312.83020308753 #= 5 =#
-
-path_coeffs_para = "/home/daniel/git/Paper_Split_IMEX_PERK/Data/SD7003/coeffs_p4/para_rhs/"
-
-ode_algorithm = Trixi.PairedExplicitRK4SplitMulti(Stages, Stages_para,
-                                                  path, path_coeffs_para,
-                                                  dtRatios, dtRatios_para)
-=#
-
-sol = Trixi.solve(ode, ode_algorithm,
-                  dt = 42.0,
-                  save_everystep = false, callback = callbacks);
-
-#=
-using Plots
-pd = PlotData2D(sol);
-
-plot(getmesh(pd), xlabel = "\$x\$", ylabel = "\$y \$")
-
-# For level distribution
-Trixi2Vtk.trixi2vtk(semi.cache, dtRatios, Stages, "out/solution_000000001.h5")
-=#
