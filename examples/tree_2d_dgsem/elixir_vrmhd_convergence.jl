@@ -48,7 +48,7 @@ function source_terms_convergence(u, x, t, equations)
     s_8 = 0.0
     s_9 = 0.0
 
-    return -SVector(s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8, s_9)
+    return SVector(s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8, s_9)
 end
 
 surface_flux = (flux_hll, flux_nonconservative_powell)
@@ -77,8 +77,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-# Create ODE problem with time span `tspan`
-tspan = (0.0, 0.0)
+tspan = (0.0, 1.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()

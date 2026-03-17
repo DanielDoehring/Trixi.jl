@@ -81,6 +81,11 @@ function ViscoResistiveMhdDiffusion2D(equations::IdealGlmMhdEquations2D;
                                                     equations, gradient_variables)
 end
 
+function varnames(variable_mapping,
+                  equations_parabolic::ViscoResistiveMhdDiffusion2D)
+    varnames(variable_mapping, equations_parabolic.equations_hyperbolic)
+end
+
 # Explicit formulas for the diffusive MHD fluxes are available, e.g., in Section 2
 # of the paper by Rueda-Ramírez, Hennemann, Hindenlang, Winters, and Gassner
 # "An Entropy Stable Nodal Discontinuous Galerkin Method for the resistive
@@ -164,11 +169,19 @@ function flux(u, gradients, orientation::Integer,
     end
 end
 
-function cons2entropy(u, equations::ViscoResistiveMhdDiffusion2D)
-  cons2entropy(u, equations.equations_hyperbolic)
-end
-function entropy2cons(w, equations::ViscoResistiveMhdDiffusion2D)
-  entropy2cons(w, equations.equations_hyperbolic)
+# Convert conservative variables to primitive
+@inline function cons2prim(u, equations::ViscoResistiveMhdDiffusion2D)
+    rho, rho_v1, rho_v2, rho_v3, rho_e, B1, B2, B3, psi = u
+
+    v1 = rho_v1 / rho
+    v2 = rho_v2 / rho
+    v3 = rho_v3 / rho
+    p = (equations.gamma - 1) * (rho_e -
+         0.5f0 * (rho_v1 * v1 + rho_v2 * v2 + rho_v3 * v3
+          + B1 * B1 + B2 * B2 + B3 * B3
+          + psi * psi))
+
+    return SVector(rho, v1, v2, v3, p, B1, B2, B3, psi)
 end
 
 # the `flux` function takes in transformed variables `u` which depend on the type of the gradient variables.
@@ -193,4 +206,60 @@ end
 @inline function energy_magnetic_mhd(cons, ::ViscoResistiveMhdDiffusion2D)
     return 0.5 * (cons[6]^2 + cons[7]^2 + cons[8]^2)
 end
+
+@inline function prim2cons(u, equations::ViscoResistiveMhdDiffusion2D)
+    prim2cons(u, equations.equations_hyperbolic)
+end
+
+#=
+@inline function (boundary_condition::BoundaryConditionVRMHDWall{<:NoSlip,
+                                                                 <:Adiabatic,
+                                                                 <:Isomagnetic})(flux_inner,
+                                                                                 u_inner,
+                                                                                 normal::AbstractVector,
+                                                                                 x,
+                                                                                 t,
+                                                                                 operator_type::Gradient,
+                                                                                 equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
+    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
+                                                                                        t,
+                                                                                        equations)
+    B1, B2, B3 = boundary_condition.boundary_condition_magnetic.boundary_value_function(x,
+                                                                                        t,
+                                                                                        equations)
+    return SVector(u_inner[1], v1, v2, v3, u_inner[5], B1, B2, B3, u_inner[9])
+end
+
+@inline function (boundary_condition::BoundaryConditionVRMHDWall{<:NoSlip,
+                                                                 <:Adiabatic,
+                                                                 <:Isomagnetic})(flux_inner,
+                                                                                 u_inner,
+                                                                                 normal::AbstractVector,
+                                                                                 x,
+                                                                                 t,
+                                                                                 operator_type::Divergence,
+                                                                                 equations::ViscoResistiveMhdDiffusion2D{GradientVariablesPrimitive})
+    normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x,
+                                                                                                           t,
+                                                                                                           equations)
+    v1, v2, v3 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
+                                                                                        t,
+                                                                                        equations)
+
+    B1, B2, B3 = boundary_condition.boundary_condition_magnetic.boundary_value_function(x,
+                                                                                        t,
+                                                                                        equations)
+
+    _, tau_1n, tau_2n, tau_3n, _, Bvisc_1n, Bvisc_2n, Bvisc_3n = flux_inner # extract fluxes for 2nd and 3rd equations
+
+    # This is the Navier-Stokes part
+    normal_energy_flux = (v1 * tau_1n + v2 * tau_2n + v3 * tau_3n + normal_heat_flux +
+                          # This is the MHD part
+                          B1 * Bvisc_1n + B2 * Bvisc_2n + B3 * Bvisc_3n)
+
+    return SVector(flux_inner[1], flux_inner[2], flux_inner[3], flux_inner[4],
+                   normal_energy_flux, flux_inner[6], flux_inner[7], flux_inner[8],
+                   flux_inner[9])
+end
+=#
 end # @muladd
