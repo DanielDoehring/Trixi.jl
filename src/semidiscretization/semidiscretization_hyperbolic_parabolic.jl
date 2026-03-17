@@ -11,7 +11,7 @@
 A struct containing everything needed to describe a spatial semidiscretization
 of a mixed hyperbolic-parabolic conservation law.
 """
-struct SemidiscretizationHyperbolicParabolic{Mesh, Equations, EquationsParabolic,
+mutable struct SemidiscretizationHyperbolicParabolic{Mesh, Equations, EquationsParabolic,
                                              InitialCondition,
                                              BoundaryConditions,
                                              BoundaryConditionsParabolic,
@@ -26,16 +26,16 @@ struct SemidiscretizationHyperbolicParabolic{Mesh, Equations, EquationsParabolic
 
     # This guy is a bit messy since we abuse it as some kind of "exact solution"
     # although this doesn't really exist...
-    initial_condition::InitialCondition
+    const initial_condition::InitialCondition
 
-    boundary_conditions::BoundaryConditions
-    boundary_conditions_parabolic::BoundaryConditionsParabolic
+    const boundary_conditions::BoundaryConditions
+    const boundary_conditions_parabolic::BoundaryConditionsParabolic
 
-    source_terms::SourceTerms
-    source_terms_parabolic::SourceTermsParabolic
+    const source_terms::SourceTerms
+    const source_terms_parabolic::SourceTermsParabolic
 
-    solver::Solver
-    solver_parabolic::SolverParabolic
+    const solver::Solver
+    const solver_parabolic::SolverParabolic
 
     cache::Cache
     cache_parabolic::CacheParabolic
