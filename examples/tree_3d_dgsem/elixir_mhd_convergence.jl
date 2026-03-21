@@ -2,22 +2,14 @@ using Trixi
 using OrdinaryDiffEqLowStorageRK
 
 ###############################################################################
-# Semidiscretization of the compressible Euler equations
+# semidiscretization of the compressible ideal GLM-MHD equations
 
 # Fluid parameters
 gamma() = 2.0
-prandtl_number() = 0.72
-
-mu() = 5e-3
-eta() = 5e-3
-
-equations = IdealGlmMhdEquations2D(gamma())
-equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
-                                                   Prandtl = prandtl_number(),
-                                                   eta = eta())
+equations = IdealGlmMhdEquations3D(gamma())
 
 @inline function initial_condition_convergence(x, t, equations)
-    h = 0.5 * sinpi(2 * (x[1] + x[2] - t)) + 2
+    h = 0.5 * sinpi(2 * (x[1] + x[2] + x[3] - t)) + 2
 
     u_1 = h
     u_2 = h
@@ -34,9 +26,9 @@ equations_parabolic = ViscoResistiveMhdDiffusion2D(equations, mu = mu(),
 end
 
 function source_terms_convergence(u, x, t, equations)
-    h = 0.5 * sinpi(2 * (x[1] + x[2] - t)) + 2
-    h_x = pi * cospi(2 * (x[1] + x[2] - t))
-    h_xx = -2 * pi^2 * sinpi(2 * (x[1] + x[2] - t))
+    h = 0.5 * sinpi(2 * (x[1] + x[2] + x[3]- t)) + 2
+    h_x = pi * cospi(2 * (x[1] + x[2] +x[3] - t))
+    h_xx = -2 * pi^2 * sinpi(2 * (x[1] + x[2] + x[3] - t))
 
     s_1 = h_x
     s_2 = h_x + 4 * h * h_x
@@ -60,19 +52,13 @@ basis = LobattoLegendreBasis(polydeg)
 volume_integral = VolumeIntegralFluxDifferencing(volume_flux)
 solver = DGSEM(basis, surface_flux, volume_integral)
 
-coordinates_min = (0.0, 0.0)
-coordinates_max = (1.0, 1.0)
+coordinates_min = (0.0, 0.0, 0.0)
+coordinates_max = (1.0, 1.0, 1.0)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 3,
                 periodicity = true,
                 n_cells_max = 30_000)
-
-semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                             initial_condition_convergence, solver;
-                                             source_terms = source_terms_convergence,
-                                             boundary_conditions = (boundary_condition_periodic,
-                                                                    boundary_condition_periodic))
 
 semi = SemidiscretizationHyperbolic(mesh, equations,
                                     initial_condition_convergence, solver;
@@ -92,7 +78,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-cfl = 0.1
+cfl = 1.8
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
