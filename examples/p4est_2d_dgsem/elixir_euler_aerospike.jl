@@ -47,19 +47,25 @@ bc_nozzle_inlet_bottom = BoundaryConditionDirichlet(state_thruster_nozzle_inlet_
 volume_flux = flux_ranocha_turbo
 surface_flux = flux_lax_friedrichs
 
-polydeg = 3
+polydeg = 4
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
-                                            alpha_max = 1.0,
+                                            alpha_max = 0.5,
                                             alpha_min = 0.001,
                                             alpha_smooth = true,
                                             variable = density_pressure)
 # In non-blended/limited regions, we use the cheaper weak form volume integral
 volume_integral_default = VolumeIntegralWeakForm()
+#volume_integral_default = VolumeIntegralFluxDifferencing(volume_flux)
 
 # For the blended/limited regions, we need to supply high-order and low-order volume integrals.
 volume_integral_blend_high_order = VolumeIntegralFluxDifferencing(volume_flux)
 volume_integral_blend_low_order = VolumeIntegralPureLGLFiniteVolume(flux_hllc)
+
+volume_integral_blend_low_order = VolumeIntegralPureLGLFiniteVolumeO2(basis;
+                                                                      volume_flux_fv = flux_hllc,
+                                                                      reconstruction_mode = reconstruction_O2_inner,
+                                                                      slope_limiter = minmod)
 
 volume_integral = VolumeIntegralShockCapturingHGType(shock_indicator;
                                                      volume_integral_default = volume_integral_default,
@@ -69,8 +75,7 @@ volume_integral = VolumeIntegralShockCapturingHGType(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-# Get the unstructured quad mesh from a file (downloads the file if not available locally)
-mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/Aerospike/out/nozzle.inp"
+mesh_file = "/storage/home/daniel/Meshes/Aerospike/out/nozzle.inp"
 
 mesh = P4estMesh{2}(mesh_file)
 
@@ -127,18 +132,30 @@ boundary_conditions = (; NozzleWallTop = boundary_condition_slip_wall,
                        Top_R = bc_right_top,
                        Left_R = bc_ambient)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, state_ambient, solver;
+function initial_condition(x, t, equations::CompressibleEulerEquations2D)
+    if x[1] > 0.1
+        return state_ambient(x, t, equations)
+    else
+        if x[2] > 0.0
+            return state_thruster_nozzle_inlet_top(x, t, equations)
+        else
+            return state_thruster_nozzle_inlet_bottom(x, t, equations)
+        end
+    end
+end
+
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_conditions)
 
 ###############################################################################
 # ODE solvers
 
-tspan = (0.0, 100.0)
+tspan = (0.0, 25.0)
 dt0 = 1e-4
 ode = semidiscretize(semi, tspan)
 
-
-restart_file = "out/restart_000001000.h5"
+#=
+restart_file = "out/restart_000027000.h5"
 
 mesh = load_mesh(restart_file)
 
@@ -148,7 +165,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, state_ambient, solver;
 tspan = (load_time(restart_file), 100.0)
 dt0 = load_dt(restart_file)
 ode = semidiscretize(semi, tspan, restart_file)
-
+=#
 
 # Callbacks
 
@@ -164,12 +181,13 @@ save_solution = SaveSolutionCallback(interval = 1000,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-amr_indicator = IndicatorLöhner(semi, variable = Trixi.density)
+#amr_indicator = IndicatorLöhner(semi, variable = Trixi.density_pressure)
+amr_indicator = shock_indicator
 
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 0,
                                       med_level = 2, med_threshold = 0.05,
-                                      max_level = 4, max_threshold = 0.1)
+                                      max_level = 3, max_threshold = 0.1)
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 20,
@@ -177,22 +195,27 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 save_restart = SaveRestartCallback(interval = 1000)
 
+stepsize_callback = StepsizeCallback(cfl = 3.5)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution, save_restart,
-                        amr_callback)
+                        amr_callback,
+                        #stepsize_callback
+                        )
 
 ###############################################################################
 # run the simulation
 
-
-stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds = (5.0e-6, 5.0e-6),
+#=
+stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds = (1.0e-4, 1.0e-4),
                                                      variables = (Trixi.density, pressure))
 ode_alg = SSPRK43(stage_limiter! = stage_limiter!, thread = Trixi.True())
+=#
 
-
-#ode_alg = SSPRK43(thread = Trixi.True())
+ode_alg = SSPRK43(thread = Trixi.True())
 
 sol = solve(ode, ode_alg;
-            adaptive = true, dt = dt0, abstol = 1e-5,
+            #adaptive = false, dt = dt0, #abstol = 1e-5,
+            adaptive = true, dt = dt0,
             ode_default_options()..., callback = callbacks);
