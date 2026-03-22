@@ -56,11 +56,9 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             variable = density_pressure)
 # In non-blended/limited regions, we use the cheaper weak form volume integral
 volume_integral_default = VolumeIntegralWeakForm()
-#volume_integral_default = VolumeIntegralFluxDifferencing(volume_flux)
 
 # For the blended/limited regions, we need to supply high-order and low-order volume integrals.
 volume_integral_blend_high_order = VolumeIntegralFluxDifferencing(volume_flux)
-volume_integral_blend_low_order = VolumeIntegralPureLGLFiniteVolume(flux_hllc)
 
 volume_integral_blend_low_order = VolumeIntegralPureLGLFiniteVolumeO2(basis;
                                                                       volume_flux_fv = flux_hllc,
@@ -80,17 +78,23 @@ mesh_file = "/storage/home/daniel/Meshes/Aerospike/out/Aerospike.inp"
 
 mesh = P4estMesh{2}(mesh_file)
 
+# Calculate the boundary flux from the inner state while
+# using the pressure from the ambient state when the flow is subsonic.
+#
+# See the reference below for a discussion on inflow/outflow boundary conditions. The subsonic
+# outflow boundary conditions are discussed in Section 2.3.
+#
+# - Jan-Reneé Carlson (2011)
+#   Inflow/Outflow Boundary Conditions with Application to FUN3D.
+#   [NASA TM 20110022658](https://ntrs.nasa.gov/citations/20110022658)
 @inline function boundary_condition_outflow_general(u_inner,
                                                     normal_direction::AbstractVector, x, t,
                                                     surface_flux_function,
                                                     equations::CompressibleEulerEquations2D)
-
-    # This would be for the general case where we need to check the magnitude of the local Mach number
     norm_ = norm(normal_direction)
-    # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
     normal = normal_direction / norm_
 
-    # Rotate the internal solution state
+    # Rotate the internal solution state to have normal and tangential components
     u_local = Trixi.rotate_to_x(u_inner, normal, equations)
 
     # Compute the primitive variables
@@ -111,8 +115,6 @@ mesh = P4estMesh{2}(mesh_file)
     # Compute the flux using the appropriate mixture of internal / external solution states
     return flux(u_surface, normal_direction, equations)
 end
-
-#bc_right_top = boundary_condition_do_nothing
 bc_right_top = boundary_condition_outflow_general
 
 boundary_conditions = (; NozzleWallTop = boundary_condition_slip_wall,
@@ -123,7 +125,7 @@ boundary_conditions = (; NozzleWallTop = boundary_condition_slip_wall,
                        Right = bc_right_top,
                        Top = bc_right_top,
                        Left = bc_ambient,
-                       # Symmetry boundaries
+                       # Boundaries on flipped/symmetric part
                        NozzleWallTop_R = boundary_condition_slip_wall,
                        Inlet_R = bc_nozzle_inlet_bottom,
                        NozzleWallBottom_R = boundary_condition_slip_wall,
@@ -133,13 +135,14 @@ boundary_conditions = (; NozzleWallTop = boundary_condition_slip_wall,
                        Top_R = bc_right_top,
                        Left_R = bc_ambient)
 
+# Initialize nozzles already with the inlet state, rest of the domain with ambient state.
 function initial_condition(x, t, equations::CompressibleEulerEquations2D)
-    if x[1] > 0.1
+    if x[1] > 0.1 # Outside nozzles
         return state_ambient(x, t, equations)
-    else
-        if x[2] > 0.0
+    else # Inside nozzles
+        if x[2] > 0.0 # Top nozzle
             return state_thruster_nozzle_inlet_top(x, t, equations)
-        else
+        else # Bottom nozzle
             return state_thruster_nozzle_inlet_bottom(x, t, equations)
         end
     end
@@ -149,24 +152,9 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_conditions)
 
 ###############################################################################
-# ODE solvers
 
 tspan = (0.0, 25.0)
-dt0 = 1e-4
 ode = semidiscretize(semi, tspan)
-
-#=
-restart_file = "out/restart_000027000.h5"
-
-mesh = load_mesh(restart_file)
-
-semi = SemidiscretizationHyperbolic(mesh, equations, state_ambient, solver;
-                                    boundary_conditions = boundary_conditions)
-
-tspan = (load_time(restart_file), 100.0)
-dt0 = load_dt(restart_file)
-ode = semidiscretize(semi, tspan, restart_file)
-=#
 
 # Callbacks
 
@@ -182,41 +170,26 @@ save_solution = SaveSolutionCallback(interval = 1000,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-#amr_indicator = IndicatorLöhner(semi, variable = Trixi.density_pressure)
 amr_indicator = shock_indicator
-
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 0,
                                       med_level = 2, med_threshold = 0.1,
                                       max_level = 3, max_threshold = 0.2)
-
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 20,
                            adapt_initial_condition = false)
 
 save_restart = SaveRestartCallback(interval = 1000)
 
-stepsize_callback = StepsizeCallback(cfl = 3.5)
-
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution, save_restart,
-                        amr_callback,
-                        #stepsize_callback
-                        )
+                        amr_callback)
 
 ###############################################################################
 # run the simulation
 
-#=
-stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds = (1.0e-4, 1.0e-4),
-                                                     variables = (Trixi.density, pressure))
-ode_alg = SSPRK43(stage_limiter! = stage_limiter!, thread = Trixi.True())
-=#
-
 ode_alg = SSPRK43(thread = Trixi.True())
-
 sol = solve(ode, ode_alg;
-            #adaptive = false, dt = dt0, #abstol = 1e-5,
-            adaptive = true, dt = dt0,
+            adaptive = true, dt = 1e-4,
             ode_default_options()..., callback = callbacks);
