@@ -47,7 +47,7 @@ bc_nozzle_inlet_bottom = BoundaryConditionDirichlet(state_thruster_nozzle_inlet_
 volume_flux = flux_ranocha_turbo
 surface_flux = flux_lax_friedrichs
 
-polydeg = 4
+polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 0.5,
@@ -75,7 +75,8 @@ volume_integral = VolumeIntegralShockCapturingHGType(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-mesh_file = "/storage/home/daniel/Meshes/Aerospike/out/nozzle.inp"
+mesh_file = "/storage/home/daniel/Meshes/Aerospike/out/Aerospike.inp"
+#mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/Aerospike/out/Aerospike.inp"
 
 mesh = P4estMesh{2}(mesh_file)
 
@@ -186,8 +187,8 @@ amr_indicator = shock_indicator
 
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 0,
-                                      med_level = 2, med_threshold = 0.05,
-                                      max_level = 3, max_threshold = 0.1)
+                                      med_level = 2, med_threshold = 0.1,
+                                      max_level = 3, max_threshold = 0.2)
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 20,
