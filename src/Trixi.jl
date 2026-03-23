@@ -190,7 +190,7 @@ export LaplaceDiffusion1D, LaplaceDiffusion2D, LaplaceDiffusion3D,
        LaplaceDiffusionEntropyVariables3D,
        CompressibleNavierStokesDiffusion1D, CompressibleNavierStokesDiffusion2D,
        CompressibleNavierStokesDiffusion3D,
-       ViscoResistiveMhdDiffusion2D
+       ViscoResistiveMhdDiffusion3D
 
 export GradientVariablesConservative, GradientVariablesPrimitive, GradientVariablesEntropy
 

@@ -57,7 +57,7 @@ where ``\underline{I}`` is the ``2\times 2`` identity matrix and the heat flux i
 ```math
 \mathbf{q} = -\kappa\nabla\left(T\right),\quad T = \frac{p}{R\rho}
 ```
-where ``T`` is the temperature and ``\kappa`` is the thermal conductivity for Fick's law.
+where ``T`` is the temperature and ``\kappa`` is the thermal conductivity for Fourier's law.
 Under the assumption that the gas has a constant Prandtl number,
 the thermal conductivity is
 ```math
@@ -95,7 +95,7 @@ struct CompressibleNavierStokesDiffusion2D{GradientVariables, RealT <: Real, Mu,
 
     mu::Mu                     # viscosity
     Pr::RealT                  # Prandtl number
-    kappa::RealT               # thermal diffusivity for Fick's law
+    kappa::RealT               # thermal diffusivity for Fourier's law
     max_4over3_kappa::RealT    # max(4/3, kappa) used for diffusive CFL => `max_diffusivity`
 
     equations_hyperbolic::E    # CompressibleEulerEquations2D
@@ -170,7 +170,7 @@ function flux(u, gradients, orientation::Integer,
     # (4/3 * (v2)_y - 2/3 * (v1)_x)
     tau_22 = (4 * dv2dy - 2 * dv1dx) / 3
 
-    # Fick's law q = -kappa * grad(T) = -kappa * grad(p / (R rho))
+    # for Fourier's law q = -kappa * grad(T) = -kappa * grad(p / (R rho))
     # with thermal diffusivity constant kappa = gamma μ R / ((gamma-1) Pr)
     # Note, the gas constant cancels under this formulation, so it is not present
     # in the implementation

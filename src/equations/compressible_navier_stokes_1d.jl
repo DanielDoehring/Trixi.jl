@@ -57,7 +57,7 @@ where the heat flux is
 ```math
 q = -\kappa \frac{\partial}{\partial x} \left(T\right),\quad T = \frac{p}{R\rho}
 ```
-where ``T`` is the temperature and ``\kappa`` is the thermal conductivity for Fick's law.
+where ``T`` is the temperature and ``\kappa`` is the thermal conductivity for Fourier's law.
 Under the assumption that the gas has a constant Prandtl number,
 the thermal conductivity is
 ```math
@@ -95,7 +95,7 @@ struct CompressibleNavierStokesDiffusion1D{GradientVariables, RealT <: Real, Mu,
 
     mu::Mu                     # viscosity
     Pr::RealT                  # Prandtl number
-    kappa::RealT               # thermal diffusivity for Fick's law
+    kappa::RealT               # thermal diffusivity for Fourier's law
     max_1_kappa::RealT         # max(1, kappa) used for diffusive CFL => `max_diffusivity`
 
     equations_hyperbolic::E    # CompressibleEulerEquations1D
@@ -163,7 +163,7 @@ function flux(u, gradients, orientation::Integer,
     # Viscous stress (tensor)
     tau_11 = dv1dx
 
-    # Fick's law q = -kappa * grad(T) = -kappa * grad(p / (R rho))
+    # for Fourier's law q = -kappa * grad(T) = -kappa * grad(p / (R rho))
     # with thermal diffusivity constant kappa = gamma μ R / ((gamma-1) Pr)
     # Note, the gas constant cancels under this formulation, so it is not present
     # in the implementation
