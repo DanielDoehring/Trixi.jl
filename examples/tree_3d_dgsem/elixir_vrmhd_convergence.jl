@@ -7,8 +7,17 @@ using OrdinaryDiffEqLowStorageRK
 gamma() = 2.0 # required to make solution below working!
 equations = IdealGlmMhdEquations3D(gamma())
 
+mu() = 1e-3
+Pr() = 0.72
+eta() = 1e-3
+equations_parabolic = ViscoResistiveMhdDiffusion3D(equations,
+                                                   mu = mu(), Prandtl = Pr(),
+                                                   eta = eta())
+
 """
-    initial_condition_convergence(x, t, equations::IdealGlmMhdEquations3D)
+    initial_condition_convergence(x, t,
+                                  equations::Union{IdealGlmMhdEquations3D,
+                                                   ViscoResistiveMhdDiffusion3D})
 
 Manufactured solution for the 3D(only!) compressible ideal GLM-MHD equations.
 Proposed in 
@@ -17,7 +26,9 @@ Proposed in
   Part I: Theory and numerical verification
   [10.1016/j.jcp.2018.06.027](https://doi.org/10.1016/j.jcp.2018.06.027)
 """
-@inline function initial_condition_convergence(x, t, equations::IdealGlmMhdEquations3D)
+@inline function initial_condition_convergence(x, t,
+                                               equations::Union{IdealGlmMhdEquations3D,
+                                                                ViscoResistiveMhdDiffusion3D})
     h = 0.5f0 * sinpi(2 * (x[1] + x[2] + x[3] - t)) + 2
 
     u_1 = h
@@ -34,16 +45,30 @@ Proposed in
     return SVector(u_1, u_2, u_3, u_4, u_5, u_6, u_7, u_8, u_9)
 end
 
-function source_terms_convergence(u, x, t, equations)
-    h = 0.5f0 * sinpi(2 * (x[1] + x[2] + x[3]- t)) + 2
-    h_x = pi * cospi(2 * (x[1] + x[2] +x[3] - t))
+"""
+    source_terms_convergence(u, x, t,
+                             equations::Union{IdealGlmMhdEquations3D,
+                                              ViscoResistiveMhdDiffusion3D})
+
+Manufactured solution for the 3D(only!) compressible ideal GLM-MHD equations.
+Proposed in 
+- Marvin Bohm, Andrew R Winters, Gregor J Gassner, Dominik Derigs, Florian Hindenlang, Joachim Saur (2020):
+  An entropy stable nodal discontinuous Galerkin method for the resistive MHD equations.
+  Part I: Theory and numerical verification
+  [10.1016/j.jcp.2018.06.027](https://doi.org/10.1016/j.jcp.2018.06.027)
+"""
+function source_terms_convergence(u, x, t,
+                                  equations::Union{IdealGlmMhdEquations3D,
+                                                   ViscoResistiveMhdDiffusion3D})
+    h = 0.5f0 * sinpi(2 * (x[1] + x[2] + x[3] - t)) + 2
+    h_x = pi * cospi(2 * (x[1] + x[2] + x[3] - t))
     h_xx = -2 * pi^2 * sinpi(2 * (x[1] + x[2] + x[3] - t))
 
     s_1 = h_x
     s_2 = h_x + 4 * h * h_x
     s_3 = h_x + 4 * h * h_x
     s_4 = 4 * h * h_x
-    s_5 = h_x + 12 * h * h_x - 6 * (eta() * (h_x^2 + h * h_xx) + mu() * h_xx / prandtl_number())
+    s_5 = h_x + 12 * h * h_x - 6 * (eta() * (h_x^2 + h * h_xx) + mu() * h_xx / Pr())
     s_6 = h_x - 3 * eta() * h_xx
     s_7 = -h_x + 3 * eta() * h_xx
     s_8 = 0
@@ -69,10 +94,11 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 periodicity = true,
                 n_cells_max = 100_000)
 
-semi = SemidiscretizationHyperbolic(mesh, equations,
-                                    initial_condition_convergence, solver;
-                                    source_terms = source_terms_convergence,
-                                    boundary_conditions = boundary_condition_periodic)
+semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
+                                             initial_condition_convergence, solver;
+                                             source_terms = source_terms_convergence,
+                                             boundary_conditions = (boundary_condition_periodic,
+                                                                    boundary_condition_periodic))
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -82,12 +108,12 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 50
+analysis_interval = 500
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-cfl = 1.8
+cfl = 1.0
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)

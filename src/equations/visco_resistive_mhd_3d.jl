@@ -7,7 +7,7 @@
 
 @doc raw"""
     ViscoResistiveMhdDiffusion3D(equations::IdealGlmMhdEquations3D;
-                                 mu, Pr, eta,
+                                 mu, Prandtl, eta,
                                  gradient_variables = GradientVariablesPrimitive())
 
 Compressible, viscous and resistive MHD equations, which extend the [`IdealGlmMhdEquations3D`](@ref)
@@ -15,7 +15,7 @@ by adding viscosity, heat conduction, and magnetic diffusion/resistivity.
 
 - `equations`: instance of the ideal GLM-MHD equations, used to compute the hyperbolic fluxes
 - `mu`: dynamic viscosity,
-- `Pr`: Prandtl number,
+- `Prandtl`: Prandtl number,
 - `eta`: magnetic diffusion (resistivity)
 - `gradient_variables`: which variables the gradients are taken with respect to.
 Defaults to `GradientVariablesPrimitive()`.
@@ -46,12 +46,13 @@ For more details see e.g. arXiv:2012.12040.
 struct ViscoResistiveMhdDiffusion3D{GradientVariables, RealT <: Real, Mu,
                                     E <: AbstractIdealGlmMhdEquations{3}} <:
        AbstractViscoResistiveMhdDiffusion{3, 9, GradientVariables}
-    gamma::RealT               # ratio of specific heats
-    inv_gamma_minus_one::RealT # = inv(gamma - 1); can be used to write slow divisions as fast multiplications
+    # TODO: parabolic
+    # Add NGRADS as a type parameter here and in AbstractEquationsParabolic, add `ngradients(...)` accessor function
     mu::Mu                     # viscosity of the fluid
     Pr::RealT                  # Prandtl number
     eta::RealT                 # magnetic diffusion
     kappa::RealT               # thermal diffusivity for Fourier's law
+
     equations_hyperbolic::E    # IdealGlmMhdEquations3D
     gradient_variables::GradientVariables # GradientVariablesPrimitive or GradientVariablesEntropy
 end
@@ -60,8 +61,7 @@ end
 function ViscoResistiveMhdDiffusion3D(equations::IdealGlmMhdEquations3D;
                                       mu, Prandtl, eta,
                                       gradient_variables = GradientVariablesPrimitive())
-    gamma = equations.gamma
-    inv_gamma_minus_one = equations.inv_gamma_minus_one
+    @unpack gamma, inv_gamma_minus_one = equations
 
     # Under the assumption of constant Prandtl number the thermal conductivity
     # constant is kappa = gamma μ / ((gamma-1) Prandtl).
@@ -69,10 +69,10 @@ function ViscoResistiveMhdDiffusion3D(equations::IdealGlmMhdEquations3D;
     # This avoids recomputation of kappa for non-constant μ.
     kappa = gamma * inv_gamma_minus_one / Prandtl
 
-    ViscoResistiveMhdDiffusion3D{typeof(gradient_variables), typeof(gamma),
+    ViscoResistiveMhdDiffusion3D{typeof(gradient_variables),
+                                 typeof(Prandtl),
                                  typeof(mu),
-                                 typeof(equations)}(gamma, inv_gamma_minus_one,
-                                                    mu, Prandtl, eta, kappa,
+                                 typeof(equations)}(mu, Prandtl, eta, kappa,
                                                     equations, gradient_variables)
 end
 
