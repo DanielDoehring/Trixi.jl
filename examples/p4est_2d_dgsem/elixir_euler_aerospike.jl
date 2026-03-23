@@ -7,10 +7,18 @@ using LinearAlgebra
 
 equations = CompressibleEulerEquations2D(1.4)
 
+###############################################################################
+
+# The setup presented here follows the Mach 2 fully expanded case presented in
+# - Zachary Pyle, Gustaaf B. Jacobs (2025)
+#   Robust Spectral Solver for High-Fidelity Investigations of Aerospike Nozzle Flow Dynamics
+#   ArXiv Preprint: https://doi.org/10.48550/arXiv.2508.10275
+
 aerospike_angle = 15 # degree
 sin_angle() = sin(deg2rad(aerospike_angle))
 cos_angle() = cos(deg2rad(aerospike_angle))
 
+# Taken from Table 1 in the reference above
 @inline function state_ambient(x, t, equations::CompressibleEulerEquations2D)
     rho_ = 1.0
     v1_ = 0.0
@@ -22,6 +30,7 @@ cos_angle() = cos(deg2rad(aerospike_angle))
 end
 bc_ambient = BoundaryConditionDirichlet(state_ambient)
 
+# Taken from Table 1 in the reference above
 function state_thruster_nozzle_inlet_top(x, t, equations::CompressibleEulerEquations2D)
     rho_ = 4.18
     v1_ = sin_angle() * 0.19
@@ -33,6 +42,7 @@ function state_thruster_nozzle_inlet_top(x, t, equations::CompressibleEulerEquat
 end
 bc_nozzle_inlet_top = BoundaryConditionDirichlet(state_thruster_nozzle_inlet_top)
 
+# Taken from Table 1 in the reference above
 function state_thruster_nozzle_inlet_bottom(x, t, equations::CompressibleEulerEquations2D)
     rho_ = 4.18
     v1_ = sin_angle() * 0.19
@@ -60,6 +70,8 @@ volume_integral_default = VolumeIntegralWeakForm()
 # For the blended/limited regions, we need to supply high-order and low-order volume integrals.
 volume_integral_blend_high_order = VolumeIntegralFluxDifferencing(volume_flux)
 
+# For the low-order volume integral, we use a second-order finite volume method
+# with HLLC surface flux (this does not need to be the standard interface flux!) and a minmod slope limiter.
 volume_integral_blend_low_order = VolumeIntegralPureLGLFiniteVolumeO2(basis;
                                                                       volume_flux_fv = flux_hllc,
                                                                       reconstruction_mode = reconstruction_O2_inner,
@@ -73,8 +85,8 @@ volume_integral = VolumeIntegralShockCapturingHGType(shock_indicator;
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
-mesh_file = "/storage/home/daniel/Meshes/Aerospike/out/Aerospike.inp"
-#mesh_file = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/Aerospike/out/Aerospike.inp"
+mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/2c3abacd7830de3c9649a7bc186b2085/raw/e67860fb9dcd952ac582bbfa1203f89c300710fc/Aerospike2D.inp",
+                           joinpath(@__DIR__, "Aerospike2D.inp"))
 
 mesh = P4estMesh{2}(mesh_file)
 
@@ -136,6 +148,7 @@ boundary_conditions = (; NozzleWallTop = boundary_condition_slip_wall,
                        Left_R = bc_ambient)
 
 # Initialize nozzles already with the inlet state, rest of the domain with ambient state.
+# Inspired by eq. (38) in reference above.
 function initial_condition(x, t, equations::CompressibleEulerEquations2D)
     if x[1] > 0.1 # Outside nozzles
         return state_ambient(x, t, equations)
@@ -153,6 +166,8 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
 
 ###############################################################################
 
+# Final time in reference above is 100.
+# Only tested up to 25.0, which already shows interesting flow features.
 tspan = (0.0, 25.0)
 ode = semidiscretize(semi, tspan)
 

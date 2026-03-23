@@ -1002,6 +1002,27 @@ end
     # (e.g., from type instabilities)
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
+
+@trixi_testset "elixir_euler_aerospike.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_aerospike.jl"),
+                        tspan=(0.0, 0.05),
+                        l2=[
+                            0.057209902051162255,
+                            0.024768705838434275,
+                            0.029755202859662187,
+                            0.06071701173839474
+                        ],
+                        linf=[
+                            2.2058066869075184,
+                            1.3659103388686802,
+                            0.8382228894134149,
+                            1.9831552002113821
+                        ])
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    @test_allocations(Trixi.rhs!, semi, sol, 1000)
+end
 end
 
 # Clean up afterwards: delete Trixi.jl output directory
