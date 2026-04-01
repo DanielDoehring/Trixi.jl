@@ -12,49 +12,6 @@ function get_element_variables!(element_variables, u, mesh, equations,
     return nothing
 end
 
-# Function to define "element variables" for the SaveSolutionCallback. It does
-# nothing by default, but can be specialized for certain mesh types. For instance,
-# parallel meshes output the mpi rank as an "element variable".
-function get_element_variables!(element_variables, mesh, dg, cache)
-    return nothing
-end
-
-### Functions to define `node variables` for the `SaveSolutionCallback`. ###
-
-# Abstract function which is to be overwritten for the specific `node_variable`
-# in e.g. the elixirs.
-function get_node_variable end
-
-# Version for (purely) hyperbolic equations.
-function get_node_variables!(node_variables, u_ode, mesh, equations,
-                             dg, cache)
-    if !isempty(node_variables)
-        u = wrap_array(u_ode, mesh, equations, dg, cache)
-        for var in keys(node_variables)
-            node_variables[var] = get_node_variable(Val(var), u, mesh, equations,
-                                                    dg, cache)
-        end
-    end
-
-    return nothing
-end
-# Version for parabolic-extended equations
-function get_node_variables!(node_variables, u_ode, mesh, equations,
-                             dg, cache,
-                             equations_parabolic, cache_parabolic)
-    if !isempty(node_variables)
-        u = wrap_array(u_ode, mesh, equations, dg, cache)
-        for var in keys(node_variables)
-            node_variables[var] = get_node_variable(Val(var), u, mesh, equations,
-                                                    dg, cache,
-                                                    equations_parabolic,
-                                                    cache_parabolic)
-        end
-    end
-
-    return nothing
-end
-
 """
     VolumeIntegralStrongForm()
 

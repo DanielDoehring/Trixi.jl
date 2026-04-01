@@ -24,10 +24,10 @@ and the second parameter is the equation struct.
 
 Additional nodal variables such as vorticity or the Mach number can be saved by passing a tuple of symbols
 to `extra_node_variables`, e.g., `extra_node_variables = (:vorticity, :mach)`.
-In that case the function `get_node_variable` must be defined for each symbol in the tuple.
+In that case the function `get_nodal_variable` must be defined for each symbol in the tuple.
 The expected signature of the function for (purely) hyperbolic equations is:
 ```julia
-function get_node_variable(::Val{symbol}, u, mesh, equations, dg, cache)
+function get_nodal_variable(::Val{symbol}, u, mesh, equations, dg, cache)
     # Implementation goes here
 end
 ```
@@ -36,7 +36,7 @@ and must return an array of dimension
 
 For parabolic-hyperbolic equations `equations_parabolic` and `cache_parabolic` must be added:
 ```julia
-function get_node_variable(::Val{symbol}, u, mesh, equations, dg, cache,
+function get_nodal_variable(::Val{symbol}, u, mesh, equations, dg, cache,
                            equations_parabolic, cache_parabolic)
     # Implementation goes here
 end
@@ -248,6 +248,49 @@ function (solution_callback::SaveSolutionCallback)(integrator)
     return nothing
 end
 
+# Function to define "element variables" for the SaveSolutionCallback. It does
+# nothing by default, but can be specialized for certain mesh types. For instance,
+# parallel meshes output the mpi rank as an "element variable".
+function get_element_variables!(element_variables, mesh, dg, cache)
+    return nothing
+end
+
+### Functions to define `node variables` for the `SaveSolutionCallback`. ###
+
+# Abstract function which is to be overwritten for the specific `node_variable`
+# in e.g. the elixirs.
+function get_nodal_variable end
+
+# Version for (purely) hyperbolic equations.
+function get_nodal_variables!(node_variables, u_ode, mesh, equations,
+                             dg, cache)
+    if !isempty(node_variables)
+        u = wrap_array(u_ode, mesh, equations, dg, cache)
+        for var in keys(node_variables)
+            node_variables[var] = get_nodal_variable(Val(var), u, mesh, equations,
+                                                    dg, cache)
+        end
+    end
+
+    return nothing
+end
+# Version for parabolic-extended equations
+function get_nodal_variables!(node_variables, u_ode, mesh, equations,
+                             dg, cache,
+                             equations_parabolic, cache_parabolic)
+    if !isempty(node_variables)
+        u = wrap_array(u_ode, mesh, equations, dg, cache)
+        for var in keys(node_variables)
+            node_variables[var] = get_nodal_variable(Val(var), u, mesh, equations,
+                                                    dg, cache,
+                                                    equations_parabolic,
+                                                    cache_parabolic)
+        end
+    end
+
+    return nothing
+end
+
 @inline function save_solution_file(semi::AbstractSemidiscretization, u_ode,
                                     solution_callback,
                                     integrator; system = "")
@@ -270,7 +313,7 @@ end
         end
     end
 
-    @trixi_timeit timer() "get node variables" get_node_variables!(solution_callback.node_variables,
+    @trixi_timeit timer() "get node variables" get_nodal_variables!(solution_callback.node_variables,
                                                                    u_ode, semi)
 
     @trixi_timeit timer() "save solution" save_solution_file(u_ode, t, dt, iter, semi,
