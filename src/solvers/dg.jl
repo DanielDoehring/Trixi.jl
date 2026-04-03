@@ -1065,6 +1065,17 @@ end
     return nothing
 end
 
+# Use this function instead of `set_node_vars!` to speed up
+# multiply-and-set-node-vars operations
+# See https://github.com/trixi-framework/Trixi.jl/pull/643
+@inline function multiply_set_node_vars!(u, factor, u_node, equations, solver::DG,
+                                         indices...)
+    for v in eachvariable(equations)
+        u[v, indices...] = factor * u_node[v]
+    end
+    return nothing
+end
+
 # Use this function instead of `add_to_node_vars` to speed up
 # multiply-and-add-to-node-vars operations
 # See https://github.com/trixi-framework/Trixi.jl/pull/643

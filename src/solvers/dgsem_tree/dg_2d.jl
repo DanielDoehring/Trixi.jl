@@ -187,8 +187,45 @@ This treatment is required to achieve, e.g., entropy-stability or well-balancedn
 See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-1765644064
 =#
 @inline function weak_form_kernel!(du, u,
-                                   element, ::Type{<:TreeMesh{2}},
-                                   have_nonconservative_terms::False, equations,
+                                   element, MeshT::Type{<:TreeMesh{2}},
+                                   have_nonconservative_terms::False,
+                                   #sym:set_not_add
+                                   set_not_add::True, equations,
+                                   dg::DGSEM, cache, alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_hat = dg.basis
+
+    # Calculate volume terms in one element
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        flux1 = flux(u_node, 1, equations)
+        for ii in eachnode(dg)
+            multiply_set_node_vars!(du, alpha * derivative_hat[ii, i], flux1,
+                                    equations, dg, ii, j, element)
+        end
+    end
+
+    # Add y-direction contributions
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        flux2 = flux(u_node, 2, equations)
+        for jj in eachnode(dg)
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], flux2,
+                                       equations, dg, i, jj, element)
+        end
+    end
+
+    return nothing
+end
+
+@inline function weak_form_kernel!(du, u,
+                                   element, MeshT::Type{<:TreeMesh{2}},
+                                   have_nonconservative_terms::False,
+                                   #sym:set_not_add
+                                   set_not_add::False, equations,
                                    dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -214,8 +251,53 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
     return nothing
 end
 
-@inline function flux_differencing_kernel!(du, u, element, ::Type{<:TreeMesh{2}},
-                                           have_nonconservative_terms::False, equations,
+@inline function flux_differencing_kernel!(du, u, element, MeshT::Type{<:TreeMesh{2}},
+                                           have_nonconservative_terms::False,
+                                           set_not_add::True, equations,
+                                           volume_flux, dg::DGSEM, cache, alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_split = dg.basis
+
+    # Calculate volume integral in one element
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        # All diagonal entries of `derivative_split` are zero. Thus, we can skip
+        # the computation of the diagonal terms. In addition, we use the symmetry
+        # of the `volume_flux` to save half of the possible two-point flux
+        # computations.
+
+        # x direction
+        for ii in (i + 1):nnodes(dg)
+            u_node_ii = get_node_vars(u, equations, dg, ii, j, element)
+            flux1 = volume_flux(u_node, u_node_ii, 1, equations)
+            multiply_set_node_vars!(du, alpha * derivative_split[i, ii], flux1,
+                                    equations, dg, i, j, element)
+            multiply_set_node_vars!(du, alpha * derivative_split[ii, i], flux1,
+                                    equations, dg, ii, j, element)
+        end
+    end
+
+    # Add y-direction contributions
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        # y direction
+        for jj in (j + 1):nnodes(dg)
+            u_node_jj = get_node_vars(u, equations, dg, i, jj, element)
+            flux2 = volume_flux(u_node, u_node_jj, 2, equations)
+            multiply_add_to_node_vars!(du, alpha * derivative_split[j, jj], flux2,
+                                       equations, dg, i, j, element)
+            multiply_add_to_node_vars!(du, alpha * derivative_split[jj, j], flux2,
+                                       equations, dg, i, jj, element)
+        end
+    end
+end
+
+@inline function flux_differencing_kernel!(du, u, element, MeshT::Type{<:TreeMesh{2}},
+                                           have_nonconservative_terms::False,
+                                           set_not_add::False, equations,
                                            volume_flux, dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -253,7 +335,77 @@ end
 end
 
 @inline function flux_differencing_kernel!(du, u, element, MeshT::Type{<:TreeMesh{2}},
-                                           have_nonconservative_terms::True, equations,
+                                           have_nonconservative_terms::True,
+                                           set_not_add::True, equations,
+                                           volume_flux, dg::DGSEM, cache, alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_split = dg.basis
+    symmetric_flux, nonconservative_flux = volume_flux
+
+    # Apply the symmetric flux as usual using set for first contributions
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        # x direction
+        for ii in (i + 1):nnodes(dg)
+            u_node_ii = get_node_vars(u, equations, dg, ii, j, element)
+            flux1 = symmetric_flux(u_node, u_node_ii, 1, equations)
+            multiply_set_node_vars!(du, alpha * derivative_split[i, ii], flux1,
+                                    equations, dg, i, j, element)
+            multiply_set_node_vars!(du, alpha * derivative_split[ii, i], flux1,
+                                    equations, dg, ii, j, element)
+        end
+    end
+
+    # Add y-direction contributions
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        # y direction
+        for jj in (j + 1):nnodes(dg)
+            u_node_jj = get_node_vars(u, equations, dg, i, jj, element)
+            flux2 = symmetric_flux(u_node, u_node_jj, 2, equations)
+            multiply_add_to_node_vars!(du, alpha * derivative_split[j, jj], flux2,
+                                       equations, dg, i, j, element)
+            multiply_add_to_node_vars!(du, alpha * derivative_split[jj, j], flux2,
+                                       equations, dg, i, jj, element)
+        end
+    end
+
+    # Calculate the remaining volume terms using the nonsymmetric generalized flux
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        # The diagonal terms are zero since the diagonal of `derivative_split`
+        # is zero. We ignore this for now.
+
+        # x direction
+        integral_contribution = zero(u_node)
+        for ii in eachnode(dg)
+            u_node_ii = get_node_vars(u, equations, dg, ii, j, element)
+            noncons_flux1 = nonconservative_flux(u_node, u_node_ii, 1, equations)
+            integral_contribution = integral_contribution +
+                                    derivative_split[i, ii] * noncons_flux1
+        end
+
+        # y direction
+        for jj in eachnode(dg)
+            u_node_jj = get_node_vars(u, equations, dg, i, jj, element)
+            noncons_flux2 = nonconservative_flux(u_node, u_node_jj, 2, equations)
+            integral_contribution = integral_contribution +
+                                    derivative_split[j, jj] * noncons_flux2
+        end
+
+        # The factor 0.5 cancels the factor 2 in the flux differencing form
+        multiply_add_to_node_vars!(du, alpha * 0.5f0, integral_contribution, equations,
+                                   dg, i, j, element)
+    end
+end
+
+@inline function flux_differencing_kernel!(du, u, element, MeshT::Type{<:TreeMesh{2}},
+                                           have_nonconservative_terms::True,
+                                           set_not_add::False, equations,
                                            volume_flux, dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -261,8 +413,8 @@ end
     symmetric_flux, nonconservative_flux = volume_flux
 
     # Apply the symmetric flux as usual
-    flux_differencing_kernel!(du, u, element, MeshT, False(), equations, symmetric_flux,
-                              dg, cache, alpha)
+    flux_differencing_kernel!(du, u, element, MeshT, False(), False(), equations,
+                              symmetric_flux, dg, cache, alpha)
 
     # Calculate the remaining volume terms using the nonsymmetric generalized flux
     for j in eachnode(dg), i in eachnode(dg)
@@ -298,7 +450,48 @@ end
                               MeshT::Type{<:Union{TreeMesh{2}, StructuredMesh{2},
                                                   UnstructuredMesh2D, P4estMesh{2},
                                                   T8codeMesh{2}}},
-                              have_nonconservative_terms, equations,
+                              have_nonconservative_terms,
+                              #sym:set_not_add
+                              set_not_add::True, equations,
+                              volume_flux_fv, dg::DGSEM, cache, element,
+                              sc_interface_coords, reconstruction_mode, slope_limiter,
+                              cons2recon, recon2cons,
+                              alpha = true)
+    @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
+    @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes
+
+    # Calculate FV two-point fluxes
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar2_L = fstar2_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    fstar2_R = fstar2_R_threaded[Threads.threadid()]
+    calcflux_fvO2!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+                   have_nonconservative_terms, equations,
+                   volume_flux_fv, dg, element, cache,
+                   sc_interface_coords, reconstruction_mode, slope_limiter,
+                   cons2recon, recon2cons)
+
+    # Calculate FV volume integral contribution with assignment (set)
+    for j in eachnode(dg), i in eachnode(dg)
+        for v in eachvariable(equations)
+            du[v, i, j, element] = (alpha *
+                                     (inverse_weights[i] *
+                                      (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
+                                      inverse_weights[j] *
+                                      (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
+        end
+    end
+
+    return nothing
+end
+
+@inline function fvO2_kernel!(du, u,
+                              MeshT::Type{<:Union{TreeMesh{2}, StructuredMesh{2},
+                                                  UnstructuredMesh2D, P4estMesh{2},
+                                                  T8codeMesh{2}}},
+                              have_nonconservative_terms,
+                              #sym:set_not_add
+                              set_not_add::False, equations,
                               volume_flux_fv, dg::DGSEM, cache, element,
                               sc_interface_coords, reconstruction_mode, slope_limiter,
                               cons2recon, recon2cons,
@@ -402,7 +595,43 @@ end
                             MeshT::Type{<:Union{TreeMesh{2}, StructuredMesh{2},
                                                 UnstructuredMesh2D, P4estMesh{2},
                                                 T8codeMesh{2}}},
-                            have_nonconservative_terms, equations,
+                            have_nonconservative_terms,
+                            #sym:set_not_add
+                            set_not_add::True, equations,
+                            volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
+    @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
+    @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes
+
+    # Calculate FV two-point fluxes
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar2_L = fstar2_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    fstar2_R = fstar2_R_threaded[Threads.threadid()]
+    calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+                 have_nonconservative_terms, equations, volume_flux_fv, dg, element,
+                 cache)
+
+    # Calculate FV volume integral contribution with assignment (set)
+    for j in eachnode(dg), i in eachnode(dg)
+        for v in eachvariable(equations)
+            du[v, i, j, element] = (alpha *
+                                     (inverse_weights[i] *
+                                      (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
+                                      inverse_weights[j] *
+                                      (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
+        end
+    end
+
+    return nothing
+end
+
+@inline function fv_kernel!(du, u,
+                            MeshT::Type{<:Union{TreeMesh{2}, StructuredMesh{2},
+                                                UnstructuredMesh2D, P4estMesh{2},
+                                                T8codeMesh{2}}},
+                            have_nonconservative_terms,
+                            #sym:set_not_add
+                            set_not_add::False, equations,
                             volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
     @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
     @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes

@@ -127,7 +127,30 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
 @inline function weak_form_kernel!(du, u,
                                    element,
                                    ::Type{<:Union{TreeMesh{1}, StructuredMesh{1}}},
-                                   have_nonconservative_terms::False, equations,
+                                   have_nonconservative_terms::False, set_not_add::True,
+                                   equations, dg::DGSEM, cache, alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_hat = dg.basis
+
+    for i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, element)
+
+        flux1 = flux(u_node, 1, equations)
+        for ii in eachnode(dg)
+            multiply_set_node_vars!(du, alpha * derivative_hat[ii, i], flux1,
+                                    equations, dg, ii, element)
+        end
+    end
+
+    return nothing
+end
+
+@inline function weak_form_kernel!(du, u,
+                                   element,
+                                   ::Type{<:Union{TreeMesh{1}, StructuredMesh{1}}},
+                                   have_nonconservative_terms::False,
+                                   set_not_add::False, equations,
                                    dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -214,7 +237,33 @@ end
 
 @inline function fv_kernel!(du, u,
                             MeshT::Type{<:Union{TreeMesh{1}, StructuredMesh{1}}},
-                            have_nonconservative_terms, equations,
+                            have_nonconservative_terms, set_not_add::True, equations,
+                            volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
+    @unpack fstar1_L_threaded, fstar1_R_threaded = cache
+    @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes
+
+    # Calculate FV two-point fluxes
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    calcflux_fv!(fstar1_L, fstar1_R, u, MeshT,
+                 have_nonconservative_terms, equations,
+                 volume_flux_fv, dg, element, cache)
+
+    # Calculate FV volume integral contribution
+    for i in eachnode(dg)
+        for v in eachvariable(equations)
+            du[v, i, element] = (alpha *
+                                 (inverse_weights[i] *
+                                  (fstar1_L[v, i + 1] - fstar1_R[v, i])))
+        end
+    end
+
+    return nothing
+end
+
+@inline function fv_kernel!(du, u,
+                            MeshT::Type{<:Union{TreeMesh{1}, StructuredMesh{1}}},
+                            have_nonconservative_terms, set_not_add::False, equations,
                             volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
     @unpack fstar1_L_threaded, fstar1_R_threaded = cache
     @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes
@@ -240,7 +289,37 @@ end
 
 @inline function fvO2_kernel!(du, u,
                               MeshT::Type{<:Union{TreeMesh{1}, StructuredMesh{1}}},
-                              nonconservative_terms, equations,
+                              nonconservative_terms, set_not_add::True, equations,
+                              volume_flux_fv, dg::DGSEM, cache, element,
+                              sc_interface_coords, reconstruction_mode, slope_limiter,
+                              cons2recon, recon2cons,
+                              alpha = true)
+    @unpack fstar1_L_threaded, fstar1_R_threaded = cache
+    @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes
+
+    # Calculate FV two-point fluxes
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    calcflux_fvO2!(fstar1_L, fstar1_R, u, MeshT, nonconservative_terms, equations,
+                   volume_flux_fv, dg, element, cache,
+                   sc_interface_coords, reconstruction_mode, slope_limiter,
+                   cons2recon, recon2cons)
+
+    # Calculate FV volume integral contribution
+    for i in eachnode(dg)
+        for v in eachvariable(equations)
+            du[v, i, element] = (alpha *
+                                 (inverse_weights[i] *
+                                  (fstar1_L[v, i + 1] - fstar1_R[v, i])))
+        end
+    end
+
+    return nothing
+end
+
+@inline function fvO2_kernel!(du, u,
+                              MeshT::Type{<:Union{TreeMesh{1}, StructuredMesh{1}}},
+                              nonconservative_terms, set_not_add::False, equations,
                               volume_flux_fv, dg::DGSEM, cache, element,
                               sc_interface_coords, reconstruction_mode, slope_limiter,
                               cons2recon, recon2cons,
