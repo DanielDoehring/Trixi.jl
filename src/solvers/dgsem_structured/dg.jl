@@ -44,9 +44,6 @@ function rhs!(du, u, t,
               dg::DG, cache) where {Source}
     backend = trixi_backend(u)
 
-    # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
-
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(backend, du, u, mesh,

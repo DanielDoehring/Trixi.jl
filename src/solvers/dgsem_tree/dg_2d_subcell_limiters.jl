@@ -62,7 +62,61 @@ end
                                          MeshT::Type{<:Union{TreeMesh{2},
                                                              StructuredMesh{2},
                                                              P4estMesh{2}}},
-                                         have_nonconservative_terms, equations,
+                                         have_nonconservative_terms,
+                                         set_not_add::True, equations,
+                                         volume_integral::VolumeIntegralSubcellLimiting,
+                                         dg::DGSEM, cache)
+    @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes
+    @unpack volume_flux_dg, volume_flux_fv, limiter = volume_integral
+
+    # high-order DG fluxes
+    @unpack fhat1_L_threaded, fhat1_R_threaded, fhat2_L_threaded, fhat2_R_threaded = cache
+
+    fhat1_L = fhat1_L_threaded[Threads.threadid()]
+    fhat1_R = fhat1_R_threaded[Threads.threadid()]
+    fhat2_L = fhat2_L_threaded[Threads.threadid()]
+    fhat2_R = fhat2_R_threaded[Threads.threadid()]
+    calcflux_fhat!(fhat1_L, fhat1_R, fhat2_L, fhat2_R, u, MeshT,
+                   have_nonconservative_terms, equations, volume_flux_dg, dg, element,
+                   cache)
+
+    # low-order FV fluxes
+    @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
+
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar2_L = fstar2_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    fstar2_R = fstar2_R_threaded[Threads.threadid()]
+    calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+                 have_nonconservative_terms, equations, volume_flux_fv, dg, element,
+                 cache)
+
+    # antidiffusive flux
+    calcflux_antidiffusive!(fhat1_L, fhat1_R, fhat2_L, fhat2_R,
+                            fstar1_L, fstar1_R, fstar2_L, fstar2_R,
+                            u, MeshT, have_nonconservative_terms, equations, limiter,
+                            dg,
+                            element, cache)
+
+    # Calculate volume integral contribution of low-order FV flux
+    for j in eachnode(dg), i in eachnode(dg)
+        for v in eachvariable(equations)
+            du[v, i, j, element] = inverse_weights[i] *
+                                   (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
+                                   inverse_weights[j] *
+                                   (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])
+        end
+    end
+
+    return nothing
+end
+
+@inline function volume_integral_kernel!(du, u, element,
+                                         MeshT::Type{<:Union{TreeMesh{2},
+                                                             StructuredMesh{2},
+                                                             P4estMesh{2}}},
+                                         have_nonconservative_terms,
+                                         set_not_add::False, equations,
                                          volume_integral::VolumeIntegralSubcellLimiting,
                                          dg::DGSEM, cache)
     @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes

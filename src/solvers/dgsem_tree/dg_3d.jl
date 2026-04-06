@@ -127,9 +127,8 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
 =#
 @inline function weak_form_kernel!(du, u,
                                    element, MeshT::Type{<:TreeMesh{3}},
-                                   have_nonconservative_terms::False,
-                                   #sym:set_not_add
-                                   set_not_add::True, equations,
+                                   have_nonconservative_terms::False, set_not_add::True,
+                                   equations,
                                    dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -142,7 +141,7 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
         flux1 = flux(u_node, 1, equations)
         for ii in eachnode(dg)
             multiply_set_node_vars!(du, alpha * derivative_hat[ii, i], flux1,
-                                   equations, dg, ii, j, k, element)
+                                    equations, dg, ii, j, k, element)
         end
     end
 
@@ -174,7 +173,6 @@ end
 @inline function weak_form_kernel!(du, u,
                                    element, MeshT::Type{<:TreeMesh{3}},
                                    have_nonconservative_terms::False,
-                                   #sym:set_not_add
                                    set_not_add::False, equations,
                                    dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
@@ -488,15 +486,15 @@ end
     for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
         for v in eachvariable(equations)
             du[v, i, j, k, element] = (alpha *
-                                        (inverse_weights[i] *
-                                         (fstar1_L[v, i + 1, j, k] -
-                                          fstar1_R[v, i, j, k]) +
-                                         inverse_weights[j] *
-                                         (fstar2_L[v, i, j + 1, k] -
-                                          fstar2_R[v, i, j, k]) +
-                                         inverse_weights[k] *
-                                         (fstar3_L[v, i, j, k + 1] -
-                                          fstar3_R[v, i, j, k])))
+                                       (inverse_weights[i] *
+                                        (fstar1_L[v, i + 1, j, k] -
+                                         fstar1_R[v, i, j, k]) +
+                                        inverse_weights[j] *
+                                        (fstar2_L[v, i, j + 1, k] -
+                                         fstar2_R[v, i, j, k]) +
+                                        inverse_weights[k] *
+                                        (fstar3_L[v, i, j, k + 1] -
+                                         fstar3_R[v, i, j, k])))
         end
     end
 
@@ -578,15 +576,15 @@ end
     for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
         for v in eachvariable(equations)
             du[v, i, j, k, element] = (alpha *
-                                        (inverse_weights[i] *
-                                         (fstar1_L[v, i + 1, j, k] -
-                                          fstar1_R[v, i, j, k]) +
-                                         inverse_weights[j] *
-                                         (fstar2_L[v, i, j + 1, k] -
-                                          fstar2_R[v, i, j, k]) +
-                                         inverse_weights[k] *
-                                         (fstar3_L[v, i, j, k + 1] -
-                                          fstar3_R[v, i, j, k])))
+                                       (inverse_weights[i] *
+                                        (fstar1_L[v, i + 1, j, k] -
+                                         fstar1_R[v, i, j, k]) +
+                                        inverse_weights[j] *
+                                        (fstar2_L[v, i, j + 1, k] -
+                                         fstar2_R[v, i, j, k]) +
+                                        inverse_weights[k] *
+                                        (fstar3_L[v, i, j, k + 1] -
+                                         fstar3_R[v, i, j, k])))
         end
     end
 

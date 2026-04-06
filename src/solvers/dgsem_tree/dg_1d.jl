@@ -66,9 +66,6 @@ function rhs!(du, u, t,
               dg::DG, cache) where {Source}
     backend = trixi_backend(u)
 
-    # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
-
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
         calc_volume_integral!(backend, du, u, mesh,
@@ -172,7 +169,39 @@ end
 @inline function flux_differencing_kernel!(du, u, element,
                                            ::Type{<:Union{TreeMesh{1},
                                                           StructuredMesh{1}}},
-                                           have_nonconservative_terms::False, equations,
+                                           have_nonconservative_terms::False,
+                                           set_not_add::True, equations,
+                                           volume_flux, dg::DGSEM, cache, alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_split = dg.basis
+
+    # Calculate volume integral in one element
+    for i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, element)
+
+        # All diagonal entries of `derivative_split` are zero. Thus, we can skip
+        # the computation of the diagonal terms. In addition, we use the symmetry
+        # of the `volume_flux` to save half of the possible two-point flux
+        # computations.
+
+        # x direction
+        for ii in (i + 1):nnodes(dg)
+            u_node_ii = get_node_vars(u, equations, dg, ii, element)
+            flux1 = volume_flux(u_node, u_node_ii, 1, equations)
+            multiply_set_node_vars!(du, alpha * derivative_split[i, ii], flux1,
+                                    equations, dg, i, element)
+            multiply_set_node_vars!(du, alpha * derivative_split[ii, i], flux1,
+                                    equations, dg, ii, element)
+        end
+    end
+end
+
+@inline function flux_differencing_kernel!(du, u, element,
+                                           ::Type{<:Union{TreeMesh{1},
+                                                          StructuredMesh{1}}},
+                                           have_nonconservative_terms::False,
+                                           set_not_add::False, equations,
                                            volume_flux, dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -202,7 +231,8 @@ end
 @inline function flux_differencing_kernel!(du, u, element,
                                            MeshT::Type{<:Union{TreeMesh{1},
                                                                StructuredMesh{1}}},
-                                           have_nonconservative_terms::True, equations,
+                                           have_nonconservative_terms::True,
+                                           set_not_add, equations,
                                            volume_flux, dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -210,8 +240,8 @@ end
     symmetric_flux, nonconservative_flux = volume_flux
 
     # Apply the symmetric flux as usual
-    flux_differencing_kernel!(du, u, element, MeshT, False(), equations, symmetric_flux,
-                              dg, cache, alpha)
+    flux_differencing_kernel!(du, u, element, MeshT, False(), set_not_add, equations,
+                              symmetric_flux, dg, cache, alpha)
 
     # Calculate the remaining volume terms using the nonsymmetric generalized flux
     for i in eachnode(dg)

@@ -67,6 +67,7 @@ end # muladd
 @inline function flux_differencing_kernel!(_du::PtrArray, u_cons::PtrArray,
                                            element, MeshT::Type{<:TreeMesh{2}},
                                            have_nonconservative_terms::False,
+                                           set_not_add,
                                            equations::CompressibleEulerEquations2D,
                                            volume_flux::typeof(flux_shima_etal_turbo),
                                            dg::DGSEM, cache, alpha)
@@ -218,17 +219,27 @@ end # muladd
 
     # Finally, we add the temporary RHS computed here to the global RHS in the
     # given `element`.
-    @turbo for v in eachvariable(equations),
-               j in eachnode(dg),
-               i in eachnode(dg)
+    if set_not_add isa True
+        @turbo for v in eachvariable(equations),
+                   j in eachnode(dg),
+                   i in eachnode(dg)
 
-        _du[v, i, j, element] += du[i, j, v]
+            _du[v, i, j, element] = du[i, j, v]
+        end
+    else
+        @turbo for v in eachvariable(equations),
+                   j in eachnode(dg),
+                   i in eachnode(dg)
+
+            _du[v, i, j, element] += du[i, j, v]
+        end
     end
 end
 
 @inline function flux_differencing_kernel!(_du::PtrArray, u_cons::PtrArray,
                                            element, MeshT::Type{<:TreeMesh{2}},
                                            have_nonconservative_terms::False,
+                                           set_not_add,
                                            equations::CompressibleEulerEquations2D,
                                            volume_flux::typeof(flux_ranocha_turbo),
                                            dg::DGSEM, cache, alpha)
@@ -453,10 +464,19 @@ end
 
     # Finally, we add the temporary RHS computed here to the global RHS in the
     # given `element`.
-    @turbo for v in eachvariable(equations),
-               j in eachnode(dg),
-               i in eachnode(dg)
+    if set_not_add isa True
+        @turbo for v in eachvariable(equations),
+                   j in eachnode(dg),
+                   i in eachnode(dg)
 
-        _du[v, i, j, element] += du[i, j, v]
+            _du[v, i, j, element] = du[i, j, v]
+        end
+    else
+        @turbo for v in eachvariable(equations),
+                   j in eachnode(dg),
+                   i in eachnode(dg)
+
+            _du[v, i, j, element] += du[i, j, v]
+        end
     end
 end

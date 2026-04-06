@@ -112,11 +112,6 @@ function rhs!(du, u, t,
               dg::DG, cache) where {Source}
     backend = trixi_backend(u)
 
-    # Reset du
-    @trixi_timeit_ext backend timer() "reset ∂u/∂t" begin
-        set_zero!(du, dg, cache)
-    end
-
     # Calculate volume integral
     @trixi_timeit_ext backend timer() "volume integral" begin
         calc_volume_integral!(backend, du, u, mesh,
@@ -188,9 +183,8 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
 =#
 @inline function weak_form_kernel!(du, u,
                                    element, MeshT::Type{<:TreeMesh{2}},
-                                   have_nonconservative_terms::False,
-                                   #sym:set_not_add
-                                   set_not_add::True, equations,
+                                   have_nonconservative_terms::False, set_not_add::True,
+                                   equations,
                                    dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
@@ -224,7 +218,6 @@ end
 @inline function weak_form_kernel!(du, u,
                                    element, MeshT::Type{<:TreeMesh{2}},
                                    have_nonconservative_terms::False,
-                                   #sym:set_not_add
                                    set_not_add::False, equations,
                                    dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
@@ -475,10 +468,10 @@ end
     for j in eachnode(dg), i in eachnode(dg)
         for v in eachvariable(equations)
             du[v, i, j, element] = (alpha *
-                                     (inverse_weights[i] *
-                                      (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
-                                      inverse_weights[j] *
-                                      (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
+                                    (inverse_weights[i] *
+                                     (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
+                                     inverse_weights[j] *
+                                     (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
         end
     end
 
@@ -615,10 +608,10 @@ end
     for j in eachnode(dg), i in eachnode(dg)
         for v in eachvariable(equations)
             du[v, i, j, element] = (alpha *
-                                     (inverse_weights[i] *
-                                      (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
-                                      inverse_weights[j] *
-                                      (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
+                                    (inverse_weights[i] *
+                                     (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
+                                     inverse_weights[j] *
+                                     (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
         end
     end
 
