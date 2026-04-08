@@ -50,8 +50,8 @@ struct ViscoResistiveMhdDiffusion3D{GradientVariables, RealT <: Real, Mu,
     # Add NGRADS as a type parameter here and in AbstractEquationsParabolic, add `ngradients(...)` accessor function
     mu::Mu                     # viscosity of the fluid
     Pr::RealT                  # Prandtl number
-    eta::RealT                 # magnetic diffusion
     kappa::RealT               # thermal diffusivity for Fourier's law
+    eta::RealT                 # magnetic diffusion
 
     equations_hyperbolic::E    # IdealGlmMhdEquations3D
     gradient_variables::GradientVariables # GradientVariablesPrimitive or GradientVariablesEntropy
@@ -63,16 +63,16 @@ function ViscoResistiveMhdDiffusion3D(equations::IdealGlmMhdEquations3D;
                                       gradient_variables = GradientVariablesPrimitive())
     @unpack gamma, inv_gamma_minus_one = equations
 
+    Pr = promote_type(typeof(gamma), typeof(Prandtl))(Prandtl)
     # Under the assumption of constant Prandtl number the thermal conductivity
     # constant is kappa = gamma μ / ((gamma-1) Prandtl).
     # Important note! Factor of μ is accounted for later in `flux`.
     # This avoids recomputation of kappa for non-constant μ.
-    kappa = gamma * inv_gamma_minus_one / Prandtl
+    kappa = gamma * inv_gamma_minus_one / Pr
 
     ViscoResistiveMhdDiffusion3D{typeof(gradient_variables),
-                                 typeof(Prandtl),
-                                 typeof(mu),
-                                 typeof(equations)}(mu, Prandtl, eta, kappa,
+                                 typeof(Pr), typeof(mu),
+                                 typeof(equations)}(mu, Pr, kappa, eta,
                                                     equations, gradient_variables)
 end
 
