@@ -39,9 +39,16 @@ in conservation form:
 ```
 where `\tau` is the viscous stress tensor and
 `q = \kappa \overrightarrow{\nabla} T` the heat flux according to Fourier's law with thermal diffusivity constant $\kappa$.
-Divergence cleaning is done using the `\psi` field.
 
-For more details see e.g. arXiv:2012.12040.
+## References
+- Bohm, Winters, Gassner, Derigs, Hindenlang, Saur (2020):
+  An entropy stable nodal discontinuous Galerkin method for the resistive MHD equations.
+  Part I: Theory and numerical verification
+  [DOI: 10.1016/j.jcp.2018.06.027](https://doi.org/10.1016/j.jcp.2018.06.027)
+- Rueda-Ramírez, Hennemann, Hindenlang, Winters, and Gassner (2022):
+  An entropy stable nodal discontinuous Galerkin method for the resistive MHD equations.
+  Part II: Subcell finite volume shock capturing
+  [DOI: 10.1016/j.jcp.2021.110580](https://doi.org/10.1016/j.jcp.2021.110580)
 """
 struct ViscoResistiveMhdDiffusion3D{GradientVariables, RealT <: Real, Mu,
                                     E <: AbstractIdealGlmMhdEquations{3}} <:
@@ -52,6 +59,7 @@ struct ViscoResistiveMhdDiffusion3D{GradientVariables, RealT <: Real, Mu,
     Pr::RealT                  # Prandtl number
     kappa::RealT               # thermal diffusivity for Fourier's law
     eta::RealT                 # magnetic diffusion
+    # TODO: Quantity for viscous wave speed estimate
 
     equations_hyperbolic::E    # IdealGlmMhdEquations3D
     gradient_variables::GradientVariables # GradientVariablesPrimitive or GradientVariablesEntropy
@@ -81,8 +89,8 @@ function varnames(variable_mapping,
     varnames(variable_mapping, equations_parabolic.equations_hyperbolic)
 end
 
-# Explicit formulas for the diffusive MHD fluxes are available, e.g., in Section 2
-# of the paper by Rueda-Ramírez, Hennemann, Hindenlang, Winters, and Gassner
+# Explicit formulas for the diffusive MHD fluxes are available for instance in Section 2
+# of the paper by Rueda-Ramírez, Hennemann, Hindenlang, Winters, and Gassner:
 # "An Entropy Stable Nodal Discontinuous Galerkin Method for the resistive
 #  MHD Equations. Part II: Subcell Finite Volume Shock Capturing"
 function flux(u, gradients, orientation::Integer,

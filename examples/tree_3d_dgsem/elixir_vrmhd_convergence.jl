@@ -24,7 +24,7 @@ Proposed in
 - Marvin Bohm, Andrew R Winters, Gregor J Gassner, Dominik Derigs, Florian Hindenlang, Joachim Saur (2020):
   An entropy stable nodal discontinuous Galerkin method for the resistive MHD equations.
   Part I: Theory and numerical verification
-  [10.1016/j.jcp.2018.06.027](https://doi.org/10.1016/j.jcp.2018.06.027)
+  [DOI: 10.1016/j.jcp.2018.06.027](https://doi.org/10.1016/j.jcp.2018.06.027)
 """
 @inline function initial_condition_convergence(x, t,
                                                equations::Union{IdealGlmMhdEquations3D,
@@ -55,7 +55,7 @@ Proposed in
 - Marvin Bohm, Andrew R Winters, Gregor J Gassner, Dominik Derigs, Florian Hindenlang, Joachim Saur (2020):
   An entropy stable nodal discontinuous Galerkin method for the resistive MHD equations.
   Part I: Theory and numerical verification
-  [10.1016/j.jcp.2018.06.027](https://doi.org/10.1016/j.jcp.2018.06.027)
+  [DOI: 10.1016/j.jcp.2018.06.027](https://doi.org/10.1016/j.jcp.2018.06.027)
 """
 function source_terms_convergence(u, x, t,
                                   equations::Union{IdealGlmMhdEquations3D,
