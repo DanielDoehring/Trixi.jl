@@ -101,17 +101,17 @@ function flux(u, gradients, orientation::Integer,
     # either computed directly or reverse engineered from the gradient of the entropy variables
     # by way of the `convert_gradient_variables` function.
 
-    @unpack eta = equations
+    @unpack kappa, eta = equations
 
-    _, dv1dx, dv2dx, dv3dx, dTdx, dB1dx, dB2dx, dB3dx, _ = convert_derivative_to_primitive(u,
-                                                                                           gradients[1],
-                                                                                           equations)
-    _, dv1dy, dv2dy, dv3dy, dTdy, dB1dy, dB2dy, dB3dy, _ = convert_derivative_to_primitive(u,
-                                                                                           gradients[2],
-                                                                                           equations)
-    _, dv1dz, dv2dz, dv3dz, dTdz, dB1dz, dB2dz, dB3dz, _ = convert_derivative_to_primitive(u,
-                                                                                           gradients[3],
-                                                                                           equations)
+    _, dv1dx, dv2dx, dv3dx, dTdx, _, dB2dx, dB3dx, _ = convert_derivative_to_primitive(u,
+                                                                                       gradients[1],
+                                                                                       equations)
+    _, dv1dy, dv2dy, dv3dy, dTdy, dB1dy, _, dB3dy, _ = convert_derivative_to_primitive(u,
+                                                                                       gradients[2],
+                                                                                       equations)
+    _, dv1dz, dv2dz, dv3dz, dTdz, dB1dz, dB2dz, _, _ = convert_derivative_to_primitive(u,
+                                                                                       gradients[3],
+                                                                                       equations)
 
     # Components of viscous stress tensor
 
@@ -135,9 +135,9 @@ function flux(u, gradients, orientation::Integer,
     # with thermal diffusivity constant kappa = gamma μ R / ((gamma-1) Pr)
     # Note, the gas constant cancels under this formulation, so it is not present
     # in the implementation
-    q1 = equations.kappa * dTdx
-    q2 = equations.kappa * dTdy
-    q3 = equations.kappa * dTdz
+    q1 = kappa * dTdx
+    q2 = kappa * dTdy
+    q3 = kappa * dTdz
 
     # In the simplest cases, the user passed in `mu` or `mu()` 
     # (which returns just a constant) but
