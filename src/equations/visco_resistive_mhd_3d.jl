@@ -60,7 +60,6 @@ struct ViscoResistiveMhdDiffusion3D{GradientVariables, RealT <: Real, Mu,
     kappa::RealT               # thermal diffusivity for Fourier's law
     max_4over3_kappa::RealT    # max(4/3, kappa) used for parabolic cfl => `max_diffusivity`
     eta::RealT                 # magnetic diffusion
-    # TODO: Quantity for viscous wave speed estimate
 
     equations_hyperbolic::E    # IdealGlmMhdEquations3D
     gradient_variables::GradientVariables # GradientVariablesPrimitive or GradientVariablesEntropy
@@ -204,24 +203,24 @@ end
 where `max_4over3_kappa = max(4/3, kappa)` is computed in the constructor.
 
 For the viscous contribution we use the same estimate as for the compressible
-Navier-Stokes equations. The resistive contribution is given by the magnetic
+Navier-Stokes equations, see
+[`max_diffusivity(u, equations_parabolic::CompressibleNavierStokesDiffusion3D)`](@ref).
+The resistive contribution is given by the magnetic
 diffusivity `eta` and we take the maximum of both for the parabolic CFL.
 
 The magnetic terms in the energy flux
 `eta * (B · (∇B - (∇B)^T))` are included in [`flux`](@ref). For the CFL estimate,
 they enter as off-diagonal couplings (analogous to velocity-coupled energy terms in
-Navier-Stokes), while the principal resistive diffusion scale is still set by `eta`.
+Navier-Stokes), while the principal resistive diffusion scale is set by `eta`.
 """
 @inline function max_diffusivity(u,
                                  equations_parabolic::ViscoResistiveMhdDiffusion3D)
     viscous = dynamic_viscosity(u, equations_parabolic) / u[1] *
               equations_parabolic.max_4over3_kappa
-    # The resistive magnetic-energy couplings are off-diagonal in the principal
+    # The resistive magnetic-energy couplings are off-diagonal in the
     # diffusion operator, hence the resistive scale is governed by `eta`.
     return max(viscous, equations_parabolic.eta)
 end
-
-
 
 # the `flux` function takes in transformed variables `u` which depend on the type of the gradient variables.
 # For CNS, it is simplest to formulate the viscous terms in primitive variables, so we transform the transformed
