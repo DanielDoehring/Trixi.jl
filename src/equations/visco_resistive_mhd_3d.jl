@@ -40,6 +40,9 @@ in conservation form:
 where `\tau` is the viscous stress tensor and
 `q = \kappa \overrightarrow{\nabla} T` the heat flux according to Fourier's law with thermal diffusivity constant $\kappa$.
 
+Note that parabolic-CFL based timestepping is not supported due to conflicts with the hyperbolic CFL condition used in [`GlmSpeedCallback`](@ref),
+with this callback being for all practical purposes a necessity for the GLM-MHD equations to achieve divergence cleaning.
+
 ## References
 - Bohm, Winters, Gassner, Derigs, Hindenlang, Saur (2020):
   An entropy stable nodal discontinuous Galerkin method for the resistive MHD equations.
@@ -58,7 +61,6 @@ struct ViscoResistiveMhdDiffusion3D{GradientVariables, RealT <: Real, Mu,
     mu::Mu                     # viscosity of the fluid
     Pr::RealT                  # Prandtl number
     kappa::RealT               # thermal diffusivity for Fourier's law
-    max_4over3_kappa::RealT    # max(4/3, kappa) used for parabolic cfl => `max_diffusivity`
     eta::RealT                 # magnetic diffusion
 
     equations_hyperbolic::E    # IdealGlmMhdEquations3D
@@ -80,8 +82,7 @@ function ViscoResistiveMhdDiffusion3D(equations::IdealGlmMhdEquations3D;
 
     ViscoResistiveMhdDiffusion3D{typeof(gradient_variables),
                                  typeof(Pr), typeof(mu),
-                                 typeof(equations)}(mu, Pr, kappa,
-                                                    max(4 / 3, kappa), eta,
+                                 typeof(equations)}(mu, Pr, kappa, eta,
                                                     equations, gradient_variables)
 end
 
@@ -194,33 +195,9 @@ function flux(u, gradients, orientation::Integer,
     end
 end
 
-@doc raw"""
-    max_diffusivity(u, equations_parabolic::ViscoResistiveMhdDiffusion3D)
-
-# Returns
-- `max(dynamic_viscosity(u, equations_parabolic) / u[1] * equations_parabolic.max_4over3_kappa,
-       equations_parabolic.eta)`
-where `max_4over3_kappa = max(4/3, kappa)` is computed in the constructor.
-
-For the viscous contribution we use the same estimate as for the compressible
-Navier-Stokes equations, see
-[`max_diffusivity(u, equations_parabolic::CompressibleNavierStokesDiffusion3D)`](@ref).
-The resistive contribution is given by the magnetic
-diffusivity `eta` and we take the maximum of both for the parabolic CFL.
-
-The magnetic terms in the energy flux
-`eta * (B · (∇B - (∇B)^T))` are included in [`flux`](@ref). For the CFL estimate,
-they enter as off-diagonal couplings (analogous to velocity-coupled energy terms in
-Navier-Stokes), while the principal resistive diffusion scale is set by `eta`.
-"""
-@inline function max_diffusivity(u,
-                                 equations_parabolic::ViscoResistiveMhdDiffusion3D)
-    viscous = dynamic_viscosity(u, equations_parabolic) / u[1] *
-              equations_parabolic.max_4over3_kappa
-    # The resistive magnetic-energy couplings are off-diagonal in the
-    # diffusion operator, hence the resistive scale is governed by `eta`.
-    return max(viscous, equations_parabolic.eta)
-end
+# Diffusive CFL-based timestepping clashes with the `GlmSpeedCallback`,
+# thus we provide for now NO `max_diffusivity(u, equations_parabolic::ViscoResistiveMhdDiffusion3D)`
+# function.
 
 # the `flux` function takes in transformed variables `u` which depend on the type of the gradient variables.
 # For CNS, it is simplest to formulate the viscous terms in primitive variables, so we transform the transformed

@@ -29,11 +29,7 @@ end
 # Returns
 - `False()`
 
-Used in parabolic CFL condition computation (see [`StepsizeCallback`](@ref)) to indicate that the
-diffusivity is not constant in space and that [`max_diffusivity`](@ref) needs to be computed
-at every node in every element.
-
-Also employed in [`linear_structure`](@ref) and [`linear_structure_parabolic`](@ref) to check
+Employed in [`linear_structure_parabolic`](@ref) to check
 if the diffusion term is linear in the variables/constant.
 """
 @inline have_constant_diffusivity(::AbstractViscoResistiveMhdDiffusion) = False()

@@ -2601,6 +2601,16 @@ end
         end
     end
 
+    @timed_testset "ViscoResistiveMhdDiffusion3D" begin
+        equations = IdealGlmMhdEquations3D(1.4)
+
+        equations_parabolic = ViscoResistiveMhdDiffusion3D(equations,
+                                                           mu = 1e-3, Prandtl = 0.72,
+                                                           eta = 1e-3)
+
+        @test have_constant_diffusivity(equations_parabolic) == False()
+    end
+
     @timed_testset "PolytropicEulerEquations2D" begin
         for gamma in [1.4, 5 / 3, 7 / 5]
             equations = PolytropicEulerEquations2D(gamma, gamma * 0.72)
