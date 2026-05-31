@@ -33,8 +33,7 @@ see `flux_differencing_kernel!`.
 This treatment is required to achieve, e.g., entropy-stability or well-balancedness.
 See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-1765644064
 =#
-@inline function weak_form_kernel!(du, u,
-                                   element,
+@inline function weak_form_kernel!(du, u, element,
                                    ::Type{<:Union{StructuredMesh{3}, P4estMesh{3},
                                                   T8codeMesh{3}}},
                                    have_nonconservative_terms::False,
@@ -89,8 +88,7 @@ See also https://github.com/trixi-framework/Trixi.jl/issues/1671#issuecomment-17
     return nothing
 end
 
-@inline function weak_form_kernel!(du, u,
-                                   element,
+@inline function weak_form_kernel!(du, u, element,
                                    ::Type{<:Union{StructuredMesh{3}, P4estMesh{3},
                                                   T8codeMesh{3}}},
                                    have_nonconservative_terms::False,
