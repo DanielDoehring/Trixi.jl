@@ -127,6 +127,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred cons2prim(u, equations)) == RealT
             @test eltype(@inferred prim2cons(u, equations)) == RealT
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa AcousticPerturbationEquations2D{Float32}
+            @test eltype(adapted.v_mean_global) == Float32
+            @test typeof(adapted.c_mean_global) == Float32
         end
     end
 
@@ -209,6 +214,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred density_pressure(u, equations)) == RealT
             @test typeof(@inferred entropy(cons, equations)) == RealT
             @test typeof(@inferred energy_internal(cons, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa CompressibleEulerEquations1D{Float32}
+            @test typeof(adapted.gamma) == Float32
+            @test typeof(adapted.inv_gamma_minus_one) == Float32
         end
     end
 
@@ -220,8 +230,9 @@ isdir(outdir) && rm(outdir, recursive = true)
                                                                                        b,
                                                                                        gamma,
                                                                                        R))
-
-            for equations in (equations_ideal_gas, equations_vdw)
+            equations_helmholtz_ideal_gas = @inferred NonIdealCompressibleEulerEquations1D(HelmholtzIdealGas(RealT(2)))
+            for equations in (equations_ideal_gas, equations_vdw,
+                              equations_helmholtz_ideal_gas)
                 x = SVector(zero(RealT))
                 t = zero(RealT)
                 u = u_ll = u_rr = u_inner = cons = SVector(one(RealT), one(RealT),
@@ -262,6 +273,30 @@ isdir(outdir) && rm(outdir, recursive = true)
                 @test typeof(@inferred entropy(cons, equations)) == RealT
                 @test typeof(@inferred energy_internal(cons, equations)) == RealT
             end
+
+            # EoS adapt tests
+            adapted_ig = @inferred Trixi.trixi_adapt(Array, Float32,
+                                                     equations_ideal_gas.equation_of_state)
+            @test typeof(adapted_ig.gamma) == Float32
+            @test typeof(adapted_ig.cv) == Float32
+            adapted_vdw = @inferred Trixi.trixi_adapt(Array, Float32,
+                                                      equations_vdw.equation_of_state)
+            @test typeof(adapted_vdw.a) == Float32
+            @test typeof(adapted_vdw.cv) == Float32
+            eos_pr = Trixi.PengRobinson(RealT(0.5), RealT(0.1), RealT(0.7), RealT(0.3),
+                                        RealT(300), RealT(8.314))
+            adapted_pr = @inferred Trixi.trixi_adapt(Array, Float32, eos_pr)
+            @test typeof(adapted_pr.R) == Float32
+            @test typeof(adapted_pr.inv2sqrt2b) == Float32
+            adapted_heim = @inferred Trixi.trixi_adapt(Array, Float32,
+                                                       equations_helmholtz_ideal_gas.equation_of_state)
+            @test typeof(adapted_heim.gamma) == Float32
+            @test typeof(adapted_heim.R) == Float32
+
+            # Wrapper adapt tests
+            adapted_neq = @inferred Trixi.trixi_adapt(Array, Float32, equations_ideal_gas)
+            @test adapted_neq isa NonIdealCompressibleEulerEquations1D
+            @test typeof(adapted_neq.equation_of_state.gamma) == Float32
         end
     end
 
@@ -309,6 +344,10 @@ isdir(outdir) && rm(outdir, recursive = true)
                 @test typeof(@inferred entropy(cons, equations)) == RealT
                 @test typeof(@inferred energy_internal(cons, equations)) == RealT
             end
+
+            adapted_neq2d = @inferred Trixi.trixi_adapt(Array, Float32, equations_ideal_gas)
+            @test adapted_neq2d isa NonIdealCompressibleEulerEquations2D
+            @test typeof(adapted_neq2d.equation_of_state.gamma) == Float32
         end
     end
 
@@ -463,6 +502,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred Trixi.gradient_conservative(entropy_guermond_etal,
                                                                u,
                                                                equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa CompressibleEulerEquations2D{Float32}
+            @test typeof(adapted.gamma) == Float32
+            @test typeof(adapted.inv_gamma_minus_one) == Float32
         end
     end
 
@@ -577,6 +621,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred entropy_math(cons, equations)) == RealT
             @test typeof(@inferred entropy_thermodynamic(cons, equations)) == RealT
             @test typeof(@inferred energy_internal(cons, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa CompressibleEulerEquations3D{Float32}
+            @test typeof(adapted.gamma) == Float32
+            @test typeof(adapted.inv_gamma_minus_one) == Float32
         end
     end
 
@@ -619,6 +668,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred Trixi.totalgamma(u, equations)) == RealT
             @test typeof(@inferred density(u, equations)) == RealT
             @test typeof(@inferred pressure(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa CompressibleEulerMulticomponentEquations1D
+            @test eltype(adapted.gammas) == Float32
+            @test eltype(adapted.cv) == Float32
         end
     end
 
@@ -673,6 +727,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred Trixi.totalgamma(u, equations)) == RealT
             @test typeof(@inferred density(u, equations)) == RealT
             @test typeof(@inferred density_pressure(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa CompressibleEulerMulticomponentEquations2D
+            @test eltype(adapted.gammas) == Float32
+            @test eltype(adapted.cv) == Float32
         end
     end
 
@@ -714,6 +773,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred density(u, equations)) == RealT
             @test typeof(@inferred pressure(u, equations)) == RealT
             @test typeof(@inferred density_pressure(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa CompressibleEulerEquationsQuasi1D{Float32}
+            @test typeof(adapted.gamma) == Float32
+            @test typeof(adapted.inv_gamma_minus_one) == Float32
         end
     end
 
@@ -769,9 +833,15 @@ isdir(outdir) && rm(outdir, recursive = true)
                 @test eltype(@inferred cons2entropy(u, equations_parabolic)) == RealT
                 @test eltype(@inferred entropy2cons(u, equations_parabolic)) == RealT
                 @test typeof(@inferred Trixi.temperature(u, equations_parabolic)) == RealT
-
-                @test eltype(@inferred Trixi.convert_transformed_to_primitive(u_transformed,
+                if equations_parabolic.gradient_variables isa GradientVariablesEntropy
+                    w = cons2entropy(u, equations_parabolic)
+                    @test eltype(@inferred Trixi.entropy2velocity_temperature(w,
                                                                               equations_parabolic)) ==
+                          RealT
+                end
+
+                @test eltype(@inferred Trixi.convert_transformed_to_velocity_temperature(u_transformed,
+                                                                                         equations_parabolic)) ==
                       RealT
                 @test eltype(@inferred Trixi.convert_derivative_to_primitive(u, gradients,
                                                                              equations_parabolic)) ==
@@ -819,6 +889,14 @@ isdir(outdir) && rm(outdir, recursive = true)
                           RealT
                 end
             end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32,
+                                                  equations_parabolic_primitive)
+            @test adapted isa CompressibleNavierStokesDiffusion1D
+            @test typeof(adapted.mu) == Float32
+            @test typeof(adapted.Pr) == Float32
+            @test typeof(adapted.kappa) == Float32
+            @test adapted.equations_hyperbolic isa CompressibleEulerEquations1D{Float32}
         end
     end
 
@@ -879,13 +957,19 @@ isdir(outdir) && rm(outdir, recursive = true)
                 @test eltype(@inferred cons2entropy(u, equations_parabolic)) == RealT
                 @test eltype(@inferred entropy2cons(u, equations_parabolic)) == RealT
                 @test typeof(@inferred Trixi.temperature(u, equations_parabolic)) == RealT
+                if equations_parabolic.gradient_variables isa GradientVariablesEntropy
+                    w = cons2entropy(u, equations_parabolic)
+                    @test eltype(@inferred Trixi.entropy2velocity_temperature(w,
+                                                                              equations_parabolic)) ==
+                          RealT
+                end
                 @test typeof(@inferred Trixi.enstrophy(u, gradients, equations_parabolic)) ==
                       RealT
                 @test typeof(@inferred Trixi.vorticity(u, gradients, equations_parabolic)) ==
                       RealT
 
-                @test eltype(@inferred Trixi.convert_transformed_to_primitive(u_transformed,
-                                                                              equations_parabolic)) ==
+                @test eltype(@inferred Trixi.convert_transformed_to_velocity_temperature(u_transformed,
+                                                                                         equations_parabolic)) ==
                       RealT
                 @test eltype(@inferred Trixi.convert_derivative_to_primitive(u, gradient,
                                                                              equations_parabolic)) ==
@@ -934,6 +1018,14 @@ isdir(outdir) && rm(outdir, recursive = true)
                                                                equations_parabolic)) ==
                       RealT
             end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32,
+                                                  equations_parabolic_primitive)
+            @test adapted isa CompressibleNavierStokesDiffusion2D
+            @test typeof(adapted.mu) == Float32
+            @test typeof(adapted.Pr) == Float32
+            @test typeof(adapted.kappa) == Float32
+            @test adapted.equations_hyperbolic isa CompressibleEulerEquations2D{Float32}
         end
     end
 
@@ -1000,13 +1092,19 @@ isdir(outdir) && rm(outdir, recursive = true)
                 @test eltype(@inferred cons2entropy(u, equations_parabolic)) == RealT
                 @test eltype(@inferred entropy2cons(u, equations_parabolic)) == RealT
                 @test typeof(@inferred Trixi.temperature(u, equations_parabolic)) == RealT
+                if equations_parabolic.gradient_variables isa GradientVariablesEntropy
+                    w = cons2entropy(u, equations_parabolic)
+                    @test eltype(@inferred Trixi.entropy2velocity_temperature(w,
+                                                                              equations_parabolic)) ==
+                          RealT
+                end
                 @test typeof(@inferred Trixi.enstrophy(u, gradients, equations_parabolic)) ==
                       RealT
                 @test eltype(@inferred Trixi.vorticity(u, gradients, equations_parabolic)) ==
                       RealT
 
-                @test eltype(@inferred Trixi.convert_transformed_to_primitive(u_transformed,
-                                                                              equations_parabolic)) ==
+                @test eltype(@inferred Trixi.convert_transformed_to_velocity_temperature(u_transformed,
+                                                                                         equations_parabolic)) ==
                       RealT
                 @test eltype(@inferred Trixi.convert_derivative_to_primitive(u, gradient,
                                                                              equations_parabolic)) ==
@@ -1055,6 +1153,59 @@ isdir(outdir) && rm(outdir, recursive = true)
                                                                equations_parabolic)) ==
                       RealT
             end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32,
+                                                  equations_parabolic_primitive)
+            @test adapted isa CompressibleNavierStokesDiffusion3D
+            @test typeof(adapted.mu) == Float32
+            @test typeof(adapted.Pr) == Float32
+            @test typeof(adapted.kappa) == Float32
+            @test adapted.equations_hyperbolic isa CompressibleEulerEquations3D{Float32}
+        end
+    end
+
+    @timed_testset "Testing Trixi.entropy2velocity_temperature for CompressibleNavierStokesDiffusion" begin
+        for RealT in (Float32, Float64)
+            prandtl_number = RealT(0.72)
+            mu = RealT(0.01)
+
+            equations_1d = CompressibleEulerEquations1D(RealT(1.4))
+            equations_parabolic_1d = CompressibleNavierStokesDiffusion1D(equations_1d,
+                                                                         mu = mu,
+                                                                         Prandtl = prandtl_number,
+                                                                         gradient_variables = GradientVariablesEntropy())
+            u_1d = prim2cons(SVector(RealT(2.0), RealT(0.1), RealT(4.0)), equations_1d)
+            w_1d = cons2entropy(u_1d, equations_parabolic_1d)
+            @test Trixi.entropy2velocity_temperature(w_1d, equations_parabolic_1d) ≈
+                  cons2prim(u_1d, equations_parabolic_1d)[2:end]
+            @test length(Trixi.entropy2velocity_temperature(w_1d, equations_parabolic_1d)) ==
+                  2
+
+            equations_2d = CompressibleEulerEquations2D(RealT(1.4))
+            equations_parabolic_2d = CompressibleNavierStokesDiffusion2D(equations_2d,
+                                                                         mu = mu,
+                                                                         Prandtl = prandtl_number,
+                                                                         gradient_variables = GradientVariablesEntropy())
+            u_2d = prim2cons(SVector(RealT(2.0), RealT(0.1), RealT(0.2), RealT(4.0)),
+                             equations_2d)
+            w_2d = cons2entropy(u_2d, equations_parabolic_2d)
+            @test Trixi.entropy2velocity_temperature(w_2d, equations_parabolic_2d) ≈
+                  cons2prim(u_2d, equations_parabolic_2d)[2:end]
+            @test length(Trixi.entropy2velocity_temperature(w_2d, equations_parabolic_2d)) ==
+                  3
+
+            equations_3d = CompressibleEulerEquations3D(RealT(1.4))
+            equations_parabolic_3d = CompressibleNavierStokesDiffusion3D(equations_3d,
+                                                                         mu = mu,
+                                                                         Prandtl = prandtl_number,
+                                                                         gradient_variables = GradientVariablesEntropy())
+            u_3d = prim2cons(SVector(RealT(2.0), RealT(0.1), RealT(0.2), RealT(0.3),
+                                     RealT(4.0)), equations_3d)
+            w_3d = cons2entropy(u_3d, equations_parabolic_3d)
+            @test Trixi.entropy2velocity_temperature(w_3d, equations_parabolic_3d) ≈
+                  cons2prim(u_3d, equations_parabolic_3d)[2:end]
+            @test length(Trixi.entropy2velocity_temperature(w_3d, equations_parabolic_3d)) ==
+                  4
         end
     end
 
@@ -1102,6 +1253,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
             @test typeof(@inferred entropy(u, equations)) == RealT
             @test typeof(@inferred energy_total(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa HyperbolicDiffusionEquations1D{Float32}
+            @test typeof(adapted.nu) == Float32
+            @test typeof(adapted.Lr) == Float32
         end
     end
 
@@ -1164,6 +1320,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
             @test typeof(@inferred entropy(u, equations)) == RealT
             @test typeof(@inferred energy_total(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa HyperbolicDiffusionEquations2D{Float32}
+            @test typeof(adapted.nu) == Float32
+            @test typeof(adapted.Lr) == Float32
         end
     end
 
@@ -1219,6 +1380,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
             @test typeof(@inferred entropy(u, equations)) == RealT
             @test typeof(@inferred energy_total(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa HyperbolicDiffusionEquations3D{Float32}
+            @test typeof(adapted.nu) == Float32
+            @test typeof(adapted.Lr) == Float32
         end
     end
 
@@ -1285,6 +1451,10 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred energy_magnetic(cons, equations)) == RealT
             @test typeof(@inferred energy_internal(cons, equations)) == RealT
             @test typeof(@inferred cross_helicity(cons, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa IdealGlmMhdEquations1D{Float32}
+            @test typeof(adapted.gamma) == Float32
         end
     end
 
@@ -1405,6 +1575,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred energy_magnetic(cons, equations)) == RealT
             @test typeof(@inferred energy_internal(cons, equations)) == RealT
             @test typeof(@inferred cross_helicity(cons, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa IdealGlmMhdEquations2D{Float32}
+            @test typeof(adapted.gamma) == Float32
+            @test typeof(adapted.c_h) == Float32
         end
     end
 
@@ -1500,6 +1675,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred energy_magnetic(cons, equations)) == RealT
             @test typeof(@inferred energy_internal(cons, equations)) == RealT
             @test typeof(@inferred cross_helicity(cons, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa IdealGlmMhdEquations3D{Float32}
+            @test typeof(adapted.gamma) == Float32
+            @test typeof(adapted.c_h) == Float32
         end
     end
 
@@ -1547,6 +1727,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             for direction in directions
                 @test typeof(Trixi.calc_fast_wavespeed(cons, direction, equations)) == RealT
             end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa IdealGlmMhdMulticomponentEquations1D
+            @test eltype(adapted.gammas) == Float32
+            @test eltype(adapted.cv) == Float32
         end
     end
 
@@ -1602,6 +1787,12 @@ isdir(outdir) && rm(outdir, recursive = true)
             for direction in directions
                 @test typeof(Trixi.calc_fast_wavespeed(cons, direction, equations)) == RealT
             end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa IdealGlmMhdMulticomponentEquations2D
+            @test eltype(adapted.gammas) == Float32
+            @test eltype(adapted.cv) == Float32
+            @test typeof(adapted.c_h) == Float32
         end
     end
 
@@ -1696,6 +1887,12 @@ isdir(outdir) && rm(outdir, recursive = true)
             for direction in orientations
                 @test typeof(Trixi.calc_fast_wavespeed(cons, direction, equations)) == RealT
             end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa IdealGlmMhdMultiIonEquations2D
+            @test eltype(adapted.gammas) == Float32
+            @test eltype(adapted.ion_ion_collision_constants) == Float32
+            @test typeof(adapted.c_h) == Float32
         end
     end
 
@@ -1761,6 +1958,12 @@ isdir(outdir) && rm(outdir, recursive = true)
             for direction in orientations
                 @test typeof(Trixi.calc_fast_wavespeed(cons, direction, equations)) == RealT
             end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa IdealGlmMhdMultiIonEquations3D
+            @test eltype(adapted.gammas) == Float32
+            @test eltype(adapted.charge_to_mass) == Float32
+            @test typeof(adapted.c_h) == Float32
         end
     end
 
@@ -1860,6 +2063,32 @@ isdir(outdir) && rm(outdir, recursive = true)
                                                               x, t,
                                                               operator_divergence,
                                                               equations_parabolic)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations_parabolic)
+            @test adapted isa LaplaceDiffusion1D
+            @test typeof(adapted.diffusivity) == Float32
+            @test adapted.equations_hyperbolic isa LinearScalarAdvectionEquation1D{Float32}
+        end
+    end
+
+    @timed_testset "Linear Diffusion Equation" begin
+        for RealT in (Float32, Float64)
+            u = SVector(one(RealT))
+
+            equations_1d = LinearDiffusionEquation1D(RealT(0.1))
+            @test eltype(@inferred cons2prim(u, equations_1d)) == RealT
+            @test eltype(@inferred cons2entropy(u, equations_1d)) == RealT
+
+            equations_2d = LinearDiffusionEquation2D(RealT(0.1))
+            @test eltype(@inferred cons2prim(u, equations_2d)) == RealT
+            @test eltype(@inferred cons2entropy(u, equations_2d)) == RealT
+
+            adapted_1d = @inferred Trixi.trixi_adapt(Array, Float32, equations_1d)
+            @test adapted_1d isa LinearDiffusionEquation1D{Float32}
+            @test typeof(adapted_1d.diffusivity) == Float32
+            adapted_2d = @inferred Trixi.trixi_adapt(Array, Float32, equations_2d)
+            @test adapted_2d isa LinearDiffusionEquation2D{Float32}
+            @test typeof(adapted_2d.diffusivity) == Float32
         end
     end
 
@@ -1882,6 +2111,11 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred Trixi.penalty(u_outer, u_inner, inv_h,
                                                  equations_parabolic, parabolic_solver)) ==
                   RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations_parabolic)
+            @test adapted isa LaplaceDiffusion2D
+            @test typeof(adapted.diffusivity) == Float32
+            @test adapted.equations_hyperbolic isa LinearScalarAdvectionEquation2D{Float32}
         end
     end
 
@@ -1905,6 +2139,73 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred Trixi.penalty(u_outer, u_inner, inv_h,
                                                  equations_parabolic, parabolic_solver)) ==
                   RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations_parabolic)
+            @test adapted isa LaplaceDiffusion3D
+            @test typeof(adapted.diffusivity) == Float32
+            @test adapted.equations_hyperbolic isa LinearScalarAdvectionEquation3D{Float32}
+        end
+    end
+
+    @timed_testset "Laplace Diffusion Entropy Variables 1D" begin
+        for RealT in (Float32, Float64)
+            equations = @inferred CompressibleEulerEquations1D(RealT(1.4))
+            equations_parabolic = @inferred LaplaceDiffusionEntropyVariables1D(RealT(0.1),
+                                                                               equations)
+
+            u = gradients = SVector(one(RealT), zero(RealT), zero(RealT))
+            orientation = 1
+
+            @test eltype(@inferred flux(u, (gradients,), orientation, equations_parabolic)) ==
+                  RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations_parabolic)
+            @test adapted isa Trixi.LaplaceDiffusionEntropyVariables{1}
+            @test typeof(adapted.diffusivity) == Float32
+            @test adapted.equations_hyperbolic isa CompressibleEulerEquations1D{Float32}
+        end
+    end
+
+    @timed_testset "Laplace Diffusion Entropy Variables 2D" begin
+        for RealT in (Float32, Float64)
+            equations = @inferred CompressibleEulerEquations2D(RealT(1.4))
+            equations_parabolic = @inferred LaplaceDiffusionEntropyVariables2D(RealT(0.1),
+                                                                               equations)
+
+            u = gradients = SVector(one(RealT), zero(RealT), zero(RealT), zero(RealT))
+            orientations = [1, 2]
+
+            for orientation in orientations
+                @test eltype(@inferred flux(u, gradients, orientation, equations_parabolic)) ==
+                      RealT
+            end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations_parabolic)
+            @test adapted isa Trixi.LaplaceDiffusionEntropyVariables{2}
+            @test typeof(adapted.diffusivity) == Float32
+            @test adapted.equations_hyperbolic isa CompressibleEulerEquations2D{Float32}
+        end
+    end
+
+    @timed_testset "Laplace Diffusion Entropy Variables 3D" begin
+        for RealT in (Float32, Float64)
+            equations = @inferred CompressibleEulerEquations3D(RealT(1.4))
+            equations_parabolic = @inferred LaplaceDiffusionEntropyVariables3D(RealT(0.1),
+                                                                               equations)
+
+            u = gradients = SVector(one(RealT), zero(RealT), zero(RealT), zero(RealT),
+                                    zero(RealT))
+            orientations = [1, 2, 3]
+
+            for orientation in orientations
+                @test eltype(@inferred flux(u, gradients, orientation, equations_parabolic)) ==
+                      RealT
+            end
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations_parabolic)
+            @test adapted isa Trixi.LaplaceDiffusionEntropyVariables{3}
+            @test typeof(adapted.diffusivity) == Float32
+            @test adapted.equations_hyperbolic isa CompressibleEulerEquations3D{Float32}
         end
     end
 
@@ -1953,6 +2254,12 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred Trixi.max_abs_speeds(equations)) == RealT
             @test eltype(@inferred cons2prim(u, equations)) == RealT
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LatticeBoltzmannEquations2D{Float32}
+            @test typeof(adapted.c) == Float32
+            @test eltype(adapted.weights) == Float32
+            @test eltype(adapted.v_alpha1) == Float32
         end
     end
 
@@ -1998,6 +2305,12 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred energy_kinetic(u, equations)) == RealT
             @test typeof(@inferred Trixi.energy_kinetic_nondimensional(u, equations)) ==
                   RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LatticeBoltzmannEquations3D{Float32}
+            @test typeof(adapted.c) == Float32
+            @test eltype(adapted.weights) == Float32
+            @test eltype(adapted.v_alpha1) == Float32
         end
     end
 
@@ -2048,6 +2361,10 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
             @test typeof(@inferred entropy(u, equations)) == RealT
             @test typeof(@inferred energy_total(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LinearScalarAdvectionEquation1D{Float32}
+            @test eltype(adapted.advection_velocity) == Float32
         end
     end
 
@@ -2131,6 +2448,10 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
             @test typeof(@inferred entropy(u, equations)) == RealT
             @test typeof(@inferred energy_total(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LinearScalarAdvectionEquation2D{Float32}
+            @test eltype(adapted.advection_velocity) == Float32
         end
     end
 
@@ -2190,6 +2511,10 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
             @test typeof(@inferred entropy(u, equations)) == RealT
             @test typeof(@inferred energy_total(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LinearScalarAdvectionEquation3D{Float32}
+            @test eltype(adapted.advection_velocity) == Float32
         end
     end
 
@@ -2218,6 +2543,10 @@ isdir(outdir) && rm(outdir, recursive = true)
                   RealT
             @test eltype(@inferred cons2prim(u, equations)) == RealT
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa MaxwellEquations1D{Float32}
+            @test typeof(adapted.speed_of_light) == Float32
         end
     end
 
@@ -2258,6 +2587,11 @@ isdir(outdir) && rm(outdir, recursive = true)
 
             @test eltype(@inferred cons2prim(u, equations)) == RealT
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LinearizedEulerEquations1D{Float32}
+            @test typeof(adapted.v_mean_global) == Float32
+            @test typeof(adapted.c_mean_global) == Float32
         end
     end
 
@@ -2318,6 +2652,11 @@ isdir(outdir) && rm(outdir, recursive = true)
 
             @test eltype(@inferred cons2prim(u, equations)) == RealT
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LinearizedEulerEquations2D{Float32}
+            @test eltype(adapted.v_mean_global) == Float32
+            @test typeof(adapted.c_mean_global) == Float32
         end
     end
 
@@ -2372,6 +2711,11 @@ isdir(outdir) && rm(outdir, recursive = true)
 
             @test eltype(@inferred cons2prim(u, equations)) == RealT
             @test eltype(@inferred cons2entropy(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LinearizedEulerEquations3D{Float32}
+            @test eltype(adapted.v_mean_global) == Float32
+            @test typeof(adapted.c_mean_global) == Float32
         end
     end
 
@@ -2433,6 +2777,11 @@ isdir(outdir) && rm(outdir, recursive = true)
                 @test typeof(@inferred density(u, equations)) == RealT
                 @test typeof(@inferred pressure(u, equations)) == RealT
             end
+
+            adapted1 = @inferred Trixi.trixi_adapt(Array, Float32, equations1)
+            @test adapted1 isa PolytropicEulerEquations2D{Float32}
+            @test typeof(adapted1.gamma) == Float32
+            @test typeof(adapted1.kappa) == Float32
         end
     end
 
@@ -2466,6 +2815,10 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred entropy(u, equations)) == RealT
             @test typeof(@inferred energy_total(c, equations)) == RealT
             @test typeof(@inferred energy_total(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa TrafficFlowLWREquations1D{Float32}
+            @test typeof(adapted.v_max) == Float32
         end
     end
 
@@ -2507,6 +2860,10 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred pressure(u, equations)) == RealT
             @test typeof(@inferred density_pressure(u, equations)) == RealT
             @test typeof(@inferred entropy(cons, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa PassiveTracerEquations
+            @test adapted.flow_equations isa CompressibleEulerEquations1D{Float32}
         end
     end
 
@@ -2545,6 +2902,12 @@ isdir(outdir) && rm(outdir, recursive = true)
             @test typeof(@inferred energy_kinetic(u, equations)) == RealT
 
             @test typeof(@inferred velocity(u, equations)) == RealT
+
+            adapted = @inferred Trixi.trixi_adapt(Array, Float32, equations)
+            @test adapted isa LinearElasticityEquations1D{Float32}
+            @test typeof(adapted.rho) == Float32
+            @test typeof(adapted.c1) == Float32
+            @test typeof(adapted.E) == Float32
         end
     end
 end

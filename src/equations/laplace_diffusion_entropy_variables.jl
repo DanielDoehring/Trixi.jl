@@ -32,6 +32,21 @@ function entropy2cons(w, equations::LaplaceDiffusionEntropyVariables)
     return entropy2cons(w, equations.equations_hyperbolic)
 end
 
+# Together with our specialization of `Adapt.adapt_structure`,
+# this allows to move semidiscretizations and their components including
+# the equations to GPUs and adapt the floating point type, e.g.,
+# to `Float32` to improve performance on GPUs.
+function Base.similar(equations::LaplaceDiffusionEntropyVariables{NDIMS},
+                      ::Type{NewRealT}) where {NDIMS, NewRealT}
+    diffusivity = equations.diffusivity isa AbstractFloat ?
+                  convert(NewRealT, equations.diffusivity) : equations.diffusivity
+    equations_hyperbolic = similar(equations.equations_hyperbolic, NewRealT)
+    return LaplaceDiffusionEntropyVariables{NDIMS, typeof(equations_hyperbolic),
+                                            nvariables(equations_hyperbolic),
+                                            typeof(diffusivity)}(diffusivity,
+                                                                 equations_hyperbolic)
+end
+
 # This is used to compute the diffusivity tensor for LaplaceDiffusionEntropyVariables.
 # This is the generic fallback using AD (assuming entropy2cons exists)
 function jacobian_entropy2cons(w, equations)
@@ -72,3 +87,7 @@ end
                                                                 equations_parabolic::LaplaceDiffusionEntropyVariables)
     return flux_inner
 end
+
+include("laplace_diffusion_entropy_variables_1d.jl")
+include("laplace_diffusion_entropy_variables_2d.jl")
+include("laplace_diffusion_entropy_variables_3d.jl")

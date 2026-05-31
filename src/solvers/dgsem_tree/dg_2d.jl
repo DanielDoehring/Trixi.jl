@@ -76,8 +76,13 @@ function create_cache(mesh::TreeMesh{2}, equations,
     fstar2_L_threaded, fstar2_R_threaded = create_f_threaded(mesh, equations, dg,
                                                              uEltype)
 
+    cache_subcell_limiting = create_cache_subcell_limiting(mesh, equations,
+                                                           volume_integral, dg,
+                                                           cache_containers, uEltype)
+
     return (; fstar1_L_threaded, fstar1_R_threaded,
-            fstar2_L_threaded, fstar2_R_threaded)
+            fstar2_L_threaded, fstar2_R_threaded,
+            cache_subcell_limiting...)
 end
 
 # The methods below are specialized on the mortar type
@@ -168,7 +173,7 @@ function rhs!(du, u, t,
 
     # Calculate source terms
     @trixi_timeit_ext backend timer() "source terms" begin
-        calc_sources!(du, u, t, source_terms, equations, dg, cache)
+        calc_sources!(backend, du, u, t, source_terms, equations, dg, cache)
     end
 
     return nothing
@@ -1500,8 +1505,8 @@ function calc_surface_integral!(backend::Nothing, du, u,
 end
 
 function calc_surface_integral!(backend::Nothing, du, u,
-                                mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                            StructuredMeshView{2}},
+                                mesh::Union{TreeMesh{2},
+                                            StructuredMesh{2}, StructuredMeshView{2}},
                                 equations, surface_integral::SurfaceIntegralWeakForm,
                                 dg::DGSEM{<:GaussLegendreBasis}, cache)
     @unpack boundary_interpolation_inverse_weights = dg.basis
@@ -1576,12 +1581,12 @@ function apply_jacobian!(backend::Nothing, du, mesh::TreeMesh{2},
 end
 
 # Need dimension specific version to avoid error at dispatching
-function calc_sources!(du, u, t, source_terms::Nothing,
+function calc_sources!(backend::Nothing, du, u, t, source_terms::Nothing,
                        equations::AbstractEquations{2}, dg::DG, cache)
     return nothing
 end
 
-function calc_sources!(du, u, t, source_terms,
+function calc_sources!(backend::Nothing, du, u, t, source_terms,
                        equations::AbstractEquations{2}, dg::DG, cache)
     @unpack node_coordinates = cache.elements
 

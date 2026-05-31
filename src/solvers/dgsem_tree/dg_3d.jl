@@ -62,9 +62,14 @@ function create_cache(mesh::TreeMesh{3},
     fstar3_L_threaded, fstar3_R_threaded = create_f_threaded(mesh, equations, dg,
                                                              uEltype)
 
+    cache_subcell_limiting = create_cache_subcell_limiting(mesh, equations,
+                                                           volume_integral, dg,
+                                                           cache_containers, uEltype)
+
     return (; fstar1_L_threaded, fstar1_R_threaded,
             fstar2_L_threaded, fstar2_R_threaded,
-            fstar3_L_threaded, fstar3_R_threaded)
+            fstar3_L_threaded, fstar3_R_threaded,
+            cache_subcell_limiting...)
 end
 
 # The methods below are specialized on the mortar type
@@ -1710,12 +1715,12 @@ function apply_jacobian!(backend::Nothing, du, mesh::TreeMesh{3},
 end
 
 # Need dimension specific version to avoid error at dispatching
-function calc_sources!(du, u, t, source_terms::Nothing,
+function calc_sources!(backend::Nothing, du, u, t, source_terms::Nothing,
                        equations::AbstractEquations{3}, dg::DG, cache)
     return nothing
 end
 
-function calc_sources!(du, u, t, source_terms,
+function calc_sources!(backend::Nothing, du, u, t, source_terms,
                        equations::AbstractEquations{3}, dg::DG, cache)
     @unpack node_coordinates = cache.elements
 
