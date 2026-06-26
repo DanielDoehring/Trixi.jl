@@ -621,4 +621,36 @@ end
     # for Dirichlet boundary conditions, we do not impose any conditions on the parabolic fluxes
     return flux_inner
 end
+
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,
+                                                                        <:RadiativeEquilibrium})(flux_inner,
+                                                                                                 u_inner,
+                                                                                                 normal::AbstractVector,
+                                                                                                 x,
+                                                                                                 t,
+                                                                                                 operator_type::Gradient,
+                                                                                                 equations::CompressibleNavierStokesDiffusion2D{GradientVariablesPrimitive})
+    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x,
+                                                                                    t,
+                                                                                    equations)
+
+    T_inner = u_inner[4]
+    rad_bc = boundary_condition.boundary_condition_heat_flux
+
+    T_w = solve_radiative_equilibrium_temperature(T_inner, rad_bc, equations)
+
+    return SVector(u_inner[1], v1, v2, T_w)
+end
+
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,
+                                                                        <:RadiativeEquilibrium})(flux_inner,
+                                                                                                 u_inner,
+                                                                                                 normal::AbstractVector,
+                                                                                                 x,
+                                                                                                 t,
+                                                                                                 operator_type::Divergence,
+                                                                                                 equations::CompressibleNavierStokesDiffusion2D{GradientVariablesPrimitive})
+    # Same as no-slip isothermal
+    return flux_inner
+end
 end # @muladd

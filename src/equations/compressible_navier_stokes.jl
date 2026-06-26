@@ -151,6 +151,150 @@ if the diffusion term is linear in the variables/constant.
 """
 @inline have_constant_diffusivity(::AbstractCompressibleNavierStokesDiffusion) = False()
 
+# Radiative-equilibrium no-slip wall BC for CompressibleNavierStokesDiffusion1D
+#
+# Physics: convective/conductive heat reaching the wall is balanced by
+# grey-body radiative emission to a cold far field (neglecting incoming
+# radiation):
+#
+#     k(T_w) * dT/dn|_w  =  eps * sigma * (T_w^4 - T_far_field^4)
+#
+# T_w is not prescribed -- it's the root of this nonlinear balance, solved
+# locally (per boundary node) via Newton's method, using a one-sided estimate
+# of dT/dn purely as the *iteration* surrogate. Trixi's own (more accurate,
+# lifted) gradient machinery is what actually gets used in the real flux,
+# once we hand back the converged T_w as the boundary value -- exactly the
+# same structural slot the built-in `Isothermal` BC fills with a prescribed T.
+
+"""
+    RadiativeEquilibrium
+ 
+Marker type analogous to `Trixi.Isothermal` / `Trixi.Adiabatic`, to be used as
+the temperature-BC slot of `BoundaryConditionNavierStokesWall`:
+ 
+    BoundaryConditionNavierStokesWall(NoSlip(velocity_fn),
+                                       RadiativeEquilibrium(eps, sigma, dist_fn))
+ 
+    # with a nonzero far-field/background temperature:
+    BoundaryConditionNavierStokesWall(NoSlip(velocity_fn),
+                                       RadiativeEquilibrium(eps, sigma, dist_fn;
+                                                             T_far_field = 300.0))
+ 
+`emissivity`, `stefan_boltzmann`, and `T_far_field` may each be `Real` or
+callables `(x, t, equations) -> Real`, to allow spatially/temporally varying
+values. The radiative balance solved is
+ 
+    k(T_w) * (T_inner - T_w) / delta  =  eps * sigma * (T_w^4 - T_far_field^4)
+ 
+`T_far_field = 0` recovers the "neglect far-field" case.
+ 
+IMPORTANT -- what `boundary_node_distance` is and why it matters:
+There is no mesh/basis object available inside a `BoundaryConditionNavierStokesWall`
+call, so Trixi cannot hand you the LGL node spacing automatically. But this
+function's job is NOT cosmetic: it supplies `delta`, the one-sided distance used
+in a *local* finite-difference estimate of dT/dn,
+ 
+    dT/dn|_w  ~=  (T_inner - T_w) / delta
+ 
+which only exists to give the *Newton iteration inside this BC* a residual to
+drive to zero. Trixi's own (BR1-lifted) gradient, used in the real flux that
+actually enters the RHS, is computed completely separately and does NOT use
+`delta` at all -- once T_w has converged, Trixi recomputes the gradient itself
+from the returned boundary value, the same way it does for `Isothermal`.
+ 
+However, because `delta` appears directly inside the iteration's residual,
+the *converged* T_w does depend on what `delta` you supply -- a wrong delta
+gives a different fixed point, not just a slower path to the same one. Get
+delta right: for DGSEM with LGL nodes of degree `p` on an element of physical
+length `L`,
+ 
+    delta = (L / 2) * (nodes[2] - nodes[1])   # nodes from dg.basis.nodes
+ 
+is the genuine physical distance from the boundary node to the nearest
+interior node, and should be closed over from your basis/mesh object at BC
+construction time, e.g.:
+ 
+    nodes = dg.basis.nodes  # reference LGL nodes on [-1, 1]
+    delta = dx / 2 * (nodes[2] - nodes[1])
+    dist_fn(x, direction) = delta
+"""
+struct RadiativeEquilibrium{MinBndNodeDistance <: Real,
+                            Emissivity <: Real,
+                            Absorptivity <: Real,
+                            TempFarfield <: Real,
+                            StefanBoltzmannConst <: Real}
+    min_bnd_node_distance::MinBndNodeDistance
+    emissivity::Emissivity
+    absorptivity::Absorptivity
+    temp_farfield::TempFarfield
+    stefan_boltzmann_const::StefanBoltzmannConst
+end
+
+"""
+    RadiativeEquilibrium(; 
+        boundary_node_distance,
+        emissivity = 1.0, absorptivity = 1.0,
+        T_far_field = 0.0f0, stefan_boltzmann = 5.670374419f-8)
+"""
+function RadiativeEquilibrium(; boundary_node_distance,
+                              emissivity = 1.0, absorptivity = 1.0,
+                              T_far_field = 0.0f0, stefan_boltzmann = 5.670374419f-8)
+    return RadiativeEquilibrium{typeof(boundary_node_distance),
+                              typeof(emissivity), typeof(absorptivity),
+                              typeof(T_far_field), typeof(stefan_boltzmann)}(
+        boundary_node_distance, emissivity, absorptivity, T_far_field, stefan_boltzmann)
+end
+
+# ----------------------------------------------------------------------------
+# Newton solve for T_w from the local radiative-equilibrium balance.
+#
+# Residual:  R(T_w) = k(T_w) * (T_inner - T_w) / delta
+#                      - eps * sigma * (T_w^4 - T_far_field^4)
+#
+# `delta` is the boundary-to-nearest-interior-node distance used in the
+# one-sided dT/dn estimate that drives this Newton iteration; Trixi's real
+# lifted gradient is what gets used downstream once T_w has converged.
+# ----------------------------------------------------------------------------
+@inline function solve_radiative_equilibrium_temperature(T_inner, rad_bc,
+    equations)
+
+    eps = rad_bc.emissivity
+    alpha = rad_bc.absorptivity
+    sigma = rad_bc.stefan_boltzmann_const
+    delta = rad_bc.boundary_node_distance
+
+    @unpack kappa = equations
+
+    T_w = T_inner
+    T_far4 = rad_bc.temp_farfield^4
+ 
+    for _ in 1:max_iter
+        # TODO: Currently hard-coded to constant mu and kappa
+
+        # Estimate the thermal conductivity and its derivative at the wall temperature
+        # TODO: Empirical formula for specific heat transfer from fluid to solid
+        q_cond = kappa * (T_inner - T_w) / delta * alpha
+        q_rad = eps * sigma * (T_w^4 - T_far4)
+        q_diff = q_cond - q_rad
+ 
+        dq_cond_dT = - kappa / delta
+        dq_rad_dT = 4 * eps * sigma * T_w^3
+        dq_diff_dT = dq_cond_dT - dq_rad_dT
+ 
+        dT = -q_diff / dq_diff_dT
+        T_w += dT
+        T_w = max(T_w, 1)
+ 
+        if abs(dT) < tol * max(T_w, 1)
+            break
+        end
+    end
+ 
+    return T_w
+end
+
+
+
 include("compressible_navier_stokes_1d.jl")
 include("compressible_navier_stokes_2d.jl")
 include("compressible_navier_stokes_3d.jl")
