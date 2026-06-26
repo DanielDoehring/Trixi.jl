@@ -218,29 +218,28 @@ construction time, e.g.:
     delta = dx / 2 * (nodes[2] - nodes[1])
     dist_fn(x, direction) = delta
 """
-struct RadiativeEquilibrium{MinBndNodeDistance <: Real,
-                            Emissivity <: Real,
+struct RadiativeEquilibrium{
+    ConvectiveHeatTransferCoefficient <: Real,
+    Emissivity <: Real,
                             Absorptivity <: Real,
                             TempFarfield <: Real,
                             StefanBoltzmannConst <: Real}
-    min_bnd_node_distance::MinBndNodeDistance
+    convective_heat_transfer_coefficient::ConvectiveHeatTransferCoefficient
     emissivity::Emissivity
-    absorptivity::Absorptivity
     temp_farfield::TempFarfield
     stefan_boltzmann_const::StefanBoltzmannConst
 end
 
 """
-    RadiativeEquilibrium(; 
-        boundary_node_distance,
-        emissivity = 1.0, absorptivity = 1.0,
+    RadiativeEquilibrium(;
+
+        emissivity = 1.0,
         T_far_field = 0.0f0, stefan_boltzmann = 5.670374419f-8)
 """
-function RadiativeEquilibrium(; boundary_node_distance,
-                              emissivity = 1.0, absorptivity = 1.0,
+function RadiativeEquilibrium(;
+                              emissivity = 1.0,
                               T_far_field = 0.0f0, stefan_boltzmann = 5.670374419f-8)
-    return RadiativeEquilibrium{typeof(boundary_node_distance),
-                              typeof(emissivity), typeof(absorptivity),
+    return RadiativeEquilibrium{typeof(emissivity), typeof(absorptivity),
                               typeof(T_far_field), typeof(stefan_boltzmann)}(
         boundary_node_distance, emissivity, absorptivity, T_far_field, stefan_boltzmann)
 end
@@ -258,10 +257,9 @@ end
 @inline function solve_radiative_equilibrium_temperature(T_inner, rad_bc,
     equations)
 
+    h = rad_bc.conv_heat_transfer_coefficient
     eps = rad_bc.emissivity
-    alpha = rad_bc.absorptivity
     sigma = rad_bc.stefan_boltzmann_const
-    delta = rad_bc.boundary_node_distance
 
     @unpack kappa = equations
 
@@ -269,15 +267,11 @@ end
     T_far4 = rad_bc.temp_farfield^4
  
     for _ in 1:max_iter
-        # TODO: Currently hard-coded to constant mu and kappa
-
-        # Estimate the thermal conductivity and its derivative at the wall temperature
-        # TODO: Empirical formula for specific heat transfer from fluid to solid
-        q_cond = kappa * (T_inner - T_w) / delta * alpha
+        q_cond = h * (T_inner - T_w)
         q_rad = eps * sigma * (T_w^4 - T_far4)
         q_diff = q_cond - q_rad
  
-        dq_cond_dT = - kappa / delta
+        dq_cond_dT = -h
         dq_rad_dT = 4 * eps * sigma * T_w^3
         dq_diff_dT = dq_cond_dT - dq_rad_dT
  
