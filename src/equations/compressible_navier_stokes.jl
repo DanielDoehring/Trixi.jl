@@ -244,19 +244,10 @@ function RadiativeEquilibrium(;
         boundary_node_distance, emissivity, absorptivity, T_far_field, stefan_boltzmann)
 end
 
-# ----------------------------------------------------------------------------
-# Newton solve for T_w from the local radiative-equilibrium balance.
-#
-# Residual:  R(T_w) = k(T_w) * (T_inner - T_w) / delta
-#                      - eps * sigma * (T_w^4 - T_far_field^4)
-#
-# `delta` is the boundary-to-nearest-interior-node distance used in the
-# one-sided dT/dn estimate that drives this Newton iteration; Trixi's real
-# lifted gradient is what gets used downstream once T_w has converged.
-# ----------------------------------------------------------------------------
 @inline function solve_radiative_equilibrium_temperature(T_inner, rad_bc,
     equations)
 
+    # TODO: Reconstruct h on-the fly from flux_inner?
     h = rad_bc.conv_heat_transfer_coefficient
     eps = rad_bc.emissivity
     sigma = rad_bc.stefan_boltzmann_const
