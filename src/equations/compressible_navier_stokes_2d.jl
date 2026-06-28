@@ -635,9 +635,15 @@ end
                                                                                     equations)
 
     T_inner = u_inner[4]
+
+    mu = dynamic_viscosity(u_inner, equations)
+    _, tau_1n, tau_2n, normal_energy_flux = flux_inner
+    normal_heat_flux = normal_energy_flux - (v1 * tau_1n + v2 * tau_2n) * mu
+
     rad_bc = boundary_condition.boundary_condition_heat_flux
 
-    T_w = solve_radiative_equilibrium_temperature(T_inner, rad_bc, equations)
+    T_w = solve_radiative_equilibrium_temperature(T_inner, normal_heat_flux,
+                                                  rad_bc)
 
     return SVector(u_inner[1], v1, v2, T_w)
 end

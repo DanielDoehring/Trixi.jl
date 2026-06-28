@@ -187,98 +187,72 @@ values. The radiative balance solved is
     k(T_w) * (T_inner - T_w) / delta  =  eps * sigma * (T_w^4 - T_far_field^4)
  
 `T_far_field = 0` recovers the "neglect far-field" case.
- 
-IMPORTANT -- what `boundary_node_distance` is and why it matters:
-There is no mesh/basis object available inside a `BoundaryConditionNavierStokesWall`
-call, so Trixi cannot hand you the LGL node spacing automatically. But this
-function's job is NOT cosmetic: it supplies `delta`, the one-sided distance used
-in a *local* finite-difference estimate of dT/dn,
- 
-    dT/dn|_w  ~=  (T_inner - T_w) / delta
- 
-which only exists to give the *Newton iteration inside this BC* a residual to
-drive to zero. Trixi's own (BR1-lifted) gradient, used in the real flux that
-actually enters the RHS, is computed completely separately and does NOT use
-`delta` at all -- once T_w has converged, Trixi recomputes the gradient itself
-from the returned boundary value, the same way it does for `Isothermal`.
- 
-However, because `delta` appears directly inside the iteration's residual,
-the *converged* T_w does depend on what `delta` you supply -- a wrong delta
-gives a different fixed point, not just a slower path to the same one. Get
-delta right: for DGSEM with LGL nodes of degree `p` on an element of physical
-length `L`,
- 
-    delta = (L / 2) * (nodes[2] - nodes[1])   # nodes from dg.basis.nodes
- 
-is the genuine physical distance from the boundary node to the nearest
-interior node, and should be closed over from your basis/mesh object at BC
-construction time, e.g.:
- 
-    nodes = dg.basis.nodes  # reference LGL nodes on [-1, 1]
-    delta = dx / 2 * (nodes[2] - nodes[1])
-    dist_fn(x, direction) = delta
 """
-struct RadiativeEquilibrium{
-    ConvectiveHeatTransferCoefficient <: Real,
-    Emissivity <: Real,
-                            Absorptivity <: Real,
+struct RadiativeEquilibrium{Emissivity <: Real,
+                            TempWall <: Real,
                             TempFarfield <: Real,
                             StefanBoltzmannConst <: Real}
-    convective_heat_transfer_coefficient::ConvectiveHeatTransferCoefficient
     emissivity::Emissivity
+    temp_wall::TempWall
     temp_farfield::TempFarfield
     stefan_boltzmann_const::StefanBoltzmannConst
 end
 
 """
     RadiativeEquilibrium(;
-
-        emissivity = 1.0,
-        T_far_field = 0.0f0, stefan_boltzmann = 5.670374419f-8)
+                         emissivity = 1.0,
+                         T_far_field = 0.0f0,
+                         T_wall = 0.0f0,
+                         stefan_boltzmann = 5.670374419f-8)
 """
 function RadiativeEquilibrium(;
                               emissivity = 1.0,
-                              T_far_field = 0.0f0, stefan_boltzmann = 5.670374419f-8)
-    return RadiativeEquilibrium{typeof(emissivity), typeof(absorptivity),
-                              typeof(T_far_field), typeof(stefan_boltzmann)}(
-        boundary_node_distance, emissivity, absorptivity, T_far_field, stefan_boltzmann)
+                              T_far_field = 0.0f0, T_wall = 0.0f0,
+                              stefan_boltzmann = 5.670374419f-8)
+    return RadiativeEquilibrium{typeof(emissivity),
+                                typeof(T_far_field), typeof(T_wall),
+                                typeof(stefan_boltzmann)}(emissivity,
+                                                          T_far_field, T_wall,
+                                                          stefan_boltzmann)
 end
 
-@inline function solve_radiative_equilibrium_temperature(T_inner, rad_bc,
-    equations)
+@inline function solve_radiative_equilibrium_temperature(T_inner, normal_heat_flux,
+                                                         rad_bc)
 
     # TODO: Reconstruct h on-the fly from flux_inner?
-    h = rad_bc.conv_heat_transfer_coefficient
+    #h = rad_bc.conv_heat_transfer_coefficient
+    # This approach uses the old wall temperature to compute the convective heat transfer coefficient
+    T_wall = rad_bc.temp_wall
+    h = normal_heat_flux / (T_wall - T_inner)
+
     eps = rad_bc.emissivity
     sigma = rad_bc.stefan_boltzmann_const
+    rel_tol = 1e-8 # TODO: Make field of BC
 
-    @unpack kappa = equations
-
-    T_w = T_inner
     T_far4 = rad_bc.temp_farfield^4
- 
+
     for _ in 1:max_iter
-        q_cond = h * (T_inner - T_w)
-        q_rad = eps * sigma * (T_w^4 - T_far4)
+        T_wall_3 = T_wall^3
+
+        q_cond = h * (T_inner - T_wall)
+        q_rad = eps * sigma * (T_wall_3 * T_wall - T_far4)
         q_diff = q_cond - q_rad
- 
+
         dq_cond_dT = -h
-        dq_rad_dT = 4 * eps * sigma * T_w^3
+        dq_rad_dT = 4 * eps * sigma * T_wall_3
         dq_diff_dT = dq_cond_dT - dq_rad_dT
- 
+
         dT = -q_diff / dq_diff_dT
-        T_w += dT
-        T_w = max(T_w, 1)
- 
-        if abs(dT) < tol * max(T_w, 1)
+        rad_bc.temp_wall += dT
+        T_wall = max(T_wall, 1)
+
+        if abs(dT) < rel_tol * max(T_wall, 1)
             break
         end
     end
- 
-    return T_w
+
+    return T_wall
 end
-
-
 
 include("compressible_navier_stokes_1d.jl")
 include("compressible_navier_stokes_2d.jl")
