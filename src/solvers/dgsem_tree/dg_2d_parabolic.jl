@@ -51,7 +51,7 @@ function rhs_parabolic!(du, u, t, mesh::Union{TreeMesh{2}, TreeMesh{3}},
     @trixi_timeit timer() "calculate gradient" begin
         calc_gradient!(gradients, u_transformed, t, mesh,
                        equations_parabolic, boundary_conditions_parabolic,
-                       dg, parabolic_scheme, cache)
+                       dg, parabolic_scheme, cache, cache_parabolic)
     end
 
     prolong_gradients2boundaries!(cache_parabolic, cache, gradients,
@@ -542,7 +542,7 @@ function get_unsigned_normal_vector_2d(direction)
     end
 end
 
-function calc_boundary_flux_gradient!(cache, t,
+function calc_boundary_flux_gradient!(cache, cache_parabolic, t,
                                       boundary_conditions_parabolic::BoundaryConditionPeriodic,
                                       mesh::Union{TreeMesh{2}, P4estMesh{2}},
                                       equations_parabolic::AbstractEquationsParabolic,
@@ -558,7 +558,7 @@ function calc_boundary_flux_divergence!(cache, t,
     return nothing
 end
 
-function calc_boundary_flux_gradient!(cache, t,
+function calc_boundary_flux_gradient!(cache, cache_parabolic, t,
                                       boundary_conditions_parabolic::NamedTuple,
                                       mesh::TreeMesh{2}, # for dispatch only
                                       equations_parabolic::AbstractEquationsParabolic,
@@ -574,22 +574,22 @@ function calc_boundary_flux_gradient!(cache, t,
     calc_boundary_flux_by_direction_gradient!(surface_flux_values, t,
                                               boundary_conditions_parabolic[1],
                                               equations_parabolic, surface_integral,
-                                              dg, cache,
+                                              dg, cache, cache_parabolic,
                                               1, firsts[1], lasts[1])
     calc_boundary_flux_by_direction_gradient!(surface_flux_values, t,
                                               boundary_conditions_parabolic[2],
                                               equations_parabolic, surface_integral,
-                                              dg, cache,
+                                              dg, cache, cache_parabolic,
                                               2, firsts[2], lasts[2])
     calc_boundary_flux_by_direction_gradient!(surface_flux_values, t,
                                               boundary_conditions_parabolic[3],
                                               equations_parabolic, surface_integral,
-                                              dg, cache,
+                                              dg, cache, cache_parabolic,
                                               3, firsts[3], lasts[3])
     calc_boundary_flux_by_direction_gradient!(surface_flux_values, t,
                                               boundary_conditions_parabolic[4],
                                               equations_parabolic, surface_integral,
-                                              dg, cache,
+                                              dg, cache, cache_parabolic,
                                               4, firsts[4], lasts[4])
 
     return nothing
@@ -1174,7 +1174,7 @@ end
 function calc_gradient!(gradients, u_transformed, t,
                         mesh::Union{TreeMesh{2}, TreeMesh{3}},
                         equations_parabolic, boundary_conditions_parabolic,
-                        dg::DG, parabolic_scheme, cache)
+                        dg::DG, parabolic_scheme, cache, cache_parabolic)
     backend = trixi_backend(u_transformed)
 
     # Reset gradients
@@ -1211,7 +1211,7 @@ function calc_gradient!(gradients, u_transformed, t,
 
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
-        calc_boundary_flux_gradient!(cache, t,
+        calc_boundary_flux_gradient!(cache, cache_parabolic, t,
                                      boundary_conditions_parabolic, mesh,
                                      equations_parabolic,
                                      dg.surface_integral, dg)
