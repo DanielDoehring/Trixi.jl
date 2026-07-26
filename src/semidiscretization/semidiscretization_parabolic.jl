@@ -62,7 +62,9 @@ function SemidiscretizationParabolic(mesh, equations::AbstractEquationsParabolic
     check_periodicity_mesh_boundary_conditions(mesh, _boundary_conditions)
 
     cache_parabolic = create_cache_parabolic(mesh, equations, solver,
-                                             nelements(solver, cache), uEltype)
+                                             nelements(solver, cache),
+                                             nboundaries(cache.boundaries),
+                                             uEltype)
 
     performance_counter = PerformanceCounter()
 

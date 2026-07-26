@@ -9,8 +9,8 @@
 # It constructs the basic `cache` used throughout the simulation to compute
 # the RHS etc.
 function create_cache_parabolic(mesh::TreeMesh{1},
-                                equations_hyperbolic::AbstractEquations,
-                                dg::DG, n_elements, uEltype)
+                                equations_hyperbolic::AbstractEquations, dg::DG,
+                                n_elements, n_boundaries, uEltype)
     parabolic_container = init_parabolic_container_1d(nvariables(equations_hyperbolic),
                                                       nnodes(dg), n_elements,
                                                       uEltype)
