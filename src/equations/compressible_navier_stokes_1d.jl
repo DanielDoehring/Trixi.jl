@@ -260,7 +260,7 @@ end
 
 This directly converts entropy variables `w` to velocity and temperature, which are computed 
 from the entropy variables via 
-``T = -1/w_3`` and ``v_1 = -w_2/w_3``, where ``w_3 = -\\rho/p`` following
+``T = -1/(w_3 * R)`` and ``v_1 = -w_2/w_3``, where ``w_3 = -\\rho/p`` following
 
 - Hughes, Franca, Mallet (1986) 
   A new finite element formulation for CFD
@@ -270,7 +270,7 @@ from the entropy variables via
                                               ::AbstractCompressibleNavierStokesDiffusion{1,
                                                                                           3})
     inv_w3 = inv(w[3])
-    T = -inv_w3
+    T = -inv_w3 / equations.R
     v1 = -w[2] * inv_w3
     return SVector(v1, T)
 end
@@ -462,8 +462,8 @@ end
     T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t,
                                                                                 equations)
 
-    # the entropy variables w2 = rho * v1 / p = v1 / T = -v1 * w3.
-    w3 = -1 / T
+    # the entropy variables w2 = rho * v1 / p = v1 / (R * T) = -v1 * w3.
+    w3 = -1 / (equations.R * T)
     return SVector(w_inner[1], -v1 * w3, w3)
 end
 
