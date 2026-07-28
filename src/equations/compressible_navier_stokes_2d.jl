@@ -289,10 +289,10 @@ from the entropy variables via
 
 """
 @inline function entropy2velocity_temperature(w,
-                                              ::AbstractCompressibleNavierStokesDiffusion{2,
+                                              equations_parabolic::AbstractCompressibleNavierStokesDiffusion{2,
                                                                                           4})
     inv_w4 = inv(w[4])
-    T = -inv_w4 / equations.R
+    T = -inv_w4 / equations_parabolic.R
     v1 = -w[2] * inv_w4
     v2 = -w[3] * inv_w4
     return SVector(v1, v2, T)
