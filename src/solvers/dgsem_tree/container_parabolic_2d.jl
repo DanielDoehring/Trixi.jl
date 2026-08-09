@@ -89,8 +89,12 @@ function Base.resize!(parabolic_container::ParabolicContainer2D, equations, dg, 
     return nothing
 end
 
+abstract type AbstractParabolicGradientBoundaryContainer2D <:
+              AbstractParabolicGradientBoundaryContainer end
+
 # Container is only for `TreeMesh`
-mutable struct TreeParabolicGradientBoundaryContainer2D{uEltype <: Real}
+mutable struct TreeParabolicGradientBoundaryContainer2D{uEltype <: Real} <:
+               AbstractParabolicGradientBoundaryContainer2D
     # ([leftright, variables, noes, boundaries],
     #  [leftright, variables, nodes, boundaries])
     gradients::NTuple{2, Array{uEltype, 4}}

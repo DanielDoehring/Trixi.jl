@@ -1,5 +1,6 @@
 # Container is only for `P4estMesh`
-mutable struct P4estParabolicGradientBoundaryContainer2D{uEltype <: Real}
+mutable struct P4estParabolicGradientBoundaryContainer2D{uEltype <: Real} <:
+               AbstractParabolicGradientBoundaryContainer2D
     # ([variables, noes, boundaries],
     #  [variables, nodes, boundaries])
     gradients::NTuple{2, Array{uEltype, 3}}

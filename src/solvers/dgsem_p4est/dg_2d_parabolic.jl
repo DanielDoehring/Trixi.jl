@@ -47,6 +47,11 @@ function rhs_parabolic!(backend::Nothing, du, u, t,
                        dg, parabolic_scheme, cache)
     end
 
+    if mesh isa P4estMesh{2}
+        prolong_gradients2boundaries!(cache_parabolic, cache, gradients,
+                                      mesh, equations_parabolic, dg)
+    end
+
     # Compute and store the parabolic fluxes
     @trixi_timeit timer() "calculate parabolic fluxes" begin
         calc_parabolic_fluxes!(flux_parabolic, gradients, u_transformed, mesh,
@@ -100,7 +105,7 @@ function rhs_parabolic!(backend::Nothing, du, u, t,
     # Calculate boundary fluxes.
     # This calls the specialized version for parabolic equations.
     @trixi_timeit timer() "boundary flux" begin
-        calc_boundary_flux_divergence!(cache, t,
+        calc_boundary_flux_divergence!(cache, cache_parabolic, t,
                                        boundary_conditions_parabolic, mesh,
                                        equations_parabolic,
                                        dg.surface_integral, dg)
@@ -992,6 +997,18 @@ function calc_boundary_flux_divergence!(cache, t, boundary_conditions, mesh::P4e
     return nothing
 end
 
+function calc_boundary_flux_divergence!(cache, cache_parabolic, t, boundary_conditions,
+                                        mesh::P4estMesh,
+                                        equations_parabolic, surface_integral, dg::DG)
+    (; boundary_condition_types, boundary_indices) = boundary_conditions
+
+    calc_boundary_flux_by_type!(cache, cache_parabolic, t,
+                                boundary_condition_types, boundary_indices,
+                                Divergence(), mesh, equations_parabolic,
+                                surface_integral, dg)
+    return nothing
+end
+
 # Iterate over tuples of boundary condition types and associated indices
 # in a type-stable way using "lispy tuple programming".
 function calc_boundary_flux_by_type!(cache, t, BCs::NTuple{N, Any},
@@ -1022,6 +1039,42 @@ end
 
 # terminate the type-stable iteration over tuples
 function calc_boundary_flux_by_type!(cache, t, BCs::Tuple{}, BC_indices::Tuple{},
+                                     operator_type, mesh::P4estMesh,
+                                     equations_parabolic,
+                                     surface_integral, dg::DG)
+    return nothing
+end
+
+function calc_boundary_flux_by_type!(cache, cache_parabolic, t, BCs::NTuple{N, Any},
+                                     BC_indices::NTuple{N, Vector{Int}},
+                                     operator_type,
+                                     mesh::P4estMesh,
+                                     equations_parabolic, surface_integral,
+                                     dg::DG) where {N}
+    # Extract the boundary condition type and index vector
+    boundary_condition = first(BCs)
+    boundary_condition_indices = first(BC_indices)
+    # Extract the remaining types and indices to be processed later
+    remaining_boundary_conditions = Base.tail(BCs)
+    remaining_boundary_condition_indices = Base.tail(BC_indices)
+
+    # process the first boundary condition type
+    calc_boundary_flux!(cache, cache_parabolic, t,
+                        boundary_condition, boundary_condition_indices,
+                        operator_type, mesh, equations_parabolic, surface_integral, dg)
+
+    # recursively call this method with the unprocessed boundary types
+    calc_boundary_flux_by_type!(cache, cache_parabolic, t,
+                                remaining_boundary_conditions,
+                                remaining_boundary_condition_indices,
+                                operator_type,
+                                mesh, equations_parabolic, surface_integral, dg)
+
+    return nothing
+end
+
+function calc_boundary_flux_by_type!(cache, cache_parabolic, t,
+                                     BCs::Tuple{}, BC_indices::Tuple{},
                                      operator_type, mesh::P4estMesh,
                                      equations_parabolic,
                                      surface_integral, dg::DG)
@@ -1088,6 +1141,89 @@ function calc_boundary_flux!(cache, t,
     end
 
     return nothing
+end
+
+function calc_boundary_flux!(cache, cache_parabolic, t,
+                             boundary_condition_parabolic, # works with Dict types
+                             boundary_condition_indices,
+                             operator_type, mesh::P4estMesh{2},
+                             equations_parabolic::AbstractEquationsParabolic,
+                             surface_integral, dg::DG)
+    (; boundaries) = cache
+    (; node_coordinates, surface_flux_values) = cache.elements
+    (; contravariant_vectors) = cache.elements
+    (; gradients_at_boundaries_container) = cache_parabolic
+    gradient_1, gradient_2 = gradients_at_boundaries_container.gradients
+    index_range = eachnode(dg)
+
+    @threaded for local_index in eachindex(boundary_condition_indices)
+        # Use the local index to get the global boundary index from the pre-sorted list
+        boundary_index = boundary_condition_indices[local_index]
+
+        # Get information on the adjacent element, compute the surface fluxes,
+        # and store them
+        element = boundaries.neighbor_ids[boundary_index]
+        node_indices = boundaries.node_indices[boundary_index]
+        direction_index = indices2direction(node_indices)
+
+        i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
+        j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
+
+        i_node = i_node_start
+        j_node = j_node_start
+        for node_index in eachnode(dg)
+            # Extract solution data from boundary container
+            u_inner = get_node_vars(boundaries.u, equations_parabolic, dg, node_index,
+                                    boundary_index)
+
+            # Extract precomputed boundary gradients
+            gradient_1_inner = @view gradient_1[:, node_index, boundary_index]
+            gradient_2_inner = @view gradient_2[:, node_index, boundary_index]
+
+            # Outward-pointing normal direction (not normalized)
+            normal_direction = get_normal_direction(direction_index,
+                                                    contravariant_vectors,
+                                                    i_node, j_node, element)
+
+            # TODO: revisit if we want more general boundary treatments.
+            # This assumes the gradient numerical flux at the boundary is the gradient variable,
+            # which is consistent with BR1, LDG.
+            flux_inner = u_inner
+
+            # Coordinates at boundary node
+            x = get_node_coords(node_coordinates, equations_parabolic, dg,
+                                i_node, j_node, element)
+
+            flux_ = boundary_condition_parabolic(flux_inner, u_inner, normal_direction,
+                                                 x, t, operator_type,
+                                                 equations_parabolic)
+
+            # Copy flux to element storage in the correct orientation
+            for v in eachvariable(equations_parabolic)
+                surface_flux_values[v, node_index, direction_index, element] = flux_[v]
+            end
+
+            i_node += i_node_step
+            j_node += j_node_step
+        end
+    end
+
+    return nothing
+end
+
+# 3D does currently not contain the 
+function calc_boundary_flux!(cache, cache_parabolic, t,
+                             boundary_condition_parabolic, # works with Dict types
+                             boundary_condition_indices,
+                             operator_type, mesh::P4estMesh{3},
+                             equations_parabolic::AbstractEquationsParabolic,
+                             surface_integral, dg::DG)
+    return calc_boundary_flux!(cache, t,
+                               boundary_condition_parabolic,
+                               boundary_condition_indices,
+                               operator_type, mesh,
+                               equations_parabolic,
+                               surface_integral, dg)
 end
 
 function calc_surface_integral_gradient!(gradients,
