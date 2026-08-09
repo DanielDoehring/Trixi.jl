@@ -868,6 +868,41 @@ function prolong2boundaries!(cache, flux_parabolic::Tuple,
     return nothing
 end
 
+function prolong_gradients2boundaries!(cache_parabolic, cache, gradients::Tuple,
+                                       mesh::P4estMesh{2},
+                                       equations_parabolic::AbstractEquationsParabolic,
+                                       dg::DG)
+    (; gradients_at_boundaries_container) = cache_parabolic
+    gradient_1, gradient_2 = gradients_at_boundaries_container.gradients
+
+    (; boundaries) = cache
+    index_range = eachnode(dg)
+    gradient_x, gradient_y = gradients
+
+    @threaded for boundary in eachboundary(dg, cache)
+        # Copy gradient data from the element using "delayed indexing" with
+        # a start value and a step size to get the correct face and orientation.
+        element = boundaries.neighbor_ids[boundary]
+        node_indices = boundaries.node_indices[boundary]
+
+        i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
+        j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
+
+        i_node = i_node_start
+        j_node = j_node_start
+        for i in eachnode(dg)
+            for v in eachvariable(equations_parabolic)
+                gradient_1[v, i, boundary] = gradient_x[v, i_node, j_node, element]
+                gradient_2[v, i, boundary] = gradient_y[v, i_node, j_node, element]
+            end
+            i_node += i_node_step
+            j_node += j_node_step
+        end
+    end
+
+    return nothing
+end
+
 function calc_volume_integral_gradient!(gradients, u_transformed,
                                         mesh::P4estMesh{2}, # for dispatch only
                                         equations_parabolic::AbstractEquationsParabolic,
