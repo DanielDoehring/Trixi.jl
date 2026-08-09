@@ -632,6 +632,7 @@ function calc_boundary_flux_by_direction_gradient!(surface_flux_values::Abstract
             flux_inner = u_inner
 
             x = get_node_coords(node_coordinates, equations_parabolic, dg, i, boundary)
+            # TODO: Could use the gradient information here
             flux = boundary_condition(flux_inner, u_inner,
                                       get_unsigned_normal_vector_2d(direction),
                                       x, t, Gradient(), equations_parabolic)
