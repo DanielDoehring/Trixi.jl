@@ -921,6 +921,114 @@ function flux_hllc(u_ll, u_rr, orientation::Integer,
     return SVector(f1, f2, f3)
 end
 
+# TODO: Entry point AUSM+
+
+# Critical speed of sound a_star (a*)
+@inline function a_star(rho, v1, p,
+                        equations::CompressibleEulerEquations1D)
+    @unpack gamma = equations
+
+    a_squared = gamma * p / rho
+
+    # This is a_star from eq. (27)
+    return sqrt((2 * a_squared + (gamma - 1) * v1^2) / (gamma + 1))
+end
+
+# eq. (40)
+@inline function a_tilde(a_star, u_mag)
+    return a_star * a_star/maximum(a_star, u_mag)
+end
+
+# eq. (19b)
+@inline function split_mach_beta_plus(mach, beta = 0.5f0)
+    return 0.5f0 * (mach + 1)^2 + beta * (mach^2 - 1)^2
+end
+
+# eq. (19a)
+@inline function split_mach_plus(mach, beta = 0.5f0)
+    mach_abs = abs(mach)
+    if mach_abs > 1
+        return 0.5f0 * (mach + mach_abs)
+    else
+        return split_mach_beta_plus(mach, beta)
+    end
+end
+
+# eq. (19b)
+@inline function split_mach_beta_minus(mach, beta = 0.5f0)
+    return -0.5f0 * (mach - 1)^2 - beta * (mach^2 - 1)^2
+end
+
+# eq. (19a)
+@inline function split_mach_minus(mach, beta = 0.5)
+    mach_abs = abs(mach)
+    if mach_abs > 1
+        return 0.5f0 * (mach - mach_abs)
+    else
+        return split_mach_beta_minus(mach, beta)
+    end
+end
+
+@inline function split_pressure_alpha_plus(mach, alpha = 3/16)
+    return 0.25 * (mach + 1)^2 * (2 - mach) + alpha * mach * (mach^2 - 1)^2
+end
+
+@inline function split_pressure_plus(mach, alpha = 3/16)
+    if abs(mach) > 1
+        return 0.5 * (1 + sign(mach))
+    else
+        return split_pressure_alpha_plus(mach, alpha)
+    end
+end
+
+@inline function split_pressure_alpha_minus(mach, alpha = 3/16)
+    return 0.25 * (mach - 1)^2 * (2 + mach) - alpha * mach * (mach^2 - 1)^2
+end
+
+@inline function split_pressure_minus(mach, alpha = 3/16)
+    if abs(mach) > 1
+        return 0.5 * (1 - sign(mach))
+    else
+        return split_pressure_alpha_minus(mach, alpha)
+    end
+end
+
+function flux_ausmplus(u_ll, u_rr, orientation::Integer,
+                       equations::CompressibleEulerEquations1D)
+    rho_ll, v1_ll, p_ll = cons2prim(u_ll, equations)
+    rho_rr, v1_rr, p_rr = cons2prim(u_rr, equations)
+
+    a_star_ll = a_star(rho_ll, v1_ll, p_ll, equations)
+    v1_ll_mag = abs(v1_ll)
+    a_tilde_ll = a_tilde(a_star_ll, v1_ll_mag)
+
+    a_star_rr = a_star(rho_rr, v1_rr, p_rr, equations)
+    v1_rr_mag = abs(v1_rr)
+    a_tilde_rr = a_tilde(a_star_rr, v1_rr_mag)
+
+    a_interface = minimum(a_tilde_ll, a_tilde_rr) # eq. (40)
+
+    # (A1)
+    mach_ll = v1_ll / a_interface
+    mach_rr = v1_rr / a_interface
+
+    # (A2)
+    mach_split_interface = split_mach_plus(mach_ll) + split_mach_minus(mach_rr)
+    mach_split_interface_abs = abs(mach_split_interface)
+
+    # (A2)
+    mach_split_interface_plus = 0.5 * (mach_split_interface + mach_split_interface_abs)
+    mach_split_interface_minus = 0.5 * (mach_split_interface - mach_split_interface_abs)
+
+    # (A2)
+    p_interface = p_split_plus(mach_ll) * p_ll + p_split_minus(mach_rr) * p_rr
+
+    flux_ll_scaled = mach_split_interface_plus * u_ll
+    flux_rr_scaled = mach_split_interface_minus * u_rr
+
+    return a_interface * (flux_ll_scaled + flux_rr_scaled) + SVector(0, p_interface, 0)
+end
+
 # While `normal_direction` isn't strictly necessary in 1D, certain solvers assume that
 # the normal component is incorporated into the numerical flux.
 #
