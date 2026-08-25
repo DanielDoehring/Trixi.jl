@@ -924,11 +924,11 @@ end
 # TODO: Entry point AUSM+
 
 # eq. (19b)
-@inline function split_mach_beta_plus(mach, beta = 0.5f0)
+@inline function split_mach_beta_plus(mach, beta = 1/8)
     return 0.5f0 * (mach + 1)^2 + beta * (mach^2 - 1)^2
 end
 # eq. (19a)
-@inline function split_mach_plus(mach, beta = 0.5f0)
+@inline function split_mach_plus(mach, beta = 1/8)
     mach_abs = abs(mach)
     if mach_abs >= 1
         return 0.5f0 * (mach + mach_abs)
@@ -938,11 +938,11 @@ end
 end
 
 # eq. (19b)
-@inline function split_mach_beta_minus(mach, beta = 0.5f0)
+@inline function split_mach_beta_minus(mach, beta = 1/8)
     return -0.5f0 * (mach - 1)^2 - beta * (mach^2 - 1)^2
 end
 # eq. (19a)
-@inline function split_mach_minus(mach, beta = 0.5)
+@inline function split_mach_minus(mach, beta = 1/8)
     mach_abs = abs(mach)
     if mach_abs >= 1
         return 0.5f0 * (mach - mach_abs)
@@ -986,7 +986,7 @@ end
 
 # eq. (40)
 @inline function a_tilde(a_star, u_mag)
-    return a_star * a_star/maximum(a_star, u_mag)
+    return a_star * a_star/max(a_star, u_mag)
 end
 
 function flux_ausmplus(u_ll, u_rr, orientation::Integer,
@@ -1002,7 +1002,7 @@ function flux_ausmplus(u_ll, u_rr, orientation::Integer,
     v1_rr_mag = abs(v1_rr)
     a_tilde_rr = a_tilde(a_star_rr, v1_rr_mag)
 
-    a_interface = minimum(a_tilde_ll, a_tilde_rr) # eq. (40)
+    a_interface = min(a_tilde_ll, a_tilde_rr) # eq. (40)
 
     # (A1)
     mach_ll = v1_ll / a_interface # M_j
@@ -1017,11 +1017,14 @@ function flux_ausmplus(u_ll, u_rr, orientation::Integer,
     mach_split_interface_minus = 0.5 * (mach_split_interface - mach_split_interface_abs) # m_{j + 1/2}^-
 
     # (A2)
-    p_interface = p_split_plus(mach_ll) * p_ll + p_split_minus(mach_rr) * p_rr # p_{j + 1/2}
+    p_interface = split_pressure_plus(mach_ll) * p_ll + split_pressure_minus(mach_rr) * p_rr # p_{j + 1/2}
 
     # (A3)
-    flux_ll_scaled = mach_split_interface_plus * u_ll
-    flux_rr_scaled = mach_split_interface_minus * u_rr
+    total_enthalpy_ll = u_ll[3] + p_ll
+    total_enthalpy_rr = u_rr[3] + p_rr
+
+    flux_ll_scaled = mach_split_interface_plus * SVector(u_ll[1], u_ll[2], total_enthalpy_ll)
+    flux_rr_scaled = mach_split_interface_minus * SVector(u_rr[1], u_rr[2], total_enthalpy_rr)
 
     # (A3)
     return a_interface * (flux_ll_scaled + flux_rr_scaled) + SVector(0, p_interface, 0)
