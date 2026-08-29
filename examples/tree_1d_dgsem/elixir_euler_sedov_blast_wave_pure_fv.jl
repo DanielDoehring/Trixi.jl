@@ -38,7 +38,8 @@ initial_condition = initial_condition_sedov_blast_wave
 
 surface_flux = flux_hllc
 basis = LobattoLegendreBasis(3)
-volume_integral = VolumeIntegralPureLGLFiniteVolume(flux_hllc)
+volume_integral = VolumeIntegralPureLGLFiniteVolume(Trixi.flux_ausmplus)
+#volume_integral = VolumeIntegralPureLGLFiniteVolume(flux_hllc)
 solver = DGSEM(basis, surface_flux, volume_integral)
 
 coordinates_min = (-2.0,)
@@ -53,7 +54,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 12.5)
+tspan = (0.0, 2.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
