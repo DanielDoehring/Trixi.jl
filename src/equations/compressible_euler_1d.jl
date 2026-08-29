@@ -925,7 +925,7 @@ end
 
 # eq. (19b)
 @inline function split_mach_beta_plus(mach, beta = 1/8)
-    return 0.5f0 * (mach + 1)^2 + beta * (mach^2 - 1)^2
+    return 0.25f0 * (mach + 1)^2 + beta * (mach^2 - 1)^2
 end
 # eq. (19a)
 @inline function split_mach_plus(mach, beta = 1/8)
@@ -939,7 +939,7 @@ end
 
 # eq. (19b)
 @inline function split_mach_beta_minus(mach, beta = 1/8)
-    return -0.5f0 * (mach - 1)^2 - beta * (mach^2 - 1)^2
+    return -0.25f0 * (mach - 1)^2 - beta * (mach^2 - 1)^2
 end
 # eq. (19a)
 @inline function split_mach_minus(mach, beta = 1/8)
