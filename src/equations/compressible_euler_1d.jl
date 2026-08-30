@@ -925,6 +925,7 @@ end
 
 # eq. (19b)
 @inline function split_mach_beta_plus(mach, beta = 1/8)
+    # Note: In the original paper there is a typo (0.5 instead of 0.25)
     return 0.25f0 * (mach + 1)^2 + beta * (mach^2 - 1)^2
 end
 # eq. (19a)
@@ -939,6 +940,7 @@ end
 
 # eq. (19b)
 @inline function split_mach_beta_minus(mach, beta = 1/8)
+    # Note: In the original paper there is a typo (0.5 instead of 0.25)
     return -0.25f0 * (mach - 1)^2 - beta * (mach^2 - 1)^2
 end
 # eq. (19a)
@@ -1027,6 +1029,54 @@ function flux_ausmplus(u_ll, u_rr, orientation::Integer,
     flux_rr_scaled = mach_split_interface_minus * SVector(u_rr[1], u_rr[2], total_enthalpy_rr)
 
     # (A3)
+    return a_interface * (flux_ll_scaled + flux_rr_scaled) + SVector(0, p_interface, 0)
+end
+
+function flux_ausmplusup(u_ll, u_rr, orientation::Integer,
+                         equations::CompressibleEulerEquations1D,
+                         K_u = 0.75) # TODO: somewhow possible to make this a true parameter?
+    rho_ll, v1_ll, p_ll = cons2prim(u_ll, equations)
+    rho_rr, v1_rr, p_rr = cons2prim(u_rr, equations)
+
+    a_star_ll = a_star(rho_ll, v1_ll, p_ll, equations)
+    v1_ll_mag = abs(v1_ll)
+    a_tilde_ll = a_tilde(a_star_ll, v1_ll_mag)
+
+    a_star_rr = a_star(rho_rr, v1_rr, p_rr, equations)
+    v1_rr_mag = abs(v1_rr)
+    a_tilde_rr = a_tilde(a_star_rr, v1_rr_mag)
+
+    a_interface = min(a_tilde_ll, a_tilde_rr)
+
+    mach_ll = v1_ll / a_interface # M_j
+    mach_rr = v1_rr / a_interface # M_{j + 1}
+
+    # (A2)
+    mach_split_interface = split_mach_plus(mach_ll) + split_mach_minus(mach_rr) # m_{j + 1/2}
+    mach_split_interface_abs = abs(mach_split_interface) # | m_{j + 1/2} |
+
+    # (A2)
+    mach_split_interface_plus = 0.5 * (mach_split_interface + mach_split_interface_abs) # m_{j + 1/2}^+
+    mach_split_interface_minus = 0.5 * (mach_split_interface - mach_split_interface_abs) # m_{j + 1/2}^-
+
+    # (A2S): Standard AUSM+ pressure split
+    p_interface = split_pressure_plus(mach_ll) * p_ll + split_pressure_minus(mach_rr) * p_rr # p_{j + 1/2}
+
+    # AUSM+-up Low-Mach Correction
+    rho_interface = 0.5 * (rho_ll + rho_rr)
+    a_star_interface = 0.5 * (a_star_ll + a_star_rr)
+    
+    # Pressure-velocity coupling correction (this is the "up" in AUSM+-up)
+    p_correction = K_u * split_pressure_plus(mach_ll) * split_pressure_minus(mach_rr) * 
+                   rho_interface * a_star_interface * (v1_rr - v1_ll)
+    p_interface += p_correction
+
+    total_enthalpy_ll = u_ll[3] + p_ll
+    total_enthalpy_rr = u_rr[3] + p_rr
+
+    flux_ll_scaled = mach_split_interface_plus * SVector(u_ll[1], u_ll[2], total_enthalpy_ll)
+    flux_rr_scaled = mach_split_interface_minus * SVector(u_rr[1], u_rr[2], total_enthalpy_rr)
+
     return a_interface * (flux_ll_scaled + flux_rr_scaled) + SVector(0, p_interface, 0)
 end
 
