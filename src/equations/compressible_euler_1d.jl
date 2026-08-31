@@ -1044,7 +1044,7 @@ function flux_ausmplusup(u_ll, u_rr, orientation::Integer,
 
     a_star_rr = a_star(rho_rr, v1_rr, p_rr, equations)
     v1_rr_mag = abs(v1_rr)
-    a_tilde_rr = a_tilde(a_star_rr, v1_rr_mag)
+    a_tilde_rr = a_tilde(a_star_rr, v1_rr_mag) # TODO: Check (30): Introduce -sign for _rr?
 
     a_interface = min(a_tilde_ll, a_tilde_rr)
 
@@ -1059,16 +1059,19 @@ function flux_ausmplusup(u_ll, u_rr, orientation::Integer,
     mach_split_interface_plus = 0.5 * (mach_split_interface + mach_split_interface_abs) # m_{j + 1/2}^+
     mach_split_interface_minus = 0.5 * (mach_split_interface - mach_split_interface_abs) # m_{j + 1/2}^-
 
-    # (A2S): Standard AUSM+ pressure split
-    p_interface = split_pressure_plus(mach_ll) * p_ll + split_pressure_minus(mach_rr) * p_rr # p_{j + 1/2}
+    # (A2): Standard AUSM+ pressure split
+    p_plus = split_pressure_plus(mach_ll) # \mathcal{P}^+
+    p_minus = split_pressure_minus(mach_ll) # \mathcal{P}^-
+    p_interface = p_plus * p_ll + p_minus * p_rr # p_{j + 1/2}
 
     # AUSM+-up Low-Mach Correction
     rho_interface = 0.5 * (rho_ll + rho_rr)
+    # TODO: If one follows eq. (28), this would be `a_interface`
     a_star_interface = 0.5 * (a_star_ll + a_star_rr)
     
     # Pressure-velocity coupling correction (this is the "up" in AUSM+-up)
-    p_correction = K_u * split_pressure_plus(mach_ll) * split_pressure_minus(mach_rr) * 
-                   rho_interface * a_star_interface * (v1_rr - v1_ll)
+    # TODO: Check with eq. (75). Questions: minus sign, rho_L + rho_R not divided by 2, factor fa
+    p_correction = K_u * p_plus * p_minus * rho_interface * a_star_interface * (v1_rr - v1_ll)
     p_interface += p_correction
 
     total_enthalpy_ll = u_ll[3] + p_ll
