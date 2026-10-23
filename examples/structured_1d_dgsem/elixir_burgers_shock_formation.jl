@@ -1,5 +1,3 @@
-using NonlinearSolveFirstOrder
-using ADTypes
 using OrdinaryDiffEqLowStorageRK
 using Trixi
 
@@ -9,9 +7,9 @@ using Trixi
 equations = InviscidBurgersEquation1D()
 
 basis = LobattoLegendreBasis(3)
-# Use shock capturing techniques to suppress oscillations at discontinuities
+# Use shock capturing techniques to suppress oscillations at discontinuities.
 # Note that this introduces additional numerical dissipation,
-# which leads to a non-stationary solution.
+# which causes the left and right states of the discontinuity to dampen out over time.
 indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 1.0,
                                          alpha_min = 0.001,
@@ -27,14 +25,13 @@ volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
 
 solver = DGSEM(basis, surface_flux, volume_integral)
 
-solver = DGSEM(basis, surface_flux)
-
 coordinates_min = (0.0,)
 coordinates_max = (1.0,)
 cells_per_dimension = (20,)
 
-refinement_strength = 0.8
-mapping(xi) = 0.5 * (xi - refinement_strength * sinpi(xi) / pi + 1)
+# Cluster cells around the shock location at x = 0.5
+refinement_strength() = 0.8
+mapping(xi) = 0.5 * (xi - refinement_strength() * sinpi(xi) / pi + 1)
 
 mesh = StructuredMesh(cells_per_dimension, mapping, periodicity = true)
 
@@ -48,24 +45,12 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
-# ODE/Steady State problem
+# ODE problem & Callbacks
 
-tspan = (0.0, 1e-6) # Does not matter for steady-state solve
+t_shock() = 1 / (2 * pi)
+tspan = (0.0, t_shock())
+
 ode = semidiscretize(semi, tspan)
-
-# Construct steady steate problem
-steady_state_prob = SteadyStateProblem(ode)
-
-alg = NewtonRaphson(autodiff = AutoFiniteDiff())
-
-sol_steady_state = NonlinearSolveFirstOrder.solve(steady_state_prob, alg; abstol = 1e-4)
-
-# Supply steady state solution as initial condition for time-dependent run
-#@assert SciMLBase.successful_retcode(sol_steady_state)
-ode.u0 .= sol_steady_state.u
-
-###############################################################################
-# Callbacks
 
 summary_callback = SummaryCallback()
 
@@ -85,5 +70,5 @@ callbacks = CallbackSet(summary_callback,
 
 sol = solve(ode,
             CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
-            dt = 42, # solve needs some value here but it will be overwritten by the stepsize_callback
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
             ode_default_options()..., callback = callbacks);
