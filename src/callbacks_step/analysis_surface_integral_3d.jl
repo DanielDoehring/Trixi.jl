@@ -265,4 +265,92 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
     end
     return surface_integral
 end
+
+function analyze(surface_variable::AnalysisSurfaceIntegral{Variable}, du, u, t,
+                 mesh::P4estMesh{3},
+                 equations, equations_parabolic,
+                 dg::DGSEM, cache, semi,
+                 cache_parabolic) where {Variable <: VariableViscous}
+    @unpack boundaries = cache
+    @unpack node_coordinates, contravariant_vectors = cache.elements
+    @unpack weights = dg.basis
+
+    @unpack variable, boundary_symbols = surface_variable
+    @unpack boundary_symbol_indices = semi.boundary_conditions
+    boundary_indices = get_boundary_indices(boundary_symbols, boundary_symbol_indices)
+
+    # Restore boundary values for parabolic equations
+    # which overwrite the solution boundary values with the gradients
+    prolong2boundaries!(cache, u, mesh, equations, dg)
+
+    # Additions for parabolic
+    @unpack viscous_container = cache_parabolic
+    @unpack gradients = viscous_container
+
+    gradients_x, gradients_y, gradients_z = gradients
+
+    surface_integral = zero(eltype(u))
+    index_range = eachnode(dg)
+    for boundary in boundary_indices
+        element = boundaries.neighbor_ids[boundary]
+        node_indices = boundaries.node_indices[boundary]
+        direction = indices2direction(node_indices)
+
+        i_node_start, i_node_step_i, i_node_step_j = index_to_start_step_3d(node_indices[1],
+                                                                            index_range)
+        j_node_start, j_node_step_i, j_node_step_j = index_to_start_step_3d(node_indices[2],
+                                                                            index_range)
+        k_node_start, k_node_step_i, k_node_step_j = index_to_start_step_3d(node_indices[3],
+                                                                            index_range)
+
+        i_node = i_node_start
+        j_node = j_node_start
+        k_node = k_node_start
+        for node_index2 in index_range
+            for node_index1 in index_range
+                u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg,
+                                             node_index1, node_index2, boundary)
+                # Extract normal direction at nodes which points from the elements outwards,
+                # i.e., *into* the structure.
+                normal_direction = get_normal_direction(direction, contravariant_vectors,
+                                                        i_node, j_node, k_node, element)
+
+                # Coordinates at a boundary node
+                x = get_node_coords(node_coordinates, equations, dg,
+                                    i_node, j_node, k_node, element)
+
+                # L2 norm of normal direction (contravariant_vector) is the surface element
+                dS = weights[node_index1] * weights[node_index2] *
+                     norm(normal_direction)
+
+                gradients_1 = get_node_vars(gradients_x, equations_parabolic, dg,
+                                            i_node, j_node, k_node, element)
+                gradients_2 = get_node_vars(gradients_y, equations_parabolic, dg,
+                                            i_node, j_node, k_node, element)
+                gradients_3 = get_node_vars(gradients_z, equations_parabolic, dg,
+                                            i_node, j_node, k_node, element)
+
+                # Integral over whole boundary surface. Note, it is assumed that the
+                # `normal_direction` is normalized to be a normal vector within the
+                # function `variable` and the division of the normal scaling factor
+                # `norm(normal_direction)` is then accounted for with the `dS` quantity.
+                surface_integral += variable(u_node, normal_direction, x, t,
+                                             equations_parabolic,
+                                             gradients_1, gradients_2, gradients_3) * dS
+
+                i_node += i_node_step_i
+                j_node += j_node_step_i
+                k_node += k_node_step_i
+            end
+            i_node += i_node_step_j
+            j_node += j_node_step_j
+            k_node += k_node_step_j
+        end
+    end
+    if mpi_isparallel()
+        surface_integral = MPI.Allreduce!(Ref(surface_integral), +, mpi_comm())[]
+    end
+    return surface_integral
+end
+
 end # muladd

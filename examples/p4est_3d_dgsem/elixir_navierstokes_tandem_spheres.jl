@@ -117,11 +117,12 @@ restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/r
 
 
 #restart_file = "restart_ts25_hp.h5"
-restart_file = "restart_ts100_hp.h5"
+restart_file = "restart_ts150_hp.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
-tspan = (load_time(restart_filename), t_end)
+#tspan = (load_time(restart_filename), t_end)
+tspan = (100.0, t_end)
 
 ode = semidiscretize(semi, tspan, restart_filename) # Split method
 #ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
@@ -152,7 +153,7 @@ drag_shear_back = AnalysisSurfaceIntegral((:BackSphere,),
 
 analysis_callback = AnalysisCallback(semi,
                                      interval = analysis_interval,
-                                     save_analysis = false,
+                                     save_analysis = true,
                                      output_directory = restart_path,
                                      analysis_errors = Symbol[], # Turn off error computation
                                      analysis_integrals = (drag_p_front,
@@ -294,13 +295,13 @@ dtRatios = reverse([0.000120724458014592531464
 path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
 #path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
 
-ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
+#ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
 #ode_alg = Trixi.PairedExplicitRK3(14, path_coeffs)
 
 #relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)
 #ode_alg = Trixi.PairedExplicitRelaxationRK3Multi(Stages, path_coeffs, dtRatios; relaxation_solver = relaxation_solver)
 
-#=
+
 path_coeffs_para = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/para/"
 
 Stages_para = [11, 10, 8, 7, 6, 5, 4, 3]
@@ -320,7 +321,7 @@ ode_alg = Trixi.PairedExplicitRK3SplitMulti(Stages, Stages_para,
 
 
 #ode_alg = Trixi.PairedExplicitRK3Split(11, path_coeffs, path_coeffs_para)
-=#
+
 
 sol = Trixi.solve(ode, ode_alg,
                   dt = 2.37e-3,
