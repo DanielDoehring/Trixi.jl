@@ -141,7 +141,7 @@ function viscous_stress_tensor(u, equations_parabolic,
                   tau_33)
 end
 
-# 2D viscous stress vector based on contracting the viscous stress tensor
+# 3D viscous stress vector based on contracting the viscous stress tensor
 # with the normalized `normal_direction` vector.
 function viscous_stress_vector(u, normal_direction, equations_parabolic,
                                gradients_1, gradients_2, gradients_3)
