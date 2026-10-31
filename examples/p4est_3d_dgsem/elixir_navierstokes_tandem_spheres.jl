@@ -56,7 +56,7 @@ end
 
 bc_farfield = BoundaryConditionDirichlet(initial_condition)
 
-polydeg = 3 # 2, 3, 4
+polydeg = 4 # 2, 3, 4
 
 surface_flux = flux_hll
 volume_flux = flux_kennedy_gruber
@@ -73,17 +73,17 @@ mesh_file = case_path * "Pointwise/TandemSpheresHexMesh2P2_fixed.inp"
 boundary_symbols = [:FrontSphere, :BackSphere, :FarField]
 mesh = P4estMesh{3}(mesh_file; boundary_symbols = boundary_symbols)
 
-boundary_conditions = Dict(:FrontSphere => boundary_condition_slip_wall,
-                           :BackSphere => boundary_condition_slip_wall,
-                           :FarField => bc_farfield)
+boundary_conditions = (; FrontSphere = boundary_condition_slip_wall,
+                         BackSphere = boundary_condition_slip_wall,
+                         FarField = bc_farfield)
 
 velocity_bc = NoSlip((x, t, equations) -> SVector(0.0, 0.0, 0.0))
 heat_bc = Adiabatic((x, t, equations) -> 0.0)
 bc_spheres = BoundaryConditionNavierStokesWall(velocity_bc, heat_bc)
 
-boundary_conditions_para = Dict(:FrontSphere => bc_spheres,
-                                :BackSphere => bc_spheres,
-                                :FarField => bc_farfield)
+boundary_conditions_para = (; FrontSphere = bc_spheres,
+                              BackSphere = bc_spheres,
+                              FarField = bc_farfield)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
@@ -101,7 +101,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations,
 # 1) 0 to 50: k2, p2, Euler only ?
 # 2) 50 to 75: k3, p2
 # 3) 75 to 200: k4, p3
-t_star_end = 75
+t_star_end = 200
 t_end = t_star_end * D()/U()
 
 #=
@@ -116,22 +116,22 @@ restart_path = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/r
 #restart_path = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Pointwise/restart_2p2/"
 
 
-restart_file = "restart_ts25_hp.h5"
-#restart_file = "restart_ts75_hp_LDG.h5"
+#restart_file = "restart_ts25_hp.h5"
+restart_file = "restart_ts100_hp.h5"
 
 restart_filename = joinpath(restart_path, restart_file)
 
 tspan = (load_time(restart_filename), t_end)
 
-#ode = semidiscretize(semi, tspan, restart_filename) # Split method
-ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
+ode = semidiscretize(semi, tspan, restart_filename) # Split method
+#ode = semidiscretize(semi, tspan, restart_filename; split_problem = false)
 
 
 ###############################################################################
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 500 # 50 for coefficient recording run
+analysis_interval = 50 # 50 for coefficient recording run
 
 A_sphere() = pi * (D()/2)^2
 drag_p_front = AnalysisSurfaceIntegral((:FrontSphere,),
@@ -156,9 +156,9 @@ analysis_callback = AnalysisCallback(semi,
                                      output_directory = restart_path,
                                      analysis_errors = Symbol[], # Turn off error computation
                                      analysis_integrals = (drag_p_front,
-                                                           #drag_shear_front,
+                                                           drag_shear_front,
                                                            drag_p_back,
-                                                           #drag_shear_back
+                                                           drag_shear_back
                                                            ))
 
 #analysis_callback = AnalysisCallback(semi_hyp, interval = analysis_interval)
@@ -172,7 +172,7 @@ t_ramp_up() = 5.0
 # Hyp-Diff
 #cfl_max() = 13.5 # k = 2 p2
 
-cfl_max() = 9.0 # k = 3, p2
+#cfl_max() = 9.0 # k = 3, p2
 #cfl_max() = 7.4 # k = 3, p2, LDG
 
 #cfl_max() = 6.0 # k = 4, p3
@@ -180,7 +180,7 @@ cfl_max() = 9.0 # k = 3, p2
 #cfl_max() = 6.4 # k = 4, p3, Multi
 #cfl_max() = 4.0 # k = 4, p3, Multi, LDG
 
-#cfl_max() = 6.7 # k = 4, p3 14-11 Split Multi
+cfl_max() = 6.7 # k = 4, p3 14-11 Split Multi
 #cfl_max() = 9.2 # k = 4, p3 14-11 Split
 
 #cfl_max() = 6.2 # k = 4, p3, S=14
@@ -253,7 +253,7 @@ callbacks = CallbackSet(summary_callback,
 
 ### p2 ###
 
-
+#=
 # Pointwise
 Stages = [14, 13, 12, 11, 10, 8, 7, 5, 4, 3, 2]
 
@@ -274,10 +274,10 @@ path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coef
 #path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k2_hll_fluxdiff/p2/"
 
 ode_alg = Trixi.PairedExplicitRK2Multi(Stages, path_coeffs, dtRatios)
-
+=#
 
 ### p3 ###
-#=
+
 Stages = [14, 13, 12, 11, 10, 9, 8, 6, 5, 4, 3]
 dtRatios = reverse([0.000120724458014592531464
 0.00022078421326354146521
@@ -295,7 +295,6 @@ path_coeffs = "/storage/home/daniel/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coef
 #path_coeffs = "/home/daniel/Sciebo/Job/Doktorand/Content/Meshes/HighOrderCFDWorkshop/CS1/Spectra_Coeffs/hyp_para/k4_hll_fluxdiff/p3/"
 
 ode_alg = Trixi.PairedExplicitRK3Multi(Stages, path_coeffs, dtRatios)
-=#
 #ode_alg = Trixi.PairedExplicitRK3(14, path_coeffs)
 
 #relaxation_solver = Trixi.RelaxationSolverNewton(max_iterations = 5, root_tol = 1e-12)

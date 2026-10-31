@@ -163,7 +163,7 @@ function rhs_parabolic!(du, u, t, mesh::Union{P4estMesh{2}, P4estMesh{3}},
 end
 
 function calc_gradient!(gradients, u_transformed, t,
-                        mesh::P4estMesh{2}, equations_parabolic,
+                        mesh::Union{P4estMesh{2}, P4estMesh{3}}, equations_parabolic,
                         boundary_conditions_parabolic,
                         dg::DG, parabolic_scheme, cache,
                         element_indices = eachelement(dg, cache),
