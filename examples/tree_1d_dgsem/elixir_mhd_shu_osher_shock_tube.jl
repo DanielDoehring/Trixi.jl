@@ -1,5 +1,4 @@
-
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -14,20 +13,22 @@ Extended version of the test of Shu and Osher for one dimensional ideal MHD equa
 Taken from Section 4.1 of
 - Derigs et al. (2016)
   A Novel High-Order, Entropy Stable, 3D AMR MHD Solver withGuaranteed Positive Pressure
+  [arXiv: 1605.03572](https://arxiv.org/abs/1605.03572)
   [DOI: 10.1016/j.jcp.2016.04.048](https://doi.org/10.1016/j.jcp.2016.04.048)
 """
 function initial_condition_shu_osher_shock_tube(x, t, equations::IdealGlmMhdEquations1D)
     # domain must be set to [-5, 5], γ = 5/3, final time = 0.7
     # initial shock location is taken to be at x = -4
-    x_0 = -4.0
-    rho = x[1] <= x_0 ? 3.5 : 1.0 + 0.2 * sin(5.0 * x[1])
-    v1 = x[1] <= x_0 ? 5.8846 : 0.0
-    v2 = x[1] <= x_0 ? 1.1198 : 0.0
-    v3 = 0.0
-    p = x[1] <= x_0 ? 42.0267 : 1.0
-    B1 = 1.0
-    B2 = x[1] <= x_0 ? 3.6359 : 1.0
-    B3 = 0.0
+    RealT = eltype(x)
+    x_0 = -4
+    rho = x[1] <= x_0 ? RealT(3.5) : 1 + RealT(0.2) * sin(5 * x[1])
+    v1 = x[1] <= x_0 ? RealT(5.8846) : zero(RealT)
+    v2 = x[1] <= x_0 ? RealT(1.1198) : zero(RealT)
+    v3 = 0
+    p = x[1] <= x_0 ? RealT(42.0267) : one(RealT)
+    B1 = 1
+    B2 = x[1] <= x_0 ? RealT(3.6359) : one(RealT)
+    B3 = 0
 
     return prim2cons(SVector(rho, v1, v2, v3, p, B1, B2, B3), equations)
 end
@@ -45,15 +46,16 @@ function initial_condition_shu_osher_shock_tube_flipped(x, t,
                                                         equations::IdealGlmMhdEquations1D)
     # domain must be set to [-5, 5], γ = 5/3, final time = 0.7
     # initial shock location is taken to be at x = 4
-    x_0 = 4.0
-    rho = x[1] <= x_0 ? 1.0 + 0.2 * sin(5.0 * x[1]) : 3.5
-    v1 = x[1] <= x_0 ? 0.0 : -5.8846
-    v2 = x[1] <= x_0 ? 0.0 : -1.1198
-    v3 = 0.0
-    p = x[1] <= x_0 ? 1.0 : 42.0267
-    B1 = 1.0
-    B2 = x[1] <= x_0 ? 1.0 : 3.6359
-    B3 = 0.0
+    RealT = eltype(x)
+    x_0 = 4
+    rho = x[1] <= x_0 ? 1 + RealT(0.2) * sin(5 * x[1]) : RealT(3.5)
+    v1 = x[1] <= x_0 ? zero(RealT) : RealT(-5.8846)
+    v2 = x[1] <= x_0 ? zero(RealT) : RealT(-1.1198)
+    v3 = 0
+    p = x[1] <= x_0 ? one(RealT) : RealT(42.0267)
+    B1 = 1
+    B2 = x[1] <= x_0 ? one(RealT) : RealT(3.6359)
+    B3 = 0
 
     return prim2cons(SVector(rho, v1, v2, v3, p, B1, B2, B3), equations)
 end
@@ -79,10 +81,9 @@ coordinates_min = -5.0
 coordinates_max = 5.0
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                n_cells_max = 10_000,
                 periodicity = false)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_conditions)
 
 ###############################################################################
@@ -130,7 +131,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

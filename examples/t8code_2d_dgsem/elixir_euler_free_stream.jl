@@ -1,5 +1,4 @@
-using Downloads: download
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -9,9 +8,17 @@ equations = CompressibleEulerEquations2D(1.4)
 
 initial_condition = initial_condition_constant
 
-solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+solver = DGSEM(polydeg = 3, surface_flux = FluxLaxFriedrichs(max_abs_speed_naive))
 
-# Mapping as described in https://arxiv.org/abs/2012.12040 but reduced to 2D
+# Mapping as described in https://arxiv.org/abs/2012.12040
+# (DOI: https://doi.org/10.1016/j.jcp.2021.110580) but reduced to 2D
 function mapping(xi_, eta_)
     # Transform input variables between -1 and 1 onto [0,3]
     xi = 1.5 * xi_ + 1.5
@@ -30,35 +37,20 @@ end
 # Get the uncurved mesh from a file (downloads the file if not available locally)
 
 # Unstructured mesh with 48 cells of the square domain [-1, 1]^n
-mesh_file = joinpath(@__DIR__, "square_unstructured_1.inp")
-isfile(mesh_file) ||
-    download("https://gist.githubusercontent.com/efaulhaber/a075f8ec39a67fa9fad8f6f84342cbca/raw/a7206a02ed3a5d3cadacd8d9694ac154f9151db7/square_unstructured_1.inp",
-             mesh_file)
+mesh_file = Trixi.download("https://gist.githubusercontent.com/efaulhaber/a075f8ec39a67fa9fad8f6f84342cbca/raw/a7206a02ed3a5d3cadacd8d9694ac154f9151db7/square_unstructured_1.inp",
+                           joinpath(@__DIR__, "square_unstructured_1.inp"))
 
-# INP mesh files are only support by p4est. Hence, we
-# create a p4est connecvity object first from which
-# we can create a t8code mesh.
-conn = Trixi.read_inp_p4est(mesh_file, Val(2))
+mesh = T8codeMesh(mesh_file, 2; polydeg = 3,
+                  mapping = mapping,
+                  initial_refinement_level = 1)
 
-mesh = T8codeMesh{2}(conn, polydeg = 3,
-                     mapping = mapping,
-                     initial_refinement_level = 1)
-
-function adapt_callback(forest,
-                        forest_from,
-                        which_tree,
-                        lelement_id,
-                        ts,
-                        is_family,
-                        num_elements,
-                        elements_ptr)::Cint
+function adapt_callback(forest, ltreeid, tree_class, lelemntid, scheme, is_family,
+                        elements, user_data)
     vertex = Vector{Cdouble}(undef, 3)
 
-    elements = unsafe_wrap(Array, elements_ptr, num_elements)
+    Trixi.t8_element_get_vertex_reference_coords(scheme, tree_class, elements[1], 0, vertex)
 
-    Trixi.t8_element_vertex_reference_coords(ts, elements[1], 0, pointer(vertex))
-
-    level = Trixi.t8_element_level(ts, elements[1])
+    level = Trixi.t8_element_get_level(scheme, tree_class, elements[1])
 
     # TODO: Make this condition more general.
     if vertex[1] < 1e-8 && vertex[2] < 1e-8 && level < 3
@@ -70,29 +62,11 @@ function adapt_callback(forest,
     end
 end
 
-Trixi.@T8_ASSERT(Trixi.t8_forest_is_committed(mesh.forest)!=0);
+Trixi.adapt!(mesh, adapt_callback)
 
-# Init new forest.
-new_forest_ref = Ref{Trixi.t8_forest_t}()
-Trixi.t8_forest_init(new_forest_ref);
-new_forest = new_forest_ref[]
-
-# Check out `examples/t8_step4_partition_balance_ghost.jl` in
-# https://github.com/DLR-AMR/T8code.jl for detailed explanations.
-let set_from = C_NULL, recursive = 1, set_for_coarsening = 0, no_repartition = 0
-    Trixi.t8_forest_set_user_data(new_forest, C_NULL)
-    Trixi.t8_forest_set_adapt(new_forest, mesh.forest,
-                              Trixi.@t8_adapt_callback(adapt_callback), recursive)
-    Trixi.t8_forest_set_balance(new_forest, set_from, no_repartition)
-    Trixi.t8_forest_set_partition(new_forest, set_from, set_for_coarsening)
-    Trixi.t8_forest_set_ghost(new_forest, 1, Trixi.T8_GHOST_FACES)
-    Trixi.t8_forest_commit(new_forest)
-end
-
-mesh.forest = new_forest
-
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
-                                    boundary_conditions = Dict(:all => BoundaryConditionDirichlet(initial_condition)))
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = (;
+                                                           all = BoundaryConditionDirichlet(initial_condition),))
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -107,16 +81,22 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
+save_solution = SaveSolutionCallback(interval = 100,
+                                     save_initial_solution = true,
+                                     save_final_solution = true,
+                                     solution_variables = cons2prim)
+
 stepsize_callback = StepsizeCallback(cfl = 2.0)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
+                        save_solution,
                         stepsize_callback)
 
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

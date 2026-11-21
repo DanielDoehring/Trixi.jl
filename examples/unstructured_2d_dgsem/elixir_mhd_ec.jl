@@ -1,6 +1,4 @@
-
-using Downloads: download
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -9,7 +7,7 @@ using Trixi
 equations = IdealGlmMhdEquations2D(5 / 3)
 
 function initial_condition_shifted_weak_blast_wave(x, t, equations::IdealGlmMhdEquations2D)
-    # Adapted MHD version of the weak blast wave from Hennemann & Gassner JCP paper 2020 (Sec. 6.3)
+    # Adapted MHD version of the weak blast wave from Hennemann et al. JCP paper 2021 (Sec. 6.3)
     # Shift blastwave to center of domain
     inicenter = (sqrt(2) / 2, sqrt(2) / 2)
     x_norm = x[1] - inicenter[1]
@@ -35,16 +33,14 @@ solver = DGSEM(polydeg = 6,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 # Get the unstructured quad mesh from a file (downloads the file if not available locally)
-default_mesh_file = joinpath(@__DIR__, "mesh_alfven_wave_with_twist_and_flip.mesh")
-isfile(default_mesh_file) ||
-    download("https://gist.githubusercontent.com/andrewwinters5000/8f8cd23df27fcd494553f2a89f3c1ba4/raw/85e3c8d976bbe57ca3d559d653087b0889535295/mesh_alfven_wave_with_twist_and_flip.mesh",
-             default_mesh_file)
-mesh_file = default_mesh_file
+mesh_file = Trixi.download("https://gist.githubusercontent.com/andrewwinters5000/8f8cd23df27fcd494553f2a89f3c1ba4/raw/85e3c8d976bbe57ca3d559d653087b0889535295/mesh_alfven_wave_with_twist_and_flip.mesh",
+                           joinpath(@__DIR__, "mesh_alfven_wave_with_twist_and_flip.mesh"))
 
 mesh = UnstructuredMesh2D(mesh_file, periodicity = true)
 
 # create the semi discretization object
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -84,7 +80,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

@@ -1,5 +1,4 @@
-
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 # define new structs inside a module to allow re-evaluating the file
@@ -33,7 +32,7 @@ function (indicator::IndicatorSolutionIndependent)(u::AbstractArray{<:Any, 4},
     outer_distance = 1.85
 
     #Iterate over all elements
-    for element in 1:length(alpha)
+    for element in eachindex(alpha)
         # Calculate periodic distance between cell and center.
         # This requires an uncurved mesh!
         coordinates = SVector(0.5 * (cache.elements.node_coordinates[1, 1, 1, element] +
@@ -96,9 +95,11 @@ trees_per_dimension = (1, 1)
 
 mesh = P4estMesh(trees_per_dimension, polydeg = 3,
                  coordinates_min = coordinates_min, coordinates_max = coordinates_max,
-                 initial_refinement_level = 4)
+                 initial_refinement_level = 4,
+                 periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -140,7 +141,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

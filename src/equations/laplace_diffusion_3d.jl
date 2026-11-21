@@ -10,15 +10,29 @@ struct LaplaceDiffusion3D{E, N, T} <: AbstractLaplaceDiffusion{3, N}
 end
 
 function LaplaceDiffusion3D(diffusivity, equations_hyperbolic)
-    LaplaceDiffusion3D{typeof(equations_hyperbolic), nvariables(equations_hyperbolic),
-                       typeof(diffusivity)}(diffusivity, equations_hyperbolic)
+    return LaplaceDiffusion3D{typeof(equations_hyperbolic),
+                              nvariables(equations_hyperbolic),
+                              typeof(diffusivity)}(diffusivity, equations_hyperbolic)
+end
+
+# Together with our specialization of `Adapt.adapt_structure`,
+# this allows to move semidiscretizations and their components including
+# the equations to GPUs and adapt the floating point type, e.g.,
+# to `Float32` to improve performance on GPUs.
+function Base.similar(equations::LaplaceDiffusion3D, ::Type{NewRealT}) where {NewRealT}
+    diffusivity = equations.diffusivity isa AbstractFloat ?
+                  convert(NewRealT, equations.diffusivity) : equations.diffusivity
+    return LaplaceDiffusion3D(diffusivity,
+                              similar(equations.equations_hyperbolic, NewRealT))
 end
 
 function varnames(variable_mapping, equations_parabolic::LaplaceDiffusion3D)
-    varnames(variable_mapping, equations_parabolic.equations_hyperbolic)
+    return varnames(variable_mapping, equations_parabolic.equations_hyperbolic)
 end
 
-function flux(u, gradients, orientation::Integer, equations_parabolic::LaplaceDiffusion3D)
+# no orientation specified since the flux is vector-valued
+@inline function flux(u, gradients, orientation::Integer,
+                      equations_parabolic::LaplaceDiffusion3D)
     dudx, dudy, dudz = gradients
     if orientation == 1
         return SVector(equations_parabolic.diffusivity * dudx)
@@ -33,39 +47,8 @@ end
 # The penalization depends on the solver, but also depends explicitly on physical parameters,
 # and would probably need to be specialized for every different equation.
 function penalty(u_outer, u_inner, inv_h, equations_parabolic::LaplaceDiffusion3D,
-                 dg::ViscousFormulationLocalDG)
+                 dg::ParabolicFormulationLocalDG)
     return dg.penalty_parameter * (u_outer - u_inner) * equations_parabolic.diffusivity
 end
 
-# Dirichlet-type boundary condition for use with a parabolic solver in weak form
-@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner, u_inner,
-                                                                  normal::AbstractVector,
-                                                                  x, t,
-                                                                  operator_type::Gradient,
-                                                                  equations_parabolic::LaplaceDiffusion3D)
-    return boundary_condition.boundary_value_function(x, t, equations_parabolic)
-end
-
-@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner, u_inner,
-                                                                  normal::AbstractVector,
-                                                                  x, t,
-                                                                  operator_type::Divergence,
-                                                                  equations_parabolic::LaplaceDiffusion3D)
-    return flux_inner
-end
-
-@inline function (boundary_condition::BoundaryConditionNeumann)(flux_inner, u_inner,
-                                                                normal::AbstractVector,
-                                                                x, t,
-                                                                operator_type::Divergence,
-                                                                equations_parabolic::LaplaceDiffusion3D)
-    return boundary_condition.boundary_normal_flux_function(x, t, equations_parabolic)
-end
-
-@inline function (boundary_condition::BoundaryConditionNeumann)(flux_inner, u_inner,
-                                                                normal::AbstractVector,
-                                                                x, t,
-                                                                operator_type::Gradient,
-                                                                equations_parabolic::LaplaceDiffusion3D)
-    return flux_inner
-end
+# General Dirichlet and Neumann boundary condition functions are defined in `src/equations/laplace_diffusion_1d.jl`.

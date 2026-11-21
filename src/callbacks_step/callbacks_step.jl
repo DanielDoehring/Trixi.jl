@@ -5,21 +5,23 @@
 @muladd begin
 #! format: noindent
 
-# overload this function for specific callbacks which use element element variables
-# that should be saved
-function get_element_variables!(element_variables, u, mesh, equations, solver, cache,
-                                callback; kwargs...)
-    nothing
+# Add "element variables" of a callback such as AMR indicators to the output of the
+# `SaveSolutionCallback`. By default, there are none. Specialize the method with the
+# argument `callback` for specific callbacks.
+function get_element_variables_callback!(element_variables, u, mesh, equations, solver,
+                                         cache, callback; kwargs...)
+    return nothing
 end
 
-@inline function get_element_variables!(element_variables, u_ode,
-                                        semi::AbstractSemidiscretization,
-                                        cb::DiscreteCallback;
-                                        kwargs...)
+# The `SaveSolutionCallback` calls this method for all continuous and discrete
+# callbacks. Trixi.jl implements its callbacks as the `affect!` of these callbacks.
+@inline function get_element_variables_callback!(element_variables, u_ode,
+                                                 semi::AbstractSemidiscretization,
+                                                 cb; kwargs...)
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
     u = wrap_array(u_ode, mesh, equations, solver, cache)
-    get_element_variables!(element_variables, u, mesh, equations, solver, cache,
-                           cb.affect!; kwargs...)
+    return get_element_variables_callback!(element_variables, u, mesh, equations,
+                                           solver, cache, cb.affect!; kwargs...)
 end
 
 @inline function isfinished(integrator)
@@ -28,6 +30,20 @@ end
     return integrator.t == last(integrator.sol.prob.tspan) ||
            isempty(integrator.opts.tstops) ||
            integrator.iter == integrator.opts.maxiters
+end
+
+# OrdinaryDiffEqCore < v4: legacy controller lives in integrator.opts.controller and
+# doubles as its own cache (setup_controller_cache returns the controller itself).
+# OrdinaryDiffEqCore >= v4: controller cache lives in integrator.controller_cache.
+get_controller_cache(integrator) = hasproperty(integrator, :controller_cache) ?
+                                   integrator.controller_cache :
+                                   integrator.opts.controller
+
+# OrdinaryDiffEq v7+ wraps the pure controller (parameters only) in controller_cache.controller;
+# older versions store it directly in controller_cache or opts.controller.
+function get_controller(integrator)
+    cc = get_controller_cache(integrator)
+    return hasproperty(cc, :controller) ? cc.controller : cc
 end
 
 # `include` callback definitions in the order that we currently prefer

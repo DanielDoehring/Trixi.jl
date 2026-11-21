@@ -1,4 +1,4 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -12,14 +12,12 @@ equations_parabolic = LaplaceDiffusion3D(diffusivity(), equations)
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
 
-coordinates_min = (-1.0, -0.5, -0.25) # minimum coordinates (min(x), min(y), min(z))
-coordinates_max = (0.0, 0.5, 0.25) # maximum coordinates (max(x), max(y), max(z))
+coordinates_min = (-1.0, -0.5, -0.5) # minimum coordinates (min(x), min(y), min(z))
+coordinates_max = (0.0, 0.5, 0.5) # maximum coordinates (max(x), max(y), max(z))
 
-# Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 3,
-                periodicity = false,
-                n_cells_max = 30_000) # set maximum capacity of tree data structure
+                periodicity = false)
 
 # Example setup taken from
 # - Truman Ellis, Jesse Chan, and Leszek Demkowicz (2016).
@@ -29,7 +27,7 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
 #   [DOI](https://doi.org/10.1007/978-3-319-41640-3_6).
 function initial_condition_eriksson_johnson(x, t, equations)
     l = 4
-    epsilon = diffusivity() # TODO: this requires epsilon < .6 due to sqrt
+    epsilon = diffusivity() # NOTE: this requires epsilon <= 1/16 due to sqrt
     lambda_1 = (-1 + sqrt(1 - 4 * epsilon * l)) / (-2 * epsilon)
     lambda_2 = (-1 - sqrt(1 - 4 * epsilon * l)) / (-2 * epsilon)
     r1 = (1 + sqrt(1 + 4 * pi^2 * epsilon^2)) / (2 * epsilon)
@@ -53,6 +51,7 @@ boundary_conditions_parabolic = BoundaryConditionDirichlet(initial_condition)
 semi = SemidiscretizationHyperbolicParabolic(mesh,
                                              (equations, equations_parabolic),
                                              initial_condition, solver;
+                                             solver_parabolic = ParabolicFormulationBassiRebay1(),
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
@@ -61,7 +60,7 @@ semi = SemidiscretizationHyperbolicParabolic(mesh,
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
-ode = semidiscretize(semi, tspan);
+ode = semidiscretize(semi, tspan)
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timers
@@ -82,8 +81,6 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback)
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 time_int_tol = 1.0e-11
-sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol,
+sol = solve(ode, RDPK3SpFSAL49(thread = Trixi.Threaded());
+            abstol = time_int_tol, reltol = time_int_tol,
             ode_default_options()..., callback = callbacks)
-
-# Print the timer summary
-summary_callback()

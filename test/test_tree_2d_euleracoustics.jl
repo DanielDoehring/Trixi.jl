@@ -1,16 +1,11 @@
-module TestExamples2DEulerAcoustics
+@testsnippet TreeMesh2DEulerAcoustics begin
+    EXAMPLES_DIR = joinpath(examples_dir(), "tree_2d_dgsem")
+end
 
-using Test
-using Trixi
-
-include("test_trixi.jl")
-
-EXAMPLES_DIR = joinpath(examples_dir(), "tree_2d_dgsem")
-
-@testset "Acoustic perturbation coupled with compressible Euler" begin
-#! format: noindent
-
-@trixi_testset "elixir_euleracoustics_co-rotating_vortex_pair.jl" begin
+@testitem "TreeMesh2D EulerAcoustics: elixir_euleracoustics_co-rotating_vortex_pair.jl" setup=[
+    Setup,
+    TreeMesh2DEulerAcoustics
+] tags=[:tree_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euleracoustics_co-rotating_vortex_pair.jl"),
                         initial_refinement_level=5,
@@ -22,7 +17,7 @@ EXAMPLES_DIR = joinpath(examples_dir(), "tree_2d_dgsem")
                             13.000001753042364,
                             26.00000080243847,
                             38.00000884725549,
-                            51.000000003859995,
+                            51.000000003859995
                         ],
                         linf=[
                             0.22312716933051027,
@@ -31,17 +26,15 @@ EXAMPLES_DIR = joinpath(examples_dir(), "tree_2d_dgsem")
                             13.468872744263273,
                             26.54666679978679,
                             38.139032147739684,
-                            51.378134660241294,
+                            51.378134660241294
                         ])
+    # Test `show()`
+    @trixi_test_nowarn show(IOContext(stdout, :compact => false), averaging_callback)
+    @trixi_test_nowarn show(IOContext(stdout, :compact => false), euler_acoustics_coupling)
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
-end
-end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 
-end # module
+    @test_nowarn show(semi)
+end

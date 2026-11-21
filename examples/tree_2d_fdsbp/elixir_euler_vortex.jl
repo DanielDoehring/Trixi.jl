@@ -1,7 +1,7 @@
 # !!! warning "Experimental implementation (upwind SBP)"
 #     This is an experimental feature and may change in future releases.
 
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK
 using Trixi
 
 ###############################################################################
@@ -69,16 +69,16 @@ coordinates_min = (-10.0, -10.0)
 coordinates_max = (10.0, 10.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 3,
-                n_cells_max = 30_000,
                 periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 20.0)
-ode = semidiscretize(semi, tspan);
+ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
@@ -100,6 +100,6 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, SSPRK43(); abstol = 1.0e-6, reltol = 1.0e-6, dt = 1e-3,
+sol = solve(ode, SSPRK43(thread = Trixi.Threaded());
+            abstol = 1.0e-6, reltol = 1.0e-6, dt = 1e-3,
             ode_default_options()..., callback = callbacks)
-summary_callback()

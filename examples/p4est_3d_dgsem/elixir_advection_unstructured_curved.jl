@@ -1,6 +1,4 @@
-
-using Downloads: download
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -15,9 +13,10 @@ solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
 initial_condition = initial_condition_convergence_test
 
 boundary_condition = BoundaryConditionDirichlet(initial_condition)
-boundary_conditions = Dict(:all => boundary_condition)
+boundary_conditions = (; all = boundary_condition)
 
-# Mapping as described in https://arxiv.org/abs/2012.12040 but with less warping.
+# Mapping as described in https://arxiv.org/abs/2012.12040
+# (DOI: https://doi.org/10.1016/j.jcp.2021.110580) but with less warping.
 # The mapping will be interpolated at tree level, and then refined without changing
 # the geometry interpolant. The original mapping applied to this unstructured mesh
 # causes some Jacobians to be negative, which makes the mesh invalid.
@@ -46,24 +45,22 @@ function mapping(xi, eta, zeta)
 end
 
 # Unstructured mesh with 68 cells of the cube domain [-1, 1]^3
-mesh_file = joinpath(@__DIR__, "cube_unstructured_1.inp")
-isfile(mesh_file) ||
-    download("https://gist.githubusercontent.com/efaulhaber/d45c8ac1e248618885fa7cc31a50ab40/raw/37fba24890ab37cfa49c39eae98b44faf4502882/cube_unstructured_1.inp",
-             mesh_file)
+mesh_file = Trixi.download("https://gist.githubusercontent.com/efaulhaber/d45c8ac1e248618885fa7cc31a50ab40/raw/37fba24890ab37cfa49c39eae98b44faf4502882/cube_unstructured_1.inp",
+                           joinpath(@__DIR__, "cube_unstructured_1.inp"))
 
 mesh = P4estMesh{3}(mesh_file, polydeg = 3,
                     mapping = mapping,
                     initial_refinement_level = 2)
 
 # A semidiscretization collects data structures and functions for the spatial discretization
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_conditions)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span from 0.0 to 0.1
-ode = semidiscretize(semi, (0.0, 0.1));
+ode = semidiscretize(semi, (0.0, 0.1))
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timers
@@ -94,9 +91,7 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback, sav
 # run the simulation
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-
-# Print the timer summary
-summary_callback()
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

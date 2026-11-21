@@ -15,17 +15,17 @@ time steps. If `analysis_interval ≂̸ 0`, the output is omitted every
 """
 mutable struct AliveCallback
     start_time::Float64
-    alive_interval::Int
-    analysis_interval::Int
+    const alive_interval::Int
+    const analysis_interval::Int
 end
 
 function AliveCallback(; analysis_interval = 0,
                        alive_interval = analysis_interval ÷ 10)
     alive_callback = AliveCallback(0.0, alive_interval, analysis_interval)
 
-    DiscreteCallback(alive_callback, alive_callback, # the first one is the condition, the second the affect!
-                     save_positions = (false, false),
-                     initialize = initialize!)
+    return DiscreteCallback(alive_callback, alive_callback, # the first one is the condition, the second the affect!
+                            save_positions = (false, false),
+                            initialize = initialize!)
 end
 
 function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:AliveCallback})
@@ -33,6 +33,7 @@ function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:AliveCallback})
 
     alive_callback = cb.affect!
     print(io, "AliveCallback(alive_interval=", alive_callback.alive_interval, ")")
+    return nothing
 end
 
 function Base.show(io::IO, ::MIME"text/plain",
@@ -45,7 +46,7 @@ function Base.show(io::IO, ::MIME"text/plain",
         alive_callback = cb.affect!
 
         setup = [
-            "interval" => alive_callback.alive_interval,
+            "interval" => alive_callback.alive_interval
         ]
         summary_box(io, "AliveCallback", setup)
     end
@@ -68,7 +69,6 @@ function (alive_callback::AliveCallback)(u, t, integrator)
     # We need to check the number of accepted steps since callbacks are not
     # activated after a rejected step.
     return alive_interval > 0 && ((integrator.stats.naccept % alive_interval == 0 &&
-             !(integrator.stats.naccept == 0 && integrator.iter > 0) &&
              (analysis_interval == 0 ||
               integrator.stats.naccept % analysis_interval != 0)) ||
             isfinished(integrator))
@@ -98,7 +98,7 @@ function (alive_callback::AliveCallback)(integrator)
     end
 
     # avoid re-evaluating possible FSAL stages
-    u_modified!(integrator, false)
+    derivative_discontinuity!(integrator, false)
     return nothing
 end
 end # @muladd

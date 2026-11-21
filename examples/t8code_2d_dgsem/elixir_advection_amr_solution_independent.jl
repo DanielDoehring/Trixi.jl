@@ -1,4 +1,4 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 # Define new structs inside a module to allow re-evaluating the file.
@@ -32,7 +32,7 @@ function (indicator::IndicatorSolutionIndependent)(u::AbstractArray{<:Any, 4},
     outer_distance = 1.85
 
     # Iterate over all elements.
-    for element in 1:length(alpha)
+    for element in eachindex(alpha)
         # Calculate periodic distance between cell and center.
         # This requires an uncurved mesh!
         coordinates = SVector(0.5 * (cache.elements.node_coordinates[1, 1, 1, element] +
@@ -93,15 +93,15 @@ solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
 coordinates_min = (-5.0, -5.0)
 coordinates_max = (5.0, 5.0)
 
-mapping = Trixi.coordinates2mapping(coordinates_min, coordinates_max)
-
 trees_per_dimension = (1, 1)
 
 mesh = T8codeMesh(trees_per_dimension, polydeg = 3,
-                  mapping = mapping,
-                  initial_refinement_level = 1)
+                  coordinates_min = coordinates_min, coordinates_max = coordinates_max,
+                  initial_refinement_level = 4,
+                  periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -116,6 +116,11 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      extra_analysis_integrals = (entropy,))
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
+
+save_solution = SaveSolutionCallback(interval = 100,
+                                     save_initial_solution = true,
+                                     save_final_solution = true,
+                                     solution_variables = cons2prim)
 
 amr_controller = ControllerThreeLevel(semi,
                                       TrixiExtension.IndicatorSolutionIndependent(semi),
@@ -132,12 +137,13 @@ stepsize_callback = StepsizeCallback(cfl = 1.6)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
+                        save_solution,
                         amr_callback, stepsize_callback);
 
 ###############################################################################
 # Run the simulation.
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

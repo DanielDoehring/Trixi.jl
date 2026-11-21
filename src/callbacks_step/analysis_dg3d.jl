@@ -10,70 +10,172 @@ function create_cache_analysis(analyzer, mesh::TreeMesh{3},
                                RealT, uEltype)
 
     # pre-allocate buffers
-    # We use `StrideArray`s here since these buffers are used in performance-critical
-    # places and the additional information passed to the compiler makes them faster
-    # than native `Array`s.
-    u_local = StrideArray(undef, uEltype,
-                          StaticInt(nvariables(equations)), StaticInt(nnodes(analyzer)),
-                          StaticInt(nnodes(analyzer)), StaticInt(nnodes(analyzer)))
-    u_tmp1 = StrideArray(undef, uEltype,
-                         StaticInt(nvariables(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
-    u_tmp2 = StrideArray(undef, uEltype,
-                         StaticInt(nvariables(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
-    x_local = StrideArray(undef, RealT,
-                          StaticInt(ndims(equations)), StaticInt(nnodes(analyzer)),
-                          StaticInt(nnodes(analyzer)), StaticInt(nnodes(analyzer)))
-    x_tmp1 = StrideArray(undef, RealT,
-                         StaticInt(ndims(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
-    x_tmp2 = StrideArray(undef, RealT,
-                         StaticInt(ndims(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+    # We use `StrideArray`s for `isbits` element types here since these buffers are used
+    # in performance-critical places and the additional information passed to the
+    # compiler makes them faster than native `Array`s (see `stride_array_or_array`).
+    u_local = stride_array_or_array(uEltype,
+                                    StaticInt(nvariables(equations)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)))
+    u_tmp1 = stride_array_or_array(uEltype,
+                                   StaticInt(nvariables(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
+    u_tmp2 = stride_array_or_array(uEltype,
+                                   StaticInt(nvariables(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+    x_local = stride_array_or_array(RealT,
+                                    StaticInt(ndims(equations)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)))
+    x_tmp1 = stride_array_or_array(RealT,
+                                   StaticInt(ndims(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
+    x_tmp2 = stride_array_or_array(RealT,
+                                   StaticInt(ndims(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
 
     return (; u_local, u_tmp1, u_tmp2, x_local, x_tmp1, x_tmp2)
 end
 
-function create_cache_analysis(analyzer, mesh::Union{StructuredMesh{3}, P4estMesh{3}},
+# Specialized cache for P4estMesh to allow for different ambient dimension from mesh dimension
+function create_cache_analysis(analyzer,
+                               mesh::P4estMesh{3, NDIMS_AMBIENT},
+                               equations, dg::DG, cache,
+                               RealT, uEltype) where {NDIMS_AMBIENT}
+
+    # pre-allocate buffers
+    # We use `StrideArray`s for `isbits` element types here since these buffers are used
+    # in performance-critical places and the additional information passed to the
+    # compiler makes them faster than native `Array`s (see `stride_array_or_array`).
+    u_local = stride_array_or_array(uEltype,
+                                    StaticInt(nvariables(equations)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)))
+    u_tmp1 = stride_array_or_array(uEltype,
+                                   StaticInt(nvariables(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
+    u_tmp2 = stride_array_or_array(uEltype,
+                                   StaticInt(nvariables(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+    x_local = stride_array_or_array(RealT,
+                                    StaticInt(NDIMS_AMBIENT),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)))
+    x_tmp1 = stride_array_or_array(RealT,
+                                   StaticInt(NDIMS_AMBIENT),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
+    x_tmp2 = stride_array_or_array(RealT,
+                                   StaticInt(NDIMS_AMBIENT),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+    jacobian_local = stride_array_or_array(RealT,
+                                           StaticInt(nnodes(analyzer)),
+                                           StaticInt(nnodes(analyzer)),
+                                           StaticInt(nnodes(analyzer)))
+    jacobian_tmp1 = stride_array_or_array(RealT,
+                                          StaticInt(nnodes(analyzer)),
+                                          StaticInt(nnodes(dg)),
+                                          StaticInt(nnodes(dg)))
+    jacobian_tmp2 = stride_array_or_array(RealT,
+                                          StaticInt(nnodes(analyzer)),
+                                          StaticInt(nnodes(analyzer)),
+                                          StaticInt(nnodes(dg)))
+
+    aux_local, aux_tmp1, aux_tmp2 = create_cache_analysis_aux(analyzer,
+                                                              equations, dg, cache)
+
+    return (; u_local, u_tmp1, u_tmp2, x_local, x_tmp1, x_tmp2, jacobian_local,
+            jacobian_tmp1, jacobian_tmp2, aux_local, aux_tmp1, aux_tmp2)
+end
+
+function create_cache_analysis(analyzer,
+                               mesh::Union{StructuredMesh{3}, T8codeMesh{3}},
                                equations, dg::DG, cache,
                                RealT, uEltype)
 
     # pre-allocate buffers
-    # We use `StrideArray`s here since these buffers are used in performance-critical
-    # places and the additional information passed to the compiler makes them faster
-    # than native `Array`s.
-    u_local = StrideArray(undef, uEltype,
-                          StaticInt(nvariables(equations)), StaticInt(nnodes(analyzer)),
-                          StaticInt(nnodes(analyzer)), StaticInt(nnodes(analyzer)))
-    u_tmp1 = StrideArray(undef, uEltype,
-                         StaticInt(nvariables(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
-    u_tmp2 = StrideArray(undef, uEltype,
-                         StaticInt(nvariables(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
-    x_local = StrideArray(undef, RealT,
-                          StaticInt(ndims(equations)), StaticInt(nnodes(analyzer)),
-                          StaticInt(nnodes(analyzer)), StaticInt(nnodes(analyzer)))
-    x_tmp1 = StrideArray(undef, RealT,
-                         StaticInt(ndims(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
-    x_tmp2 = StrideArray(undef, RealT,
-                         StaticInt(ndims(equations)), StaticInt(nnodes(analyzer)),
-                         StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
-    jacobian_local = StrideArray(undef, RealT,
-                                 StaticInt(nnodes(analyzer)),
-                                 StaticInt(nnodes(analyzer)),
-                                 StaticInt(nnodes(analyzer)))
-    jacobian_tmp1 = StrideArray(undef, RealT,
-                                StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)),
-                                StaticInt(nnodes(dg)))
-    jacobian_tmp2 = StrideArray(undef, RealT,
-                                StaticInt(nnodes(analyzer)),
-                                StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+    # We use `StrideArray`s for `isbits` element types here since these buffers are used
+    # in performance-critical places and the additional information passed to the
+    # compiler makes them faster than native `Array`s (see `stride_array_or_array`).
+    u_local = stride_array_or_array(uEltype,
+                                    StaticInt(nvariables(equations)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)))
+    u_tmp1 = stride_array_or_array(uEltype,
+                                   StaticInt(nvariables(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
+    u_tmp2 = stride_array_or_array(uEltype,
+                                   StaticInt(nvariables(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+    x_local = stride_array_or_array(RealT,
+                                    StaticInt(ndims(equations)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)),
+                                    StaticInt(nnodes(analyzer)))
+    x_tmp1 = stride_array_or_array(RealT,
+                                   StaticInt(ndims(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
+    x_tmp2 = stride_array_or_array(RealT,
+                                   StaticInt(ndims(equations)),
+                                   StaticInt(nnodes(analyzer)),
+                                   StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+    jacobian_local = stride_array_or_array(RealT,
+                                           StaticInt(nnodes(analyzer)),
+                                           StaticInt(nnodes(analyzer)),
+                                           StaticInt(nnodes(analyzer)))
+    jacobian_tmp1 = stride_array_or_array(RealT,
+                                          StaticInt(nnodes(analyzer)),
+                                          StaticInt(nnodes(dg)),
+                                          StaticInt(nnodes(dg)))
+    jacobian_tmp2 = stride_array_or_array(RealT,
+                                          StaticInt(nnodes(analyzer)),
+                                          StaticInt(nnodes(analyzer)),
+                                          StaticInt(nnodes(dg)))
+
+    aux_local, aux_tmp1, aux_tmp2 = create_cache_analysis_aux(analyzer,
+                                                              equations, dg, cache)
 
     return (; u_local, u_tmp1, u_tmp2, x_local, x_tmp1, x_tmp2, jacobian_local,
-            jacobian_tmp1, jacobian_tmp2)
+            jacobian_tmp1, jacobian_tmp2, aux_local, aux_tmp1, aux_tmp2)
+end
+
+# Buffers to interpolate the auxiliary variables to the analysis nodes,
+# or `nothing` if the equations do not have auxiliary variables
+function create_cache_analysis_aux(analyzer, equations, dg::DG, cache)
+    aux = get_aux_vars(cache)
+    aux === nothing && return nothing, nothing, nothing
+
+    auxEltype = eltype(aux)
+    aux_local = stride_array_or_array(auxEltype,
+                                      StaticInt(nauxvariables(equations)),
+                                      StaticInt(nnodes(analyzer)),
+                                      StaticInt(nnodes(analyzer)),
+                                      StaticInt(nnodes(analyzer)))
+    aux_tmp1 = stride_array_or_array(auxEltype,
+                                     StaticInt(nauxvariables(equations)),
+                                     StaticInt(nnodes(analyzer)),
+                                     StaticInt(nnodes(dg)), StaticInt(nnodes(dg)))
+    aux_tmp2 = stride_array_or_array(auxEltype,
+                                     StaticInt(nauxvariables(equations)),
+                                     StaticInt(nnodes(analyzer)),
+                                     StaticInt(nnodes(analyzer)), StaticInt(nnodes(dg)))
+
+    return aux_local, aux_tmp1, aux_tmp2
 end
 
 function calc_error_norms(func, u, t, analyzer,
@@ -118,17 +220,32 @@ function calc_error_norms(func, u, t, analyzer,
 end
 
 function calc_error_norms(func, u, t, analyzer,
-                          mesh::Union{StructuredMesh{3}, P4estMesh{3}},
+                          mesh::Union{StructuredMesh{3}, P4estMesh{3}, T8codeMesh{3}},
                           equations, initial_condition,
                           dg::DGSEM, cache, cache_analysis)
     @unpack vandermonde, weights = analyzer
-    @unpack node_coordinates, inverse_jacobian = cache.elements
     @unpack u_local, u_tmp1, u_tmp2, x_local, x_tmp1, x_tmp2, jacobian_local, jacobian_tmp1, jacobian_tmp2 = cache_analysis
+    @unpack aux_local, aux_tmp1, aux_tmp2 = cache_analysis
+    @unpack node_coordinates, inverse_jacobian = cache.elements
+    # `nothing` if the equations do not have auxiliary variables
+    aux = get_aux_vars(cache)
+
+    # Calculate error norms on the CPU, to ensure the order of summation is the same.
+    if trixi_backend(u) !== nothing
+        node_coordinates = Array(node_coordinates)
+        inverse_jacobian = Array(inverse_jacobian)
+        u = Array(u)
+        if aux !== nothing
+            aux = Array(aux)
+        end
+    end
 
     # Set up data structures
-    l2_error = zero(func(get_node_vars(u, equations, dg, 1, 1, 1, 1), equations))
+    aux_node = get_aux_node_vars(aux, equations, dg, 1, 1, 1, 1)
+    l2_error = zero(func(get_node_vars(u, equations, dg, 1, 1, 1, 1),
+                         aux_node..., equations))
     linf_error = copy(l2_error)
-    total_volume = zero(real(mesh))
+    total_volume = zero(eltype(weights)) * zero(eltype(inverse_jacobian))
 
     # Iterate over all elements for error calculations
     for element in eachelement(dg, cache)
@@ -141,20 +258,27 @@ function calc_error_norms(func, u, t, analyzer,
         multiply_scalar_dimensionwise!(jacobian_local, vandermonde,
                                        inv.(view(inverse_jacobian, :, :, :, element)),
                                        jacobian_tmp1, jacobian_tmp2)
+        if aux !== nothing
+            multiply_dimensionwise!(aux_local, vandermonde,
+                                    view(aux, :, :, :, :, element), aux_tmp1, aux_tmp2)
+        end
 
         # Calculate errors at each analysis node
-        @. jacobian_local = abs(jacobian_local)
-
         for k in eachnode(analyzer), j in eachnode(analyzer), i in eachnode(analyzer)
             u_exact = initial_condition(get_node_coords(x_local, equations, dg, i, j,
                                                         k), t, equations)
-            diff = func(u_exact, equations) -
-                   func(get_node_vars(u_local, equations, dg, i, j, k), equations)
+            aux_node = get_aux_node_vars(aux_local, equations, dg, i, j, k)
+            diff = func(u_exact, aux_node..., equations) -
+                   func(get_node_vars(u_local, equations, dg, i, j, k),
+                        aux_node..., equations)
+            # We take absolute value as we need the Jacobian here for the volume calculation
+            abs_jacobian_local_ijk = abs(jacobian_local[i, j, k])
+
             l2_error += diff .^ 2 *
-                        (weights[i] * weights[j] * weights[k] * jacobian_local[i, j, k])
+                        (weights[i] * weights[j] * weights[k] * abs_jacobian_local_ijk)
             linf_error = @. max(linf_error, abs(diff))
-            total_volume += weights[i] * weights[j] * weights[k] *
-                            jacobian_local[i, j, k]
+            total_volume += (weights[i] * weights[j] * weights[k] *
+                             abs_jacobian_local_ijk)
         end
     end
 
@@ -162,6 +286,163 @@ function calc_error_norms(func, u, t, analyzer,
     l2_error = @. sqrt(l2_error / total_volume)
 
     return l2_error, linf_error
+end
+
+# Use quadrature to numerically integrate a single element.
+# We do not multiply by the Jacobian to stay in reference space.
+# This avoids the need to divide the RHS of the DG scheme by the Jacobian when computing
+# the time derivative of entropy, see `entropy_change_reference_element`.
+Base.@propagate_inbounds function integrate_reference_element(func::Func, u, element,
+                                                              ::Type{<:AbstractMesh{3}},
+                                                              equations, dg::DGSEM,
+                                                              cache,
+                                                              args...) where {Func}
+    @unpack weights = dg.basis
+
+    # Initialize integral with zeros of the right shape
+    integral = zero(func(u, 1, 1, 1, element, equations, dg, args...))
+
+    for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+        integral += weights[i] * weights[j] * weights[k] *
+                    func(u, i, j, k, element, equations, dg, args...)
+    end
+
+    return integral
+end
+
+# Calculate ∫_e (∂S/∂u ⋅ ∂u/∂t) dΩ_e where the result on element 'e' is kept in reference space
+# Note that ∂S/∂u = w(u) with entropy variables w
+Base.@propagate_inbounds function entropy_change_reference_element(du, u, element,
+                                                                   MeshT::Type{<:AbstractMesh{3}},
+                                                                   equations, dg::DGSEM,
+                                                                   cache, args...)
+    # Not a `do` block since `Base.@propagate_inbounds` cannot be applied to it
+    Base.@propagate_inbounds function integrand(u, i, j, k, element, equations, dg, du)
+        u_node = get_node_vars(u, equations, dg, i, j, k, element)
+        du_node = get_node_vars(du, equations, dg, i, j, k, element)
+
+        return dot(cons2entropy(u_node, equations), du_node)
+    end
+
+    return integrate_reference_element(integrand, u, element, MeshT, equations, dg,
+                                       cache, du)
+end
+
+# calculate surface integral of func(u, equations) * normal on the reference element.
+Base.@propagate_inbounds function surface_integral_reference_element(func::Func, u,
+                                                                     element,
+                                                                     ::Type{<:TreeMesh{3}},
+                                                                     equations,
+                                                                     dg::DGSEM,
+                                                                     cache,
+                                                                     args...) where {Func}
+    @unpack weights = dg.basis
+
+    u_tmp = get_node_vars(u, equations, dg, 1, 1, 1, element)
+    surface_integral = zero(func(u_tmp, 1, equations))
+    for j in eachnode(dg), i in eachnode(dg)
+        # integrate along x-y plane, normal in z (3) direction
+        u_back = get_node_vars(u, equations, dg, i, j, 1, element)
+        u_front = get_node_vars(u, equations, dg, i, j, nnodes(dg), element)
+
+        surface_integral += dg.basis.weights[i] * dg.basis.weights[j] *
+                            (func(u_front, 3, equations) - func(u_back, 3, equations))
+
+        # integrate along x-z plane, normal in y (2) direction
+        u_bottom = get_node_vars(u, equations, dg, i, 1, j, element)
+        u_top = get_node_vars(u, equations, dg, i, nnodes(dg), j, element)
+
+        surface_integral += dg.basis.weights[i] * dg.basis.weights[j] *
+                            (func(u_top, 2, equations) - func(u_bottom, 2, equations))
+
+        # integrate along y-z plane, normal in x (1) direction
+        u_left = get_node_vars(u, equations, dg, 1, i, j, element)
+        u_right = get_node_vars(u, equations, dg, nnodes(dg), i, j, element)
+
+        surface_integral += dg.basis.weights[i] * dg.basis.weights[j] *
+                            (func(u_right, 1, equations) - func(u_left, 1, equations))
+    end
+
+    return surface_integral
+end
+
+# calculate surface integral of func(u, normal_direction, equations) * normal on the reference element.
+# Note: `get_normal_direction` already returns an outward-pointing normal for all directions,
+# thus no +- flips are needed here.
+Base.@propagate_inbounds function surface_integral_reference_element(func::Func, u,
+                                                                     element,
+                                                                     ::Type{<:Union{StructuredMesh{3},
+                                                                                    P4estMesh{3},
+                                                                                    T8codeMesh{3}}},
+                                                                     equations,
+                                                                     dg::DGSEM,
+                                                                     cache,
+                                                                     args...) where {Func}
+    @unpack contravariant_vectors = cache.elements
+    @unpack weights = dg.basis
+
+    # Construct zero of right shape:
+    # Evaluate `func` at actual quadrature node and normal direction
+    u_tmp = get_node_vars(u, equations, dg, 1, 1, 1, element)
+    normal_direction = get_normal_direction(1, contravariant_vectors,
+                                            1, 1, 1, element)
+    surface_integral = zero(func(u_tmp, normal_direction, equations))
+
+    # Direction 1: face at i = 1 (x_min)
+    for k in eachnode(dg), j in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, 1, j, k, element)
+        normal_direction = get_normal_direction(1, contravariant_vectors,
+                                                1, j, k, element)
+        surface_integral += weights[j] * weights[k] *
+                            func(u_node, normal_direction, equations)
+    end
+
+    # Direction 2: face at i = nnodes(dg) (x_max)
+    for k in eachnode(dg), j in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, nnodes(dg), j, k, element)
+        normal_direction = get_normal_direction(2, contravariant_vectors,
+                                                nnodes(dg), j, k, element)
+        surface_integral += weights[j] * weights[k] *
+                            func(u_node, normal_direction, equations)
+    end
+
+    # Direction 3: face at j = 1 (y_min)
+    for k in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, 1, k, element)
+        normal_direction = get_normal_direction(3, contravariant_vectors,
+                                                i, 1, k, element)
+        surface_integral += weights[i] * weights[k] *
+                            func(u_node, normal_direction, equations)
+    end
+
+    # Direction 4: face at j = nnodes(dg) (y_max)
+    for k in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, nnodes(dg), k, element)
+        normal_direction = get_normal_direction(4, contravariant_vectors,
+                                                i, nnodes(dg), k, element)
+        surface_integral += weights[i] * weights[k] *
+                            func(u_node, normal_direction, equations)
+    end
+
+    # Direction 5: face at k = 1 (z_min)
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, 1, element)
+        normal_direction = get_normal_direction(5, contravariant_vectors,
+                                                i, j, 1, element)
+        surface_integral += weights[i] * weights[j] *
+                            func(u_node, normal_direction, equations)
+    end
+
+    # Direction 6: face at k = nnodes(dg) (z_max)
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, nnodes(dg), element)
+        normal_direction = get_normal_direction(6, contravariant_vectors,
+                                                i, j, nnodes(dg), element)
+        surface_integral += weights[i] * weights[j] *
+                            func(u_node, normal_direction, equations)
+    end
+
+    return surface_integral
 end
 
 function integrate_via_indices(func::Func, u,
@@ -173,7 +454,7 @@ function integrate_via_indices(func::Func, u,
     integral = zero(func(u, 1, 1, 1, 1, equations, dg, args...))
 
     # Use quadrature to numerically integrate over entire domain
-    for element in eachelement(dg, cache)
+    @batch reduction=(+, integral) for element in eachelement(dg, cache)
         volume_jacobian_ = volume_jacobian(element, mesh, cache)
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             integral += volume_jacobian_ * weights[i] * weights[j] * weights[k] *
@@ -190,19 +471,31 @@ function integrate_via_indices(func::Func, u,
 end
 
 function integrate_via_indices(func::Func, u,
-                               mesh::Union{StructuredMesh{3}, P4estMesh{3}},
+                               mesh::Union{StructuredMesh{3}, P4estMesh{3},
+                                           T8codeMesh{3}},
+                               equations, dg::DGSEM, cache,
+                               args...; normalize = true) where {Func}
+    return integrate_via_indices(func, trixi_backend(u), u, mesh, equations, dg, cache,
+                                 args...; normalize = normalize)
+end
+
+function integrate_via_indices(func::Func, ::Nothing, u,
+                               mesh::Union{StructuredMesh{3}, P4estMesh{3},
+                                           T8codeMesh{3}},
                                equations, dg::DGSEM, cache,
                                args...; normalize = true) where {Func}
     @unpack weights = dg.basis
+    @unpack inverse_jacobian = cache.elements
 
     # Initialize integral with zeros of the right shape
     integral = zero(func(u, 1, 1, 1, 1, equations, dg, args...))
-    total_volume = zero(real(mesh))
+    total_volume = zero(eltype(weights)) * zero(eltype(inverse_jacobian))
 
     # Use quadrature to numerically integrate over entire domain
-    for element in eachelement(dg, cache)
+    @batch reduction=((+, integral), (+, total_volume)) for element in eachelement(dg,
+                                                                                   cache)
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
-            volume_jacobian = abs(inv(cache.elements.inverse_jacobian[i, j, k, element]))
+            volume_jacobian = abs(inv(inverse_jacobian[i, j, k, element]))
             integral += volume_jacobian * weights[i] * weights[j] * weights[k] *
                         func(u, i, j, k, element, equations, dg, args...)
             total_volume += volume_jacobian * weights[i] * weights[j] * weights[k]
@@ -217,22 +510,72 @@ function integrate_via_indices(func::Func, u,
     return integral
 end
 
+function integrate_via_indices(func::Func, backend::Backend, u,
+                               mesh::Union{StructuredMesh{3}, P4estMesh{3},
+                                           T8codeMesh{3}},
+                               equations, dg::DGSEM, cache,
+                               args...; normalize = true) where {Func}
+    @unpack weights = dg.basis
+    @unpack inverse_jacobian = cache.elements
+
+    function local_plus((integral, total_volume), (integral_element, volume_element))
+        return (integral + integral_element, total_volume + volume_element)
+    end
+
+    # `func(u, 1,1,1,1, equations, dg, args...)` might access GPU memory
+    # so we have to rely on the compiler to correctly infer the type of the integral here.
+    # TODO: Technically we need device_promote_op here that "infers" the function within the context of the GPU.
+    integral0 = zero_return_type(func, typeof(u), Int, Int, Int, Int,
+                                 typeof(equations), typeof(dg), map(typeof, args)...)
+    volume0 = zero(eltype(weights)) * zero(eltype(inverse_jacobian))
+    init = neutral = (integral0, volume0)
+
+    # Use quadrature to numerically integrate over entire domain
+    num_elements = nelements(dg, cache)
+    integral, total_volume = mapreduce_accelerated(local_plus, 1:num_elements,
+                                                   backend; init,
+                                                   neutral) do element
+        # Initialize integral with zeros of the right shape
+        local_integral, local_total_volume = neutral
+
+        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+            volume_jacobian = abs(inv(inverse_jacobian[i, j, k, element]))
+            local_integral += volume_jacobian * weights[i] * weights[j] * weights[k] *
+                              func(u, i, j, k, element, equations, dg, args...)
+            local_total_volume += volume_jacobian * weights[i] * weights[j] * weights[k]
+        end
+        return local_integral, local_total_volume
+    end
+
+    # Normalize with total volume
+    if normalize
+        integral = integral / total_volume
+    end
+
+    return integral
+end
+
 function integrate(func::Func, u,
-                   mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3}},
-                   equations, dg::DG, cache; normalize = true) where {Func}
-    integrate_via_indices(u, mesh, equations, dg, cache;
-                          normalize = normalize) do u, i, j, k, element, equations, dg
+                   mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
+                               T8codeMesh{3}},
+                   equations, dg::Union{DGSEM, FDSBP}, cache;
+                   normalize = true) where {Func}
+    # `nothing` if the equations do not have auxiliary variables
+    aux = get_aux_vars(cache)
+    integrate_via_indices(u, mesh, equations, dg, cache, aux;
+                          normalize = normalize) do u, i, j, k, element,
+                                                    equations, dg, aux
         u_local = get_node_vars(u, equations, dg, i, j, k, element)
-        return func(u_local, equations)
+        aux_local = get_aux_node_vars(aux, equations, dg, i, j, k, element)
+        return func(u_local, aux_local..., equations)
     end
 end
 
 function integrate(func::Func, u,
                    mesh::Union{TreeMesh{3}, P4estMesh{3}},
-                   equations, equations_parabolic,
-                   dg::DGSEM,
+                   equations, equations_parabolic, dg::DGSEM,
                    cache, cache_parabolic; normalize = true) where {Func}
-    gradients_x, gradients_y, gradients_z = cache_parabolic.viscous_container.gradients
+    gradients_x, gradients_y, gradients_z = cache_parabolic.parabolic_container.gradients
     integrate_via_indices(u, mesh, equations, dg, cache;
                           normalize = normalize) do u, i, j, k, element, equations, dg
         u_local = get_node_vars(u, equations, dg, i, j, k, element)
@@ -248,121 +591,164 @@ function integrate(func::Func, u,
 end
 
 function analyze(::typeof(entropy_timederivative), du, u, t,
-                 mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3}},
-                 equations, dg::DG, cache)
+                 mesh::Union{TreeMesh{3}, StructuredMesh{3}, P4estMesh{3},
+                             T8codeMesh{3}},
+                 equations, dg::Union{DGSEM, FDSBP}, cache)
+    # `nothing` if the equations do not have auxiliary variables
+    aux = get_aux_vars(cache)
     # Calculate ∫(∂S/∂u ⋅ ∂u/∂t)dΩ
     integrate_via_indices(u, mesh, equations, dg, cache,
-                          du) do u, i, j, k, element, equations, dg, du
+                          du, aux) do u, i, j, k, element, equations, dg, du, aux
         u_node = get_node_vars(u, equations, dg, i, j, k, element)
         du_node = get_node_vars(du, equations, dg, i, j, k, element)
-        dot(cons2entropy(u_node, equations), du_node)
+        aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
+        return dot(cons2entropy(u_node, aux_node..., equations), du_node)
     end
 end
 
 function analyze(::Val{:l2_divb}, du, u, t,
-                 mesh::TreeMesh{3}, equations::IdealGlmMhdEquations3D,
+                 mesh::TreeMesh{3}, equations,
                  dg::DGSEM, cache)
     integrate_via_indices(u, mesh, equations, dg, cache, cache,
                           dg.basis.derivative_matrix) do u, i, j, k, element, equations,
                                                          dg, cache, derivative_matrix
         divb = zero(eltype(u))
         for l in eachnode(dg)
-            divb += (derivative_matrix[i, l] * u[6, l, j, k, element] +
-                     derivative_matrix[j, l] * u[7, i, l, k, element] +
-                     derivative_matrix[k, l] * u[8, i, j, l, element])
+            u_ljk = get_node_vars(u, equations, dg, l, j, k, element)
+            u_ilk = get_node_vars(u, equations, dg, i, l, k, element)
+            u_ijl = get_node_vars(u, equations, dg, i, j, l, element)
+
+            B_ljk = magnetic_field(u_ljk, equations)
+            B_ilk = magnetic_field(u_ilk, equations)
+            B_ijl = magnetic_field(u_ijl, equations)
+
+            divb += (derivative_matrix[i, l] * B_ljk[1] +
+                     derivative_matrix[j, l] * B_ilk[2] +
+                     derivative_matrix[k, l] * B_ijl[3])
         end
         divb *= cache.elements.inverse_jacobian[element]
-        divb^2
+        return divb^2
     end |> sqrt
 end
 
 function analyze(::Val{:l2_divb}, du, u, t,
-                 mesh::Union{StructuredMesh{3}, P4estMesh{3}},
-                 equations::IdealGlmMhdEquations3D,
+                 mesh::Union{StructuredMesh{3}, P4estMesh{3}, T8codeMesh{3}},
+                 equations,
                  dg::DGSEM, cache)
-    @unpack contravariant_vectors = cache.elements
+    @unpack contravariant_vectors, inverse_jacobian = cache.elements
     integrate_via_indices(u, mesh, equations, dg, cache, cache,
                           dg.basis.derivative_matrix) do u, i, j, k, element, equations,
                                                          dg, cache, derivative_matrix
         divb = zero(eltype(u))
         # Get the contravariant vectors Ja^1, Ja^2, and Ja^3
-        Ja11, Ja12, Ja13 = get_contravariant_vector(1, contravariant_vectors, i, j, k,
-                                                    element)
-        Ja21, Ja22, Ja23 = get_contravariant_vector(2, contravariant_vectors, i, j, k,
-                                                    element)
-        Ja31, Ja32, Ja33 = get_contravariant_vector(3, contravariant_vectors, i, j, k,
-                                                    element)
+        Ja11, Ja12, Ja13 = get_contravariant_vector(1, contravariant_vectors,
+                                                    i, j, k, element)
+        Ja21, Ja22, Ja23 = get_contravariant_vector(2, contravariant_vectors,
+                                                    i, j, k, element)
+        Ja31, Ja32, Ja33 = get_contravariant_vector(3, contravariant_vectors,
+                                                    i, j, k, element)
         # Compute the transformed divergence
         for l in eachnode(dg)
+            u_ljk = get_node_vars(u, equations, dg, l, j, k, element)
+            u_ilk = get_node_vars(u, equations, dg, i, l, k, element)
+            u_ijl = get_node_vars(u, equations, dg, i, j, l, element)
+
+            B_ljk = magnetic_field(u_ljk, equations)
+            B_ilk = magnetic_field(u_ilk, equations)
+            B_ijl = magnetic_field(u_ijl, equations)
+
             divb += (derivative_matrix[i, l] *
-                     (Ja11 * u[6, l, j, k, element] + Ja12 * u[7, l, j, k, element] +
-                      Ja13 * u[8, l, j, k, element]) +
+                     (Ja11 * B_ljk[1] + Ja12 * B_ljk[2] + Ja13 * B_ljk[3]) +
                      derivative_matrix[j, l] *
-                     (Ja21 * u[6, i, l, k, element] + Ja22 * u[7, i, l, k, element] +
-                      Ja23 * u[8, i, l, k, element]) +
+                     (Ja21 * B_ilk[1] + Ja22 * B_ilk[2] + Ja23 * B_ilk[3]) +
                      derivative_matrix[k, l] *
-                     (Ja31 * u[6, i, j, l, element] + Ja32 * u[7, i, j, l, element] +
-                      Ja33 * u[8, i, j, l, element]))
+                     (Ja31 * B_ijl[1] + Ja32 * B_ijl[2] + Ja33 * B_ijl[3]))
         end
-        divb *= cache.elements.inverse_jacobian[i, j, k, element]
-        divb^2
+        divb *= inverse_jacobian[i, j, k, element]
+        return divb^2
     end |> sqrt
 end
 
 function analyze(::Val{:linf_divb}, du, u, t,
-                 mesh::TreeMesh{3}, equations::IdealGlmMhdEquations3D,
+                 mesh::TreeMesh{3}, equations,
                  dg::DGSEM, cache)
     @unpack derivative_matrix, weights = dg.basis
 
     # integrate over all elements to get the divergence-free condition errors
     linf_divb = zero(eltype(u))
-    for element in eachelement(dg, cache)
+    @batch reduction=(max, linf_divb) for element in eachelement(dg, cache)
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             divb = zero(eltype(u))
             for l in eachnode(dg)
-                divb += (derivative_matrix[i, l] * u[6, l, j, k, element] +
-                         derivative_matrix[j, l] * u[7, i, l, k, element] +
-                         derivative_matrix[k, l] * u[8, i, j, l, element])
+                u_ljk = get_node_vars(u, equations, dg, l, j, k, element)
+                u_ilk = get_node_vars(u, equations, dg, i, l, k, element)
+                u_ijl = get_node_vars(u, equations, dg, i, j, l, element)
+
+                B_ljk = magnetic_field(u_ljk, equations)
+                B_ilk = magnetic_field(u_ilk, equations)
+                B_ijl = magnetic_field(u_ijl, equations)
+
+                divb += (derivative_matrix[i, l] * B_ljk[1] +
+                         derivative_matrix[j, l] * B_ilk[2] +
+                         derivative_matrix[k, l] * B_ijl[3])
             end
             divb *= cache.elements.inverse_jacobian[element]
             linf_divb = max(linf_divb, abs(divb))
         end
     end
 
+    if mpi_isparallel()
+        # Base.max instead of max needed, see comment in src/auxiliary/math.jl
+        linf_divb = MPI.Allreduce!(Ref(linf_divb), Base.max, mpi_comm())[]
+    end
+
     return linf_divb
 end
 
 function analyze(::Val{:linf_divb}, du, u, t,
-                 mesh::Union{StructuredMesh{3}, P4estMesh{3}},
-                 equations::IdealGlmMhdEquations3D,
+                 mesh::Union{StructuredMesh{3}, P4estMesh{3}, T8codeMesh{3}},
+                 equations,
                  dg::DGSEM, cache)
     @unpack derivative_matrix, weights = dg.basis
-    @unpack contravariant_vectors = cache.elements
+    @unpack contravariant_vectors, inverse_jacobian = cache.elements
 
     # integrate over all elements to get the divergence-free condition errors
     linf_divb = zero(eltype(u))
-    for element in eachelement(dg, cache)
+    @batch reduction=(max, linf_divb) for element in eachelement(dg, cache)
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             divb = zero(eltype(u))
             # Get the contravariant vectors Ja^1, Ja^2, and Ja^3
-            Ja11, Ja12, Ja13 = get_contravariant_vector(1, contravariant_vectors, i, j,
-                                                        k, element)
-            Ja21, Ja22, Ja23 = get_contravariant_vector(2, contravariant_vectors, i, j,
-                                                        k, element)
-            Ja31, Ja32, Ja33 = get_contravariant_vector(3, contravariant_vectors, i, j,
-                                                        k, element)
+            Ja11, Ja12, Ja13 = get_contravariant_vector(1, contravariant_vectors,
+                                                        i, j, k, element)
+            Ja21, Ja22, Ja23 = get_contravariant_vector(2, contravariant_vectors,
+                                                        i, j, k, element)
+            Ja31, Ja32, Ja33 = get_contravariant_vector(3, contravariant_vectors,
+                                                        i, j, k, element)
             # Compute the transformed divergence
             for l in eachnode(dg)
-                divb += (derivative_matrix[i, l] * (Ja11 * u[6, l, j, k, element] +
-                          Ja12 * u[7, l, j, k, element] + Ja13 * u[8, l, j, k, element]) +
-                         derivative_matrix[j, l] * (Ja21 * u[6, i, l, k, element] +
-                          Ja22 * u[7, i, l, k, element] + Ja23 * u[8, i, l, k, element]) +
-                         derivative_matrix[k, l] * (Ja31 * u[6, i, j, l, element] +
-                          Ja32 * u[7, i, j, l, element] + Ja33 * u[8, i, j, l, element]))
+                u_ljk = get_node_vars(u, equations, dg, l, j, k, element)
+                u_ilk = get_node_vars(u, equations, dg, i, l, k, element)
+                u_ijl = get_node_vars(u, equations, dg, i, j, l, element)
+
+                B_ljk = magnetic_field(u_ljk, equations)
+                B_ilk = magnetic_field(u_ilk, equations)
+                B_ijl = magnetic_field(u_ijl, equations)
+
+                divb += (derivative_matrix[i, l] * (Ja11 * B_ljk[1] +
+                          Ja12 * B_ljk[2] + Ja13 * B_ljk[3]) +
+                         derivative_matrix[j, l] * (Ja21 * B_ilk[1] +
+                          Ja22 * B_ilk[2] + Ja23 * B_ilk[3]) +
+                         derivative_matrix[k, l] * (Ja31 * B_ijl[1] +
+                          Ja32 * B_ijl[2] + Ja33 * B_ijl[3]))
             end
-            divb *= cache.elements.inverse_jacobian[i, j, k, element]
+            divb *= inverse_jacobian[i, j, k, element]
             linf_divb = max(linf_divb, abs(divb))
         end
+    end
+
+    if mpi_isparallel()
+        # Base.max instead of max needed, see comment in src/auxiliary/math.jl
+        linf_divb = MPI.Allreduce!(Ref(linf_divb), Base.max, mpi_comm())[]
     end
 
     return linf_divb

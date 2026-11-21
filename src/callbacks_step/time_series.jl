@@ -23,17 +23,16 @@ After the last time step, the results are stored in an HDF5 file `filename` in d
 The real data type `RealT` and data type for solution variables `uEltype` default to the respective
 types used in the solver and the cache.
 
-!!! warning "Experimental implementation"
-    This is an experimental feature and may change in future releases.
+Currently this callback is only implemented for [`TreeMesh`](@ref) and [`UnstructuredMesh2D`](@ref).
 """
 mutable struct TimeSeriesCallback{RealT <: Real, uEltype <: Real, SolutionVariables,
                                   VariableNames, Cache}
-    interval::Int
-    solution_variables::SolutionVariables
-    variable_names::VariableNames
-    output_directory::String
-    filename::String
-    point_coordinates::Array{RealT, 2}
+    const interval::Int
+    const solution_variables::SolutionVariables
+    const variable_names::VariableNames
+    const output_directory::String
+    const filename::String
+    const point_coordinates::Array{RealT, 2}
     # Point data is stored as a vector of vectors of the solution data type:
     # * the "outer" `Vector` contains one vector for each point at which a time_series is recorded
     # * the "inner" `Vector` contains the actual time series for a single point,
@@ -43,7 +42,7 @@ mutable struct TimeSeriesCallback{RealT <: Real, uEltype <: Real, SolutionVariab
     point_data::Vector{Vector{uEltype}}
     time::Vector{RealT}
     step::Vector{Int}
-    time_series_cache::Cache
+    const time_series_cache::Cache
 end
 
 function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:TimeSeriesCallback})
@@ -57,6 +56,7 @@ function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:TimeSeriesCallback})
           "output_directory=", "\"output_directory\"", ", ",
           "filename=", "\"filename\"",
           ")")
+    return nothing
 end
 
 function Base.show(io::IO, ::MIME"text/plain",
@@ -73,7 +73,7 @@ function Base.show(io::IO, ::MIME"text/plain",
             "interval" => time_series_callback.interval,
             "solution_variables" => time_series_callback.solution_variables,
             "output_directory" => time_series_callback.output_directory,
-            "filename" => time_series_callback.filename,
+            "filename" => time_series_callback.filename
         ]
         summary_box(io, "TimeSeriesCallback", setup)
     end
@@ -94,6 +94,11 @@ function TimeSeriesCallback(mesh, equations, solver, cache, point_coordinates;
 
     if ndims(point_coordinates) != 2 || size(point_coordinates, 2) != ndims(mesh)
         throw(ArgumentError("`point_coordinates` must be a matrix of size n_points × ndims"))
+    end
+
+    # create the output folder if it does not exist already
+    if mpi_isroot() && !isdir(output_directory)
+        mkpath(output_directory)
     end
 
     # Transpose point_coordinates to our usual format [ndims, n_points]
@@ -207,11 +212,12 @@ function (time_series_callback::TimeSeriesCallback)(integrator)
     end
 
     # avoid re-evaluating possible FSAL stages
-    u_modified!(integrator, false)
+    derivative_discontinuity!(integrator, false)
 
     return nothing
 end
 
 include("time_series_dg.jl")
-include("time_series_dg2d.jl")
+include("time_series_dg_tree.jl")
+include("time_series_dg_unstructured.jl")
 end # @muladd

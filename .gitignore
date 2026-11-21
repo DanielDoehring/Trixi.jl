@@ -10,6 +10,7 @@
 *.mesh
 *.bson
 *.inp
+*.msh
 **/Manifest.toml
 out*/
 docs/build
@@ -24,10 +25,13 @@ coverage_report/
 **/solution_*.txt
 **/restart_*.txt
 .vscode/
-
 .DS_Store
+plan*/
+*.code-workspace
+*.claude
+.mcp.json
 
-run
-run/*
+run*/
+run*/*
 
 LocalPreferences.toml

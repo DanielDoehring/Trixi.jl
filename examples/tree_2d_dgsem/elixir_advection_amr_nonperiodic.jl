@@ -1,5 +1,4 @@
-
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -20,10 +19,9 @@ coordinates_min = (-5.0, -5.0)
 coordinates_max = (5.0, 5.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                n_cells_max = 30_000,
                 periodicity = false)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_conditions)
 
 ###############################################################################
@@ -63,7 +61,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
             dt = stepsize_callback(ode), # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+            ode_default_options()..., callback = callbacks);

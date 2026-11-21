@@ -6,11 +6,14 @@
 #! format: noindent
 
 # Redistribute data for load balancing after partitioning the mesh
-function rebalance_solver!(u_ode::AbstractVector, mesh::ParallelP4estMesh, equations,
+function rebalance_solver!(u_ode::AbstractVector,
+                           mesh::Union{P4estMeshParallel, T8codeMeshParallel},
+                           equations,
                            dg::DGSEM, cache, old_global_first_quadrant)
-    # mpi ranks are 0-based, this array uses 1-based indices
-    global_first_quadrant = unsafe_wrap(Array, mesh.p4est.global_first_quadrant,
-                                        mpi_nranks() + 1)
+
+    # MPI ranks are 0-based. This array uses 1-based indices.
+    global_first_quadrant = get_global_first_element_ids(mesh)
+
     if global_first_quadrant[mpi_rank() + 1] ==
        old_global_first_quadrant[mpi_rank() + 1] &&
        global_first_quadrant[mpi_rank() + 2] ==
@@ -19,19 +22,19 @@ function rebalance_solver!(u_ode::AbstractVector, mesh::ParallelP4estMesh, equat
         # solver does not need to be rebalanced on this rank.
         # Container init uses all-to-all communication -> reinitialize even if there is nothing to do
         # locally (there are other MPI ranks that need to be rebalanced if this function is called)
-        reinitialize_containers!(mesh, equations, dg, cache)
+        reinit_containers!(mesh, equations, dg, cache)
         return
     end
     # Retain current solution data
     old_n_elements = nelements(dg, cache)
     old_u_ode = copy(u_ode)
-    GC.@preserve old_u_ode begin # OBS! If we don't GC.@preserve old_u_ode, it might be GC'ed
+    GC.@preserve old_u_ode begin # Note: If we don't GC.@preserve old_u_ode, it might be GC'ed
         # Use `wrap_array_native` instead of `wrap_array` since MPI might not interact
         # nicely with non-base array types
         old_u = wrap_array_native(old_u_ode, mesh, equations, dg, cache)
 
         @trixi_timeit timer() "reinitialize data structures" begin
-            reinitialize_containers!(mesh, equations, dg, cache)
+            reinit_containers!(mesh, equations, dg, cache)
         end
 
         resize!(u_ode,
@@ -86,5 +89,14 @@ function rebalance_solver!(u_ode::AbstractVector, mesh::ParallelP4estMesh, equat
             MPI.Waitall(requests, MPI.Status)
         end
     end # GC.@preserve old_u_ode
+
+    return nothing
+end
+
+# Construct the cache of AMR controllers, called from their constructors
+function create_cache_amr_controller(mesh::Union{TreeMesh, P4estMesh, T8codeMesh},
+                                     equations, dg::DG, cache)
+    controller_value = Vector{Int}(undef, nelements(dg, cache))
+    return (; controller_value)
 end
 end # @muladd

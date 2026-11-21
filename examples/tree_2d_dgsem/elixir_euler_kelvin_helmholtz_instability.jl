@@ -1,5 +1,4 @@
-
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -15,24 +14,32 @@ A version of the classical Kelvin-Helmholtz instability based on
   A Subcell Finite Volume Positivity-Preserving Limiter for DGSEM Discretizations
   of the Euler Equations
   [arXiv: 2102.06017](https://arxiv.org/abs/2102.06017)
+  [DOI: 10.23967/wccm-eccomas.2020.038](https://doi.org/10.23967/wccm-eccomas.2020.038)
 """
 function initial_condition_kelvin_helmholtz_instability(x, t,
                                                         equations::CompressibleEulerEquations2D)
     # change discontinuity to tanh
     # typical resolution 128^2, 256^2
     # domain size is [-1,+1]^2
+    RealT = eltype(x)
     slope = 15
-    amplitude = 0.02
-    B = tanh(slope * x[2] + 7.5) - tanh(slope * x[2] - 7.5)
-    rho = 0.5 + 0.75 * B
-    v1 = 0.5 * (B - 1)
-    v2 = 0.1 * sin(2 * pi * x[1])
-    p = 1.0
+    B = tanh(slope * x[2] + 7.5f0) - tanh(slope * x[2] - 7.5f0)
+    rho = 0.5f0 + 0.75f0 * B
+    v1 = 0.5f0 * (B - 1)
+    v2 = convert(RealT, 0.1) * sinpi(2 * x[1])
+    p = 1
     return prim2cons(SVector(rho, v1, v2, p), equations)
 end
 initial_condition = initial_condition_kelvin_helmholtz_instability
 
-surface_flux = flux_lax_friedrichs
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+surface_flux = FluxLaxFriedrichs(max_abs_speed_naive)
 volume_flux = flux_ranocha
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
@@ -50,8 +57,9 @@ coordinates_min = (-1.0, -1.0)
 coordinates_max = (1.0, 1.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 5,
-                n_cells_max = 100_000)
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+                periodicity = true)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -81,7 +89,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

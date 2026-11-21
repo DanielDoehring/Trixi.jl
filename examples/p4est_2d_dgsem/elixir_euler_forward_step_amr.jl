@@ -1,6 +1,4 @@
-
-using Downloads: download
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK
 using Trixi
 
 ###############################################################################
@@ -80,15 +78,22 @@ boundary_condition_inflow = BoundaryConditionDirichlet(initial_condition_mach3_f
     return flux
 end
 
-boundary_conditions = Dict(:Bottom => boundary_condition_slip_wall,
-                           :Step_Front => boundary_condition_slip_wall,
-                           :Step_Top => boundary_condition_slip_wall,
-                           :Top => boundary_condition_slip_wall,
-                           :Right => boundary_condition_outflow,
-                           :Left => boundary_condition_inflow)
+boundary_conditions = (; Bottom = boundary_condition_slip_wall,
+                       Step_Front = boundary_condition_slip_wall,
+                       Step_Top = boundary_condition_slip_wall,
+                       Top = boundary_condition_slip_wall,
+                       Right = boundary_condition_outflow,
+                       Left = boundary_condition_inflow)
 
 volume_flux = flux_ranocha
-surface_flux = flux_lax_friedrichs
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+surface_flux = FluxLaxFriedrichs(max_abs_speed_naive)
 
 polydeg = 4
 basis = LobattoLegendreBasis(polydeg)
@@ -104,15 +109,12 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
 # Get the unstructured quad mesh from a file (downloads the file if not available locally)
-default_mesh_file = joinpath(@__DIR__, "abaqus_forward_step.inp")
-isfile(default_mesh_file) ||
-    download("https://gist.githubusercontent.com/andrewwinters5000/b346ee6aa5446687f128eab8b37d52a7/raw/cd1e1d43bebd8d2631a07caec45585ec8456ca4c/abaqus_forward_step.inp",
-             default_mesh_file)
-mesh_file = default_mesh_file
+mesh_file = Trixi.download("https://gist.githubusercontent.com/andrewwinters5000/b346ee6aa5446687f128eab8b37d52a7/raw/cd1e1d43bebd8d2631a07caec45585ec8456ca4c/abaqus_forward_step.inp",
+                           joinpath(@__DIR__, "abaqus_forward_step.inp"))
 
 mesh = P4estMesh{2}(mesh_file)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_conditions)
 
 ###############################################################################
@@ -134,6 +136,11 @@ save_solution = SaveSolutionCallback(interval = 2000,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
+# positivity limiter necessary for this example with strong shocks
+positivity_limiter = PositivityPreservingLimiterZhangShu(thresholds = (5.0e-6, 5.0e-6),
+                                                         variables = (Trixi.density,
+                                                                      pressure))
+
 amr_indicator = IndicatorLöhner(semi, variable = Trixi.density)
 
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
@@ -141,23 +148,22 @@ amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       med_level = 2, med_threshold = 0.05,
                                       max_level = 5, max_threshold = 0.1)
 
+# Set `limiter! = positivity_limiter` to apply the positivity-preserving limiter after
+# coarsening and refinement steps.
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 5,
                            adapt_initial_condition = true,
-                           adapt_initial_condition_only_refine = true)
+                           adapt_initial_condition_only_refine = true,
+                           limiter! = positivity_limiter)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution,
                         amr_callback)
 
-# positivity limiter necessary for this example with strong shocks
-stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds = (5.0e-6, 5.0e-6),
-                                                     variables = (Trixi.density, pressure))
-
 ###############################################################################
 # run the simulation
-sol = solve(ode, SSPRK43(stage_limiter!);
+sol = solve(ode,
+            SSPRK43(; stage_limiter! = positivity_limiter, thread = Trixi.Threaded());
             maxiters = 999999, ode_default_options()...,
             callback = callbacks);
-summary_callback() # print the timer summary

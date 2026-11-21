@@ -1,5 +1,4 @@
-
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -8,16 +7,17 @@ equations = CompressibleEulerEquations2D(2.0)
 
 initial_condition = initial_condition_eoc_test_coupled_euler_gravity
 
-solver = DGSEM(polydeg = 3, surface_flux = flux_hll)
+solver = DGSEM(polydeg = 3, surface_flux = FluxHLL(min_max_speed_naive))
 
 coordinates_min = (0.0, 0.0)
 coordinates_max = (2.0, 2.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 2,
-                n_cells_max = 10_000)
+                periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
-                                    source_terms = source_terms_eoc_test_euler)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    source_terms = source_terms_eoc_test_euler,
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -45,7 +45,6 @@ callbacks = CallbackSet(summary_callback, stepsize_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

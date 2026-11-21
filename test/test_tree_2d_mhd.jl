@@ -1,16 +1,8 @@
-module TestExamples2DMHD
+@testsnippet TreeMesh2DMHD begin
+    EXAMPLES_DIR = joinpath(examples_dir(), "tree_2d_dgsem")
+end
 
-using Test
-using Trixi
-
-include("test_trixi.jl")
-
-EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_2d_dgsem")
-
-@testset "MHD" begin
-#! format: noindent
-
-@trixi_testset "elixir_mhd_alfven_wave.jl" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_alfven_wave.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave.jl"),
                         l2=[
                             0.00011149543672225127,
@@ -21,7 +13,7 @@ EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_2d_dgsem")
                             1.2542675002588144e-6,
                             1.2542675002747718e-6,
                             1.8705223407238346e-6,
-                            4.651717010670585e-7,
+                            4.651717010670585e-7
                         ],
                         linf=[
                             0.00026806333988971254,
@@ -32,19 +24,20 @@ EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_2d_dgsem")
                             8.130129322880819e-6,
                             8.130129322769797e-6,
                             1.2406302192291552e-5,
-                            2.373765544951732e-6,
+                            2.373765544951732e-6
                         ])
+    # Test `show()`
+    @trixi_test_nowarn show(IOContext(stdout, :compact => false), glm_speed_callback)
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_alfven_wave.jl with flux_derigs_etal" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_alfven_wave.jl with flux_derigs_etal" setup=[
+    Setup,
+    TreeMesh2DMHD
+] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave.jl"),
                         l2=[
                             1.7201098719531215e-6,
@@ -55,7 +48,7 @@ end
                             1.07029565814218e-6,
                             1.0702956581404748e-6,
                             1.3291748105236525e-6,
-                            4.6172239295786824e-7,
+                            4.6172239295786824e-7
                         ],
                         linf=[
                             9.865325754310206e-6,
@@ -66,55 +59,74 @@ end
                             7.789533065905019e-6,
                             7.789533065905019e-6,
                             1.0933531593274037e-5,
-                            2.340244047768378e-6,
+                            2.340244047768378e-6
                         ],
                         volume_flux=(flux_derigs_etal, flux_nonconservative_powell))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_alfven_wave_mortar.jl" begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave_mortar.jl"),
+@testitem "TreeMesh2D MHD: elixir_mhd_alfven_wave_dirichlet.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave_dirichlet.jl"),
                         l2=[
-                            3.7762324533854616e-6,
-                            1.5534623833573546e-6,
-                            1.4577234868196855e-6,
-                            1.7647724628707057e-6,
-                            1.4831911814574333e-6,
-                            1.456369119716533e-6,
-                            1.4115666913995062e-6,
-                            1.804758237422838e-6,
-                            8.320469738087189e-7,
+                            0.00011004538877483271,
+                            5.926645116290825e-6,
+                            5.931933718790244e-6,
+                            8.482384248361835e-6,
+                            1.4150070042287573e-6,
+                            1.3803265179621126e-6,
+                            1.373512939846543e-6,
+                            2.2630780221312974e-6,
+                            8.186309170400813e-7
                         ],
                         linf=[
-                            3.670661330201774e-5,
-                            1.530289442645827e-5,
-                            1.3592183785327006e-5,
-                            1.5173897443654383e-5,
-                            9.43771379136038e-6,
-                            1.0906323046233624e-5,
-                            1.0603954940346938e-5,
-                            1.5900499596113726e-5,
-                            5.978772247650426e-6,
+                            0.0002801680361144143,
+                            1.8417644682994228e-5,
+                            1.8537339994670332e-5,
+                            3.0471153402808482e-5,
+                            8.604473854645356e-6,
+                            1.0055681487042278e-5,
+                            1.0191055124897375e-5,
+                            1.7660034751995624e-5,
+                            4.141061665063549e-6
+                        ])
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+end
+
+@testitem "TreeMesh2D MHD: elixir_mhd_alfven_wave_mortar.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave_mortar.jl"),
+                        l2=[
+                            1.7817867247272455e-6,
+                            8.788054707093757e-7,
+                            8.596640315610475e-7,
+                            1.2487243970329486e-6,
+                            1.0434652347305932e-6,
+                            9.72009633342213e-7,
+                            9.729248512929134e-7,
+                            1.3240721048567003e-6,
+                            4.710099772228978e-7
+                        ],
+                        linf=[
+                            2.9664250134953107e-5,
+                            9.05296547021317e-6,
+                            8.777227916395569e-6,
+                            1.2503499413729635e-5,
+                            7.90893283519889e-6,
+                            8.92383335737712e-6,
+                            8.589000874859032e-6,
+                            1.2108689799256167e-5,
+                            4.649918116658749e-6
                         ],
                         tspan=(0.0, 1.0))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_ec.jl" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_ec.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_ec.jl"),
                         l2=[
                             0.03637302248881514,
@@ -125,7 +137,7 @@ end
                             0.01745369341302589,
                             0.017454552320664566,
                             0.026873190440613117,
-                            5.336243933079389e-16,
+                            5.336243933079389e-16
                         ],
                         linf=[
                             0.23623816236321427,
@@ -136,91 +148,143 @@ end
                             0.09398098096581875,
                             0.09470282020962917,
                             0.15277253978297378,
-                            4.307694418935709e-15,
+                            4.307694418935709e-15
                         ])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+end
+
+@testitem "TreeMesh2D MHD: elixir_mhd_ec_float32.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_ec_float32.jl"),
+                        l2=Float32[0.03635566,
+                                   0.042947732,
+                                   0.042947736,
+                                   0.025748001,
+                                   0.16211228,
+                                   0.01745248,
+                                   0.017452491,
+                                   0.026877586,
+                                   2.417227f-7],
+                        linf=Float32[0.2210092,
+                                     0.28798974,
+                                     0.28799006,
+                                     0.20858109,
+                                     0.8812673,
+                                     0.09208107,
+                                     0.09208131,
+                                     0.14795369,
+                                     2.2078211f-6],
+                        RealT_for_test_tolerances=Float32)
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+end
+
+@testitem "TreeMesh2D MHD: elixir_mhd_ec_float32.jl (Float64 equations)" setup=[
+    Setup,
+    TreeMesh2DMHD
+] tags=[:tree_part3] begin
+    # Start with a clean environment: remove Trixi.jl output directory if it exists
+    outdir = "out"
+    isdir(outdir) && rm(outdir, recursive = true)
+
+    # The solution is stored as `Float32`, but `cons2prim` returns `Float64` values
+    # since the equations use `Float64`.
+    # See https://github.com/trixi-framework/Trixi.jl/issues/2135
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_ec_float32.jl"),
+                        equations=IdealGlmMhdEquations2D(1.4),
+                        tspan=(0.0f0, 0.01f0))
+
+    u = Trixi.wrap_array_native(sol.u[end], semi)
+    @test eltype(u) == Float32
+    prim = [cons2prim(Trixi.get_node_vars(u, equations, solver, i, j, element),
+                      equations)
+            for i in eachnode(solver), j in eachnode(solver),
+                element in eachelement(solver, semi.cache)]
+
+    filename = joinpath(outdir, "solution_" * lpad(sol.stats.naccept, 9, '0') * ".h5")
+    Trixi.h5open(filename, "r") do file
+        @test read(Trixi.attributes(file)["n_vars"]) == nvariables(equations)
+        for v in eachvariable(equations)
+            data = read(file["variables_$v"])
+            @test eltype(data) == Float64
+            @test data ≈ vec(getindex.(prim, v))
+            @test read(Trixi.attributes(file["variables_$v"])["name"]) ==
+                  Trixi.varnames(cons2prim, equations)[v]
+        end
     end
 end
 
-@trixi_testset "elixir_mhd_orszag_tang.jl" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_orszag_tang.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_orszag_tang.jl"),
                         l2=[
-                            0.21967600768935716,
-                            0.2643126515795721,
-                            0.31488287201980875,
+                            0.2196896072611031,
+                            0.2643149625630577,
+                            0.31492071537345334,
                             0.0,
-                            0.5160141621186931,
-                            0.23028914748088603,
-                            0.34413527376463915,
+                            0.5160634025012188,
+                            0.23035912757434615,
+                            0.34414766819550974,
                             0.0,
-                            0.003178793090381426,
+                            0.00312416589095812
                         ],
                         linf=[
-                            1.2749969218080568,
-                            0.6737013368774057,
-                            0.8604154399895696,
+                            1.2746442244018454,
+                            0.6734738397287374,
+                            0.8631029321589829,
                             0.0,
-                            2.799342099887639,
-                            0.6473347557712643,
-                            0.9691773375490476,
+                            2.7985233284833875,
+                            0.6525571599049463,
+                            0.967392391469731,
                             0.0,
-                            0.05729832038724348,
+                            0.05705437906440683
                         ],
                         tspan=(0.0, 0.09))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_orszag_tang.jl with flux_hll" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_orszag_tang.jl with flux_hlle" setup=[
+    Setup,
+    TreeMesh2DMHD
+] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_orszag_tang.jl"),
                         l2=[
-                            0.10806619664693064,
-                            0.20199136742199922,
-                            0.22984589847526207,
+                            0.10806609425776458,
+                            0.20199108727890655,
+                            0.22984592632472103,
                             0.0,
-                            0.29950152196422647,
-                            0.15688413207147794,
-                            0.24293641543490646,
+                            0.2994998927864948,
+                            0.15688280889599093,
+                            0.24293668114219336,
                             0.0,
-                            0.003246181006326598,
+                            0.003245200281656975
                         ],
                         linf=[
-                            0.560316034595759,
-                            0.5095520363866776,
-                            0.6536748458764621,
+                            0.5604737569203582,
+                            0.5095520220558266,
+                            0.6536758568490424,
                             0.0,
-                            0.9627447086204038,
-                            0.3981375420906146,
-                            0.673472146198816,
+                            0.96319026400795,
+                            0.3981344244658036,
+                            0.6734721166641753,
                             0.0,
-                            0.04879208429337193,
+                            0.04878941836831004
                         ],
                         tspan=(0.0, 0.06),
                         surface_flux=(flux_hlle,
                                       flux_nonconservative_powell))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_alfven_wave.jl one step with initial_condition_constant" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_alfven_wave.jl one step with initial_condition_constant" setup=[
+    Setup,
+    TreeMesh2DMHD
+] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave.jl"),
                         l2=[
                             7.144325530681224e-17,
@@ -231,7 +295,7 @@ end
                             3.9171737639099993e-16,
                             2.445565690318772e-16,
                             3.6588423152083e-17,
-                            9.971153407737885e-17,
+                            9.971153407737885e-17
                         ],
                         linf=[
                             2.220446049250313e-16,
@@ -242,124 +306,226 @@ end
                             8.881784197001252e-16,
                             4.440892098500626e-16,
                             1.1102230246251565e-16,
-                            4.779017148551244e-16,
+                            4.779017148551244e-16
                         ],
                         maxiters=1,
                         initial_condition=initial_condition_constant,
                         atol=2.0e-13)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_rotor.jl" begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_rotor.jl"),
+@testitem "TreeMesh2D MHD: elixir_mhd_vortex.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_vortex.jl"),
                         l2=[
-                            1.2623319195262743,
-                            1.8273050553090515,
-                            1.7004151198284634,
+                            0.0001559466989018188,
+                            0.0010365863012677349,
+                            0.001071418376513405,
                             0.0,
-                            2.2978570581460818,
-                            0.2147235065899803,
-                            0.23558337696054493,
+                            0.001481670949920638,
+                            0.0010618745179671524,
+                            0.001061114047526469,
                             0.0,
-                            0.0032515115395693483,
+                            6.059544528666306e-5
                         ],
                         linf=[
-                            11.003677581472843,
-                            14.70614192714736,
-                            15.687648666952708,
+                            0.004782835496127458,
+                            0.01260904214264702,
+                            0.014634412533858443,
                             0.0,
-                            17.098104835553823,
-                            1.3283750501377847,
-                            1.4365828094434892,
+                            0.020441478720071515,
+                            0.01350389451117244,
+                            0.013696112509106836,
                             0.0,
-                            0.07886241196068537,
+                            0.0011985128658772817
+                        ])
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+end
+
+@testitem "TreeMesh2D MHD: elixir_mhd_rotor.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_rotor.jl"),
+                        l2=[
+                            1.2598402656899168,
+                            1.820971929991119,
+                            1.6999644960527263,
+                            0.0,
+                            2.292864175916754,
+                            0.21457609873393194,
+                            0.2358014822442555,
+                            0.0,
+                            0.0031149245799970845
+                        ],
+                        linf=[
+                            11.01924588382204,
+                            14.60347214527161,
+                            15.67021495738901,
+                            0.0,
+                            17.095764983758468,
+                            1.326211734209035,
+                            1.4362411285277645,
+                            0.0,
+                            0.08275874670689418
                         ],
                         tspan=(0.0, 0.05))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_blast_wave.jl" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_blast_wave.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_blast_wave.jl"),
                         l2=[
-                            0.17646728395490927,
-                            3.866230215339417,
-                            2.4867304651291255,
+                            0.17649071751321999,
+                            3.866334873356359,
+                            2.4884369702456235,
                             0.0,
-                            355.4562971958441,
-                            2.359493623565687,
-                            1.4030741420730297,
+                            355.34561816675614,
+                            2.3558717566361573,
+                            1.4050655117370945,
                             0.0,
-                            0.029613599942667133,
+                            0.02778107563387455
                         ],
                         linf=[
-                            1.581630420824181,
-                            44.15725488910748,
-                            13.056964982196554,
+                            1.5806072087974057,
+                            44.14797256569522,
+                            13.072016885780329,
                             0.0,
-                            2244.875490238186,
-                            13.07679044647926,
-                            9.14612176426092,
+                            2245.1852927408295,
+                            13.075560456737785,
+                            9.147335384774467,
                             0.0,
-                            0.5154756722488522,
+                            0.5109516424638774
                         ],
-                        tspan=(0.0, 0.003),
-                        # Calling the AnalysisCallback before iteration 9 causes the interpolation
-                        # of this IC to have negative density/pressure values, crashing the simulation.
-                        coverage_override=(maxiters = 9,))
+                        tspan=(0.0, 0.003))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_mhd_shockcapturing_subcell.jl" begin
+@testitem "TreeMesh2D MHD: elixir_mhd_shockcapturing_subcell.jl" setup=[
+    Setup,
+    TreeMesh2DMHD
+] tags=[:tree_part3] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_shockcapturing_subcell.jl"),
-                        l2=[2.9974425783503109e-02,
-                            7.2849646345685956e-02,
-                            7.2488477174662239e-02,
+                        l2=[
+                            3.2064026219236076e-02,
+                            7.2461094392606618e-02,
+                            7.2380202888062711e-02,
                             0.0000000000000000e+00,
-                            1.2507971380965512e+00,
-                            1.8929505145499678e-02,
-                            1.2218606317164420e-02,
+                            8.6293936673145932e-01,
+                            8.4091669534557805e-03,
+                            5.2156364913231732e-03,
                             0.0000000000000000e+00,
-                            3.0154796910479838e-03],
-                        linf=[3.2147382412340830e-01,
-                            1.3709471664007811e+00,
-                            1.3465154685288383e+00,
+                            2.0786952301129021e-04
+                        ],
+                        linf=[
+                            3.8778760255775635e-01,
+                            9.4666683953698927e-01,
+                            9.4618924645661928e-01,
                             0.0000000000000000e+00,
-                            1.6051257523415284e+01,
-                            3.0564266749926644e-01,
-                            2.3908016329805595e-01,
+                            1.0980297261521951e+01,
+                            1.0264404591009069e-01,
+                            1.0655686942176350e-01,
                             0.0000000000000000e+00,
-                            1.3711262178549158e-01],
+                            6.1013422157115546e-03
+                        ],
                         tspan=(0.0, 0.003))
-    # Ensure that we do not have excessive memory allocations 
-    # (e.g., from type instabilities) 
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 15000
-    end
-end
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15000)
 end
 
-end # module
+# This is tested with reference values for the local-symmetric formulation.
+@testitem "TreeMesh2D MHD: elixir_mhd_shockcapturing_subcell.jl (local-jump formulation)" setup=[
+    Setup,
+    TreeMesh2DMHD
+] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_shockcapturing_subcell.jl"),
+                        l2=[
+                            3.2064026219236076e-02,
+                            7.2461094392606618e-02,
+                            7.2380202888062711e-02,
+                            0.0000000000000000e+00,
+                            8.6293936673145932e-01,
+                            8.4091669534557805e-03,
+                            5.2156364913231732e-03,
+                            0.0000000000000000e+00,
+                            2.0786952301129021e-04
+                        ],
+                        linf=[
+                            3.8778760255775635e-01,
+                            9.4666683953698927e-01,
+                            9.4618924645661928e-01,
+                            0.0000000000000000e+00,
+                            1.0980297261521951e+01,
+                            1.0264404591009069e-01,
+                            1.0655686942176350e-01,
+                            0.0000000000000000e+00,
+                            6.1013422157115546e-03
+                        ],
+                        tspan=(0.0, 0.003),
+                        # Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+                        # `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+                        # In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+                        # Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+                        # To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+                        # We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+                        # `StepsizeCallback` (CFL-Condition) and less diffusion.
+                        surface_flux=(FluxLaxFriedrichs(max_abs_speed_naive),
+                                      flux_nonconservative_powell_local_jump),
+                        volume_flux=(flux_derigs_etal,
+                                     flux_nonconservative_powell_local_jump))
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15000)
+end
+
+@testitem "TreeMesh2D MHD: elixir_mhd_onion.jl" setup=[Setup, TreeMesh2DMHD] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_onion.jl"),
+                        l2=[
+                            0.006145640007814805,
+                            0.04298975802036206,
+                            0.009442308958879332,
+                            0.0,
+                            0.023466074687332656,
+                            0.0037008482451226085,
+                            0.006939946291086656,
+                            0.0,
+                            2.6526292145616063e-6
+                        ],
+                        linf=[
+                            0.04034000344526789,
+                            0.25073951149407886,
+                            0.05597857594719327,
+                            0.0,
+                            0.14115800038105397,
+                            0.019956735193905117,
+                            0.03867389126521381,
+                            0.0,
+                            2.168681783467941e-5
+                        ])
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+end

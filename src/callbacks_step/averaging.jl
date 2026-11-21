@@ -32,6 +32,7 @@ function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:AveragingCallback})
     @unpack tspan = averaging_callback
 
     print(io, "AveragingCallback(tspan=", tspan, ")")
+    return nothing
 end
 
 function Base.show(io::IO, ::MIME"text/plain",
@@ -45,19 +46,18 @@ function Base.show(io::IO, ::MIME"text/plain",
 
         setup = [
             "Start time" => first(averaging_callback.tspan),
-            "Final time" => last(averaging_callback.tspan),
+            "Final time" => last(averaging_callback.tspan)
         ]
         summary_box(io, "AveragingCallback", setup)
     end
 end
 
 function AveragingCallback(semi::SemidiscretizationHyperbolic{<:Any,
-                                                              <:CompressibleEulerEquations2D
-                                                              },
+                                                              <:CompressibleEulerEquations2D},
                            tspan; output_directory = "out", filename = "averaging.h5")
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
-    mean_values = initialize_mean_values(mesh, equations, solver, cache)
-    cache = create_cache(AveragingCallback, mesh, equations, solver, cache)
+    mean_values = init_mean_values(mesh, equations, solver, cache)
+    cache = create_cache_averaging_callback(mesh, equations, solver, cache)
 
     averaging_callback = AveragingCallback(tspan, mean_values, cache, output_directory,
                                            filename)
@@ -75,11 +75,14 @@ function initialize!(cb::DiscreteCallback{Condition, Affect!}, u_ode, t,
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
     u = wrap_array(u_ode, mesh, equations, solver, cache)
 
-    @trixi_timeit timer() "averaging" initialize_cache!(averaging_callback.cache, u,
-                                                        mesh, equations, solver, cache)
+    @trixi_timeit timer() "averaging" init_cache_averaging_callback!(averaging_callback.cache,
+                                                                     u, mesh,
+                                                                     equations,
+                                                                     solver,
+                                                                     cache)
 
     # avoid re-evaluating possible FSAL stages
-    u_modified!(integrator, false)
+    derivative_discontinuity!(integrator, false)
     return nothing
 end
 
@@ -111,7 +114,7 @@ function (averaging_callback::AveragingCallback)(integrator)
     end
 
     # avoid re-evaluating possible FSAL stages
-    u_modified!(integrator, false)
+    derivative_discontinuity!(integrator, false)
 
     return nothing
 end
@@ -120,11 +123,11 @@ function save_averaging_file(averaging_callback, semi::AbstractSemidiscretizatio
     # Create output directory if it doesn't exist
     mkpath(averaging_callback.output_directory)
 
-    save_averaging_file(averaging_callback, mesh_equations_solver_cache(semi)...)
+    return save_averaging_file(averaging_callback, mesh_equations_solver_cache(semi)...)
 end
 
 function load_averaging_file(averaging_file, semi::AbstractSemidiscretization)
-    load_averaging_file(averaging_file, mesh_equations_solver_cache(semi)...)
+    return load_averaging_file(averaging_file, mesh_equations_solver_cache(semi)...)
 end
 
 include("averaging_dg.jl")

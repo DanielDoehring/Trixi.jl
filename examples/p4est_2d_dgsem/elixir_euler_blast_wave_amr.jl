@@ -1,6 +1,4 @@
-
-using Downloads: download
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -12,12 +10,15 @@ equations = CompressibleEulerEquations2D(1.4)
     initial_condition_blast_wave(x, t, equations::CompressibleEulerEquations2D)
 
 A medium blast wave taken from
-- Sebastian Hennemann, Gregor J. Gassner (2020)
+- Sebastian Hennemann, Andrés M. Rueda-Ramírez, Florian J. Hindenlang,
+  Gregor J. Gassner (2021)
   A provably entropy stable subcell shock capturing approach for high order split form DG
+  for the compressible Euler equations
   [arXiv: 2008.12044](https://arxiv.org/abs/2008.12044)
+  [DOI: 10.1016/j.jcp.2020.109935](https://doi.org/10.1016/j.jcp.2020.109935)
 """
 function initial_condition_blast_wave(x, t, equations::CompressibleEulerEquations2D)
-    # Modified From Hennemann & Gassner JCP paper 2020 (Sec. 6.3) -> "medium blast wave"
+    # Modified From Hennemann et al. JCP paper 2021 (Sec. 6.3) -> "medium blast wave"
     # Set up polar coordinates
     inicenter = SVector(0.0, 0.0)
     x_norm = x[1] - inicenter[1]
@@ -36,7 +37,14 @@ function initial_condition_blast_wave(x, t, equations::CompressibleEulerEquation
 end
 initial_condition = initial_condition_blast_wave
 
-surface_flux = flux_lax_friedrichs
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+surface_flux = FluxLaxFriedrichs(max_abs_speed_naive)
 volume_flux = flux_ranocha
 basis = LobattoLegendreBasis(3)
 indicator_sc = IndicatorHennemannGassner(equations, basis,
@@ -50,15 +58,14 @@ volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
 solver = DGSEM(basis, surface_flux, volume_integral)
 
 # Unstructured mesh with 48 cells of the square domain [-1, 1]^n
-mesh_file = joinpath(@__DIR__, "square_unstructured_1.inp")
-isfile(mesh_file) ||
-    download("https://gist.githubusercontent.com/efaulhaber/a075f8ec39a67fa9fad8f6f84342cbca/raw/a7206a02ed3a5d3cadacd8d9694ac154f9151db7/square_unstructured_1.inp",
-             mesh_file)
+mesh_file = Trixi.download("https://gist.githubusercontent.com/efaulhaber/a075f8ec39a67fa9fad8f6f84342cbca/raw/a7206a02ed3a5d3cadacd8d9694ac154f9151db7/square_unstructured_1.inp",
+                           joinpath(@__DIR__, "square_unstructured_1.inp"))
 
 mesh = P4estMesh{2}(mesh_file, polydeg = 3, initial_refinement_level = 1)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
-                                    boundary_conditions = Dict(:all => BoundaryConditionDirichlet(initial_condition)))
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = (;
+                                                           all = BoundaryConditionDirichlet(initial_condition)))
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -101,7 +108,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

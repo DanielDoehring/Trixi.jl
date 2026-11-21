@@ -33,7 +33,8 @@
 # example.
 
 # `IndicatorHennemannGassner`, also used as a shock-capturing indicator, was developed by
-# [Hennemann et al. (2021)](https://doi.org/10.1016/j.jcp.2020.109935) and is explained in detail
+# [Hennemann et al. (2021)](https://arxiv.org/abs/2008.12044)
+# ([DOI](https://doi.org/10.1016/j.jcp.2020.109935)) and is explained in detail
 # in the [tutorial about shock-capturing](@ref shock_capturing). It can be constructed as follows.
 # ````julia
 # amr_indicator = IndicatorHennemannGassner(semi,
@@ -49,7 +50,6 @@
 # ````julia
 # amr_indicator = IndicatorMax(semi, variable=variable)
 # ````
-
 
 # ### Controllers
 # The spatial discretization into elements is tree-based for both AMR supporting mesh types `TreeMesh`
@@ -87,7 +87,6 @@
 # This controller is for instance used in
 # [`elixir_euler_astro_jet_amr.jl`](https://github.com/trixi-framework/Trixi.jl/blob/main/examples/tree_2d_dgsem/elixir_euler_astro_jet_amr.jl).
 
-
 # ### Callback
 # The AMR indicator and controller are added to the simulation through the callback [`AMRCallback`](@ref).
 # It contains a semidiscretization `semi`, the controller `amr_controller` and the parameters `interval`,
@@ -103,27 +102,26 @@
 #                            adapt_initial_condition_only_refine=true)
 # ````
 
-
 # # Exemplary simulation
 # Here, we want to implement a simple AMR simulation of the 2D linear advection equation for a Gaussian pulse.
 
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 advection_velocity = (0.2, -0.7)
 equations = LinearScalarAdvectionEquation2D(advection_velocity)
 
 initial_condition = initial_condition_gauss
-solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs)
+solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
 
 coordinates_min = (-5.0, -5.0)
-coordinates_max = ( 5.0,  5.0)
+coordinates_max = (5.0, 5.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=4,
-                n_cells_max=30_000)
+                initial_refinement_level = 4,
+                periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
-
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 tspan = (0.0, 10.0)
 ode = semidiscretize(semi, tspan);
@@ -132,36 +130,35 @@ ode = semidiscretize(semi, tspan);
 # `IndicatorMax`. As described before, it returns the maximal value of the specified variable
 # (here the only conserved variable). Therefore, regions with a high maximum are refined.
 # This is not really useful numerical application, but a nice demonstration example.
-amr_indicator = IndicatorMax(semi, variable=first)
+amr_indicator = IndicatorMax(semi, variable = first)
 
 # These values are transferred to a refinement level with the `ControllerThreeLevel`, such that
 # every element with maximal value greater than `0.1` is refined once and elements with maximum
 # above `0.6` are refined twice.
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level=4,
-                                      med_level=5, med_threshold=0.1,
-                                      max_level=6, max_threshold=0.6)
+                                      base_level = 4,
+                                      med_level = 5, med_threshold = 0.1,
+                                      max_level = 6, max_threshold = 0.6)
 
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval=5,
-                           adapt_initial_condition=true,
-                           adapt_initial_condition_only_refine=true)
+                           interval = 5,
+                           adapt_initial_condition = true,
+                           adapt_initial_condition_only_refine = true)
 
-stepsize_callback = StepsizeCallback(cfl=0.9)
+stepsize_callback = StepsizeCallback(cfl = 0.9)
 
 callbacks = CallbackSet(amr_callback, stepsize_callback);
 
 # Running the simulation.
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition=false),
-            dt=1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep=false, callback=callbacks);
+sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);
 
 # We plot the solution and add the refined mesh at the end of the simulation.
 using Plots
 pd = PlotData2D(sol)
 plot(pd)
 plot!(getmesh(pd))
-
 
 # # More examples
 # Trixi.jl provides many elixirs using AMR. We want to give some examples for different mesh types:
@@ -181,7 +178,8 @@ plot!(getmesh(pd))
 #   * Source: https://www.youtube.com/watch?v=dxgzgteJdOA
 #   * Authors: Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor Gassner
 #   * Setup described in detail in: A purely hyperbolic discontinuous Galerkin approach for self-gravitating gas dynamics,
-#     Journal of Computational Physics (2021),(https://doi.org/10.1016/j.jcp.2021.110467).
+#     Journal of Computational Physics (2021), https://arxiv.org/abs/2008.10593
+#     (DOI: https://doi.org/10.1016/j.jcp.2021.110467).
 #   * Obtain responsive code by inserting link on https://embedresponsively.com
 #   -->
 #   <style>.embed-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; } .embed-container iframe, .embed-container object, .embed-container embed { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }</style><div class='embed-container'><iframe src='https://www.youtube-nocookie.com/embed/dxgzgteJdOA' frameborder='0' allowfullscreen></iframe></div>
@@ -203,7 +201,6 @@ plot!(getmesh(pd))
 
 # For more information, please have a look at the respective links.
 
-
 # ## Package versions
 
 # These results were obtained using the following versions.
@@ -212,5 +209,5 @@ using InteractiveUtils
 versioninfo()
 
 using Pkg
-Pkg.status(["Trixi", "OrdinaryDiffEq", "Plots"],
-           mode=PKGMODE_MANIFEST)
+Pkg.status(["Trixi", "OrdinaryDiffEqLowStorageRK", "Plots"],
+           mode = PKGMODE_MANIFEST)

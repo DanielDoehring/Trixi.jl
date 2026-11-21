@@ -1,6 +1,5 @@
 
-using Downloads: download
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowOrderRK
 using Trixi
 
 ###############################################################################
@@ -49,14 +48,13 @@ end
 initial_condition = initial_condition_isentropic_vortex
 solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs)
 
-default_mesh_file = joinpath(@__DIR__, "mesh_uniform_cartesian.mesh")
-isfile(default_mesh_file) ||
-    download("https://gist.githubusercontent.com/ranocha/f4ea19ba3b62348968c971db43d7798b/raw/a506abb9479c020920cf6068c142670fc1a9aadc/mesh_uniform_cartesian.mesh",
-             default_mesh_file)
-mesh_file = default_mesh_file
+mesh_file = Trixi.download("https://gist.githubusercontent.com/ranocha/f4ea19ba3b62348968c971db43d7798b/raw/a506abb9479c020920cf6068c142670fc1a9aadc/mesh_uniform_cartesian.mesh",
+                           joinpath(@__DIR__, "mesh_uniform_cartesian.mesh"))
+
 mesh = UnstructuredMesh2D(mesh_file, periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -81,6 +79,6 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback)
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, BS3(),
-            save_everystep = false, callback = callbacks);
+sol = solve(ode, BS3();
+            ode_default_options()..., callback = callbacks);
 summary_callback() # print the timer summary

@@ -1,4 +1,4 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -18,21 +18,21 @@ coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                periodicity = true,
-                n_cells_max = 30_000) # set maximum capacity of tree data structure
+                periodicity = true)
 
 # Define initial condition
 function initial_condition_diffusive_convergence_test(x, t,
                                                       equation::LinearScalarAdvectionEquation2D)
     # Store translated coordinate for easy use of exact solution
+    RealT = eltype(x)
     x_trans = x - equation.advection_velocity * t
 
     nu = diffusivity()
-    c = 1.0
-    A = 0.5
+    c = 1
+    A = 0.5f0
     L = 2
-    f = 1 / L
-    omega = 2 * pi * f
+    f = 1.0f0 / L
+    omega = 2 * convert(RealT, pi) * f
     scalar = c + A * sin(omega * sum(x_trans)) * exp(-2 * nu * omega^2 * t)
     return SVector(scalar)
 end
@@ -46,6 +46,7 @@ boundary_conditions_parabolic = boundary_condition_periodic
 semi = SemidiscretizationHyperbolicParabolic(mesh,
                                              (equations, equations_parabolic),
                                              initial_condition, solver;
+                                             solver_parabolic = ParabolicFormulationBassiRebay1(),
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
@@ -74,10 +75,7 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback)
 # run the simulation
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-alg = RDPK3SpFSAL49()
+alg = RDPK3SpFSAL49(thread = Trixi.Threaded())
 time_int_tol = 1.0e-11
 sol = solve(ode, alg; abstol = time_int_tol, reltol = time_int_tol,
             ode_default_options()..., callback = callbacks)
-
-# Print the timer summary
-summary_callback()

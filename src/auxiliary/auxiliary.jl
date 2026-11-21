@@ -4,19 +4,6 @@
 include("containers.jl")
 include("math.jl")
 
-# Enable debug timings `@trixi_timeit timer() "name" stuff...`.
-# This allows us to disable timings completely by executing
-# `TimerOutputs.disable_debug_timings(Trixi)`
-# and to enable them again by executing
-# `TimerOutputs.enable_debug_timings(Trixi)`
-timeit_debug_enabled() = true
-
-# Store main timer for global timing of functions
-const main_timer = TimerOutput()
-
-# Always call timer() to hide implementation details
-timer() = main_timer
-
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -48,7 +35,7 @@ end
 
 @inline function Base.put!(counter::PerformanceCounter, runtime::Real)
     counter.ncalls_since_readout += 1
-    counter.runtime += runtime
+    return counter.runtime += runtime
 end
 
 @inline ncalls(counter::PerformanceCounter) = counter.ncalls_since_readout
@@ -96,6 +83,46 @@ end
 end
 
 """
+    @trixi_timeit_ext backend timer() "some label" expression
+
+This macro is an extension of [`@trixi_timeit`](@ref) that also synchronizes the given `backend` after executing the given `expression`.
+This is useful to get accurate timing measurements for GPU backends, where the execution of kernels is asynchronous.
+The synchronization ensures that all GPU operations are completed before the timer is stopped.
+
+See also [`@trixi_timeit`](@ref).
+"""
+macro trixi_timeit_ext(backend, timer_output, label, expr)
+    expr = quote
+        local val = $(esc(expr))
+        if $(esc(backend)) !== nothing && $(TrixiBase).timeit_debug_enabled()
+            $(KernelAbstractions.synchronize)($(esc(backend)))
+        end
+        val
+    end
+    return :(@trixi_timeit($(esc(timer_output)), $(esc(label)), $(expr)))
+end
+
+# Compatibility shim for `AcceleratedKernels.mapreduce`, which takes the `backend` as
+# positional argument in AcceleratedKernels.jl v0.4 but as keyword argument in v0.5.
+# We support both versions since AcceleratedKernels.jl v0.5 is required for
+# KernelAbstractions.jl v0.10, while some GPU backends still require
+# KernelAbstractions.jl v0.9 (as of October 2026) and thus AcceleratedKernels.jl v0.4.
+# Since `f` and `op` are only passed through, Julia would not specialize on them
+# without the type parameters `F` and `Op`.
+# TODO: Remove this shim once we require AcceleratedKernels.jl v0.5.
+@static if pkgversion(AcceleratedKernels) >= v"0.5"
+    @inline function mapreduce_accelerated(f::F, op::Op, src, backend;
+                                           kwargs...) where {F, Op}
+        return AcceleratedKernels.mapreduce(f, op, src; backend, kwargs...)
+    end
+else
+    @inline function mapreduce_accelerated(f::F, op::Op, src, backend;
+                                           kwargs...) where {F, Op}
+        return AcceleratedKernels.mapreduce(f, op, src, backend; kwargs...)
+    end
+end
+
+"""
     examples_dir()
 
 Return the directory where the example files provided with Trixi.jl are located. If Trixi.jl is
@@ -135,7 +162,7 @@ Return the path to an example elixir that can be used to quickly see Trixi.jl in
 [`TreeMesh`](@ref). See also [`examples_dir`](@ref) and [`get_examples`](@ref).
 """
 function default_example()
-    joinpath(examples_dir(), "tree_2d_dgsem", "elixir_advection_basic.jl")
+    return joinpath(examples_dir(), "tree_2d_dgsem", "elixir_advection_basic.jl")
 end
 
 """
@@ -146,7 +173,7 @@ Return the path to an example elixir that can be used to quickly see Trixi.jl in
 given in the Trixi.jl documentation regarding unstructured meshes.
 """
 function default_example_unstructured()
-    joinpath(examples_dir(), "unstructured_2d_dgsem", "elixir_euler_basic.jl")
+    return joinpath(examples_dir(), "unstructured_2d_dgsem", "elixir_euler_basic.jl")
 end
 
 """
@@ -178,6 +205,7 @@ function print_startup_message()
          ╚═╝   ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝
       """
     mpi_println(s)
+    return nothing
 end
 
 """
@@ -217,61 +245,38 @@ Some discussion can be found at [https://discourse.julialang.org/t/overhead-of-t
 and [https://discourse.julialang.org/t/threads-threads-with-one-thread-how-to-remove-the-overhead/58435](https://discourse.julialang.org/t/threads-threads-with-one-thread-how-to-remove-the-overhead/58435).
 """
 macro threaded(expr)
-    # Use `esc(quote ... end)` for nested macro calls as suggested in
-    # https://github.com/JuliaLang/julia/issues/23221
-    #
-    # The following code is a simple version using only `Threads.@threads` from the
-    # standard library with an additional check whether only a single thread is used
-    # to reduce some overhead (and allocations) for serial execution.
-    #
-    # return esc(quote
-    #   let
-    #     if Threads.nthreads() == 1
-    #       $(expr)
-    #     else
-    #       Threads.@threads $(expr)
-    #     end
-    #   end
-    # end)
-    #
-    # However, the code below using `@batch` from Polyester.jl is more efficient,
-    # since this packages provides threads with less overhead. Since it is written
-    # by Chris Elrod, the author of LoopVectorization.jl, we expect this package
-    # to provide the most efficient and useful implementation of threads (as we use
-    # them) available in Julia.
     # !!! danger "Heisenbug"
     #     Look at the comments for `wrap_array` when considering to change this macro.
-
-    return esc(quote
-                   Trixi.@batch $(expr)
-               end)
-end
-
-#     @trixi_timeit timer() "some label" expression
-#
-# Basically the same as a special case of `@timeit_debug` from
-# [TimerOutputs.jl](https://github.com/KristofferC/TimerOutputs.jl),
-# but without `try ... finally ... end` block. Thus, it's not exception-safe,
-# but it also avoids some related performance problems. Since we do not use
-# exception handling in Trixi.jl, that's not really an issue.
-macro trixi_timeit(timer_output, label, expr)
-    timeit_block = quote
-        if timeit_debug_enabled()
-            local to = $(esc(timer_output))
-            local enabled = to.enabled
-            if enabled
-                local accumulated_data = $(TimerOutputs.push!)(to, $(esc(label)))
+    expr = @static if _PREFERENCE_THREADING === :polyester
+        # Currently using `@batch` from Polyester.jl is more efficient,
+        # bypasses the Julia task scheduler and provides parallelization with less overhead.
+        quote
+            $Trixi.@batch $(expr)
+        end
+    elseif _PREFERENCE_THREADING === :static ||
+           _PREFERENCE_THREADING === :kernelabstractions
+        # The following code is a simple version using only `Threads.@threads` from the
+        # standard library with an additional check whether only a single thread is used
+        # to reduce some overhead (and allocations) for serial execution.
+        # If we want to execute on KernelAbstractions, we use the static backend here to fallback on,
+        # for loops that do not yet support GPU execution.
+        quote
+            let
+                if $Threads.nthreads() == 1
+                    $(expr)
+                else
+                    $Threads.@threads :static $(expr)
+                end
             end
-            local b₀ = $(TimerOutputs.gc_bytes)()
-            local t₀ = $(TimerOutputs.time_ns)()
         end
-        local val = $(esc(expr))
-        if timeit_debug_enabled() && enabled
-            $(TimerOutputs.do_accumulate!)(accumulated_data, t₀, b₀)
-            $(TimerOutputs.pop!)(to)
+    elseif _PREFERENCE_THREADING === :serial
+        quote
+            $(expr)
         end
-        val
     end
+    # Use `esc(quote ... end)` for nested macro calls as suggested in
+    # https://github.com/JuliaLang/julia/issues/23221
+    return esc(expr)
 end
 
 """
@@ -344,5 +349,61 @@ function register_error_hints()
     end
 
     return nothing
+end
+
+# Check whether `src_url` points to a host operated by GitHub. Only in this
+# case, we may add the `GITHUB_TOKEN` to the request headers, see
+# [`download`](@ref); sending it to any other host would leak the token.
+function is_github_url(src_url)
+    # Extract the host from a URL of the form
+    # `scheme://[userinfo@]host[:port]/path?query#fragment`
+    m = match(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@]*@)?([^/?#:]*)", String(src_url))
+    m === nothing && return false
+
+    host = lowercase(m.captures[1])
+    return host == "github.com" || endswith(host, ".github.com") ||
+           host == "githubusercontent.com" || endswith(host, ".githubusercontent.com")
+end
+
+"""
+    Trixi.download(src_url, file_path)
+
+Download a file from given `src_url` to given `file_path` if
+`file_path` is not already a file. This function just returns
+`file_path`.
+This is a small wrapper of `Downloads.download(src_url, file_path)`
+that avoids race conditions when multiple MPI ranks are used.
+Furthermore, when run as part of a GitHub Action, it uses
+token-authenticated downloads for files hosted on GitHub to avoid
+GitHub's rate limiting for unauthenticated HTTP request. To use this
+feature, provide the environment variable `GITHUB_TOKEN`.
+"""
+function download(src_url, file_path)
+    # Note that `mpi_isroot()` is also `true` if running
+    # in serial (without MPI).
+    if mpi_isroot()
+        if !isfile(file_path)
+            headers = Pair{String, String}[]
+            # Pass the GITHUB_TOKEN through to prevent rate-limiting - but only
+            # when downloading from GitHub, so that we do not leak the token.
+            token = get(ENV, "GITHUB_TOKEN", nothing)
+            if token !== nothing && is_github_url(src_url)
+                push!(headers, "authorization" => "Bearer $token")
+            end
+            try
+                Downloads.download(src_url, file_path; headers)
+            catch exc
+                # Turn exception into something like a warning;
+                # otherwise the other ranks will wait indefinitely at the barrier below.
+                @error "Failed to download $src_url to $file_path" exception=exc
+            end
+        end
+    end
+
+    if mpi_isparallel()
+        MPI.Barrier(mpi_comm())
+    end
+
+    return file_path
 end
 end # @muladd

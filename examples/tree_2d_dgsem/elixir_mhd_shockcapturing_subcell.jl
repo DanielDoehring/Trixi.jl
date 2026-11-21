@@ -1,5 +1,3 @@
-
-using OrdinaryDiffEq
 using Trixi
 
 ###############################################################################
@@ -13,46 +11,57 @@ equations = IdealGlmMhdEquations2D(1.4)
 An MHD blast wave modified from:
 - Dominik Derigs, Gregor J. Gassner, Stefanie Walch & Andrew R. Winters (2018)
   Entropy Stable Finite Volume Approximations for Ideal Magnetohydrodynamics
-  [doi: 10.1365/s13291-018-0178-9](https://doi.org/10.1365/s13291-018-0178-9)
+  [arXiv: 1708.03537](https://arxiv.org/abs/1708.03537)
+  [DOI: 10.1365/s13291-018-0178-9](https://doi.org/10.1365/s13291-018-0178-9)
 This setup needs a positivity limiter for the density.
 """
 function initial_condition_blast_wave(x, t, equations::IdealGlmMhdEquations2D)
     # setup taken from Derigs et al. DMV article (2018)
     # domain must be [-0.5, 0.5] x [-0.5, 0.5], γ = 1.4
+    RealT = eltype(x)
     r = sqrt(x[1]^2 + x[2]^2)
 
-    pmax = 10.0
-    pmin = 1.0
-    rhomax = 1.0
-    rhomin = 0.01
-    if r <= 0.09
+    pmax = convert(RealT, 10)
+    pmin = convert(RealT, 0.01)
+    rhomax = one(RealT)
+    rhomin = convert(RealT, 0.01)
+    if r <= RealT(0.09)
         p = pmax
         rho = rhomax
-    elseif r >= 0.1
+    elseif r >= RealT(0.1)
         p = pmin
         rho = rhomin
     else
-        p = pmin + (0.1 - r) * (pmax - pmin) / 0.01
-        rho = rhomin + (0.1 - r) * (rhomax - rhomin) / 0.01
+        p = pmin + (convert(RealT, 0.1) - r) * (pmax - pmin) / convert(RealT, 0.01)
+        rho = rhomin + (convert(RealT, 0.1) - r) * (rhomax - rhomin) / convert(RealT, 0.01)
     end
-    v1 = 0.0
-    v2 = 0.0
-    v3 = 0.0
-    B1 = 1.0 / sqrt(4.0 * pi)
-    B2 = 0.0
-    B3 = 0.0
-    psi = 0.0
+    v1 = 0
+    v2 = 0
+    v3 = 0
+    B1 = 1 / sqrt(4 * convert(RealT, pi))
+    B2 = 0
+    B3 = 0
+    psi = 0
     return prim2cons(SVector(rho, v1, v2, v3, p, B1, B2, B3, psi), equations)
 end
 initial_condition = initial_condition_blast_wave
 
-surface_flux = (flux_lax_friedrichs, flux_nonconservative_powell_local_symmetric)
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+surface_flux = (FluxLaxFriedrichs(max_abs_speed_naive),
+                flux_nonconservative_powell_local_symmetric)
 volume_flux = (flux_derigs_etal, flux_nonconservative_powell_local_symmetric)
 basis = LobattoLegendreBasis(3)
 
 limiter_idp = SubcellLimiterIDP(equations, basis;
                                 positivity_variables_cons = ["rho"],
-                                positivity_correction_factor = 0.5)
+                                positivity_variables_nonlinear = [pressure],
+                                positivity_correction_factor = 0.1)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
@@ -62,9 +71,10 @@ coordinates_min = (-0.5, -0.5)
 coordinates_max = (0.5, 0.5)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                n_cells_max = 10_000)
+                periodicity = true)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
+                                    boundary_conditions = boundary_condition_periodic)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -82,9 +92,10 @@ alive_callback = AliveCallback(analysis_interval = analysis_interval)
 save_solution = SaveSolutionCallback(interval = 100,
                                      save_initial_solution = true,
                                      save_final_solution = true,
-                                     solution_variables = cons2prim)
+                                     solution_variables = cons2prim,
+                                     extra_node_variables = (:limiting_coefficient,))
 
-cfl = 0.5
+cfl = 0.4
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 glm_speed_callback = GlmSpeedCallback(glm_scale = 0.5, cfl = cfl)
@@ -101,6 +112,5 @@ callbacks = CallbackSet(summary_callback,
 stage_callbacks = (SubcellLimiterIDPCorrection(), BoundsCheckCallback())
 
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-                  save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+                  dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  ode_default_options()..., callback = callbacks);

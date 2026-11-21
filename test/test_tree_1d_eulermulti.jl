@@ -1,16 +1,49 @@
-module TestExamples1DEulerMulti
+@testsnippet TreeMesh1DEulerMulti begin
+    EXAMPLES_DIR = joinpath(examples_dir(), "tree_1d_dgsem")
+end
 
-using Test
-using Trixi
+@testitem "TreeMesh1D EulerMulti: Testing entropy2cons and cons2entropy" setup=[Setup] tags=[:tree_part1] begin
+    using ForwardDiff
+    using Trixi: Trixi, CompressibleEulerMulticomponentEquations1D, cons2entropy,
+                 entropy2cons, SVector
+    gammas = (1.3272378792562836, 1.5269959187969864, 1.8362285750521512,
+              1.0409061360276926, 1.4652015053812224, 1.3626493264184423)
+    gas_constants = (1.817636851910076, 6.760820475922636, 5.588953939749113,
+                     6.31574782981543, 3.362932038038397, 3.212779569399733)
+    equations = CompressibleEulerMulticomponentEquations1D(gammas = SVector{length(gammas)}(gammas...),
+                                                           gas_constants = SVector{length(gas_constants)}(gas_constants...))
+    u = [-1.4632513788889214, 0.9908786980927811, 0.2909066990257628,
+        0.6256623915420473, 0.4905882754313441, 0.14481800501749112,
+        1.0333532872771651, 0.6805599818745411]
+    w = cons2entropy(u, equations)
+    # test that the entropy variables match the gradients of the total entropy
+    @test w ≈ ForwardDiff.gradient(u -> Trixi.total_entropy(u, equations), u)
+    # test that `entropy2cons` is the inverse of `cons2entropy`
+    @test entropy2cons(w, equations) ≈ u
+end
 
-include("test_trixi.jl")
+@testitem "TreeMesh1D EulerMulti: Testing entropy potential" setup=[Setup] tags=[:tree_part1] begin
+    using LinearAlgebra: dot
+    gammas = (1.4, 1.6)
+    gas_constants = (1.0, 2.0)
+    equations = CompressibleEulerMulticomponentEquations1D(; gammas, gas_constants)
 
-EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_1d_dgsem")
+    q_ll = SVector(-0.1, 1.0, 1.1, 0.9)
+    q_rr = SVector(0.2, 2.0, 1.9, 2.1)
+    u_ll, u_rr = prim2cons.((q_ll, q_rr), equations)
 
-@testset "Compressible Euler Multicomponent" begin
-#! format: noindent
+    # check that `flux_chandrashekar` is entropy conservative
+    v_ll, v_rr = cons2entropy.((u_ll, u_rr), equations)
+    jump_entropy_potential = entropy_potential(u_rr, 1, equations) -
+                             entropy_potential(u_ll, 1, equations)
+    @test dot(v_rr - v_ll, flux_chandrashekar(u_ll, u_rr, 1, equations)) ≈
+          jump_entropy_potential
+end
 
-@trixi_testset "elixir_eulermulti_ec.jl" begin
+@testitem "TreeMesh1D EulerMulti: elixir_eulermulti_ec.jl" setup=[
+    Setup,
+    TreeMesh1DEulerMulti
+] tags=[:tree_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_eulermulti_ec.jl"),
                         l2=[0.15330089521538684, 0.4417674632047301,
                             0.016888510510282385, 0.03377702102056477,
@@ -20,63 +53,57 @@ EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_1d_dgsem")
                             0.1387461003999011])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_eulermulti_es.jl" begin
+@testitem "TreeMesh1D EulerMulti: elixir_eulermulti_es.jl" setup=[
+    Setup,
+    TreeMesh1DEulerMulti
+] tags=[:tree_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_eulermulti_es.jl"),
                         l2=[
                             0.1522380497572071,
                             0.43830846465313206,
                             0.03907262116499431,
-                            0.07814524232998862,
+                            0.07814524232998862
                         ],
                         linf=[
                             0.24939193075537294,
                             0.7139395740052739,
                             0.06324208768391237,
-                            0.12648417536782475,
+                            0.12648417536782475
                         ])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_eulermulti_convergence_ec.jl" begin
+@testitem "TreeMesh1D EulerMulti: elixir_eulermulti_convergence_ec.jl" setup=[
+    Setup,
+    TreeMesh1DEulerMulti
+] tags=[:tree_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_eulermulti_convergence_ec.jl"),
                         l2=[
                             8.575236038539227e-5,
                             0.00016387804318585358,
                             1.9412699303977585e-5,
-                            3.882539860795517e-5,
+                            3.882539860795517e-5
                         ],
                         linf=[
                             0.00030593277277124464,
                             0.0006244803933350696,
                             7.253121435135679e-5,
-                            0.00014506242870271358,
+                            0.00014506242870271358
                         ])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_eulermulti_convergence_es.jl" begin
+@testitem "TreeMesh1D EulerMulti: elixir_eulermulti_convergence_es.jl" setup=[
+    Setup,
+    TreeMesh1DEulerMulti
+] tags=[:tree_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_eulermulti_convergence_es.jl"),
                         l2=[1.8983933794407234e-5, 6.207744299844731e-5,
                             1.5466205761868047e-6, 3.0932411523736094e-6,
@@ -86,15 +113,13 @@ end
                             2.603347164065184e-5, 5.206694328130368e-5])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_eulermulti_convergence_es.jl with flux_chandrashekar" begin
+@testitem "TreeMesh1D EulerMulti: elixir_eulermulti_convergence_es.jl with flux_chandrashekar" setup=[
+    Setup,
+    TreeMesh1DEulerMulti
+] tags=[:tree_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_eulermulti_convergence_es.jl"),
                         l2=[1.888450477353845e-5, 5.4910600482795386e-5,
                             9.426737161533622e-7, 1.8853474323067245e-6,
@@ -105,15 +130,13 @@ end
                         volume_flux=flux_chandrashekar)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_eulermulti_two_interacting_blast_waves.jl" begin
+@testitem "TreeMesh1D EulerMulti: elixir_eulermulti_two_interacting_blast_waves.jl" setup=[
+    Setup,
+    TreeMesh1DEulerMulti
+] tags=[:tree_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_eulermulti_two_interacting_blast_waves.jl"),
                         l2=[1.288867611915533, 82.71335258388848, 0.00350680272313187,
@@ -125,13 +148,5 @@ end
                         tspan=(0.0, 0.0001))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
-end
-
-end # module

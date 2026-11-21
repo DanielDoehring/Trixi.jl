@@ -12,7 +12,20 @@ Return the number of degrees of freedom associated with each scalar variable.
 """
 @inline function ndofs(semi::AbstractSemidiscretization)
     mesh, _, solver, cache = mesh_equations_solver_cache(semi)
-    ndofs(mesh, solver, cache)
+    return ndofs(mesh, solver, cache)
+end
+
+"""
+    ndofsglobal(semi::AbstractSemidiscretization)
+
+Return the global number of degrees of freedom associated with each scalar variable across all MPI ranks.
+This is the same as [`ndofs`](@ref) for simulations running in serial or
+parallelized via threads. It will in general be different for simulations
+running in parallel with MPI.
+"""
+@inline function ndofsglobal(semi::AbstractSemidiscretization)
+    mesh, _, solver, cache = mesh_equations_solver_cache(semi)
+    return ndofsglobal(mesh, solver, cache)
 end
 
 """
@@ -28,8 +41,8 @@ function integrate_via_indices(func::Func, u_ode, semi::AbstractSemidiscretizati
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
 
     u = wrap_array(u_ode, mesh, equations, solver, cache)
-    integrate_via_indices(func, u, mesh, equations, solver, cache, args...,
-                          normalize = normalize)
+    return integrate_via_indices(func, u, mesh, equations, solver, cache, args...,
+                                 normalize = normalize)
 end
 
 """
@@ -37,6 +50,8 @@ end
 
 Call `func(u_node, equations)` for each vector of nodal variables `u_node` in `u_ode`
 and integrate the result using a quadrature associated with the semidiscretization `semi`.
+For equations with auxiliary variables (see [`nauxvariables`](@ref)),
+`func(u_node, aux_node, equations)` is called with the auxiliary variables `aux_node`.
 
 If `normalize` is true, the result is divided by the total volume of the computational domain.
 """
@@ -45,32 +60,172 @@ function integrate(func::Func, u_ode, semi::AbstractSemidiscretization;
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
 
     u = wrap_array(u_ode, mesh, equations, solver, cache)
-    integrate(func, u, mesh, equations, solver, cache, normalize = normalize)
+    return integrate(func, u, mesh, equations, solver, cache, normalize = normalize)
 end
 
-function integrate(u, semi::AbstractSemidiscretization; normalize = true)
-    integrate(cons2cons, u, semi; normalize = normalize)
+function integrate(u_ode, semi::AbstractSemidiscretization; normalize = true)
+    return integrate(cons2cons, u_ode, semi; normalize = normalize)
 end
+
+# Select the right-hand side function corresponding to the semidiscretization `semi`.
+@inline default_rhs(::AbstractSemidiscretization) = rhs_hyperbolic!
 
 """
     calc_error_norms([func=(u_node,equations)->u_node,] u_ode, t, analyzer, semi::AbstractSemidiscretization, cache_analysis)
 
 Calculate discrete L2 and L∞ error norms of `func` applied to each nodal variable `u_node` in `u_ode`.
+For equations with auxiliary variables (see [`nauxvariables`](@ref)),
+`func(u_node, aux_node, equations)` is called with the auxiliary variables `aux_node`.
 If no exact solution is available, "errors" are calculated using some reference state and can be useful
 for regression tests.
 """
 function calc_error_norms(u_ode, t, analyzer, semi::AbstractSemidiscretization,
                           cache_analysis)
-    calc_error_norms(cons2cons, u_ode, t, analyzer, semi, cache_analysis)
+    return calc_error_norms(cons2cons, u_ode, t, analyzer, semi, cache_analysis)
 end
 
 """
-    semidiscretize(semi::AbstractSemidiscretization, tspan)
+    trixi_adapt(semi::AbstractSemidiscretization;
+                storage_type = nothing, real_type = nothing, tuning = nothing)
+
+Return a semidiscretization based on `semi` that uses the array type `storage_type`
+and the real type `real_type` for its internal data structures. Use the returned
+semidiscretization afterwards, e.g., to create the ODE problem with
+[`semidiscretize`](@ref) and the callbacks. The original `semi` may share data
+with the returned one and must not be used anymore, e.g., since AMR changes the
+shared data.
+
+Optional keyword arguments:
+- `storage_type`: Array type of the internal data structures, e.g., `CuArray`
+  (from [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl)) or `ROCArray`
+  (from [AMDGPU.jl](https://github.com/JuliaGPU/AMDGPU.jl)) to run on GPUs.
+  `nothing` keeps the current array type (usually `Array`).
+- `real_type`: Real type used for the computations, e.g., `Float32`.
+  `nothing` keeps the current real type `real(semi)` (usually `Float64`).
+- `tuning`: Performance settings of the GPU and KernelAbstractions.jl kernels on a
+  `P4estMesh` or `T8codeMesh` as a [`Tuning`](@ref), e.g.,
+  `Tuning(flux_differencing_kernel = FullSweep())`. Settings that are `nothing` keep
+  their current value. `nothing` keeps all current settings.
+
+If all keyword arguments are `nothing`, `semi` is returned unchanged.
+"""
+function trixi_adapt(semi::AbstractSemidiscretization;
+                     storage_type = nothing, real_type = nothing, tuning = nothing)
+    if storage_type === nothing && real_type === nothing && tuning === nothing
+        return semi
+    end
+
+    if !(storage_type === nothing && real_type === nothing)
+        if storage_type === nothing
+            # The keyword argument shadows the function `Trixi.storage_type`
+            storage_type = Trixi.storage_type(semi)
+        end
+        if real_type === nothing
+            real_type = real(semi)
+        end
+        semi = trixi_adapt(storage_type, real_type, semi)
+    end
+
+    return adapt_tuning(semi, tuning)
+end
+
+# Array type of the internal data structures of the semidiscretization `semi`, which
+# `trixi_adapt` keeps if only the real type is changed. Only the containers of a
+# `P4estMesh` or `T8codeMesh` support other array types than `Array`, e.g., GPU arrays.
+storage_type(semi::AbstractSemidiscretization) = Array
+storage_type(mesh, cache) = Array
+function storage_type(mesh::Union{P4estMesh, P4estMeshView, T8codeMesh}, cache)
+    return storage_type(cache.elements)
+end
+
+# The `cache` of a `P4estMesh` or `T8codeMesh` contains the performance settings of
+# the GPU and KernelAbstractions.jl kernels as a `Tuning`,
+# see `create_cache_hyperbolic` in `src/solvers/dgsem_p4est/dg.jl`.
+# We set them (if requested) and check them every time the semidiscretization is adapted,
+# since the checks depend on the settings, the real type, and the storage type.
+# We store settings that are `nothing` (the defaults of the backend) without resolving
+# them, so that they follow the backend if the semidiscretization is adapted again.
+function adapt_tuning(semi, tuning)
+    if !(hasproperty(semi, :cache) && haskey(semi.cache, :tuning))
+        if tuning !== nothing
+            throw(ArgumentError("The keyword argument `tuning` is only supported for " *
+                                "a `P4estMesh` or `T8codeMesh`."))
+        end
+        return semi
+    end
+
+    if tuning !== nothing
+        tuning = merge_tuning(semi.cache.tuning, tuning)
+    else
+        tuning = semi.cache.tuning
+    end
+
+    # The checks use the settings of the backend of the adapted semidiscretization,
+    # including the defaults of the backend for settings that are `nothing`.
+    backend = get_backend(semi.cache.elements.node_coordinates)
+    resolved_tuning = resolve_tuning(backend, tuning)
+
+    volume_integral = semi.solver.volume_integral
+    if volume_integral isa VolumeIntegralFluxDifferencing
+        if resolved_tuning.flux_differencing_kernel isa FullSweepGlobal &&
+           volume_integral.volume_flux isa FluxTurbo &&
+           have_nonconservative_terms(semi.equations) === True()
+            error("`FullSweepGlobal()` does not support `FluxTurbo` with nonconservative terms")
+        end
+
+        # The resources such as the shared memory are only limited on GPUs. We check
+        # the backend instead of the array type to support all GPU array types.
+        if !(backend isa KernelAbstractions.CPU)
+            check_flux_differencing_shared_memory(resolved_tuning.flux_differencing_kernel,
+                                                  semi)
+        end
+    end
+
+    @reset semi.cache.tuning = tuning
+    return semi
+end
+
+# The tuning is not an argument of the constructors of semidiscretizations. Thus, we copy
+# it explicitly from `semi` to `semi_new` in `remake`. We use `adapt_tuning` to check the
+# settings again, since `remake` can change, e.g., the solver. The tuning is dropped if
+# `semi_new` does not support it, e.g., on a `TreeMesh`.
+function copy_tuning(semi_new, semi)
+    if hasproperty(semi, :cache) && haskey(semi.cache, :tuning) &&
+       hasproperty(semi_new, :cache) && haskey(semi_new.cache, :tuning)
+        return adapt_tuning(semi_new, semi.cache.tuning)
+    end
+    return semi_new
+end
+
+# Convert the time span to the real type of the semidiscretization. Otherwise,
+# e.g., the default `tspan = (0.0, 1.0)` would result in `Float64` time values for
+# a `Float32` semidiscretization, and time-dependent initial conditions, boundary
+# conditions, and source terms would be evaluated in `Float64`.
+# Custom semidiscretizations do not need to implement `real`; then, we keep `tspan`.
+function convert_tspan(semi, tspan)
+    applicable(real, semi) || return tspan
+    RealT = real(semi)
+    return (convert(RealT, first(tspan)), convert(RealT, last(tspan)))
+end
+
+"""
+    semidiscretize(semi::AbstractSemidiscretization, tspan;
+                   jac_prototype::Union{AbstractMatrix, Nothing} = nothing,
+                   colorvec::Union{AbstractVector, Nothing} = nothing)
 
 Wrap the semidiscretization `semi` as an ODE problem in the time interval `tspan`
-that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
+that can be passed to `solve` from the [SciML ecosystem](https://docs.sciml.ai/DiffEqDocs/stable/).
+The time span is converted to the real type `real(semi)` of the semidiscretization.
+
+Optional keyword arguments:
+- `jac_prototype`: Expected to come from [SparseConnectivityTracer.jl](https://github.com/adrhill/SparseConnectivityTracer.jl).
+  Specifies the sparsity structure of the Jacobian to enable e.g. efficient implicit time stepping.
+- `colorvec`: Expected to come from [SparseMatrixColorings.jl](https://github.com/gdalle/SparseMatrixColorings.jl).
+  Allows for even faster Jacobian computation if a sparse `jac_prototype` is given (optional).
 """
 function semidiscretize(semi::AbstractSemidiscretization, tspan;
+                        jac_prototype::Union{AbstractMatrix, Nothing} = nothing,
+                        colorvec::Union{AbstractVector, Nothing} = nothing,
                         reset_threads = true)
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
@@ -79,24 +234,56 @@ function semidiscretize(semi::AbstractSemidiscretization, tspan;
         Polyester.reset_threads!()
     end
 
-    u0_ode = compute_coefficients(first(tspan), semi)
+    tspan = convert_tspan(semi, tspan)
+
+    u0_ode = compute_coefficients(first(tspan), semi) # Invoke initial condition
+    rhs_semi! = default_rhs(semi)
+
     # TODO: MPI, do we want to synchronize loading and print debug statements, e.g. using
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
-    iip = true # is-inplace, i.e., we modify a vector when calling rhs!
-    specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
-    return ODEProblem{iip, specialize}(rhs!, u0_ode, tspan, semi)
+    iip = true # is-inplace, i.e., we modify a vector when calling `rhs_semi!`
+    specialize = SciMLBase.FullSpecialize # specialize on `rhs_semi!` and parameters (semi)
+
+    # Check if Jacobian prototype is provided for sparse Jacobian
+    if jac_prototype !== nothing
+        # Convert `jac_prototype` to real type, as seen here:
+        # https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#Declaring-a-Sparse-Jacobian-with-Automatic-Sparsity-Detection
+        ode = SciMLBase.ODEFunction(rhs_semi!,
+                                    jac_prototype = convert.(eltype(u0_ode),
+                                                             jac_prototype),
+                                    colorvec = colorvec) # coloring vector is optional
+
+        return ODEProblem{iip, specialize}(ode, u0_ode, tspan, semi)
+    else
+        # We could also construct an `ODEFunction` explicitly without the Jacobian here,
+        # but we stick to the lean direct in-place function `rhs_semi!` and
+        # let OrdinaryDiffEq.jl handle the rest
+        return ODEProblem{iip, specialize}(rhs_semi!, u0_ode, tspan, semi)
+    end
 end
 
 """
-    semidiscretize(semi::AbstractSemidiscretization, tspan, restart_file::AbstractString)
+    semidiscretize(semi::AbstractSemidiscretization, tspan,
+                   restart_file::AbstractString;
+                   jac_prototype::Union{AbstractMatrix, Nothing} = nothing,
+                   colorvec::Union{AbstractVector, Nothing} = nothing)
 
 Wrap the semidiscretization `semi` as an ODE problem in the time interval `tspan`
-that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
+that can be passed to `solve` from the [SciML ecosystem](https://docs.sciml.ai/DiffEqDocs/stable/).
 The initial condition etc. is taken from the `restart_file`.
+The time span is converted to the real type `real(semi)` of the semidiscretization.
+
+Optional keyword arguments:
+- `jac_prototype`: Expected to come from [SparseConnectivityTracer.jl](https://github.com/adrhill/SparseConnectivityTracer.jl).
+  Specifies the sparsity structure of the Jacobian to enable e.g. efficient implicit time stepping.
+- `colorvec`: Expected to come from [SparseMatrixColorings.jl](https://github.com/gdalle/SparseMatrixColorings.jl).
+  Allows for even faster Jacobian computation. Not necessarily required when `jac_prototype` is given.
 """
 function semidiscretize(semi::AbstractSemidiscretization, tspan,
                         restart_file::AbstractString;
+                        jac_prototype::Union{AbstractMatrix, Nothing} = nothing,
+                        colorvec::Union{AbstractVector, Nothing} = nothing,
                         reset_threads = true)
     # Optionally reset Polyester.jl threads. See
     # https://github.com/trixi-framework/Trixi.jl/issues/1583
@@ -105,13 +292,32 @@ function semidiscretize(semi::AbstractSemidiscretization, tspan,
         Polyester.reset_threads!()
     end
 
-    u0_ode = load_restart_file(semi, restart_file)
+    tspan = convert_tspan(semi, tspan)
+    u0_ode = load_restart_file(semi, restart_file) # Load initial condition from restart file
+    rhs_semi! = default_rhs(semi)
+
     # TODO: MPI, do we want to synchronize loading and print debug statements, e.g. using
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
-    iip = true # is-inplace, i.e., we modify a vector when calling rhs!
-    specialize = SciMLBase.FullSpecialize # specialize on rhs! and parameters (semi)
-    return ODEProblem{iip, specialize}(rhs!, u0_ode, tspan, semi)
+    iip = true # is-inplace, i.e., we modify a vector when calling `rhs_semi!`
+    specialize = SciMLBase.FullSpecialize # specialize on `rhs_semi!` and parameters (semi)
+
+    # Check if Jacobian prototype is provided for sparse Jacobian
+    if jac_prototype !== nothing
+        # Convert `jac_prototype` to real type, as seen here:
+        # https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#Declaring-a-Sparse-Jacobian-with-Automatic-Sparsity-Detection
+        ode = SciMLBase.ODEFunction(rhs_semi!,
+                                    jac_prototype = convert.(eltype(u0_ode),
+                                                             jac_prototype),
+                                    colorvec = colorvec) # coloring vector is optional
+
+        return ODEProblem{iip, specialize}(ode, u0_ode, tspan, semi)
+    else
+        # We could also construct an `ODEFunction` explicitly without the Jacobian here,
+        # but we stick to the lean direct in-place function `rhs_semi!` and
+        # let OrdinaryDiffEq.jl handle the rest
+        return ODEProblem{iip, specialize}(rhs_semi!, u0_ode, tspan, semi)
+    end
 end
 
 """
@@ -141,52 +347,94 @@ end
 Same as [`compute_coefficients`](@ref) but stores the result in `u_ode`.
 """
 function compute_coefficients!(u_ode, func, t, semi::AbstractSemidiscretization)
+    backend = trixi_backend(u_ode)
     u = wrap_array(u_ode, semi)
     # Call `compute_coefficients` defined by the solver
-    compute_coefficients!(u, func, t, mesh_equations_solver_cache(semi)...)
+    return compute_coefficients!(backend, u, func, t,
+                                 mesh_equations_solver_cache(semi)...)
 end
 
-"""
-    linear_structure(semi::AbstractSemidiscretization;
-                     t0=zero(real(semi)))
-
-Wraps the right-hand side operator of the semidiscretization `semi`
-at time `t0` as an affine-linear operator given by a linear operator `A`
-and a vector `b`.
-"""
-function linear_structure(semi::AbstractSemidiscretization;
-                          t0 = zero(real(semi)))
+# Helper function to compute linear structure for a given semidiscretization
+# `semi` and applied RHS `apply_rhs!`
+function _linear_structure_from_rhs(semi::AbstractSemidiscretization, apply_rhs!)
     # allocate memory
     u_ode = allocate_coefficients(mesh_equations_solver_cache(semi)...)
     du_ode = similar(u_ode)
 
-    # get the right hand side from possible source terms
+    # get the right hand side from boundary conditions and optional source terms
     u_ode .= zero(eltype(u_ode))
-    rhs!(du_ode, u_ode, semi, t0)
-    # Create a copy of `b` used internally to extract the linear part of `semi`.
-    # This is necessary to get everything correct when the users updates the
-    # returned vector `b`.
+    apply_rhs!(du_ode, u_ode)
     b = -du_ode
+
+    # Create a copy of `b` used internally to extract the linear part of `semi`.
+    # This is necessary to get everything correct when the user updates the
+    # returned vector `b`.
     b_tmp = copy(b)
 
     # wrap the linear operator
     A = LinearMap(length(u_ode), ismutating = true) do dest, src
-        rhs!(dest, src, semi, t0)
+        apply_rhs!(dest, src)
         @. dest += b_tmp
-        dest
+        return dest
     end
 
     return A, b
 end
 
 """
+    linear_structure(semi::AbstractSemidiscretization;
+                     t0 = zero(real(semi)))
+
+Wraps the right-hand side operator of the semidiscretization `semi`
+at time `t0` as an affine-linear operator given by a linear operator `A`
+and a vector `b`:
+```math
+\\partial_t u(t) = A u(t) - b.
+```
+Works only for linear equations, i.e.,
+equations which `have_constant_speed(equations) == True()`.
+
+This has the benefit of greatly reduced memory consumption compared to constructing
+the full system matrix explicitly, as done for instance in
+[`jacobian_fd`](@ref) and [`jacobian_ad_forward`](@ref).
+
+The returned linear operator `A` is a matrix-free operator which can be
+supplied to iterative solvers from, e.g., [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl).
+
+It is also possible to use this to construct a sparse matrix without the detour of constructing
+first the full Jacobian by calling
+```julia
+using SparseArrays
+A_map, b = linear_structure(semi, t0 = t0)
+A_sparse = sparse(A_map)
+```
+"""
+function linear_structure(semi::AbstractSemidiscretization;
+                          t0 = zero(real(semi)))
+    if have_constant_speed(semi.equations) == False()
+        throw(ArgumentError("`linear_structure` expects linear equations."))
+    end
+
+    apply_rhs! = function (dest, src)
+        return rhs_hyperbolic!(dest, src, semi, t0)
+    end
+
+    return _linear_structure_from_rhs(semi, apply_rhs!)
+end
+
+"""
     jacobian_fd(semi::AbstractSemidiscretization;
-                t0=zero(real(semi)),
-                u0_ode=compute_coefficients(t0, semi))
+                t0 = zero(real(semi)),
+                u0_ode = compute_coefficients(t0, semi))
 
 Uses the right-hand side operator of the semidiscretization `semi`
 and simple second order finite difference to compute the Jacobian `J`
-of the semidiscretization `semi` at state `u0_ode`.
+of the semidiscretization `semi` at time `t0` and state `u0_ode`.
+
+This function does not support [`SemidiscretizationHyperbolicParabolic`](@ref),
+which has separate hyperbolic and parabolic right-hand sides. Use
+[`jacobian_ad_forward`](@ref) for its combined Jacobian or
+[`jacobian_ad_forward_parabolic`](@ref) for its parabolic Jacobian.
 """
 function jacobian_fd(semi::AbstractSemidiscretization;
                      t0 = zero(real(semi)),
@@ -196,9 +444,10 @@ function jacobian_fd(semi::AbstractSemidiscretization;
     du0_ode = similar(u_ode)
     dup_ode = similar(u_ode)
     dum_ode = similar(u_ode)
+    rhs_semi! = default_rhs(semi)
 
     # compute residual of linearization state
-    rhs!(du0_ode, u_ode, semi, t0)
+    rhs_semi!(du0_ode, u_ode, semi, t0)
 
     # initialize Jacobian matrix
     J = zeros(eltype(u_ode), length(u_ode), length(u_ode))
@@ -206,17 +455,23 @@ function jacobian_fd(semi::AbstractSemidiscretization;
     # use second order finite difference to estimate Jacobian matrix
     for idx in eachindex(u0_ode)
         # determine size of fluctuation
-        epsilon = sqrt(eps(u0_ode[idx]))
+        # This is the approach used by FiniteDiff.jl to compute the
+        # step size, which assures that the finite difference is accurate
+        # for very small and very large absolute values `u0_ode[idx]`.
+        # See https://github.com/trixi-framework/Trixi.jl/pull/2514#issuecomment-3190534904.
+        absstep = sqrt(eps(typeof(u0_ode[idx])))
+        relstep = absstep
+        epsilon = max(relstep * abs(u0_ode[idx]), absstep)
 
         # plus fluctuation
         u_ode[idx] = u0_ode[idx] + epsilon
-        rhs!(dup_ode, u_ode, semi, t0)
+        rhs_semi!(dup_ode, u_ode, semi, t0)
 
         # minus fluctuation
         u_ode[idx] = u0_ode[idx] - epsilon
-        rhs!(dum_ode, u_ode, semi, t0)
+        rhs_semi!(dum_ode, u_ode, semi, t0)
 
-        # restore linearisation state
+        # restore linearization state
         u_ode[idx] = u0_ode[idx]
 
         # central second order finite difference
@@ -228,17 +483,17 @@ end
 
 """
     jacobian_ad_forward(semi::AbstractSemidiscretization;
-                        t0=zero(real(semi)),
-                        u0_ode=compute_coefficients(t0, semi))
+                        t0 = zero(real(semi)),
+                        u0_ode = compute_coefficients(t0, semi))
 
 Uses the right-hand side operator of the semidiscretization `semi`
 and forward mode automatic differentiation to compute the Jacobian `J`
-of the semidiscretization `semi` at state `u0_ode`.
+of the semidiscretization `semi` at time `t0` and state `u0_ode`.
 """
 function jacobian_ad_forward(semi::AbstractSemidiscretization;
                              t0 = zero(real(semi)),
                              u0_ode = compute_coefficients(t0, semi))
-    jacobian_ad_forward(semi, t0, u0_ode)
+    return jacobian_ad_forward(semi, t0, u0_ode)
 end
 
 # The following version is for plain arrays
@@ -248,17 +503,26 @@ function jacobian_ad_forward(semi::AbstractSemidiscretization, t0, u0_ode)
 
     # Use a function barrier since the generation of the `config` we use above
     # is not type-stable
-    _jacobian_ad_forward(semi, t0, u0_ode, du_ode, config)
+    return _jacobian_ad_forward(semi, t0, u0_ode, du_ode, config)
 end
 
 function _jacobian_ad_forward(semi, t0, u0_ode, du_ode, config)
     new_semi = remake(semi, uEltype = eltype(config))
+    rhs_semi! = default_rhs(new_semi)
+    # Create anonymous function passed as first argument to `ForwardDiff.jacobian` to match
+    # `ForwardDiff.jacobian(f!, y::AbstractArray, x::AbstractArray,
+    #                       cfg::JacobianConfig = JacobianConfig(f!, y, x), check=Val{true}())`
     J = ForwardDiff.jacobian(du_ode, u0_ode, config) do du_ode, u_ode
-        Trixi.rhs!(du_ode, u_ode, new_semi, t0)
+        return rhs_semi!(du_ode, u_ode, new_semi, t0)
     end
 
     return J
 end
+
+# unpack u if it is wrapped in VectorOfArray (mainly for DGMulti solvers)
+jacobian_ad_forward(semi::AbstractSemidiscretization, t0, u0_ode::VectorOfArray) = jacobian_ad_forward(semi,
+                                                                                                       t0,
+                                                                                                       parent(u0_ode))
 
 # This version is specialized to `StructArray`s used by some `DGMulti` solvers.
 # We need to convert the numerical solution vectors since ForwardDiff cannot
@@ -274,11 +538,16 @@ function jacobian_ad_forward(semi::AbstractSemidiscretization, t0, _u0_ode::Stru
 
     # Use a function barrier since the generation of the `config` we use above
     # is not type-stable
-    _jacobian_ad_forward_structarrays(semi, t0, u0_ode_plain, du_ode_plain, config)
+    return _jacobian_ad_forward_structarrays(semi, t0, u0_ode_plain, du_ode_plain,
+                                             config)
 end
 
 function _jacobian_ad_forward_structarrays(semi, t0, u0_ode_plain, du_ode_plain, config)
     new_semi = remake(semi, uEltype = eltype(config))
+    rhs_semi! = default_rhs(new_semi)
+    # Create anonymous function passed as first argument to `ForwardDiff.jacobian` to match
+    # `ForwardDiff.jacobian(f!, y::AbstractArray, x::AbstractArray,
+    #                       cfg::JacobianConfig = JacobianConfig(f!, y, x), check=Val{true}())`
     J = ForwardDiff.jacobian(du_ode_plain, u0_ode_plain,
                              config) do du_ode_plain, u_ode_plain
         u_ode = StructArray{SVector{nvariables(semi), eltype(config)}}(ntuple(v -> view(u_ode_plain,
@@ -291,7 +560,7 @@ function _jacobian_ad_forward_structarrays(semi, t0, u0_ode_plain, du_ode_plain,
                                                                                          :,
                                                                                          v),
                                                                                nvariables(semi)))
-        Trixi.rhs!(du_ode, u_ode, new_semi, t0)
+        return rhs_semi!(du_ode, u_ode, new_semi, t0)
     end
 
     return J
@@ -308,16 +577,18 @@ function jacobian_ad_forward(semi::AbstractSemidiscretization, t0,
 
     # Use a function barrier since the generation of the `config` we use above
     # is not type-stable
-    _jacobian_ad_forward_staticarrays(semi, t0, u0_ode_plain, du_ode_plain, config)
+    return _jacobian_ad_forward_staticarrays(semi, t0, u0_ode_plain, du_ode_plain,
+                                             config)
 end
 
 function _jacobian_ad_forward_staticarrays(semi, t0, u0_ode_plain, du_ode_plain, config)
     new_semi = remake(semi, uEltype = eltype(config))
+    rhs_semi! = default_rhs(new_semi)
     J = ForwardDiff.jacobian(du_ode_plain, u0_ode_plain,
                              config) do du_ode_plain, u_ode_plain
         u_ode = reinterpret(SVector{nvariables(semi), eltype(config)}, u_ode_plain)
         du_ode = reinterpret(SVector{nvariables(semi), eltype(config)}, du_ode_plain)
-        Trixi.rhs!(du_ode, u_ode, new_semi, t0)
+        return rhs_semi!(du_ode, u_ode, new_semi, t0)
     end
 
     return J
@@ -328,15 +599,25 @@ end
 # directly before IO and do not necessarily need to be stored in memory before,
 #   get_element_variables!(element_variables, ..)
 # is used to retrieve such up to date element variables, modifying
-# `element_variables::Dict{Symbol,Any}` in place.
+# `element_variables::Dict{Symbol,Any}` in place. The method for the solver collects them
+# from its components via `get_element_variables_volume_integral!` and
+# `get_element_variables_mesh!`. The `SaveSolutionCallback` additionally calls
+# `get_element_variables_callback!` for each callback; the `AMRCallback` forwards this
+# to its controller via `get_element_variables_controller!`. Indicators that can be
+# evaluated from `u` alone (such as the ones used for AMR and shock capturing) are
+# updated first and then stored via `get_element_variables_indicator!`.
 function get_element_variables!(element_variables, u_ode,
                                 semi::AbstractSemidiscretization)
     u = wrap_array(u_ode, semi)
-    get_element_variables!(element_variables, u, mesh_equations_solver_cache(semi)...)
+    return get_element_variables!(element_variables, u,
+                                  mesh_equations_solver_cache(semi)...)
 end
 
-function get_node_variables!(node_variables, semi::AbstractSemidiscretization)
-    get_node_variables!(node_variables, mesh_equations_solver_cache(semi)...)
+# Required for storing `extra_node_variables` in the `SaveSolutionCallback`.
+# Not to be confused with `get_node_vars` which returns the variables of the simulated equation.
+function get_node_variables!(node_variables, u_ode, semi::AbstractSemidiscretization)
+    return get_node_variables!(node_variables, u_ode,
+                               mesh_equations_solver_cache(semi)...)
 end
 
 # To implement AMR and use OrdinaryDiffEq.jl etc., we have to be a bit creative.
@@ -358,7 +639,7 @@ end
 # which can be `resize!`ed for AMR. Then, we have to wrap these `Vector`s inside
 # Trixi.jl as our favorite multidimensional array type. We need to do this wrapping
 # in every method exposed to OrdinaryDiffEq, i.e. in the first levels of things like
-# rhs!, AMRCallback, StepsizeCallback, AnalysisCallback, SaveSolutionCallback
+# rhs_hyperbolic!, AMRCallback, StepsizeCallback, AnalysisCallback, SaveSolutionCallback
 #
 # This wrapping will also allow us to experiment more easily with additional
 # kinds of wrapping, e.g. HybridArrays.jl or PaddedMatrices.jl to inform the
@@ -379,29 +660,30 @@ end
 #
 # Xref https://github.com/SciML/OrdinaryDiffEq.jl/pull/1275
 function wrap_array(u_ode, semi::AbstractSemidiscretization)
-    wrap_array(u_ode, mesh_equations_solver_cache(semi)...)
+    return wrap_array(u_ode, mesh_equations_solver_cache(semi)...)
 end
 
 # Like `wrap_array`, but guarantees to return a plain `Array`, which can be better
 # for writing solution files etc.
 function wrap_array_native(u_ode, semi::AbstractSemidiscretization)
-    wrap_array_native(u_ode, mesh_equations_solver_cache(semi)...)
+    return wrap_array_native(u_ode, mesh_equations_solver_cache(semi)...)
 end
 
 # TODO: Taal, document interface?
 # New mesh/solver combinations have to implement
 # - ndofs(mesh, solver, cache)
+# - ndofsgloabal(mesh, solver, cache)
 # - ndims(mesh)
 # - nnodes(solver)
 # - real(solver)
-# - create_cache(mesh, equations, solver, RealT)
+# - create_cache_hyperbolic(mesh, equations, solver, RealT, uEltype)
 # - wrap_array(u_ode, mesh, equations, solver, cache)
 # - integrate(func, u, mesh, equations, solver, cache; normalize=true)
 # - integrate_via_indices(func, u, mesh, equations, solver, cache, args...; normalize=true)
 # - calc_error_norms(func, u, t, analyzer, mesh, equations, initial_condition, solver, cache, cache_analysis)
 # - allocate_coefficients(mesh, equations, solver, cache)
 # - compute_coefficients!(u, func, mesh, equations, solver, cache)
-# - rhs!(du, u, t, mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache)
+# - rhs_hyperbolic!(backend, du, u, t, mesh, equations, boundary_conditions, source_terms, solver, cache)
 #
 
 end # @muladd

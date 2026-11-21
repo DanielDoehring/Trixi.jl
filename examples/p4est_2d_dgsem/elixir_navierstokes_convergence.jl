@@ -1,4 +1,4 @@
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -13,7 +13,15 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
                                                           gradient_variables = GradientVariablesPrimitive())
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs,
+
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+solver = DGSEM(polydeg = 3, surface_flux = FluxLaxFriedrichs(max_abs_speed_naive),
                volume_integral = VolumeIntegralWeakForm())
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
@@ -50,10 +58,10 @@ end
 @inline function source_terms_navier_stokes_convergence_test(u, x, t, equations)
     y = x[2]
 
+    @unpack gamma, inv_gamma_minus_one = equations
     # TODO: parabolic
     # we currently need to hardcode these parameters until we fix the "combined equation" issue
     # see also https://github.com/trixi-framework/Trixi.jl/pull/1160
-    inv_gamma_minus_one = inv(equations.gamma - 1)
     Pr = prandtl_number()
     mu_ = mu()
 
@@ -111,7 +119,7 @@ end
     E_y = p_y * inv_gamma_minus_one + rho_y * v1^2 + 2.0 * rho * v1 * v1_y
 
     # Some convenience constants
-    T_const = equations.gamma * inv_gamma_minus_one / Pr
+    T_const = gamma * inv_gamma_minus_one / Pr
     inv_rho_cubed = 1.0 / (rho^3)
 
     # compute the source terms
@@ -178,21 +186,22 @@ end
 initial_condition = initial_condition_navier_stokes_convergence_test
 
 # BC types
-velocity_bc_top_bottom = NoSlip() do x, t, equations
-    u = initial_condition_navier_stokes_convergence_test(x, t, equations)
-    return SVector(u[2], u[3])
+velocity_bc_top_bottom = NoSlip() do x, t, equations_parabolic
+    u_cons = initial_condition_navier_stokes_convergence_test(x, t, equations_parabolic)
+    return SVector(u_cons[2] / u_cons[1], u_cons[3] / u_cons[1])
 end
-heat_bc_top_bottom = Adiabatic((x, t, equations) -> 0.0)
+
+heat_bc_top_bottom = Adiabatic((x, t, equations_parabolic) -> 0.0)
 boundary_condition_top_bottom = BoundaryConditionNavierStokesWall(velocity_bc_top_bottom,
                                                                   heat_bc_top_bottom)
 
 # define inviscid boundary conditions
-boundary_conditions = Dict(:y_neg => boundary_condition_slip_wall,
-                           :y_pos => boundary_condition_slip_wall)
+boundary_conditions = (; y_neg = boundary_condition_slip_wall,
+                       y_pos = boundary_condition_slip_wall)
 
-# define viscous boundary conditions
-boundary_conditions_parabolic = Dict(:y_neg => boundary_condition_top_bottom,
-                                     :y_pos => boundary_condition_top_bottom)
+# define parabolic boundary conditions
+boundary_conditions_parabolic = (; y_neg = boundary_condition_top_bottom,
+                                 y_pos = boundary_condition_top_bottom)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
@@ -205,6 +214,10 @@ semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabol
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
+# Setting `real_type` allows to change the real number type, e.g., to `Float32`.
+# This is particularly useful when changing the `storage_type` to a GPU array
+# type such as `ROCArray` (AMD) or `CuArray` (NVIDIA CUDA).
+semi = trixi_adapt(semi; real_type = nothing, storage_type = nothing)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -217,6 +230,7 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback)
 # run the simulation
 
 time_int_tol = 1e-8
-sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol, dt = 1e-5,
+# A `Rational` initial time step `dt` keeps the real type of `semi` for the time
+sol = solve(ode, RDPK3SpFSAL49(thread = Trixi.Threaded());
+            abstol = time_int_tol, reltol = time_int_tol, dt = 1 // 100_000,
             ode_default_options()..., callback = callbacks)
-summary_callback() # print the timer summary

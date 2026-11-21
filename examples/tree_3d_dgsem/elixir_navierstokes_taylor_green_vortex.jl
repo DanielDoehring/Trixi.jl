@@ -1,17 +1,16 @@
-
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
 # semidiscretization of the compressible Navier-Stokes equations
 
-# TODO: parabolic; unify names of these accessor functions
 prandtl_number() = 0.72
-mu() = 6.25e-4 # equivalent to Re = 1600
+mu = 6.25e-4 # equivalent to Re = 1600
 
 equations = CompressibleEulerEquations3D(1.4)
-equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu(),
-                                                          Prandtl = prandtl_number())
+equations_parabolic = CompressibleNavierStokesDiffusion3D(equations, mu = mu,
+                                                          Prandtl = prandtl_number(),
+                                                          gradient_variables = GradientVariablesPrimitive())
 
 """
     initial_condition_taylor_green_vortex(x, t, equations::CompressibleEulerEquations3D)
@@ -49,10 +48,12 @@ coordinates_min = (-1.0, -1.0, -1.0) .* pi
 coordinates_max = (1.0, 1.0, 1.0) .* pi
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 3,
-                n_cells_max = 100_000)
+                periodicity = true)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                             initial_condition, solver)
+                                             initial_condition, solver;
+                                             boundary_conditions = (boundary_condition_periodic,
+                                                                    boundary_condition_periodic))
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -79,6 +80,6 @@ callbacks = CallbackSet(summary_callback,
 # run the simulation
 
 time_int_tol = 1e-8
-sol = solve(ode, RDPK3SpFSAL49(); abstol = time_int_tol, reltol = time_int_tol,
+sol = solve(ode, RDPK3SpFSAL49(thread = Trixi.Threaded());
+            abstol = time_int_tol, reltol = time_int_tol,
             ode_default_options()..., callback = callbacks)
-summary_callback() # print the timer summary

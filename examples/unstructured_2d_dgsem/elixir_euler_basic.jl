@@ -1,6 +1,4 @@
-
-using Downloads: download
-using OrdinaryDiffEq
+using OrdinaryDiffEqLowStorageRK
 using Trixi
 
 ###############################################################################
@@ -12,25 +10,28 @@ initial_condition = initial_condition_convergence_test
 source_terms = source_terms_convergence_test
 
 boundary_condition_convergence_test = BoundaryConditionDirichlet(initial_condition)
-boundary_conditions = Dict(:Slant => boundary_condition_convergence_test,
-                           :Bezier => boundary_condition_convergence_test,
-                           :Right => boundary_condition_convergence_test,
-                           :Bottom => boundary_condition_convergence_test,
-                           :Top => boundary_condition_convergence_test)
+boundary_conditions = (; Slant = boundary_condition_convergence_test,
+                       Bezier = boundary_condition_convergence_test,
+                       Right = boundary_condition_convergence_test,
+                       Bottom = boundary_condition_convergence_test,
+                       Top = boundary_condition_convergence_test)
 
 ###############################################################################
 # Get the DG approximation space
 
-solver = DGSEM(polydeg = 8, surface_flux = flux_lax_friedrichs)
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+solver = DGSEM(polydeg = 8, surface_flux = FluxLaxFriedrichs(max_abs_speed_naive))
 
 ###############################################################################
 # Get the curved quad mesh from a file (downloads the file if not available locally)
-
-default_mesh_file = joinpath(@__DIR__, "mesh_trixi_unstructured_mesh_docs.mesh")
-isfile(default_mesh_file) ||
-    download("https://gist.githubusercontent.com/andrewwinters5000/52056f1487853fab63b7f4ed7f171c80/raw/9d573387dfdbb8bce2a55db7246f4207663ac07f/mesh_trixi_unstructured_mesh_docs.mesh",
-             default_mesh_file)
-mesh_file = default_mesh_file
+mesh_file = Trixi.download("https://gist.githubusercontent.com/andrewwinters5000/52056f1487853fab63b7f4ed7f171c80/raw/9d573387dfdbb8bce2a55db7246f4207663ac07f/mesh_trixi_unstructured_mesh_docs.mesh",
+                           joinpath(@__DIR__, "mesh_trixi_unstructured_mesh_docs.mesh"))
 
 mesh = UnstructuredMesh2D(mesh_file)
 
@@ -73,7 +74,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
-summary_callback() # print the timer summary
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);

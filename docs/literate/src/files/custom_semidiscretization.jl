@@ -12,22 +12,20 @@
 # In this tutorial, we will describe how these semidiscretizations work and how
 # they can be used to create custom semidiscretizations involving also other tasks.
 
-
 # ## Overview of the right-hand side evaluation
 
 # The semidiscretizations provided by Trixi.jl are set up to create `ODEProblem`s from the
-# [SciML ecosystem for ordinary differential equations](https://diffeq.sciml.ai/latest/).
+# [SciML ecosystem for ordinary differential equations](https://docs.sciml.ai/DiffEqDocs/stable/).
 # In particular, a spatial semidiscretization can be wrapped in an ODE problem
 # using [`semidiscretize`](@ref), which returns an `ODEProblem`. This `ODEProblem`
 # bundles an initial condition, a right-hand side (RHS) function, the time span,
 # and possible parameters. The `ODEProblem`s created by Trixi.jl use the semidiscretization
 # passed to [`semidiscretize`](@ref) as a parameter.
-# For a [`SemidiscretizationHyperbolic`](@ref), the `ODEProblem` wraps
-# `Trixi.rhs!` as ODE RHS.
-# For a [`SemidiscretizationHyperbolicParabolic`](@ref),  Trixi.jl
-# uses a `SplitODEProblem` combining `Trixi.rhs_parabolic!` for the
-# (potentially) stiff part and `Trixi.rhs!` for the other part.
-
+# For a [`SemidiscretizationHyperbolic`](@ref), the `ODEProblem` uses
+# `Trixi.rhs_hyperbolic!` as its ODE RHS. For a
+# [`SemidiscretizationHyperbolicParabolic`](@ref), Trixi.jl uses a `SplitODEProblem` with
+# `Trixi.rhs_parabolic!` for the potentially stiff parabolic part and `Trixi.rhs_hyperbolic!`
+# for the hyperbolic part.
 
 # ## Standard Trixi.jl setup
 
@@ -49,7 +47,8 @@
 # First, we discretize this equation using the standard functionality
 # of Trixi.jl.
 
-using Trixi, OrdinaryDiffEq, Plots
+using OrdinaryDiffEqLowStorageRK
+using Trixi, Plots
 
 # The linear scalar advection equation is already implemented in
 # Trixi.jl as [`LinearScalarAdvectionEquation1D`](@ref). We construct
@@ -67,7 +66,6 @@ coordinates_min = (-1.0,)
 coordinates_max = (+1.0,)
 mesh = TreeMesh(coordinates_min, coordinates_max;
                 initial_refinement_level = 4,
-                n_cells_max = 10^4,
                 periodicity = true)
 
 # We wrap everything in in a semidiscretization and pass the source
@@ -88,6 +86,7 @@ end
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition,
                                     solver;
+                                    boundary_conditions = boundary_condition_periodic,
                                     source_terms = source_terms_standard)
 
 # Now, we can create the `ODEProblem`, solve the resulting ODE
@@ -108,9 +107,9 @@ plot(sol; label = "numerical sol.", legend = :topright)
 # (and only) component to get the scalar value for manual plotting.
 
 let
-   x = range(-1.0, 1.0; length = 200)
-   plot!(x, first.(initial_condition.(x, sol.t[end], equations)),
-         label = "analytical sol.", linestyle = :dash, legend = :topright)
+    x = range(-1.0, 1.0; length = 200)
+    plot!(x, first.(initial_condition.(x, sol.t[end], equations)),
+          label = "analytical sol.", linestyle = :dash, legend = :topright)
 end
 
 # We can also add the initial condition to the plot.
@@ -118,7 +117,7 @@ end
 plot!(sol.u[1], semi, label = "u0", linestyle = :dot, legend = :topleft)
 
 # You can of course also use some
-# [callbacks](https://trixi-framework.github.io/Trixi.jl/stable/callbacks/)
+# [callbacks](https://trixi-framework.github.io/TrixiDocumentation/stable/callbacks/)
 # provided by Trixi.jl as usual.
 
 summary_callback = SummaryCallback()
@@ -131,8 +130,6 @@ callbacks = CallbackSet(summary_callback,
 
 sol = solve(ode, RDPK3SpFSAL49();
             ode_default_options()..., callback = callbacks)
-summary_callback()
-
 
 # ## Using a custom ODE right-hand side function
 
@@ -152,7 +149,7 @@ end
 
 function rhs_source_custom!(du_ode, u_ode, semi, t)
     GLOBAL_TIME[] = t
-    Trixi.rhs!(du_ode, u_ode, semi, t)
+    return Trixi.rhs_hyperbolic!(du_ode, u_ode, semi, t)
 end
 
 # Next, we create an `ODEProblem` manually copying over the data from
@@ -161,7 +158,7 @@ end
 ode_source_custom = ODEProblem(rhs_source_custom!,
                                ode.u0,
                                ode.tspan,
-                               ode.p #= semi =#)
+                               ode.p) # semi
 sol_source_custom = solve(ode_source_custom, RDPK3SpFSAL49();
                           ode_default_options()...)
 
@@ -185,8 +182,6 @@ callbacks = CallbackSet(summary_callback,
 
 sol = solve(ode_source_custom, RDPK3SpFSAL49();
             ode_default_options()..., callback = callbacks)
-summary_callback()
-
 
 # ## Setting up a custom semidiscretization
 
@@ -223,11 +218,11 @@ end
 
 # We also create a custom ODE RHS to update the current global time
 # stored in the custom semidiscretization. We unpack the standard
-# semidiscretization created by Trixi.jl and pass it to `Trixi.rhs!`.
+# semidiscretization created by Trixi.jl and pass it to `Trixi.rhs_hyperbolic!`.
 
 function rhs_semi_custom!(du_ode, u_ode, semi_custom, t)
     semi_custom.t[] = t
-    Trixi.rhs!(du_ode, u_ode, semi_custom.semi, t)
+    return Trixi.rhs_hyperbolic!(du_ode, u_ode, semi_custom.semi, t)
 end
 
 # Finally, we set up an `ODEProblem` and solve it numerically.
@@ -247,7 +242,7 @@ sol_semi_custom = solve(ode_semi_custom, RDPK3SpFSAL49();
 
 Base.ndims(semi::CustomSemidiscretization) = ndims(semi.semi)
 function Trixi.mesh_equations_solver_cache(semi::CustomSemidiscretization)
-    Trixi.mesh_equations_solver_cache(semi.semi)
+    return Trixi.mesh_equations_solver_cache(semi.semi)
 end
 
 # Now, we can plot the numerical solution as usual.
@@ -284,9 +279,9 @@ end
 function Trixi.calc_error_norms(func, u, t, analyzer,
                                 semi::CustomSemidiscretization,
                                 cache_analysis)
-    Trixi.calc_error_norms(func, u, t, analyzer,
-                           semi.semi,
-                           cache_analysis)
+    return Trixi.calc_error_norms(func, u, t, analyzer,
+                                  semi.semi,
+                                  cache_analysis)
 end
 
 # Now, we can work with the callbacks used before as usual.
@@ -302,7 +297,6 @@ callbacks = CallbackSet(summary_callback,
 
 sol = solve(ode_semi_custom, RDPK3SpFSAL49();
             ode_default_options()..., callback = callbacks)
-summary_callback()
 
 # For even more advanced usage of custom semidiscretizations, you
 # may look at the source code of the ones contained in Trixi.jl, e.g.,
@@ -310,7 +304,6 @@ summary_callback()
 # - [`SemidiscretizationEulerGravity`](@ref)
 # - [`SemidiscretizationEulerAcoustics`](@ref)
 # - [`SemidiscretizationCoupled`](@ref)
-
 
 # ## Package versions
 
@@ -320,5 +313,5 @@ using InteractiveUtils
 versioninfo()
 
 using Pkg
-Pkg.status(["Trixi", "OrdinaryDiffEq", "Plots"],
-           mode=PKGMODE_MANIFEST)
+Pkg.status(["Trixi", "OrdinaryDiffEqLowStorageRK", "Plots"],
+           mode = PKGMODE_MANIFEST)
