@@ -8,8 +8,15 @@ for human readability.
 ## Changes in the v0.18 lifecycle
 
 #### Added
+- `flux_hllc` for the 2D ideal GLM-MHD equations `IdealGlmMhdEquations2D` (Cartesian
+  `orientation` version). The linear GLM subsystem of the normal magnetic field and `psi`
+  is solved exactly before applying the HLLC solver of Li (2005) to the remaining
+  variables.
 
 #### Changed
+- Fixed the selection of the star state in `flux_hllc` for `IdealGlmMhdEquations1D`,
+  which always used the left star state, even if the contact wave moves to the left.
+  This slightly changes results obtained with this flux.
 
 #### Deprecated
 

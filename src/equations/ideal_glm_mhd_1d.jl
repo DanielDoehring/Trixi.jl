@@ -382,7 +382,7 @@ An HLLC Riemann solver for magneto-hydrodynamics
 
         B2Star = (SsR * B2_rr - SsL * B2_ll - (f_rr[7] - f_ll[7])) / Sdiff
         B3Star = (SsR * B3_rr - SsL * B3_ll - (f_rr[8] - f_ll[8])) / Sdiff
-        if SsL <= SStar
+        if SStar >= 0 # the interface lies in the left star region
             SdiffStar = SsL - SStar
 
             densStar = rho_ll * sMu_L / SdiffStar # (19)
@@ -412,7 +412,7 @@ An HLLC Riemann solver for magneto-hydrodynamics
             f6 = f_ll[6] + SsL * (B1Star - u_ll[6])
             f7 = f_ll[7] + SsL * (B2Star - u_ll[7])
             f8 = f_ll[8] + SsL * (B3Star - u_ll[8])
-        else # SStar <= Ssr
+        else # SStar < 0, the interface lies in the right star region
             SdiffStar = SsR - SStar
 
             densStar = rho_rr * sMu_R / SdiffStar # (19)

@@ -281,6 +281,41 @@ end
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
+@testitem "TreeMesh2D MHD: elixir_mhd_orszag_tang.jl with flux_hllc" setup=[
+    Setup,
+    TreeMesh2DMHD
+] tags=[:tree_part3] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_orszag_tang.jl"),
+                        l2=[
+                            0.10809928818850109,
+                            0.20201439744210622,
+                            0.2298685553692212,
+                            0.0,
+                            0.299480238623609,
+                            0.1568517866827556,
+                            0.2429155449733471,
+                            0.0,
+                            0.00030381985638121837
+                        ],
+                        linf=[
+                            0.5697495728090056,
+                            0.5090626967439756,
+                            0.6536079470055538,
+                            0.0,
+                            0.9727185928270282,
+                            0.39804876540773715,
+                            0.673197460990348,
+                            0.0,
+                            0.006996738813515494
+                        ],
+                        tspan=(0.0, 0.06),
+                        surface_flux=(flux_hllc,
+                                      flux_nonconservative_powell))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+end
+
 @testitem "TreeMesh2D MHD: elixir_mhd_alfven_wave.jl one step with initial_condition_constant" setup=[
     Setup,
     TreeMesh2DMHD

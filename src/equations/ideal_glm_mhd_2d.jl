@@ -1271,220 +1271,185 @@ end
 """
     flux_hllc(u_ll, u_rr, orientation, equations::IdealGlmMhdEquations2D)
 
+HLLC approximate Riemann solver for the ideal GLM-MHD equations.
+Following Dedner et al. (2002) and Mignone and Tzeferacos (2010), the linear
+subsystem of the normal magnetic field component ``B_n`` and the GLM variable ``\\psi``
+(with wave speeds ``\\pm c_h``) is decoupled and solved exactly first. Afterwards, the
+HLLC solver of Li (2005) is applied to the remaining seven variables of the ideal MHD
+equations with the constant normal magnetic field component obtained from the GLM
+subsystem.
+
 - Li (2005)
-An HLLC Riemann solver for magneto-hydrodynamics
-[DOI: 10.1016/j.jcp.2004.08.020](https://doi.org/10.1016/j.jcp.2004.08.020).
+  An HLLC Riemann solver for magneto-hydrodynamics
+  [DOI: 10.1016/j.jcp.2004.08.020](https://doi.org/10.1016/j.jcp.2004.08.020)
+- Dedner, Kemm, Kröner, Munz, Schnitzer, Wesenberg (2002)
+  Hyperbolic Divergence Cleaning for the MHD Equations
+  [DOI: 10.1006/jcph.2001.6961](https://doi.org/10.1006/jcph.2001.6961)
+- Mignone, Tzeferacos (2010)
+  A second-order unsplit Godunov scheme for cell-centered MHD: The CTU-GLM scheme
+  [DOI: 10.1016/j.jcp.2009.11.026](https://doi.org/10.1016/j.jcp.2009.11.026)
 """
-function flux_hllc(u_ll, u_rr, orientation::Integer,
-                   equations::IdealGlmMhdEquations2D)
-    # Unpack left and right states
-    rho_ll, v1_ll, v2_ll, v3_ll, p_ll, B1_ll, B2_ll, B3_ll, psi_ll = cons2prim(u_ll, equations)
-    rho_rr, v1_rr, v2_rr, v3_rr, p_rr, B1_rr, B2_rr, B3_rr, psi_rr = cons2prim(u_rr, equations)
+@inline function flux_hllc(u_ll, u_rr, orientation::Integer,
+                           equations::IdealGlmMhdEquations2D)
+    rho_ll, v1_ll, v2_ll, v3_ll, p_ll, B1_ll, B2_ll, B3_ll, psi_ll = cons2prim(u_ll,
+                                                                               equations)
+    rho_rr, v1_rr, v2_rr, v3_rr, p_rr, B1_rr, B2_rr, B3_rr, psi_rr = cons2prim(u_rr,
+                                                                               equations)
+    c_h = equations.c_h
 
-    # Total pressure (eq. (12))
-    p_tot_ll = p_ll + 0.5 * (B1_ll^2 + B2_ll^2 + B3_ll^2)
-    p_tot_rr = p_rr + 0.5 * (B1_rr^2 + B2_rr^2 + B3_rr^2)
-
-    # Conserved variables
-    rho_v1_ll = u_ll[2]
-    rho_v2_ll = u_ll[3]
-    rho_v3_ll = u_ll[4]
-
-    rho_v1_rr = u_rr[2]
-    rho_v2_rr = u_rr[3]
-    rho_v3_rr = u_rr[4]
-
-    # Obtain left and right fluxes
-    f_ll = flux(u_ll, orientation, equations)
-    f_rr = flux(u_rr, orientation, equations)
-
-    SsL, SsR = min_max_speed_einfeldt(u_ll, u_rr, orientation, equations)
-
-    if orientation == 1 # x-direction
-        vel_L = v1_ll
-        vel_R = v1_rr
-    elseif orientation == 2 # y-direction
-        vel_L = v2_ll
-        vel_R = v2_rr
+    # Rotate into the local frame (normal, tangential, B3/v3 direction)
+    if orientation == 1
+        vn_ll, vt_ll, Bn_ll, Bt_ll = v1_ll, v2_ll, B1_ll, B2_ll
+        vn_rr, vt_rr, Bn_rr, Bt_rr = v1_rr, v2_rr, B1_rr, B2_rr
+    else # orientation == 2
+        vn_ll, vt_ll, Bn_ll, Bt_ll = v2_ll, v1_ll, B2_ll, B1_ll
+        vn_rr, vt_rr, Bn_rr, Bt_rr = v2_rr, v1_rr, B2_rr, B1_rr
     end
 
-    sMu_L = SsL - vel_L
-    sMu_R = SsR - vel_R
-    if SsL >= 0
-        f1 = f_ll[1]
-        f2 = f_ll[2]
-        f3 = f_ll[3]
-        f4 = f_ll[4]
-        f5 = f_ll[5]
-        f6 = f_ll[6]
-        f7 = f_ll[7]
-        f8 = f_ll[8]
-        f9 = f_ll[9]
-    elseif SsR <= 0
-        f1 = f_rr[1]
-        f2 = f_rr[2]
-        f3 = f_rr[3]
-        f4 = f_rr[4]
-        f5 = f_rr[5]
-        f6 = f_rr[6]
-        f7 = f_rr[7]
-        f8 = f_rr[8]
-        f9 = f_rr[9]
+    # Exact solution of the linear GLM subsystem for (B_n, psi), Dedner et al. (2002)
+    Bn_star, psi_star = _glm_riemann_solution(Bn_ll, Bn_rr, psi_ll, psi_rr, c_h)
+
+    # Wave speed estimates of the ideal MHD part, i.e., with constant normal magnetic
+    # field `Bn_star` and without the GLM variable
+    if orientation == 1
+        u_mhd_ll = prim2cons(SVector(rho_ll, v1_ll, v2_ll, v3_ll, p_ll,
+                                     Bn_star, B2_ll, B3_ll, 0), equations)
+        u_mhd_rr = prim2cons(SVector(rho_rr, v1_rr, v2_rr, v3_rr, p_rr,
+                                     Bn_star, B2_rr, B3_rr, 0), equations)
+    else # orientation == 2
+        u_mhd_ll = prim2cons(SVector(rho_ll, v1_ll, v2_ll, v3_ll, p_ll,
+                                     B1_ll, Bn_star, B3_ll, 0), equations)
+        u_mhd_rr = prim2cons(SVector(rho_rr, v1_rr, v2_rr, v3_rr, p_rr,
+                                     B1_rr, Bn_star, B3_rr, 0), equations)
+    end
+    S_L, S_R = min_max_speed_einfeldt(u_mhd_ll, u_mhd_rr, orientation, equations)
+
+    f_rho, f_mom_n, f_mom_t, f_mom_3, f_e, f_Bt, f_B3 = _flux_hllc_mhd_local(SVector(rho_ll,
+                                                                                     vn_ll,
+                                                                                     vt_ll,
+                                                                                     v3_ll,
+                                                                                     p_ll,
+                                                                                     Bt_ll,
+                                                                                     B3_ll),
+                                                                             SVector(rho_rr,
+                                                                                     vn_rr,
+                                                                                     vt_rr,
+                                                                                     v3_rr,
+                                                                                     p_rr,
+                                                                                     Bt_rr,
+                                                                                     B3_rr),
+                                                                             Bn_star,
+                                                                             S_L, S_R,
+                                                                             equations)
+
+    # Add the GLM contributions and rotate back
+    f_e += c_h * psi_star * Bn_star
+    f_Bn = c_h * psi_star
+    f_psi = c_h * Bn_star
+    if orientation == 1
+        return SVector(f_rho, f_mom_n, f_mom_t, f_mom_3, f_e, f_Bn, f_Bt, f_B3, f_psi)
+    else # orientation == 2
+        return SVector(f_rho, f_mom_t, f_mom_n, f_mom_3, f_e, f_Bt, f_Bn, f_B3, f_psi)
+    end
+end
+
+# Exact solution of the Riemann problem of the linear GLM subsystem
+#   ∂_t B_n + c_h ∂_n psi = 0,   ∂_t psi + c_h ∂_n B_n = 0
+# at the interface, see Dedner et al. (2002), eq. (42).
+# Without divergence cleaning (`c_h == 0`), B_n and psi are not transported and we
+# use the arithmetic mean of B_n.
+@inline function _glm_riemann_solution(Bn_ll, Bn_rr, psi_ll, psi_rr, c_h)
+    Bn_avg = 0.5f0 * (Bn_ll + Bn_rr)
+    if iszero(c_h)
+        Bn_star = Bn_avg
     else
-        if orientation == 1 # x-direction
-            # Compute the "HLLC-speed", eq. (14) from paper mentioned above
-            SStar = (rho_rr * v1_rr * sMu_R - rho_ll * v1_ll * sMu_L + p_tot_ll - p_tot_rr - B1_ll^2 + B1_rr^2 ) /
-                    (rho_rr * sMu_R - rho_ll * sMu_L)
-        elseif orientation == 2 # y-direction
-            # Compute the "HLLC-speed", eq. (14) from paper mentioned above
-            SStar = (rho_rr * v2_rr * sMu_R - rho_ll * v2_ll * sMu_L + p_tot_ll - p_tot_rr - B2_ll^2 + B2_rr^2 ) /
-                    (rho_rr * sMu_R - rho_ll * sMu_L)
-        end
-
-        Sdiff = SsR - SsL
-
-        # Compute HLL values for vStar, BStar
-        # These correspond to eq. (28) and (30) from the referenced paper 
-        # and the classic HLL intermediate state given by (2)
-        rho_HLL = (SsR * rho_rr - SsL * rho_ll - (f_rr[1] - f_ll[1])) / Sdiff
-
-        v1Star = (SsR * rho_v1_rr - SsL * rho_v1_ll - (f_rr[2] - f_ll[2])) /
-                 (Sdiff * rho_HLL)
-        v2Star = (SsR * rho_v2_rr - SsL * rho_v2_ll - (f_rr[3] - f_ll[3])) /
-                 (Sdiff * rho_HLL)
-        v3Star = (SsR * rho_v3_rr - SsL * rho_v3_ll - (f_rr[4] - f_ll[4])) /
-                 (Sdiff * rho_HLL)
-
-        # Traditional HLL                 
-        B1Star = (SsR * B1_rr - SsL * B1_ll - (f_rr[6] - f_ll[6])) / Sdiff
-        # Eq. (32), looks wrong in paper
-        #B1Star = (SsR * B1_rr - SsL * B1_ll) / Sdiff
-
-        B2Star = (SsR * B2_rr - SsL * B2_ll - (f_rr[7] - f_ll[7])) / Sdiff
-        B3Star = (SsR * B3_rr - SsL * B3_ll - (f_rr[8] - f_ll[8])) / Sdiff
-
-        # TODO: HLL or HLLC version of psi?
-        # This is the HLL version
-        psiStar = (SsR * psi_rr - SsL * psi_ll - (f_rr[9] - f_ll[9])) / Sdiff
-        if SsL <= SStar
-            SdiffStar = SsL - SStar
-
-            densStar = rho_ll * sMu_L / SdiffStar # (19)
-
-            if orientation == 1 # x-direction
-                mom_1_Star = densStar * SStar # (20)
-                mom_2_Star = densStar * v2_ll -
-                            (B1Star * B2Star - B1_ll * B2_ll) / SdiffStar # (21)
-                mom_3_Star = densStar * v3_ll -
-                            (B1Star * B3Star - B1_ll * B3_ll) / SdiffStar # (22)
-                  
-                p_tot_Star = rho_ll * sMu_L * (SStar - v1_ll) + p_tot_ll - B1_ll^2 + B1Star^2 # (17)
-
-                # TODO: HLL or HLLC version of psi?          
-                # This is the HLLC version
-                #psiStar = psi_ll
-
-                # TODO: Adaptation for GLM: Take psi into account
-                enerStar = u_ll[5] * sMu_L / SdiffStar +
-                        (p_tot_Star * SStar - p_tot_ll * v1_ll - (B1Star *
-                            (B1Star * v1Star + B2Star * v2Star + B3Star * v3Star) -
-                            B1_ll * (B1_ll * v1_ll + B2_ll * v2_ll + B3_ll * v3_ll)) + 
-                            equations.c_h * (psiStar * B1Star - psi_ll * B1_ll)) /
-                        SdiffStar # (23)
-            elseif orientation == 2 # y-direction
-                mom_1_Star = densStar * v1_ll -
-                            (B2Star * B1Star - B2_ll * B1_ll) / SdiffStar # (21)
-                mom_2_Star = densStar * SStar # (20)
-                mom_3_Star = densStar * v3_ll -
-                            (B2Star * B3Star - B2_ll * B3_ll) / SdiffStar # (22)
-
-                p_tot_Star = rho_ll * sMu_L * (SStar - v2_ll) + p_tot_ll - B2_ll^2 + B2Star^2 # (17)
-
-                # TODO: HLL or HLLC version of psi?
-                # This is the HLLC version
-                #psiStar = psi_ll
-
-                # TODO: Adaptation for GLM: Take psi into account!
-                enerStar = u_ll[5] * sMu_L / SdiffStar +
-                        (p_tot_Star * SStar - p_tot_ll * v2_ll - (B2Star *
-                            (B1Star * v1Star + B2Star * v2Star + B3Star * v3Star) -
-                            B2_ll * (B1_ll * v1_ll + B2_ll * v2_ll + B3_ll * v3_ll)) + 
-                            equations.c_h * (psiStar * B2Star - psi_ll * B2_ll)) /
-                        SdiffStar # (23)                     
-            end
-
-            # Classic HLLC update (32)
-            f1 = f_ll[1] + SsL * (densStar - u_ll[1])
-            f2 = f_ll[2] + SsL * (mom_1_Star - u_ll[2])
-            f3 = f_ll[3] + SsL * (mom_2_Star - u_ll[3])
-            f4 = f_ll[4] + SsL * (mom_3_Star - u_ll[4])
-            f5 = f_ll[5] + SsL * (enerStar - u_ll[5])
-            f6 = f_ll[6] + SsL * (B1Star - u_ll[6])
-            f7 = f_ll[7] + SsL * (B2Star - u_ll[7])
-            f8 = f_ll[8] + SsL * (B3Star - u_ll[8])
-            f9 = f_ll[9] + SsL * (psiStar - u_ll[9])
-        else # SStar <= Ssr
-            SdiffStar = SsR - SStar
-
-            densStar = rho_rr * sMu_R / SdiffStar # (19)
-
-            if orientation == 1 # x-direction
-                mom_1_Star = densStar * SStar # (20)
-                mom_2_Star = densStar * v2_rr -
-                            (B1Star * B2Star - B1_rr * B2_rr) / SdiffStar # (21)
-                mom_3_Star = densStar * v3_rr -
-                            (B1Star * B3Star - B1_rr * B3_rr) / SdiffStar # (22)
-
-                # TODO: Adaptation for GLM: Take psi into account ?
-                p_tot_Star = rho_rr * sMu_R * (SStar - v1_rr) + p_tot_rr - B1_rr^2 + B1Star^2 # (17)
-
-                # TODO: HLL or HLLC version of psi?
-                # This is the HLLC version
-                #psiStar = psi_rr
-
-                # TODO: Adaptation for GLM: Take psi into account!
-                enerStar = u_rr[5] * sMu_R / SdiffStar +
-                        (p_tot_Star * SStar - p_tot_rr * v1_rr - (B1Star *
-                            (B1Star * v1Star + B2Star * v2Star + B3Star * v3Star) -
-                            B1_rr * (B1_rr * v1_rr + B2_rr * v2_rr + B3_rr * v3_rr)) + 
-                            equations.c_h * (psiStar * B1Star - psi_rr * B1_rr)) /
-                        SdiffStar # (23)                   
-            elseif orientation == 2 # y-direction
-                mom_1_Star = densStar * v1_rr -
-                            (B2Star * B1Star - B2_rr * B1_rr) / SdiffStar # (21)
-                mom_2_Star = densStar * SStar # (20)
-                mom_3_Star = densStar * v3_rr -
-                            (B2Star * B3Star - B2_rr * B3_rr) / SdiffStar # (22)
-
-                # TODO: Adaptation for GLM: Take psi into account ?
-                p_tot_Star = rho_rr * sMu_R * (SStar - v2_rr) + p_tot_rr - B2_rr^2 + B2Star^2 # (17)
-
-                # TODO: HLL or HLLC version of psi?
-                # This is the HLLC version
-                #psiStar = psi_rr
-
-                # TODO: Adaptation for GLM: Take psi into account!
-                enerStar = u_rr[5] * sMu_R / SdiffStar +
-                        (p_tot_Star * SStar - p_tot_rr * v2_rr - (B2Star *
-                            (B1Star * v1Star + B2Star * v2Star + B3Star * v3Star) -
-                            B2_rr * (B1_rr * v1_rr + B2_rr * v2_rr + B3_rr * v3_rr)) + 
-                            equations.c_h * (psiStar * B2Star - psi_rr * B2_rr)) /
-                        SdiffStar # (23)
-            end
-
-            # Classic HLLC update (32)           
-            f1 = f_rr[1] + SsR * (densStar - u_rr[1])
-            f2 = f_rr[2] + SsR * (mom_1_Star - u_rr[2])
-            f3 = f_rr[3] + SsR * (mom_2_Star - u_rr[3])
-            f4 = f_rr[4] + SsR * (mom_3_Star - u_rr[4])
-            f5 = f_rr[5] + SsR * (enerStar - u_rr[5])
-            f6 = f_rr[6] + SsR * (B1Star - u_rr[6])
-            f7 = f_rr[7] + SsR * (B2Star - u_rr[7])
-            f8 = f_rr[8] + SsR * (B3Star - u_rr[8])
-            f9 = f_rr[9] + SsR * (psiStar - u_rr[9])
-        end
+        Bn_star = Bn_avg - 0.5f0 * (psi_rr - psi_ll) / c_h
     end
-    return SVector(f1, f2, f3, f4, f5, f6, f7, f8, f9)
+    psi_star = 0.5f0 * (psi_ll + psi_rr) - 0.5f0 * c_h * (Bn_rr - Bn_ll)
+    return Bn_star, psi_star
+end
+
+# HLLC flux of Li (2005) for the ideal MHD equations (without GLM terms) in the local
+# frame of an interface, assuming a constant normal magnetic field component `Bn`.
+# The primitive states are `(rho, v_n, v_t, v_3, p, B_t, B_3)`, where `t` denotes the
+# in-plane tangential direction. Returns the fluxes of
+# `(rho, rho v_n, rho v_t, rho v_3, rho e_total, B_t, B_3)`, where the total energy
+# does not include the GLM contribution `0.5 * psi^2`.
+@inline function _flux_hllc_mhd_local(prim_ll, prim_rr, Bn, S_L, S_R,
+                                      equations::AbstractIdealGlmMhdEquations)
+    rho_ll, vn_ll, vt_ll, v3_ll, p_ll, Bt_ll, B3_ll = prim_ll
+    rho_rr, vn_rr, vt_rr, v3_rr, p_rr, Bt_rr, B3_rr = prim_rr
+
+    p_tot_ll = p_ll + 0.5f0 * (Bn^2 + Bt_ll^2 + B3_ll^2)
+    p_tot_rr = p_rr + 0.5f0 * (Bn^2 + Bt_rr^2 + B3_rr^2)
+    e_ll = (p_ll * equations.inv_gamma_minus_one +
+            0.5f0 * rho_ll * (vn_ll^2 + vt_ll^2 + v3_ll^2) + (p_tot_ll - p_ll))
+    e_rr = (p_rr * equations.inv_gamma_minus_one +
+            0.5f0 * rho_rr * (vn_rr^2 + vt_rr^2 + v3_rr^2) + (p_tot_rr - p_rr))
+    vB_ll = vn_ll * Bn + vt_ll * Bt_ll + v3_ll * B3_ll
+    vB_rr = vn_rr * Bn + vt_rr * Bt_rr + v3_rr * B3_rr
+
+    u_ll = SVector(rho_ll, rho_ll * vn_ll, rho_ll * vt_ll, rho_ll * v3_ll, e_ll,
+                   Bt_ll, B3_ll)
+    u_rr = SVector(rho_rr, rho_rr * vn_rr, rho_rr * vt_rr, rho_rr * v3_rr, e_rr,
+                   Bt_rr, B3_rr)
+    f_ll = SVector(rho_ll * vn_ll,
+                   rho_ll * vn_ll^2 + p_tot_ll - Bn^2,
+                   rho_ll * vn_ll * vt_ll - Bn * Bt_ll,
+                   rho_ll * vn_ll * v3_ll - Bn * B3_ll,
+                   (e_ll + p_tot_ll) * vn_ll - Bn * vB_ll,
+                   vn_ll * Bt_ll - vt_ll * Bn,
+                   vn_ll * B3_ll - v3_ll * Bn)
+    f_rr = SVector(rho_rr * vn_rr,
+                   rho_rr * vn_rr^2 + p_tot_rr - Bn^2,
+                   rho_rr * vn_rr * vt_rr - Bn * Bt_rr,
+                   rho_rr * vn_rr * v3_rr - Bn * B3_rr,
+                   (e_rr + p_tot_rr) * vn_rr - Bn * vB_rr,
+                   vn_rr * Bt_rr - vt_rr * Bn,
+                   vn_rr * B3_rr - v3_rr * Bn)
+
+    if S_L >= 0
+        return f_ll
+    elseif S_R <= 0
+        return f_rr
+    end
+
+    # HLL intermediate state, used for the transverse magnetic field and the
+    # velocity in the star region, Li (2005), eqs. (28) and (30)
+    u_hll = (S_R * u_rr - S_L * u_ll - (f_rr - f_ll)) / (S_R - S_L)
+    rho_hll = u_hll[1]
+    Bt_star = u_hll[6]
+    B3_star = u_hll[7]
+    vB_star = (u_hll[2] * Bn + u_hll[3] * Bt_star + u_hll[4] * B3_star) / rho_hll
+
+    # Speed of the contact wave, eq. (14); the B_n^2 terms cancel since B_n is constant
+    sMu_ll = S_L - vn_ll
+    sMu_rr = S_R - vn_rr
+    S_star = ((rho_rr * vn_rr * sMu_rr - rho_ll * vn_ll * sMu_ll + p_tot_ll - p_tot_rr) /
+              (rho_rr * sMu_rr - rho_ll * sMu_ll))
+
+    # Total pressure in the star region, eq. (17); identical on both sides of the contact
+    p_tot_star = rho_ll * sMu_ll * (S_star - vn_ll) + p_tot_ll
+
+    # Star state of the side where the interface lies, eqs. (19)-(23), and HLLC flux
+    if S_star >= 0
+        S, u, f, rho, vn, vt, v3 = S_L, u_ll, f_ll, rho_ll, vn_ll, vt_ll, v3_ll
+        Bt, B3, p_tot, vB = Bt_ll, B3_ll, p_tot_ll, vB_ll
+    else
+        S, u, f, rho, vn, vt, v3 = S_R, u_rr, f_rr, rho_rr, vn_rr, vt_rr, v3_rr
+        Bt, B3, p_tot, vB = Bt_rr, B3_rr, p_tot_rr, vB_rr
+    end
+    S_diff_star = S - S_star
+    rho_star = rho * (S - vn) / S_diff_star
+    u_star = SVector(rho_star,
+                     rho_star * S_star,
+                     rho_star * vt - Bn * (Bt_star - Bt) / S_diff_star,
+                     rho_star * v3 - Bn * (B3_star - B3) / S_diff_star,
+                     (u[5] * (S - vn) + p_tot_star * S_star - p_tot * vn -
+                      Bn * (vB_star - vB)) / S_diff_star,
+                     Bt_star, B3_star)
+
+    return f + S * (u_star - u)
 end
 
 # Calculate maximum wave speed for local Lax-Friedrichs-type dissipation
