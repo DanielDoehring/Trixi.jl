@@ -36,7 +36,7 @@ function initial_condition_sedov_blast_wave(x, t, equations::CompressibleEulerEq
 end
 initial_condition = initial_condition_sedov_blast_wave
 
-surface_flux = Trixi.flux_ausmplus
+surface_flux = Trixi.flux_hllc
 basis = LobattoLegendreBasis(3)
 volume_integral = VolumeIntegralPureLGLFiniteVolume(flux_hllc)
 solver = DGSEM(basis, surface_flux, volume_integral)
@@ -53,7 +53,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 2.0)
+tspan = (0.0, 12.5)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
