@@ -3,7 +3,7 @@
 [![Docs-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://trixi-framework.github.io/TrixiDocumentation/stable)
 [![Docs-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://trixi-framework.github.io/TrixiDocumentation/dev)
 [![Slack](https://img.shields.io/badge/chat-slack-e01e5a)](https://join.slack.com/t/trixi-framework/shared_invite/zt-sgkc6ppw-6OXJqZAD5SPjBYqLd8MU~g)
-[![Youtube](https://img.shields.io/youtube/channel/views/UCpd92vU2HjjTPup-AIN0pkg?style=social)](https://www.youtube.com/@trixi-framework)
+[![YouTube](https://img.shields.io/badge/YouTube-watch-red?logo=youtube&logoColor=red&style=social)](https://www.youtube.com/@trixi-framework)
 [![Build Status](https://github.com/trixi-framework/Trixi.jl/workflows/CI/badge.svg)](https://github.com/trixi-framework/Trixi.jl/actions?query=workflow%3ACI)
 [![Codecov](https://codecov.io/gh/trixi-framework/Trixi.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/trixi-framework/Trixi.jl)
 [![Coveralls](https://coveralls.io/repos/github/trixi-framework/Trixi.jl/badge.svg?branch=main)](https://coveralls.io/github/trixi-framework/Trixi.jl?branch=main)
@@ -38,9 +38,9 @@ installation and postprocessing procedures. Its features include:
   * Positivity-preserving limiting
   * Subcell invariant domain-preserving (IDP) limiting
   * Entropy-bounded limiting
-* Compatible with the [SciML ecosystem for ordinary differential equations](https://diffeq.sciml.ai/latest/)
-  * [Explicit low-storage Runge-Kutta time integration](https://diffeq.sciml.ai/latest/solvers/ode_solve/#Low-Storage-Methods)
-  * [Strong stability preserving methods](https://diffeq.sciml.ai/latest/solvers/ode_solve/#Explicit-Strong-Stability-Preserving-Runge-Kutta-Methods-for-Hyperbolic-PDEs-(Conservation-Laws))
+* Compatible with the [SciML ecosystem for ordinary differential equations](https://docs.sciml.ai/DiffEqDocs/stable/)
+  * [Explicit low-storage Runge-Kutta time integration](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Low-Storage-Methods)
+  * [Strong stability preserving methods](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Explicit-Strong-Stability-Preserving-Runge-Kutta-Methods-for-Hyperbolic-PDEs-(Conservation-Laws))
   * CFL-based and error-based time step control
 * Custom explicit time integration schemes
   * Maximized linear stability via paired explicit Runge-Kutta methods
@@ -188,7 +188,7 @@ simulation. To quickly see Trixi.jl in action, `default_example()`
 returns the path to an example elixir with a short, two-dimensional
 problem setup. A list of all example elixirs packaged with Trixi.jl can be
 obtained by running `get_examples()`. Alternatively, you can also browse the
-[`examples/`](https://github.com/trixi-framework/Trixi.jl/examples/) subdirectory.
+[`examples/`](https://github.com/trixi-framework/Trixi.jl/tree/main/examples/) subdirectory.
 If you want to modify one of the elixirs to set up your own simulation,
 download it to your machine, edit the configuration, and pass the file path to
 `trixi_include(...)`.

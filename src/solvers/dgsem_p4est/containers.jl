@@ -64,6 +64,34 @@ end
     return uEltype
 end
 
+# Check whether the arrays in `elements` have the axes we assume it must have in the inner loops
+# of Trixi.jl.
+function check_axes(elements::P4estElementContainer{NDIMS}, equations,
+                    solver::DG, cache) where {NDIMS}
+    node_axes = ntuple(_ -> eachnode(solver), NDIMS)
+    check_axes(elements.node_coordinates,
+               (Base.OneTo(NDIMS),
+                node_axes...,
+                eachelement(solver, cache)))
+    check_axes(elements.jacobian_matrix,
+               (Base.OneTo(NDIMS), Base.OneTo(NDIMS),
+                node_axes...,
+                eachelement(solver, cache)))
+    check_axes(elements.contravariant_vectors,
+               (Base.OneTo(NDIMS), Base.OneTo(NDIMS),
+                node_axes...,
+                eachelement(solver, cache)))
+    check_axes(elements.inverse_jacobian,
+               (node_axes...,
+                eachelement(solver, cache)))
+    check_axes(elements.surface_flux_values,
+               (eachvariable(equations),
+                ntuple(_ -> eachnode(solver), NDIMS - 1)...,
+                Base.OneTo(2 * NDIMS),
+                eachelement(solver, cache)))
+    return nothing
+end
+
 # Only one-dimensional `Array`s are `resize!`able in Julia.
 # Hence, we use `Vector`s as internal storage and `resize!`
 # them whenever needed. Then, we reuse the same memory by
@@ -125,31 +153,35 @@ function init_elements(mesh::Union{P4estMesh{NDIMS, NDIMS, RealT},
     nelements = ncells(mesh)
 
     _node_coordinates = Vector{RealT}(undef, NDIMS * nnodes(basis)^NDIMS * nelements)
-    node_coordinates = unsafe_wrap(Array, pointer(_node_coordinates),
-                                   (NDIMS, ntuple(_ -> nnodes(basis), NDIMS)...,
-                                    nelements))
+    node_coordinates = unsafe_wrap_or_alloc(Array, _node_coordinates,
+                                            (NDIMS,
+                                             ntuple(_ -> nnodes(basis), NDIMS)...,
+                                             nelements))
 
     _jacobian_matrix = Vector{RealT}(undef, NDIMS^2 * nnodes(basis)^NDIMS * nelements)
-    jacobian_matrix = unsafe_wrap(Array, pointer(_jacobian_matrix),
-                                  (NDIMS, NDIMS, ntuple(_ -> nnodes(basis), NDIMS)...,
-                                   nelements))
+    jacobian_matrix = unsafe_wrap_or_alloc(Array, _jacobian_matrix,
+                                           (NDIMS, NDIMS,
+                                            ntuple(_ -> nnodes(basis), NDIMS)...,
+                                            nelements))
 
     _contravariant_vectors = similar(_jacobian_matrix)
-    contravariant_vectors = unsafe_wrap(Array, pointer(_contravariant_vectors),
-                                        size(jacobian_matrix))
+    contravariant_vectors = unsafe_wrap_or_alloc(Array, _contravariant_vectors,
+                                                 size(jacobian_matrix))
 
     _inverse_jacobian = Vector{RealT}(undef, nnodes(basis)^NDIMS * nelements)
-    inverse_jacobian = unsafe_wrap(Array, pointer(_inverse_jacobian),
-                                   (ntuple(_ -> nnodes(basis), NDIMS)..., nelements))
+    inverse_jacobian = unsafe_wrap_or_alloc(Array, _inverse_jacobian,
+                                            (ntuple(_ -> nnodes(basis), NDIMS)...,
+                                             nelements))
 
     _surface_flux_values = Vector{uEltype}(undef,
                                            nvariables(equations) *
                                            nnodes(basis)^(NDIMS - 1) * (NDIMS * 2) *
                                            nelements)
-    surface_flux_values = unsafe_wrap(Array, pointer(_surface_flux_values),
-                                      (nvariables(equations),
-                                       ntuple(_ -> nnodes(basis), NDIMS - 1)...,
-                                       NDIMS * 2, nelements))
+    surface_flux_values = unsafe_wrap_or_alloc(Array, _surface_flux_values,
+                                               (nvariables(equations),
+                                                ntuple(_ -> nnodes(basis),
+                                                       NDIMS - 1)...,
+                                                NDIMS * 2, nelements))
 
     elements = P4estElementContainer{NDIMS, RealT, uEltype,
                                      NDIMS + 1, NDIMS + 2, NDIMS + 3,
@@ -230,13 +262,13 @@ mutable struct P4estInterfaceContainer{NDIMS, RealT <: Real, uEltype <: Real,
                                        Union{DenseArray{RealT, NDIMSP1}, Nothing},
                                        IdsMatrix <: DenseMatrix{Int},
                                        IndicesMatrix <:
-                                       DenseMatrix{NTuple{NDIMS, Symbol}},
+                                       DenseMatrix{NTuple{NDIMS, NodeIndex.T}},
                                        uVector <: DenseVector{uEltype},
                                        NormalVector <:
                                        Union{DenseVector{RealT}, Nothing},
                                        IdsVector <: DenseVector{Int},
                                        IndicesVector <:
-                                       DenseVector{NTuple{NDIMS, Symbol}}} <:
+                                       DenseVector{NTuple{NDIMS, NodeIndex.T}}} <:
                AbstractInterfaceContainer
     # 2D: [primary/secondary, variable, i, interface]
     # 3D: [primary/secondary, variable, i, j, interface]
@@ -270,6 +302,26 @@ end
 end
 @inline Base.ndims(::P4estInterfaceContainer{NDIMS}) where {NDIMS} = NDIMS
 
+# Check whether the arrays in `interfaces` have the axes we assume it must have in the inner loops
+# of Trixi.jl.
+function check_axes(interfaces::P4estInterfaceContainer{NDIMS}, equations,
+                    solver::DG, cache) where {NDIMS}
+    surface_node_axes = ntuple(_ -> eachnode(solver), NDIMS - 1)
+    check_axes(interfaces.u,
+               (Base.OneTo(2), eachvariable(equations),
+                surface_node_axes...,
+                eachinterface(solver, cache)))
+    if interfaces.normal_directions !== nothing
+        check_axes(interfaces.normal_directions,
+                   (Base.OneTo(NDIMS),
+                    surface_node_axes...,
+                    eachinterface(solver, cache)))
+    end
+    check_axes(interfaces.neighbor_ids, (Base.OneTo(2), eachinterface(solver, cache)))
+    check_axes(interfaces.node_indices, (Base.OneTo(2), eachinterface(solver, cache)))
+    return nothing
+end
+
 # See explanation of Base.resize! for the element container
 function Base.resize!(interfaces::P4estInterfaceContainer, capacity)
     @unpack _u, _normal_directions, _neighbor_ids, _node_indices = interfaces
@@ -280,29 +332,30 @@ function Base.resize!(interfaces::P4estInterfaceContainer, capacity)
     ArrayType = storage_type(interfaces)
 
     resize!(_u, 2 * n_variables * n_nodes^(n_dims - 1) * capacity)
-    interfaces.u = unsafe_wrap(ArrayType, pointer(_u),
-                               (2, n_variables, ntuple(_ -> n_nodes, n_dims - 1)...,
-                                capacity))
+    interfaces.u = unsafe_wrap_or_alloc(ArrayType, _u,
+                                        (2, n_variables,
+                                         ntuple(_ -> n_nodes, n_dims - 1)...,
+                                         capacity))
 
     if _normal_directions === nothing # trivial interface normals, e.g. for Lobatto-Legendre basis
         interfaces.normal_directions = nothing
     else # non-trivial interface normals, e.g. for Gauss-Legendre basis
         resize!(_normal_directions, n_dims * n_nodes^(n_dims - 1) * capacity)
-        interfaces.normal_directions = unsafe_wrap(ArrayType,
-                                                   pointer(_normal_directions),
-                                                   (n_dims,
-                                                    ntuple(_ -> n_nodes,
-                                                           n_dims - 1)...,
-                                                    capacity))
+        interfaces.normal_directions = unsafe_wrap_or_alloc(ArrayType,
+                                                            _normal_directions,
+                                                            (n_dims,
+                                                             ntuple(_ -> n_nodes,
+                                                                    n_dims - 1)...,
+                                                             capacity))
     end
 
     resize!(_neighbor_ids, 2 * capacity)
-    interfaces.neighbor_ids = unsafe_wrap(ArrayType, pointer(_neighbor_ids),
-                                          (2, capacity))
+    interfaces.neighbor_ids = unsafe_wrap_or_alloc(ArrayType, _neighbor_ids,
+                                                   (2, capacity))
 
     resize!(_node_indices, 2 * capacity)
-    interfaces.node_indices = unsafe_wrap(ArrayType, pointer(_node_indices),
-                                          (2, capacity))
+    interfaces.node_indices = unsafe_wrap_or_alloc(ArrayType, _node_indices,
+                                                   (2, capacity))
 
     return nothing
 end
@@ -320,28 +373,30 @@ function init_interfaces(mesh::Union{P4estMesh, P4estMeshView, T8codeMesh}, equa
     _u = Vector{uEltype}(undef,
                          2 * nvariables(equations) * nnodes(basis)^(NDIMS - 1) *
                          n_interfaces)
-    u = unsafe_wrap(Array, pointer(_u),
-                    (2, nvariables(equations), ntuple(_ -> nnodes(basis), NDIMS - 1)...,
-                     n_interfaces))
+    u = unsafe_wrap_or_alloc(Array, _u,
+                             (2, nvariables(equations),
+                              ntuple(_ -> nnodes(basis), NDIMS - 1)...,
+                              n_interfaces))
 
     if !trivial_interface_normals(basis)
         _normal_directions = Vector{RealT}(undef,
                                            NDIMS * nnodes(basis)^(NDIMS - 1) *
                                            n_interfaces)
-        normal_directions = unsafe_wrap(Array, pointer(_normal_directions),
-                                        (NDIMS,
-                                         ntuple(_ -> nnodes(basis), NDIMS - 1)...,
-                                         n_interfaces))
+        normal_directions = unsafe_wrap_or_alloc(Array, _normal_directions,
+                                                 (NDIMS,
+                                                  ntuple(_ -> nnodes(basis),
+                                                         NDIMS - 1)...,
+                                                  n_interfaces))
     else
         _normal_directions = nothing
         normal_directions = nothing
     end
 
     _neighbor_ids = Vector{Int}(undef, 2 * n_interfaces)
-    neighbor_ids = unsafe_wrap(Array, pointer(_neighbor_ids), (2, n_interfaces))
+    neighbor_ids = unsafe_wrap_or_alloc(Array, _neighbor_ids, (2, n_interfaces))
 
-    _node_indices = Vector{NTuple{NDIMS, Symbol}}(undef, 2 * n_interfaces)
-    node_indices = unsafe_wrap(Array, pointer(_node_indices), (2, n_interfaces))
+    _node_indices = Vector{NTuple{NDIMS, NodeIndex.T}}(undef, 2 * n_interfaces)
+    node_indices = unsafe_wrap_or_alloc(Array, _node_indices, (2, n_interfaces))
 
     interfaces = P4estInterfaceContainer{NDIMS, RealT, uEltype,
                                          NDIMS + 1, NDIMS + 2,
@@ -418,7 +473,7 @@ mutable struct P4estBoundaryContainer{NDIMS, uEltype <: Real, NDIMSP1,
                                       uArray <: DenseArray{uEltype, NDIMSP1},
                                       IdsVector <: DenseVector{Int},
                                       IndicesVector <:
-                                      DenseVector{NTuple{NDIMS, Symbol}},
+                                      DenseVector{NTuple{NDIMS, NodeIndex.T}},
                                       uVector <: DenseVector{uEltype}} <:
                AbstractBoundaryContainer
     # 2D: [variable, i, boundary]
@@ -447,6 +502,20 @@ end
     return uEltype
 end
 
+# Check whether the arrays in `boundaries` have the axes we assume it must have in the inner loops
+# of Trixi.jl.
+function check_axes(boundaries::P4estBoundaryContainer{NDIMS}, equations,
+                    solver::DG, cache) where {NDIMS}
+    check_axes(boundaries.u,
+               (eachvariable(equations),
+                ntuple(_ -> eachnode(solver), NDIMS - 1)...,
+                eachboundary(solver, cache)))
+    check_axes(boundaries.neighbor_ids, (eachboundary(solver, cache),))
+    check_axes(boundaries.node_indices, (eachboundary(solver, cache),))
+    check_axes(boundaries.name, (eachboundary(solver, cache),))
+    return nothing
+end
+
 # See explanation of Base.resize! for the element container
 function Base.resize!(boundaries::P4estBoundaryContainer, capacity)
     @unpack _u, neighbor_ids, node_indices, name = boundaries
@@ -457,9 +526,10 @@ function Base.resize!(boundaries::P4estBoundaryContainer, capacity)
     ArrayType = storage_type(boundaries)
 
     resize!(_u, n_variables * n_nodes^(n_dims - 1) * capacity)
-    boundaries.u = unsafe_wrap(ArrayType, pointer(_u),
-                               (n_variables, ntuple(_ -> n_nodes, n_dims - 1)...,
-                                capacity))
+    boundaries.u = unsafe_wrap_or_alloc(ArrayType, _u,
+                                        (n_variables,
+                                         ntuple(_ -> n_nodes, n_dims - 1)...,
+                                         capacity))
 
     resize!(neighbor_ids, capacity)
 
@@ -482,12 +552,13 @@ function init_boundaries(mesh::Union{P4estMesh, P4estMeshView, T8codeMesh}, equa
     _u = Vector{uEltype}(undef,
                          nvariables(equations) * nnodes(basis)^(NDIMS - 1) *
                          n_boundaries)
-    u = unsafe_wrap(Array, pointer(_u),
-                    (nvariables(equations), ntuple(_ -> nnodes(basis), NDIMS - 1)...,
-                     n_boundaries))
+    u = unsafe_wrap_or_alloc(Array, _u,
+                             (nvariables(equations),
+                              ntuple(_ -> nnodes(basis), NDIMS - 1)...,
+                              n_boundaries))
 
     neighbor_ids = Vector{Int}(undef, n_boundaries)
-    node_indices = Vector{NTuple{NDIMS, Symbol}}(undef, n_boundaries)
+    node_indices = Vector{NTuple{NDIMS, NodeIndex.T}}(undef, n_boundaries)
     names = Vector{Symbol}(undef, n_boundaries)
 
     boundaries = P4estBoundaryContainer{NDIMS, uEltype, NDIMS + 1, typeof(u),
@@ -496,9 +567,10 @@ function init_boundaries(mesh::Union{P4estMesh, P4estMeshView, T8codeMesh}, equa
                                                     node_indices, names,
                                                     _u)
 
-    if n_boundaries > 0
-        init_boundaries!(boundaries, mesh)
-    end
+    # Call this on all MPI ranks, even if there are no local boundaries, since it can
+    # include collective MPI communication (`p4est_iterate` validates the forest in
+    # debug builds of p4est)
+    init_boundaries!(boundaries, mesh)
 
     return boundaries
 end
@@ -589,11 +661,11 @@ mutable struct P4estMortarContainer{NDIMS, uEltype <: Real, NDIMSP1, NDIMSP3,
                                     uArray <: DenseArray{uEltype, NDIMSP3},
                                     IdsMatrix <: DenseMatrix{Int},
                                     IndicesMatrix <:
-                                    DenseMatrix{NTuple{NDIMS, Symbol}},
+                                    DenseMatrix{NTuple{NDIMS, NodeIndex.T}},
                                     uVector <: DenseVector{uEltype},
                                     IdsVector <: DenseVector{Int},
                                     IndicesVector <:
-                                    DenseVector{NTuple{NDIMS, Symbol}}} <:
+                                    DenseVector{NTuple{NDIMS, NodeIndex.T}}} <:
                AbstractMortarContainer
 
     # 2D: [small/large side, variable, position, i, mortar]
@@ -629,16 +701,17 @@ function Base.resize!(mortars::P4estMortarContainer, capacity)
     ArrayType = storage_type(mortars)
 
     resize!(_u, 2 * n_variables * 2^(n_dims - 1) * n_nodes^(n_dims - 1) * capacity)
-    mortars.u = unsafe_wrap(ArrayType, pointer(_u),
-                            (2, n_variables, 2^(n_dims - 1),
-                             ntuple(_ -> n_nodes, n_dims - 1)..., capacity))
+    mortars.u = unsafe_wrap_or_alloc(ArrayType, _u,
+                                     (2, n_variables, 2^(n_dims - 1),
+                                      ntuple(_ -> n_nodes, n_dims - 1)..., capacity))
 
     resize!(_neighbor_ids, (2^(n_dims - 1) + 1) * capacity)
-    mortars.neighbor_ids = unsafe_wrap(ArrayType, pointer(_neighbor_ids),
-                                       (2^(n_dims - 1) + 1, capacity))
+    mortars.neighbor_ids = unsafe_wrap_or_alloc(ArrayType, _neighbor_ids,
+                                                (2^(n_dims - 1) + 1, capacity))
 
     resize!(_node_indices, 2 * capacity)
-    mortars.node_indices = unsafe_wrap(ArrayType, pointer(_node_indices), (2, capacity))
+    mortars.node_indices = unsafe_wrap_or_alloc(ArrayType, _node_indices,
+                                                (2, capacity))
 
     return nothing
 end
@@ -655,16 +728,16 @@ function init_mortars(mesh::Union{P4estMesh, P4estMeshView, T8codeMesh}, equatio
     _u = Vector{uEltype}(undef,
                          2 * nvariables(equations) * 2^(NDIMS - 1) *
                          nnodes(basis)^(NDIMS - 1) * n_mortars)
-    u = unsafe_wrap(Array, pointer(_u),
-                    (2, nvariables(equations), 2^(NDIMS - 1),
-                     ntuple(_ -> nnodes(basis), NDIMS - 1)..., n_mortars))
+    u = unsafe_wrap_or_alloc(Array, _u,
+                             (2, nvariables(equations), 2^(NDIMS - 1),
+                              ntuple(_ -> nnodes(basis), NDIMS - 1)..., n_mortars))
 
     _neighbor_ids = Vector{Int}(undef, (2^(NDIMS - 1) + 1) * n_mortars)
-    neighbor_ids = unsafe_wrap(Array, pointer(_neighbor_ids),
-                               (2^(NDIMS - 1) + 1, n_mortars))
+    neighbor_ids = unsafe_wrap_or_alloc(Array, _neighbor_ids,
+                                        (2^(NDIMS - 1) + 1, n_mortars))
 
-    _node_indices = Vector{NTuple{NDIMS, Symbol}}(undef, 2 * n_mortars)
-    node_indices = unsafe_wrap(Array, pointer(_node_indices), (2, n_mortars))
+    _node_indices = Vector{NTuple{NDIMS, NodeIndex.T}}(undef, 2 * n_mortars)
+    node_indices = unsafe_wrap_or_alloc(Array, _node_indices, (2, n_mortars))
 
     mortars = P4estMortarContainer{NDIMS, uEltype, NDIMS + 1, NDIMS + 3, typeof(u),
                                    typeof(neighbor_ids), typeof(node_indices),
@@ -676,9 +749,10 @@ function init_mortars(mesh::Union{P4estMesh, P4estMeshView, T8codeMesh}, equatio
                                                           _neighbor_ids,
                                                           _node_indices)
 
-    if n_mortars > 0
-        init_mortars!(mortars, mesh)
-    end
+    # Call this on all MPI ranks, even if there are no local mortars, since it can
+    # include collective MPI communication (`p4est_iterate` validates the forest in
+    # debug builds of p4est)
+    init_mortars!(mortars, mesh)
 
     return mortars
 end
@@ -716,7 +790,7 @@ function Adapt.adapt_structure(to, mortars::P4estMortarContainer)
                                                     _u, _neighbor_ids, _node_indices)
 end
 
-function reinitialize_containers!(mesh::P4estMesh, equations, dg::DGSEM, cache)
+function reinit_containers!(mesh::P4estMesh, equations, dg::DGSEM, cache)
     n_cells = ncells(mesh)
 
     # Re-initialize elements container
@@ -725,9 +799,7 @@ function reinitialize_containers!(mesh::P4estMesh, equations, dg::DGSEM, cache)
     init_elements!(elements, mesh, dg.basis)
 
     # Resize volume integral and related datastructures
-    @unpack volume_integral = dg
-    resize_volume_integral_cache!(cache, mesh, volume_integral, n_cells)
-    reinit_volume_integral_cache!(cache, mesh, dg, volume_integral, n_cells)
+    reinit_cache_all_volume_integrals!(cache, mesh, dg, n_cells)
 
     required = count_required_surfaces(mesh)
 
@@ -749,6 +821,12 @@ function reinitialize_containers!(mesh::P4estMesh, equations, dg::DGSEM, cache)
 
     # init_normal_directions! requires that `node_indices` have been initialized
     init_normal_directions!(interfaces, dg.basis, elements)
+
+    # Auxiliary variables are only computed when the semidiscretization is created,
+    # so mesh adaptation would require re-evaluating them and resizing their container.
+    if haskey(cache, :aux_vars)
+        throw(ArgumentError("mesh adaptation is not supported with auxiliary variables"))
+    end
 
     return nothing
 end
@@ -1015,38 +1093,45 @@ function count_required_surfaces(mesh::P4estMesh)
 end
 
 # Return direction of the face, which is indexed by node_indices
-@inline function indices2direction(indices::NTuple{3, Symbol})
-    if indices[1] === :begin
+@inline function indices2direction(indices::NTuple{3, NodeIndex.T})
+    if indices[1] === NodeIndex.Begin
         return 1
-    elseif indices[1] === :end
+    elseif indices[1] === NodeIndex.End
         return 2
-    elseif indices[2] === :begin
+    elseif indices[2] === NodeIndex.Begin
         return 3
-    elseif indices[2] === :end
+    elseif indices[2] === NodeIndex.End
         return 4
-    elseif indices[3] === :begin
+    elseif indices[3] === NodeIndex.Begin
         return 5
-    else # if indices[3] === :end
+    else # if indices[3] === NodeIndex.End
         return 6
     end
 end
 
-@inline function indices2direction(indices::NTuple{2, Symbol})
-    if indices[1] === :begin
+@inline function indices2direction(indices::NTuple{2, NodeIndex.T})
+    if indices[1] === NodeIndex.Begin
         return 1
-    elseif indices[1] === :end
+    elseif indices[1] === NodeIndex.End
         return 2
-    elseif indices[2] === :begin
+    elseif indices[2] === NodeIndex.Begin
         return 3
-    else # if indices[2] === :end
+    else # if indices[2] === NodeIndex.End
         return 4
     end
 end
 
 # Build a reduced cache which can be passed to GPU kernels
 @inline function kernel_filter_cache(cache)
-    return (;
-            elements = (; contravariant_vectors = cache.elements.contravariant_vectors))
+    elements = (; contravariant_vectors = cache.elements.contravariant_vectors)
+    # The auxiliary variables are only stored for equations with auxiliary variables,
+    # see `get_aux_vars`
+    if haskey(cache, :aux_vars)
+        aux_vars = (; aux = cache.aux_vars.aux)
+        return (; elements, aux_vars)
+    else
+        return (; elements)
+    end
 end
 
 include("containers_2d.jl")

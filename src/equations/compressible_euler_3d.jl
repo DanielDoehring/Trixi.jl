@@ -22,7 +22,7 @@ The compressible Euler equations
 +
 \frac{\partial}{\partial y}
 \begin{pmatrix}
-\rho v_2 \\ \rho v_1 v_2 \\ \rho v_2^2 + p \\ \rho v_1 v_3 \\ ( \rho e_{\text{total}} +p) v_2
+\rho v_2 \\ \rho v_1 v_2 \\ \rho v_2^2 + p \\ \rho v_2 v_3 \\ ( \rho e_{\text{total}} +p) v_2
 \end{pmatrix}
 +
 \frac{\partial}{\partial z}
@@ -156,13 +156,16 @@ end
     initial_condition_weak_blast_wave(x, t, equations::CompressibleEulerEquations3D)
 
 A weak blast wave taken from
-- Sebastian Hennemann, Gregor J. Gassner (2020)
+- Sebastian Hennemann, Andrés M. Rueda-Ramírez, Florian J. Hindenlang,
+  Gregor J. Gassner (2021)
   A provably entropy stable subcell shock capturing approach for high order split form DG
+  for the compressible Euler equations
   [arXiv: 2008.12044](https://arxiv.org/abs/2008.12044)
+  [DOI: 10.1016/j.jcp.2020.109935](https://doi.org/10.1016/j.jcp.2020.109935)
 """
 function initial_condition_weak_blast_wave(x, t,
                                            equations::CompressibleEulerEquations3D)
-    # From Hennemann & Gassner JCP paper 2020 (Sec. 6.3)
+    # From Hennemann et al. JCP paper 2021 (Sec. 6.3)
     # Set up spherical coordinates
     RealT = eltype(x)
     inicenter = (0, 0, 0)
@@ -187,9 +190,10 @@ end
     initial_condition_eoc_test_coupled_euler_gravity(x, t, equations::CompressibleEulerEquations3D)
 
 Setup used for convergence tests of the Euler equations with self-gravity used in
-- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2020)
+- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2021)
   A purely hyperbolic discontinuous Galerkin approach for self-gravitating gas dynamics
   [arXiv: 2008.10593](https://arxiv.org/abs/2008.10593)
+  [DOI: 10.1016/j.jcp.2021.110467](https://doi.org/10.1016/j.jcp.2021.110467)
 in combination with [`source_terms_eoc_test_coupled_euler_gravity`](@ref)
 or [`source_terms_eoc_test_euler`](@ref).
 """
@@ -218,9 +222,10 @@ end
     source_terms_eoc_test_coupled_euler_gravity(u, x, t, equations::CompressibleEulerEquations3D)
 
 Setup used for convergence tests of the Euler equations with self-gravity used in
-- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2020)
+- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2021)
   A purely hyperbolic discontinuous Galerkin approach for self-gravitating gas dynamics
   [arXiv: 2008.10593](https://arxiv.org/abs/2008.10593)
+  [DOI: 10.1016/j.jcp.2021.110467](https://doi.org/10.1016/j.jcp.2021.110467)
 in combination with [`initial_condition_eoc_test_coupled_euler_gravity`](@ref).
 """
 @inline function source_terms_eoc_test_coupled_euler_gravity(u, x, t,
@@ -251,9 +256,10 @@ end
     source_terms_eoc_test_euler(u, x, t, equations::CompressibleEulerEquations3D)
 
 Setup used for convergence tests of the Euler equations with self-gravity used in
-- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2020)
+- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2021)
   A purely hyperbolic discontinuous Galerkin approach for self-gravitating gas dynamics
   [arXiv: 2008.10593](https://arxiv.org/abs/2008.10593)
+  [DOI: 10.1016/j.jcp.2021.110467](https://doi.org/10.1016/j.jcp.2021.110467)
 in combination with [`initial_condition_eoc_test_coupled_euler_gravity`](@ref).
 
 !!! note
@@ -307,6 +313,7 @@ The implementation is modified to ensure non-negativity of `p_star`. This modifi
 preserves entropy stability based on the analysis in the paper:
 - F. J. Hindenlang, G. J. Gassner, D. A. Kopriva (2020)
   Stability of wall boundary condition procedures for discontinuous Galerkin spectral element approximations of the compressible Euler equations
+  [arXiv: 1901.04924](https://arxiv.org/abs/1901.04924)
   [DOI: 10.1007/978-3-030-39647-3_1](https://doi.org/10.1007/978-3-030-39647-3_1)
 
 
@@ -636,6 +643,7 @@ Entropy conserving two-point flux by
 - Chandrashekar (2013)
   Kinetic Energy Preserving and Entropy Stable Finite Volume Schemes
   for Compressible Euler and Navier-Stokes Equations
+  [arXiv: 1209.4994](https://arxiv.org/abs/1209.4994)
   [DOI: 10.4208/cicp.170712.010313a](https://doi.org/10.4208/cicp.170712.010313a)
 """
 @inline function flux_chandrashekar(u_ll, u_rr, orientation::Integer,
@@ -1420,8 +1428,8 @@ Computes the HLLC flux (HLL with Contact) for compressible Euler equations devel
 [Lecture slides](http://www.prague-sum.com/download/2012/Toro_2-HLLC-RiemannSolver.pdf)
 Signal speeds: [DOI: 10.1137/S1064827593260140](https://doi.org/10.1137/S1064827593260140)
 """
-function flux_hllc(u_ll, u_rr, orientation::Integer,
-                   equations::CompressibleEulerEquations3D)
+@inline function flux_hllc(u_ll, u_rr, orientation::Integer,
+                           equations::CompressibleEulerEquations3D)
     # Calculate primitive variables and speed of sound
     rho_ll, rho_v1_ll, rho_v2_ll, rho_v3_ll, rho_e_total_ll = u_ll
     rho_rr, rho_v1_rr, rho_v2_rr, rho_v3_rr, rho_e_total_rr = u_rr
@@ -1540,8 +1548,8 @@ function flux_hllc(u_ll, u_rr, orientation::Integer,
     return SVector(f1, f2, f3, f4, f5)
 end
 
-function flux_hllc(u_ll, u_rr, normal_direction::AbstractVector,
-                   equations::CompressibleEulerEquations3D)
+@inline function flux_hllc(u_ll, u_rr, normal_direction::AbstractVector,
+                           equations::CompressibleEulerEquations3D)
     # Calculate primitive variables and speed of sound
     rho_ll, v1_ll, v2_ll, v3_ll, p_ll = cons2prim(u_ll, equations)
     rho_rr, v1_rr, v2_rr, v3_rr, p_rr = cons2prim(u_rr, equations)
@@ -2002,8 +2010,9 @@ Calculate the modified specific entropy of Guermond et al. (2019):
 s_0 = p * \rho^{-\gamma} / (\gamma-1).
 ```
 Note: This is *not* the "conventional" specific entropy ``s = ln(p / \rho^\gamma)``.
-- Guermond at al. (2019)
+- Guermond et al. (2019)
   Invariant domain preserving discretization-independent schemes and convex limiting for hyperbolic systems.
+  [arXiv: 1807.02563](https://arxiv.org/abs/1807.02563)
   [DOI: 10.1016/j.cma.2018.11.036](https://doi.org/10.1016/j.cma.2018.11.036)
 """
 @inline function entropy_guermond_etal(u, equations::CompressibleEulerEquations3D)

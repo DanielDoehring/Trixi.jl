@@ -34,7 +34,7 @@ function compute_PairedExplicitRK4_butcher_tableau(num_stages, tspan,
     a_matrix = zeros(2, num_coeffs_max)
 
     dtmax = tspan[2] - tspan[1]
-    dteps = 1.0f-9
+    dteps = 1.0e-9
 
     num_eig_vals, eig_vals = filter_eig_vals(eig_vals; verbose)
 
@@ -99,20 +99,21 @@ end
 
 @doc raw"""
     PairedExplicitRK4(num_stages, base_path_a_coeffs::AbstractString, dt_opt = nothing;
-                      cS3 = 1.0f0)
+                      cS3 = 1.0)
     PairedExplicitRK4(num_stages, tspan, semi::AbstractSemidiscretization;
-                      verbose = false, cS3 = 1.0f0)
+                      verbose = false, cS3 = 1.0)
     PairedExplicitRK4(num_stages, tspan, eig_vals::Vector{ComplexF64};
-                      verbose = false, cS3 = 1.0f0)
+                      verbose = false, cS3 = 1.0)
 
 The following structures and methods provide an implementation of
 the fourth-order paired explicit Runge-Kutta (P-ERK) method
 optimized for a certain simulation setup (PDE, IC & BCs, Riemann Solver, DG Solver).
 The method has been proposed in
 
-- D. Doehring, L. Christmann, M. Schlottke-Lakemper, G. J. Gassner and M. Torrilhon (2024).
+- D. Doehring, L. Christmann, M. Schlottke-Lakemper, G. J. Gassner and M. Torrilhon (2025).
   Fourth-Order Paired-Explicit Runge-Kutta Methods
-  [DOI:10.48550/arXiv.2408.05470](https://doi.org/10.48550/arXiv.2408.05470)
+  [arXiv: 2408.05470](https://arxiv.org/abs/2408.05470)
+  [DOI: 10.1007/s44207-025-00005-4](https://doi.org/10.1007/s44207-025-00005-4)
 
 # Arguments
 - `num_stages` (`Int`): Number of stages in the paired explicit Runge-Kutta (P-ERK) method.
@@ -126,7 +127,7 @@ The method has been proposed in
 - `eig_vals` (`Vector{ComplexF64}`): Eigenvalues of the Jacobian of the right-hand side (rhs) of the `ODEProblem` after the
     equation has been semidiscretized.
 - `cS3` (`Float64`, optional): Value of $c_{S-3}$ in the Butcher tableau, where
-    $S$ is the number of stages. Default is `1.0f0`.
+    $S$ is the number of stages. Default is `1.0`.
 
 !!! note
     To use this integrator, the user must import the
@@ -150,7 +151,7 @@ end
 # Constructor for previously computed A Coeffs
 function PairedExplicitRK4(num_stages, base_path_a_coeffs::AbstractString,
                            dt_opt = nothing;
-                           cS3 = 1.0f0)  # Default value for best internal stability
+                           cS3 = 1.0)  # Default value for best internal stability
     @assert num_stages>=5 "PERK4 requires at least five stages"
     a_matrix, a_matrix_constant, c = compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                                                base_path_a_coeffs,
@@ -161,7 +162,7 @@ end
 
 # Constructor that computes Butcher matrix A coefficients from a semidiscretization
 function PairedExplicitRK4(num_stages, tspan, semi::AbstractSemidiscretization;
-                           verbose = false, cS3 = 1.0f0)
+                           verbose = false, cS3 = 1.0)
     @assert num_stages>=5 "PERK4 requires at least five stages"
     eig_vals = eigvals(jacobian_ad_forward(semi))
 
@@ -170,7 +171,7 @@ end
 
 # Constructor that calculates the coefficients with polynomial optimizer from a list of eigenvalues
 function PairedExplicitRK4(num_stages, tspan, eig_vals::Vector{ComplexF64};
-                           verbose = false, cS3 = 1.0f0)
+                           verbose = false, cS3 = 1.0)
     @assert num_stages>=5 "PERK4 requires at least five stages"
     a_matrix, a_matrix_constant, c, dt_opt = compute_PairedExplicitRK4_butcher_tableau(num_stages,
                                                                                        tspan,
@@ -182,7 +183,7 @@ end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
-# https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
+# https://docs.sciml.ai/DiffEqDocs/stable/basics/integrator/#Handling-Integrators
 # which are used in Trixi.jl.
 mutable struct PairedExplicitRK4Integrator{RealT <: Real, uType <: AbstractVector,
                                            Params, Sol, F,

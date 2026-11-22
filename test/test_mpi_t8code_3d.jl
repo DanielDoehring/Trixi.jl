@@ -40,8 +40,8 @@ end
 ] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_amr.jl"),
                         # Expected errors are exactly the same as with TreeMesh!
-                        l2=[1.1302812803902801e-5],
-                        linf=[0.0007889950196294793])
+                        l2=[9.773852895190228e-6],
+                        linf=[0.0005853874124925398])
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
@@ -54,8 +54,8 @@ end
 ] tags=[:mpi, :mpi_skip_windows] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_advection_amr_unstructured_curved.jl"),
-                        l2=[2.0535121347526814e-5],
-                        linf=[0.0010586603797777504],
+                        l2=[1.6163120948209677e-5],
+                        linf=[0.0010572201890564834],
                         tspan=(0.0, 1.0))
 
     # Ensure that we do not have excessive memory allocations
@@ -155,4 +155,22 @@ end
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+end
+
+@testitem "T8codeMesh MPI 3D: check_axes" setup=[Setup, MPIT8codeMesh3D] tags=[:mpi] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_source_terms_nonconforming_unstructured_curved.jl"),
+                        maxiters=1)
+    mesh, equations, dg, cache = Trixi.mesh_equations_solver_cache(semi)
+    u = Trixi.wrap_array(Trixi.compute_coefficients(0.0, semi), semi)
+    @test Trixi.check_axes(u, mesh, equations, dg, cache) === nothing
+
+    # Make sure that there are MPI interfaces and MPI mortars (on some rank)
+    @test Trixi.MPI.Allreduce(Trixi.nmpiinterfaces(dg, cache), +,
+                              Trixi.mpi_comm()) > 0
+    @test Trixi.MPI.Allreduce(Trixi.nmpimortars(dg, cache), +, Trixi.mpi_comm()) > 0
+    for container in (cache.elements, cache.interfaces, cache.mpi_interfaces,
+                      cache.boundaries, cache.mortars, cache.mpi_mortars)
+        @test Trixi.check_axes(container, equations, dg, cache) === nothing
+    end
 end

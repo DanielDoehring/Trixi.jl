@@ -141,9 +141,10 @@ end
 A sine wave in the density with constant velocity and pressure; reduces the
 compressible Euler equations to the linear advection equations.
 This setup is the test case for stability of EC fluxes from paper
-- Gregor J. Gassner, Magnus Svärd, Florian J. Hindenlang (2020)
+- Gregor J. Gassner, Magnus Svärd, Florian J. Hindenlang (2022)
   Stability issues of entropy-stable and/or split-form high-order schemes
   [arXiv: 2007.09026](https://arxiv.org/abs/2007.09026)
+  [DOI: 10.1007/s10915-021-01720-8](https://doi.org/10.1007/s10915-021-01720-8)
 with the following parameters
 - domain [-1, 1]
 - mesh = 4x4
@@ -163,13 +164,16 @@ end
     initial_condition_weak_blast_wave(x, t, equations::CompressibleEulerEquations1D)
 
 A weak blast wave taken from
-- Sebastian Hennemann, Gregor J. Gassner (2020)
+- Sebastian Hennemann, Andrés M. Rueda-Ramírez, Florian J. Hindenlang,
+  Gregor J. Gassner (2021)
   A provably entropy stable subcell shock capturing approach for high order split form DG
+  for the compressible Euler equations
   [arXiv: 2008.12044](https://arxiv.org/abs/2008.12044)
+  [DOI: 10.1016/j.jcp.2020.109935](https://doi.org/10.1016/j.jcp.2020.109935)
 """
 function initial_condition_weak_blast_wave(x, t,
                                            equations::CompressibleEulerEquations1D)
-    # From Hennemann & Gassner JCP paper 2020 (Sec. 6.3)
+    # From Hennemann et al. JCP paper 2021 (Sec. 6.3)
     # Set up polar coordinates
     RealT = eltype(x)
     inicenter = SVector(0)
@@ -194,9 +198,10 @@ end
 
 One dimensional variant of the setup used for convergence tests of the Euler equations
 with self-gravity from
-- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2020)
+- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2021)
   A purely hyperbolic discontinuous Galerkin approach for self-gravitating gas dynamics
   [arXiv: 2008.10593](https://arxiv.org/abs/2008.10593)
+  [DOI: 10.1016/j.jcp.2021.110467](https://doi.org/10.1016/j.jcp.2021.110467)
 !!! note
     There is no additional source term necessary for the manufactured solution in one
     spatial dimension. Thus, [`source_terms_eoc_test_coupled_euler_gravity`](@ref) is not
@@ -238,6 +243,7 @@ The implementation is modified to ensure non-negativity of `p_star`. This modifi
 preserves entropy stability based on the analysis in the paper:
 - F. J. Hindenlang, G. J. Gassner, D. A. Kopriva (2020)
   Stability of wall boundary condition procedures for discontinuous Galerkin spectral element approximations of the compressible Euler equations
+  [arXiv: 1901.04924](https://arxiv.org/abs/1901.04924)
   [DOI: 10.1007/978-3-030-39647-3_1](https://doi.org/10.1007/978-3-030-39647-3_1)
 
 Should be used together with [`TreeMesh`](@ref).
@@ -367,6 +373,7 @@ Entropy conserving two-point flux by
 - Chandrashekar (2013)
   Kinetic Energy Preserving and Entropy Stable Finite Volume Schemes
   for Compressible Euler and Navier-Stokes Equations
+  [arXiv: 1209.4994](https://arxiv.org/abs/1209.4994)
   [DOI: 10.4208/cicp.170712.010313a](https://doi.org/10.4208/cicp.170712.010313a)
 """
 @inline function flux_chandrashekar(u_ll, u_rr, orientation::Integer,
@@ -847,8 +854,8 @@ Computes the HLLC flux (HLL with Contact) for compressible Euler equations devel
 [Lecture slides](http://www.prague-sum.com/download/2012/Toro_2-HLLC-RiemannSolver.pdf)
 Signal speeds: [DOI: 10.1137/S1064827593260140](https://doi.org/10.1137/S1064827593260140)
 """
-function flux_hllc(u_ll, u_rr, orientation::Integer,
-                   equations::CompressibleEulerEquations1D)
+@inline function flux_hllc(u_ll, u_rr, orientation::Integer,
+                           equations::CompressibleEulerEquations1D)
     # Calculate primitive variables and speed of sound
     rho_ll, rho_v1_ll, rho_e_total_ll = u_ll
     rho_rr, rho_v1_rr, rho_e_total_rr = u_rr
@@ -1089,8 +1096,8 @@ end
 # The HLLC flux along a 1D "normal" can be evaluated by scaling the velocity/momentum by
 # the normal for the 1D HLLC flux, then scaling the resulting momentum flux again.
 # Moreover, the 2D HLLC flux reduces to this if the normal vector is [n, 0].
-function flux_hllc(u_ll, u_rr, normal_direction::AbstractVector,
-                   equations::CompressibleEulerEquations1D)
+@inline function flux_hllc(u_ll, u_rr, normal_direction::AbstractVector,
+                           equations::CompressibleEulerEquations1D)
     norm_ = abs(normal_direction[1])
     normal_direction_unit = normal_direction[1] * inv(norm_)
 

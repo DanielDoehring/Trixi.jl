@@ -57,7 +57,7 @@ mutable struct SimpleIntegratorSSPOptions{Callback, TStops}
     const adaptive::Bool # whether the algorithm is adaptive; ignored
     dtmax::Float64 # ignored
     const maxiters::Int # maximal number of time steps
-    tstops::TStops # tstops from https://diffeq.sciml.ai/v6.8/basics/common_solver_opts/#Output-Control-1; ignored
+    tstops::TStops # tstops from https://docs.sciml.ai/DiffEqDocs/stable/basics/common_solver_opts/; ignored
 end
 
 function SimpleIntegratorSSPOptions(callback, tspan; maxiters = typemax(Int), kwargs...)
@@ -76,7 +76,7 @@ end
 
 # This struct is needed to fake https://github.com/SciML/OrdinaryDiffEq.jl/blob/0c2048a502101647ac35faabd80da8a5645beac7/src/integrators/type.jl#L77
 # This implements the interface components described at
-# https://diffeq.sciml.ai/v6.8/basics/integrator/#Handing-Integrators-1
+# https://docs.sciml.ai/DiffEqDocs/stable/basics/integrator/#Handling-Integrators
 # which are used in Trixi.
 mutable struct SimpleIntegratorSSP{RealT <: Real, uType,
                                    Params, Sol, F, Alg,
@@ -172,6 +172,7 @@ function step!(integrator::SimpleIntegratorSSP)
     @unpack alg = integrator
     t_end = last(prob.tspan)
     callbacks = integrator.opts.callback
+    (; numerator_a, numerator_b, denominator) = alg
 
     @assert !integrator.finalstep
     if isnan(integrator.dt)
@@ -182,23 +183,35 @@ function step!(integrator::SimpleIntegratorSSP)
 
     limit_dt!(integrator, t_end)
 
-    @. integrator.u_tmp = integrator.u
+    (; u, u_tmp, du, dt) = integrator
+    @threaded for i in eachindex(u)
+        u_tmp[i] = u[i]
+    end
     for stage in eachindex(alg.c)
-        t_stage = integrator.t + integrator.dt * alg.c[stage]
+        t_stage = integrator.t + dt * alg.c[stage]
         # compute du
-        integrator.f(integrator.du, integrator.u, integrator.p, t_stage)
+        integrator.f(du, u, integrator.p, t_stage)
 
         # perform forward Euler step
-        @. integrator.u = integrator.u + integrator.dt * integrator.du
+        @threaded for i in eachindex(integrator.u)
+            u[i] = u[i] + dt * du[i]
+        end
 
         for stage_callback in alg.stage_callbacks
             stage_callback(integrator.u, integrator, stage)
         end
 
         # perform convex combination
-        @. integrator.u = (alg.numerator_a[stage] * integrator.u_tmp +
-                           alg.numerator_b[stage] * integrator.u) /
-                          alg.denominator[stage]
+        a = numerator_a[stage]
+        # Skip the convex combination if a = 0. In that case, b = denominator = 1 holds
+        # as well, such that the combination reduces to the identity u = u.
+        if !iszero(a)
+            b = numerator_b[stage]
+            d = denominator[stage]
+            @threaded for i in eachindex(integrator.u)
+                u[i] = (a * u_tmp[i] + b * u[i]) / d
+            end
+        end
     end
     integrator.iter += 1
     integrator.t += integrator.dt
