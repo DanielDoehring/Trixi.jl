@@ -21,6 +21,9 @@ of integration time by adding additional (shortened) time steps where necessary 
 at a single point to a set of solution variables. The first parameter passed
 to `solution_variables` will be the set of conservative variables
 and the second parameter is the equation struct.
+For equations with auxiliary variables (see [`nauxvariables`](@ref)),
+the auxiliary variables are passed as the second parameter
+and the equation struct as the third.
 
 Additional nodal variables such as vorticity or the Mach number can be saved by passing a tuple of symbols
 to `extra_node_variables`, e.g., `extra_node_variables = (:vorticity, :mach)`.
@@ -34,7 +37,16 @@ end
 and must return an array of dimension
 `(ntuple(_ -> n_nodes, ndims(mesh))..., n_elements)`.
 
-For parabolic-hyperbolic equations `equations_parabolic` and `cache_parabolic` must be added:
+For purely parabolic equations, `cache_parabolic` must be added:
+```julia
+function get_node_variable(::Val{symbol}, u, mesh, equations, dg, cache,
+                           cache_parabolic)
+    # Implementation goes here
+end
+```
+
+For hyperbolic-parabolic equations, `equations_parabolic` and `cache_parabolic` must be
+added:
 ```julia
 function get_node_variable(::Val{symbol}, u, mesh, equations, dg, cache,
                            equations_parabolic, cache_parabolic)
@@ -244,7 +256,7 @@ function (solution_callback::SaveSolutionCallback)(integrator)
     end
 
     # avoid re-evaluating possible FSAL stages
-    u_modified!(integrator, false)
+    derivative_discontinuity!(integrator, false)
     return nothing
 end
 
@@ -260,12 +272,12 @@ end
         callbacks = integrator.opts.callback
         if callbacks isa CallbackSet
             foreach(callbacks.continuous_callbacks) do cb
-                return get_element_variables!(element_variables, u_ode, semi, cb;
-                                              t = integrator.t, iter = iter)
+                return get_element_variables_callback!(element_variables, u_ode, semi,
+                                                       cb; t = integrator.t, iter)
             end
             foreach(callbacks.discrete_callbacks) do cb
-                return get_element_variables!(element_variables, u_ode, semi, cb;
-                                              t = integrator.t, iter = iter)
+                return get_element_variables_callback!(element_variables, u_ode, semi,
+                                                       cb; t = integrator.t, iter)
             end
         end
     end
@@ -287,12 +299,25 @@ end
                                     element_variables = Dict{Symbol, Any}(),
                                     node_variables = Dict{Symbol, Any}();
                                     system = "")
+    # TODO GPU currently on CPU
+    backend = trixi_backend(u_ode)
+    if backend !== nothing
+        u_ode = Array(u_ode)
+    end
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
     u = wrap_array_native(u_ode, mesh, equations, solver, cache)
-    save_solution_file(u, t, dt, iter, mesh, equations, solver, cache,
-                       solution_callback,
-                       element_variables,
-                       node_variables; system = system)
+    # `u` is an `unsafe_wrap`-based view into `u_ode`'s memory (see the "Segfaults"
+    # warning in the definition of `wrap_array` in src/solvers/dg.j).
+    # When `backend !== nothing`, `u_ode` was just
+    # rebound to a fresh host `Array` with no other reference anywhere, so without
+    # `GC.@preserve` the GC is free to collect it while `u` is still in use below,
+    # leaving `u` dangling and causing a segfault instead of a catchable error.
+    GC.@preserve u_ode begin
+        save_solution_file(u, t, dt, iter, mesh, equations, solver, cache,
+                           solution_callback,
+                           element_variables,
+                           node_variables; system = system)
+    end
 
     return nothing
 end

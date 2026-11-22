@@ -16,7 +16,7 @@ using Trixi
 # - Deep Ray, Praveen Chandrashekar (2017)
 #   An entropy stable finite volume scheme for the
 #   two dimensional Navier–Stokes equations on triangular grids
-#   [DOI:10.1016/j.amc.2017.07.020](https://doi.org/10.1016/j.amc.2017.07.020)
+#   [DOI: 10.1016/j.amc.2017.07.020](https://doi.org/10.1016/j.amc.2017.07.020)
 
 equations = CompressibleEulerEquations2D(1.4)
 
@@ -173,6 +173,6 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback, sav
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, RDPK3SpFSAL49(thread = Trixi.True());
+sol = solve(ode, RDPK3SpFSAL49(thread = Trixi.Threaded());
             abstol = 1e-8, reltol = 1e-8,
             ode_default_options()..., callback = callbacks)

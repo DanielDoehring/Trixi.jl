@@ -5,17 +5,22 @@
 @muladd begin
 #! format: noindent
 
-# Abstract supertype of indicators used for AMR, shock capturing, and
-# adaptive volume-integral selection
-abstract type AbstractIndicator end
-
-function create_cache(typ::Type{IndicatorType},
-                      semi) where {IndicatorType <: AbstractIndicator}
-    return create_cache(typ, mesh_equations_solver_cache(semi)...)
+# Create the cache of an indicator constructed from a semidiscretization, e.g., for AMR
+function create_cache_indicator(typ::Type{<:AbstractIndicator}, semi)
+    return create_cache_indicator(typ, mesh_equations_solver_cache(semi)...)
 end
 
-function get_element_variables!(element_variables, indicator::AbstractIndicator,
-                                ::AbstractVolumeIntegralShockCapturing)
+function create_cache_indicator(typ::Type{<:AbstractIndicator},
+                                mesh, equations::AbstractEquations, dg::DGSEM, cache)
+    return create_cache_indicator(typ, equations, dg.basis)
+end
+
+# Add the values of `indicator` to `element_variables` under a name depending on the
+# component using the indicator (last argument), e.g., a volume integral or the
+# `AMRCallback`.
+function get_element_variables_indicator!(element_variables,
+                                          indicator::AbstractIndicator,
+                                          ::AbstractVolumeIntegralShockCapturing)
     element_variables[:indicator_shock_capturing] = indicator.cache.alpha
     return nothing
 end
@@ -39,9 +44,11 @@ See also [`VolumeIntegralShockCapturingHG`](@ref).
 
 ## References
 
-- Hennemann, Gassner (2020)
-  "A provably entropy stable subcell shock capturing approach for high order split form DG"
+- Hennemann, Rueda-Ramírez, Hindenlang, Gassner (2021)
+  "A provably entropy stable subcell shock capturing approach for high order split form DG
+  for the compressible Euler equations"
   [arXiv: 2008.12044](https://arxiv.org/abs/2008.12044)
+  [DOI: 10.1016/j.jcp.2020.109935](https://doi.org/10.1016/j.jcp.2020.109935)
 """
 struct IndicatorHennemannGassner{RealT <: Real, Variable, Cache} <: AbstractIndicator
     alpha_max::RealT
@@ -58,7 +65,7 @@ function IndicatorHennemannGassner(equations::AbstractEquations, basis;
                                    alpha_smooth = true,
                                    variable)
     alpha_max, alpha_min = promote(alpha_max, alpha_min)
-    cache = create_cache(IndicatorHennemannGassner, equations, basis)
+    cache = create_cache_indicator(IndicatorHennemannGassner, equations, basis)
     return IndicatorHennemannGassner{typeof(alpha_max), typeof(variable),
                                      typeof(cache)}(alpha_max,
                                                     alpha_min,
@@ -74,7 +81,7 @@ function IndicatorHennemannGassner(semi::AbstractSemidiscretization;
                                    alpha_smooth = true,
                                    variable)
     alpha_max, alpha_min = promote(alpha_max, alpha_min)
-    cache = create_cache(IndicatorHennemannGassner, semi)
+    cache = create_cache_indicator(IndicatorHennemannGassner, semi)
     return IndicatorHennemannGassner{typeof(alpha_max), typeof(variable),
                                      typeof(cache)}(alpha_max,
                                                     alpha_min,
@@ -111,9 +118,14 @@ function (indicator_hg::IndicatorHennemannGassner)(u, mesh, equations, dg::DGSEM
                                                    kwargs...)
     @unpack alpha_smooth = indicator_hg
     @unpack alpha, alpha_tmp = indicator_hg.cache
-    # TODO: Taal refactor, when to `resize!` stuff changed possibly by AMR?
-    #       Shall we implement `resize!(semi::AbstractSemidiscretization, new_size)`
-    #       or just `resize!` whenever we call the relevant methods as we do now?
+    # The blending factors are resized lazily on every call instead of eagerly via
+    # `resize_cache_volume_integral!` since this indicator is also used by AMR
+    # controllers, i.e., outside of any tree of volume integrals. This is safe since
+    # the indicator is evaluated for all elements before the per-element loop of the
+    # volume integral, and `resize!` does nothing if the size does not change.
+    # In contrast, state written inside `volume_integral_kernel!` (e.g., `alpha` of
+    # `IndicatorEntropyCorrection`) must be sized eagerly, since resizing it in a
+    # threaded loop over the elements would be a data race.
     resize!(alpha, nelements(dg, cache))
     if alpha_smooth
         resize!(alpha_tmp, nelements(dg, cache))
@@ -125,6 +137,12 @@ function (indicator_hg::IndicatorHennemannGassner)(u, mesh, equations, dg::DGSEM
     threshold = 0.5f0 * 10^(convert(RealT, -1.8) * nnodes(dg)^convert(RealT, 0.25))
     o_0001 = convert(RealT, 0.0001)
     parameter_s = log((1 - o_0001) / o_0001)
+
+    # Explicit bounds check, which allows us to assume inbounds access below
+    @boundscheck begin
+        check_axes(u, mesh, equations, dg, cache)
+        check_axes_indicator_hennemann_gassner(indicator_hg, mesh, dg)
+    end
 
     @threaded for element in eachelement(dg, cache)
         # This is dispatched by mesh dimension.
@@ -138,9 +156,27 @@ function (indicator_hg::IndicatorHennemannGassner)(u, mesh, equations, dg::DGSEM
 
     if alpha_smooth
         apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache)
+        apply_smoothing_mpi!(mesh, alpha, alpha_tmp, indicator_hg.cache, dg, cache)
     end
 
     return alpha
+end
+
+function get_element_variables_volume_integral!(element_variables, u, mesh, equations,
+                                                volume_integral::VolumeIntegralAdaptive{<:IndicatorHennemannGassner},
+                                                dg, cache)
+    # call the indicator to get up-to-date values for IO
+    volume_integral.indicator(u, mesh, equations, dg, cache)
+    return get_element_variables_indicator!(element_variables,
+                                            volume_integral.indicator,
+                                            volume_integral)
+end
+
+function get_element_variables_indicator!(element_variables,
+                                          indicator::IndicatorHennemannGassner,
+                                          ::VolumeIntegralAdaptive)
+    element_variables[:indicator_volume_integral_adaptive] = indicator.cache.alpha
+    return nothing
 end
 
 """
@@ -162,7 +198,7 @@ and `basis` if this indicator should be used for shock capturing.
 
 - Löhner (1987)
   "An adaptive finite element scheme for transient problems in CFD"
-  [doi: 10.1016/0045-7825(87)90098-3](https://doi.org/10.1016/0045-7825(87)90098-3)
+  [DOI: 10.1016/0045-7825(87)90098-3](https://doi.org/10.1016/0045-7825(87)90098-3)
 - [https://flash.rochester.edu/site/flashcode/user_support/flash4_ug_4p62/node59.html#SECTION05163100000000000000](https://flash.rochester.edu/site/flashcode/user_support/flash4_ug_4p62/node59.html#SECTION05163100000000000000)
 """
 struct IndicatorLöhner{RealT <: Real, Variable, Cache} <: AbstractIndicator
@@ -174,7 +210,7 @@ end
 # this method is used when the indicator is constructed as for shock-capturing volume integrals
 function IndicatorLöhner(equations::AbstractEquations, basis;
                          f_wave = 0.2, variable)
-    cache = create_cache(IndicatorLöhner, equations, basis)
+    cache = create_cache_indicator(IndicatorLöhner, equations, basis)
     return IndicatorLöhner{typeof(f_wave), typeof(variable), typeof(cache)}(f_wave,
                                                                             variable,
                                                                             cache)
@@ -183,7 +219,7 @@ end
 # this method is used when the indicator is constructed as for AMR
 function IndicatorLöhner(semi::AbstractSemidiscretization;
                          f_wave = 0.2, variable)
-    cache = create_cache(IndicatorLöhner, semi)
+    cache = create_cache_indicator(IndicatorLöhner, semi)
     return IndicatorLöhner{typeof(f_wave), typeof(variable), typeof(cache)}(f_wave,
                                                                             variable,
                                                                             cache)
@@ -234,6 +270,10 @@ end
 A simple indicator returning the maximum of `variable` in an element.
 When constructed to be used for AMR, pass the `semi`. Pass the `equations`,
 and `basis` if this indicator should be used for shock capturing.
+
+If an AMR indicator depending not only on a solution variable but also the
+space and time is desired, consider using [`IndicatorNodalFunction`](@ref)
+instead.
 """
 struct IndicatorMax{Variable, Cache <: NamedTuple} <: AbstractIndicator
     variable::Variable
@@ -243,14 +283,14 @@ end
 # this method is used when the indicator is constructed as for shock-capturing volume integrals
 function IndicatorMax(equations::AbstractEquations, basis;
                       variable)
-    cache = create_cache(IndicatorMax, equations, basis)
+    cache = create_cache_indicator(IndicatorMax, equations, basis)
     return IndicatorMax{typeof(variable), typeof(cache)}(variable, cache)
 end
 
 # this method is used when the indicator is constructed as for AMR
 function IndicatorMax(semi::AbstractSemidiscretization;
                       variable)
-    cache = create_cache(IndicatorMax, semi)
+    cache = create_cache_indicator(IndicatorMax, semi)
     return IndicatorMax{typeof(variable), typeof(cache)}(variable, cache)
 end
 
@@ -287,7 +327,7 @@ In particular, the indicator computes
 \int_{\Omega_m}
 \frac{\partial S}{\partial \boldsymbol{u}} \cdot \dot{\boldsymbol u}_\mathrm{VI}
 \mathrm{d} \Omega_m
-- 
+-
 \int_{\partial \Omega_m}
 \boldsymbol{\psi} \cdot \hat{\boldsymbol{n}}
 \mathrm{d} \partial \Omega_m
@@ -303,6 +343,7 @@ This is discussed in more detail in
   [DOI: 10.1016/j.jcp.2017.05.025](https://doi.org/10.1016/j.jcp.2017.05.025)
 - Lin, Chan (2024)
   "High order entropy stable discontinuous Galerkin spectral element methods through subcell limiting"
+  [arXiv: 2306.12663](https://arxiv.org/abs/2306.12663)
   [DOI: 10.1016/j.jcp.2023.112677](https://doi.org/10.1016/j.jcp.2023.112677)
 
 For ``\Delta S < \sigma \leq 0`` with ``\sigma`` being set to `maximum_entropy_increase`,
@@ -365,28 +406,28 @@ function Base.show(io::IO, ::MIME"text/plain", indicator::IndicatorEntropyChange
 end
 
 """
-    IndicatorEntropyCorrection(equations::AbstractEquations, basis; 
+    IndicatorEntropyCorrection(equations::AbstractEquations, basis;
                                scaling=true)
 
-Indicator used for entropy correction using subcell FV schemes, where the 
-blending is determined so that the volume integral entropy production is the 
-same or more than that of an entropy-conservative (EC) scheme. 
+Indicator used for entropy correction using subcell FV schemes, where the
+blending is determined so that the volume integral entropy production is the
+same or more than that of an entropy-conservative (EC) scheme.
 
-This is intended to guide the convex blending of a `volume_integral_default` 
-(for example, [`VolumeIntegralWeakForm`](@ref)) and `volume_integral_stabilized` 
-(for example, [`VolumeIntegralPureLGLFiniteVolume`](@ref) with an entropy stable 
-finite volume flux). 
+This is intended to guide the convex blending of a `volume_integral_default`
+(for example, [`VolumeIntegralWeakForm`](@ref)) and `volume_integral_stabilized`
+(for example, [`VolumeIntegralPureLGLFiniteVolume`](@ref) with an entropy stable
+finite volume flux).
 
-The parameter `scaling ≥ 1` in [`IndicatorEntropyCorrection`](@ref) scales the DG-FV blending 
+The parameter `scaling ≥ 1` in [`IndicatorEntropyCorrection`](@ref) scales the DG-FV blending
 parameter ``\\alpha``(see the [tutorial on shock-capturing](https://trixi-framework.github.io/TrixiDocumentation/stable/tutorials/shock_capturing/#Shock-capturing-with-flux-differencing))
 by a constant, increasing the amount of the subcell FV added in (up to 1, i.e., pure subcell FV).
-This can be used to add shock capturing-like behavior. Note though that ``\\alpha`` is computed 
+This can be used to add shock capturing-like behavior. Note though that ``\\alpha`` is computed
 here from the entropy defect, **not** using [`IndicatorHennemannGassner`](@ref).
 
 The use of `IndicatorEntropyCorrection` requires either
 `entropy_potential(u, orientation, equations)` for TreeMesh, or
 `entropy_potential(u, normal_direction, equations)` for other mesh types
-to be defined. 
+to be defined.
 
 """
 struct IndicatorEntropyCorrection{Cache, ScalingT} <: AbstractIndicator
@@ -398,15 +439,15 @@ end
 function IndicatorEntropyCorrection(equations::AbstractEquations,
                                     basis::LobattoLegendreBasis;
                                     scaling = true) # true = 1 in floating point multiplication
-    cache = create_cache(IndicatorEntropyCorrection, equations, basis)
+    cache = create_cache_indicator(IndicatorEntropyCorrection, equations, basis)
     return IndicatorEntropyCorrection{typeof(cache), typeof(scaling)}(cache, scaling)
 end
 
-# this method is used when the indicator is constructed as for 
+# this method is used when the indicator is constructed as for
 # shock-capturing volume integrals.
-function create_cache(::Type{IndicatorEntropyCorrection},
-                      equations::AbstractEquations{NDIMS, NVARS},
-                      basis::LobattoLegendreBasis) where {NDIMS, NVARS}
+function create_cache_indicator(::Type{IndicatorEntropyCorrection},
+                                equations::AbstractEquations{NDIMS, NVARS},
+                                basis::LobattoLegendreBasis) where {NDIMS, NVARS}
     uEltype = real(basis)
     AT = Array{uEltype, NDIMS + 1}
 
@@ -415,7 +456,7 @@ function create_cache(::Type{IndicatorEntropyCorrection},
                                             ntuple(_ -> nnodes(basis), NDIMS)...)
                                          for _ in 1:Threads.maxthreadid()]
 
-    # stores the blending coefficients 
+    # stores the blending coefficients
     alpha = Vector{uEltype}()
 
     return (; alpha, volume_integral_values_threaded)
@@ -434,23 +475,23 @@ function Base.show(io::IO, ::MIME"text/plain", indicator::IndicatorEntropyCorrec
 end
 
 """
-    IndicatorEntropyCorrectionShockCapturingCombined(; indicator_shock_capturing, 
+    IndicatorEntropyCorrectionShockCapturingCombined(; indicator_shock_capturing,
                                                        indicator_entropy_correction)
 
-Indicator used for entropy correction using subcell FV schemes, where the blending 
-is taken to be the maximum between a blending determined by shock capturing 
-(`indicator_shock_capturing`) and a blending determined so that the volume integral 
-entropy production is the same or more than that of an EC scheme (`indicator_entropy_correction`). 
+Indicator used for entropy correction using subcell FV schemes, where the blending
+is taken to be the maximum between a blending determined by shock capturing
+(`indicator_shock_capturing`) and a blending determined so that the volume integral
+entropy production is the same or more than that of an EC scheme (`indicator_entropy_correction`).
 
-This is intended to guide the convex blending of a `volume_integral_default` (for 
-example, [`VolumeIntegralWeakForm`](@ref)) and `volume_integral_stabilized` (for 
-example, [`VolumeIntegralPureLGLFiniteVolume`](@ref) with an entropy stable finite 
-volume flux). 
+This is intended to guide the convex blending of a `volume_integral_default` (for
+example, [`VolumeIntegralWeakForm`](@ref)) and `volume_integral_stabilized` (for
+example, [`VolumeIntegralPureLGLFiniteVolume`](@ref) with an entropy stable finite
+volume flux).
 
 The use of `IndicatorEntropyCorrectionShockCapturingCombined` requires either
 `entropy_potential(u, orientation, equations)` for TreeMesh, or
 `entropy_potential(u, normal_direction, equations)` for other mesh types
-to be defined. 
+to be defined.
 """
 struct IndicatorEntropyCorrectionShockCapturingCombined{IndicatorEC, IndicatorSC} <:
        AbstractIndicator
@@ -488,5 +529,56 @@ function Base.show(io::IO, ::MIME"text/plain",
         summary_box(io, "IndicatorEntropyCorrectionShockCapturingCombined", setup)
     end
     return nothing
+end
+
+"""
+    IndicatorNodalFunction(f)
+
+Create an AMR indicator from a solution, space and time dependent indicator function `f(u, x, t)`.
+The function `f` is evaluated at the nodal points. The maximum of `f` over all nodes in each element is used as indicator for the element.
+The function can be solution independent allowing for user-defined mesh refinement/coarsening varying in space and time, similar to the `refinement_patches` keyword for the [`TreeMesh`](@ref).
+
+If the function `f` depends only on the solution, you can also use the [`IndicatorMax`](@ref) instead.
+"""
+struct IndicatorNodalFunction{F, Cache} <: AbstractIndicator
+    indicator_function::F
+    cache::Cache
+end
+
+# this method is used when the indicator is constructed as for AMR
+function IndicatorNodalFunction(indicator_function, semi::AbstractSemidiscretization)
+    cache = create_cache_indicator(IndicatorNodalFunction, semi)
+    return IndicatorNodalFunction{typeof(indicator_function), typeof(cache)}(indicator_function,
+                                                                             cache)
+end
+
+# this method is directly used when the indicator is constructed as for shock-capturing volume integrals
+# and by the dimension-independent method called for AMR
+function create_cache_indicator(::Type{IndicatorNodalFunction},
+                                equations::AbstractEquations,
+                                basis::LobattoLegendreBasis)
+    uEltype = real(basis)
+    alpha = Vector{uEltype}()
+
+    return (; alpha)
+end
+
+function Base.show(io::IO, indicator::IndicatorNodalFunction)
+    @nospecialize indicator # reduce precompilation time
+    print(io, "IndicatorNodalFunction")
+    print(io, indicator.indicator_function)
+    return nothing
+end
+
+function Base.show(io::IO, ::MIME"text/plain", indicator::IndicatorNodalFunction)
+    @nospecialize indicator # reduce precompilation time
+    if get(io, :compact, false)
+        show(io, indicator)
+    else
+        setup = [
+            "Indicator Function" => indicator.indicator_function
+        ]
+        summary_box(io, "IndicatorNodalFunction", setup)
+    end
 end
 end # @muladd

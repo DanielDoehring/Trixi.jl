@@ -11,8 +11,8 @@
 The linear hyperbolic diffusion equations in one space dimension.
 A description of this system can be found in Sec. 2.5 of the book
 - Masatsuka (2013)
-  I Do Like CFD, Too: Vol 1.
-  Freely available at [http://www.cfdbooks.com/](http://www.cfdbooks.com/)
+  I do like CFD, VOL.1
+  Freely available at [ResearchGate](https://www.researchgate.net/publication/315378648_I_do_like_CFD_VOL1_Governing_Equations_and_Exact_Solutions)
 Further analysis can be found in the paper
 - Nishikawa (2007)
   A first-order system approach for diffusion equation. I: Second-order residual-distribution
@@ -29,6 +29,17 @@ end
 function HyperbolicDiffusionEquations1D(; nu = 1.0, Lr = inv(2pi))
     Tr = Lr^2 / nu
     return HyperbolicDiffusionEquations1D(promote(Lr, inv(Tr), nu)...)
+end
+
+# Together with our specialization of `Adapt.adapt_structure`,
+# this allows to move semidiscretizations and their components including
+# the equations to GPUs and adapt the floating point type, e.g.,
+# to `Float32` to improve performance on GPUs.
+function Base.similar(equations::HyperbolicDiffusionEquations1D,
+                      ::Type{NewRealT}) where {NewRealT}
+    return HyperbolicDiffusionEquations1D(convert(NewRealT, equations.Lr),
+                                          convert(NewRealT, equations.inv_Tr),
+                                          convert(NewRealT, equations.nu))
 end
 
 varnames(::typeof(cons2cons), ::HyperbolicDiffusionEquations1D) = ("phi", "q1")
@@ -132,9 +143,10 @@ end
     initial_condition_eoc_test_coupled_euler_gravity(x, t, equations::HyperbolicDiffusionEquations1D)
 
 Setup used for convergence tests of the Euler equations with self-gravity used in
-- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2020)
+- Michael Schlottke-Lakemper, Andrew R. Winters, Hendrik Ranocha, Gregor J. Gassner (2021)
   A purely hyperbolic discontinuous Galerkin approach for self-gravitating gas dynamics
   [arXiv: 2008.10593](https://arxiv.org/abs/2008.10593)
+  [DOI: 10.1016/j.jcp.2021.110467](https://doi.org/10.1016/j.jcp.2021.110467)
 in combination with [`source_terms_harmonic`](@ref).
 """
 function initial_condition_eoc_test_coupled_euler_gravity(x, t,
@@ -190,7 +202,7 @@ end
 # Convert conservative variables to primitive
 @inline cons2prim(u, equations::HyperbolicDiffusionEquations1D) = u
 
-# Convert conservative variables to entropy found in I Do Like CFD, Too, Vol. 1
+# Convert conservative variables to entropy found in "I do like CFD, VOL.1"
 @inline function cons2entropy(u, equations::HyperbolicDiffusionEquations1D)
     phi, q1 = u
 
@@ -218,7 +230,7 @@ Calculate total energy for a conservative state `u` as
 E = \frac{1}{2} \left( \phi^2 + L_r^2 \Vert \boldsymbol q \Vert_2^2 \right)
 """
 @inline function energy_total(u, equations::HyperbolicDiffusionEquations1D)
-    # energy function as found in equations (2.5.12) in the book "I Do Like CFD, Vol. 1"
+    # energy function as found in equations (2.5.12) in the book "I do like CFD, VOL.1"
     phi, q1 = u
     return 0.5f0 * (phi^2 + equations.Lr^2 * q1^2)
 end

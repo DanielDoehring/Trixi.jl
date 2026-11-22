@@ -31,7 +31,8 @@ using Trixi
 # Special value for which nonlinear solver can be omitted
 # Corresponds essentially to fixing the Mach number
 alpha = 0.5
-# We want kappa = cp * mu = mu_bar to ensure constant enthalpy
+# We want kappa = cp * mu_bar to ensure constant enthalpy
+# See footnote 1 on page 335 in Margolin et al.
 prandtl_number() = 3 / 4
 
 ### Free choices: ###
@@ -89,7 +90,8 @@ initial_condition = initial_condition_viscous_shock
 equations = CompressibleEulerEquations2D(gamma())
 
 # Trixi implements the stress tensor in deviatoric form, thus we need to
-# convert the "isotropic viscosity" to the "deviatoric viscosity"
+# convert the "isotropic/longitudinal viscosity" to the "deviatoric viscosity"
+# See again footnote 1 on page 335 in Margolin et al.
 mu_deviatoric() = mu_bar() * 3 / 4
 equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu_deviatoric(),
                                                           Prandtl = prandtl_number(),
@@ -102,8 +104,7 @@ coordinates_max = (domain_length / 2, domain_length / 2)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
-                periodicity = (false, true),
-                n_cells_max = 100_000)
+                periodicity = (false, true))
 
 ### Inviscid boundary conditions ###
 
@@ -153,7 +154,7 @@ boundary_conditions_parabolic = (x_neg = boundary_condition_parabolic,
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
                                              initial_condition, solver;
-                                             solver_parabolic = ViscousFormulationBassiRebay1(),
+                                             solver_parabolic = ParabolicFormulationBassiRebay1(),
                                              boundary_conditions = (boundary_conditions,
                                                                     boundary_conditions_parabolic))
 
@@ -171,12 +172,12 @@ alive_callback = AliveCallback(alive_interval = 10)
 analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-# Admissible stepsize is governed by the diffusive CFL condition.
-# Unless the advective cfl number `cfl` is not reduced to e.g. `0.1`
+# Admissible stepsize is governed by the parabolic CFL condition.
+# Unless the hyperbolic CFL number `cfl` is reduced to e.g. `0.1`
 # (which is overly restrictive for this problem),
-# the diffusive CFL restricts the timestep for this problem.
+# the parabolic CFL restricts the timestep for this problem.
 stepsize_callback = StepsizeCallback(cfl = 0.2,
-                                     cfl_diffusive = 0.2)
+                                     cfl_parabolic = 0.025)
 
 callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback,
                         stepsize_callback)
@@ -185,5 +186,7 @@ callbacks = CallbackSet(summary_callback, alive_callback, analysis_callback,
 # run the simulation
 
 # Use time integrator tailored to compressible Navier-Stokes
-sol = solve(ode, CKLLSRK95_4S(), adaptive = false, dt = 1.0,
+sol = solve(ode, CKLLSRK95_4S(thread = Trixi.Threaded()),
+            adaptive = false,
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
             save_everystep = false, callback = callbacks);

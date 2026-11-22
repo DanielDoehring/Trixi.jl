@@ -8,7 +8,9 @@
 @doc raw"""
     CompressibleEulerEquationsQuasi1D(gamma)
 
-The quasi-1d compressible Euler equations (see Chan et al.  [DOI: 10.48550/arXiv.2307.12089](https://doi.org/10.48550/arXiv.2307.12089)  for details)
+The quasi-1d compressible Euler equations (see Chan et al.
+[arXiv: 2307.12089](https://arxiv.org/abs/2307.12089),
+[DOI: 10.1016/j.jcp.2024.112876](https://doi.org/10.1016/j.jcp.2024.112876) for details)
 ```math
 \frac{\partial}{\partial t}
 \begin{pmatrix}
@@ -59,6 +61,15 @@ struct CompressibleEulerEquationsQuasi1D{RealT <: Real} <:
         γ, inv_gamma_minus_one = promote(gamma, inv(gamma - 1))
         return new{typeof(γ)}(γ, inv_gamma_minus_one)
     end
+end
+
+# Together with our specialization of `Adapt.adapt_structure`,
+# this allows to move semidiscretizations and their components including
+# the equations to GPUs and adapt the floating point type, e.g.,
+# to `Float32` to improve performance on GPUs.
+function Base.similar(equations::CompressibleEulerEquationsQuasi1D,
+                      ::Type{NewRealT}) where {NewRealT}
+    return CompressibleEulerEquationsQuasi1D(convert(NewRealT, equations.gamma))
 end
 
 have_nonconservative_terms(::CompressibleEulerEquationsQuasi1D) = True()
@@ -179,18 +190,17 @@ end
                                    equations::CompressibleEulerEquationsQuasi1D)
     flux_nonconservative_chan_etal(u_ll, u_rr, normal_direction,
                                    equations::CompressibleEulerEquationsQuasi1D)
-    flux_nonconservative_chan_etal(u_ll, u_rr, normal_ll, normal_rr,
-                                   equations::CompressibleEulerEquationsQuasi1D)
 
 Non-symmetric two-point volume flux discretizing the nonconservative (source) term
 that contains the gradient of the pressure  [`CompressibleEulerEquationsQuasi1D`](@ref)
 and the nozzle width.
 
 Further details are available in the paper:
-- Jesse Chan, Khemraj Shukla, Xinhui Wu, Ruofeng Liu, Prani Nalluri (2023)
+- Jesse Chan, Khemraj Shukla, Xinhui Wu, Ruofeng Liu, Prani Nalluri (2024)
   High order entropy stable schemes for the quasi-one-dimensional
   shallow water and compressible Euler equations
-  [DOI: 10.48550/arXiv.2307.12089](https://doi.org/10.48550/arXiv.2307.12089)
+  [arXiv: 2307.12089](https://arxiv.org/abs/2307.12089)
+  [DOI: 10.1016/j.jcp.2024.112876](https://doi.org/10.1016/j.jcp.2024.112876)
 """
 @inline function flux_nonconservative_chan_etal(u_ll, u_rr, orientation::Integer,
                                                 equations::CompressibleEulerEquationsQuasi1D)
@@ -218,14 +228,6 @@ end
            flux_nonconservative_chan_etal(u_ll, u_rr, 1, equations)
 end
 
-@inline function flux_nonconservative_chan_etal(u_ll, u_rr,
-                                                normal_ll::AbstractVector,
-                                                normal_rr::AbstractVector,
-                                                equations::CompressibleEulerEquationsQuasi1D)
-    # normal_ll should be equal to normal_rr in 1D
-    return flux_nonconservative_chan_etal(u_ll, u_rr, normal_ll, equations)
-end
-
 """
 @inline function flux_chan_etal(u_ll, u_rr, orientation::Integer,
                                            equations::CompressibleEulerEquationsQuasi1D)
@@ -233,10 +235,11 @@ end
 Conservative (symmetric) part of the entropy conservative flux for quasi 1D compressible Euler equations split form.
 This flux is a generalization of [`flux_ranocha`](@ref) for [`CompressibleEulerEquations1D`](@ref).
 Further details are available in the paper:
-- Jesse Chan, Khemraj Shukla, Xinhui Wu, Ruofeng Liu, Prani Nalluri (2023)
+- Jesse Chan, Khemraj Shukla, Xinhui Wu, Ruofeng Liu, Prani Nalluri (2024)
   High order entropy stable schemes for the quasi-one-dimensional
   shallow water and compressible Euler equations
-  [DOI: 10.48550/arXiv.2307.12089](https://doi.org/10.48550/arXiv.2307.12089)
+  [arXiv: 2307.12089](https://arxiv.org/abs/2307.12089)
+  [DOI: 10.1016/j.jcp.2024.112876](https://doi.org/10.1016/j.jcp.2024.112876)
 """
 @inline function flux_chan_etal(u_ll, u_rr, orientation::Integer,
                                 equations::CompressibleEulerEquationsQuasi1D)

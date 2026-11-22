@@ -48,6 +48,16 @@ struct PolytropicEulerEquations2D{RealT <: Real} <:
     end
 end
 
+# Together with our specialization of `Adapt.adapt_structure`,
+# this allows to move semidiscretizations and their components including
+# the equations to GPUs and adapt the floating point type, e.g.,
+# to `Float32` to improve performance on GPUs.
+function Base.similar(equations::PolytropicEulerEquations2D,
+                      ::Type{NewRealT}) where {NewRealT}
+    return PolytropicEulerEquations2D(convert(NewRealT, equations.gamma),
+                                      convert(NewRealT, equations.kappa))
+end
+
 function varnames(::typeof(cons2cons), ::PolytropicEulerEquations2D)
     return ("rho", "rho_v1", "rho_v2")
 end
@@ -106,12 +116,15 @@ end
     initial_condition_weak_blast_wave(x, t, equations::PolytropicEulerEquations2D)
 
 A weak blast wave adapted from
-- Sebastian Hennemann, Gregor J. Gassner (2020)
+- Sebastian Hennemann, Andrés M. Rueda-Ramírez, Florian J. Hindenlang,
+  Gregor J. Gassner (2021)
   A provably entropy stable subcell shock capturing approach for high order split form DG
+  for the compressible Euler equations
   [arXiv: 2008.12044](https://arxiv.org/abs/2008.12044)
+  [DOI: 10.1016/j.jcp.2020.109935](https://doi.org/10.1016/j.jcp.2020.109935)
 """
 function initial_condition_weak_blast_wave(x, t, equations::PolytropicEulerEquations2D)
-    # Adapted MHD version of the weak blast wave from Hennemann & Gassner JCP paper 2020 (Sec. 6.3)
+    # Adapted MHD version of the weak blast wave from Hennemann et al. JCP paper 2021 (Sec. 6.3)
     # Set up polar coordinates
     inicenter = (0, 0)
     x_norm = x[1] - inicenter[1]
@@ -176,6 +189,7 @@ For details see Section 3.2 of the following reference
 - Andrew R. Winters, Christof Czernik, Moritz B. Schily & Gregor J. Gassner (2020)
   Entropy stable numerical approximations for the isothermal and polytropic
   Euler equations
+  [arXiv: 1907.03287](https://arxiv.org/abs/1907.03287)
   [DOI: 10.1007/s10543-019-00789-w](https://doi.org/10.1007/s10543-019-00789-w)
 """
 @inline function flux_winters_etal(u_ll, u_rr, normal_direction::AbstractVector,

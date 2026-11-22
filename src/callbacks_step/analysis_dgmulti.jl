@@ -10,7 +10,7 @@ function calc_error_norms(func, u, t, analyzer,
                           dg::DGMulti{NDIMS}, cache, cache_analysis) where {NDIMS}
     rd = dg.basis
     md = mesh.md
-    @unpack u_values = cache
+    (; u_values) = cache.solution_container
 
     # interpolate u to quadrature points
     apply_to_each_field(mul_by!(rd.Vq), u_values, u)
@@ -31,7 +31,7 @@ function integrate(func::Func, u, mesh::DGMultiMesh,
                    equations, dg::DGMulti, cache; normalize = true) where {Func}
     rd = dg.basis
     md = mesh.md
-    @unpack u_values = cache
+    (; u_values) = cache.solution_container
 
     # interpolate u to quadrature points
     apply_to_each_field(mul_by!(rd.Vq), u_values, u)
@@ -47,7 +47,7 @@ function analyze(::typeof(entropy_timederivative), du, u, t,
                  mesh::DGMultiMesh, equations, dg::DGMulti, cache)
     rd = dg.basis
     md = mesh.md
-    @unpack u_values = cache
+    (; u_values) = cache.solution_container
 
     # interpolate u, du to quadrature points
     du_values = similar(u_values) # Todo: DGMulti. Can we move this to the analysis cache somehow?
@@ -76,10 +76,11 @@ function compute_local_divergence!(local_divergence, element, vector_field,
 
     # computes dU_i/dx_i = ∑_j dxhat_j/dx_i * dU_i / dxhat_j
     # dU_i/dx_i is then accumulated into local_divergence.
+    # `md.rstxyzJ` contains the metric terms scaled by the Jacobian `md.J`.
     # TODO: DGMulti. Extend to curved elements.
     for i in eachdim(mesh)
         for j in eachdim(mesh)
-            geometric_scaling = md.rstxyzJ[i, j][1, element]
+            geometric_scaling = md.rstxyzJ[i, j][1, element] / md.J[1, element]
             jth_ref_derivative_matrix = rd.Drst[j]
             mul!(local_divergence, jth_ref_derivative_matrix, vector_field[i],
                  geometric_scaling, one(uEltype))
@@ -101,8 +102,9 @@ function analyze(::Val{:l2_divb}, du, u, t,
 
     uEltype = eltype(B1)
     l2norm_divB = zero(uEltype)
-    local_divB = zeros(uEltype, size(B1, 1))
-    for e in eachelement(mesh, dg, cache)
+    local_divB_threaded = [zeros(uEltype, size(B1, 1)) for _ in 1:Threads.maxthreadid()]
+    @batch reduction=(+, l2norm_divB) for e in eachelement(mesh, dg, cache)
+        local_divB = local_divB_threaded[Threads.threadid()]
         compute_local_divergence!(local_divB, e, view.(B, :, e), mesh, dg, cache)
 
         # TODO: DGMulti. Extend to curved elements.
@@ -111,7 +113,9 @@ function analyze(::Val{:l2_divb}, du, u, t,
         l2norm_divB += local_l2norm_divB
     end
 
-    return sqrt(l2norm_divB)
+    # normalize with the total volume as for the other L2 norms
+    total_volume = sum(md.wJq)
+    return sqrt(l2norm_divB / total_volume)
 end
 
 function analyze(::Val{:linf_divb}, du, u, t,
@@ -123,8 +127,9 @@ function analyze(::Val{:linf_divb}, du, u, t,
 
     uEltype = eltype(B1)
     linf_divB = zero(uEltype)
-    local_divB = zeros(uEltype, size(B1, 1))
-    @batch reduction=(max, linf_divb) for e in eachelement(mesh, dg, cache)
+    local_divB_threaded = [zeros(uEltype, size(B1, 1)) for _ in 1:Threads.maxthreadid()]
+    @batch reduction=(max, linf_divB) for e in eachelement(mesh, dg, cache)
+        local_divB = local_divB_threaded[Threads.threadid()]
         compute_local_divergence!(local_divB, e, view.(B, :, e), mesh, dg, cache)
 
         # compute maximum norm
@@ -135,10 +140,11 @@ function analyze(::Val{:linf_divb}, du, u, t,
 end
 
 # Calculate ∫_e (∂S/∂u ⋅ ∂u/∂t) dΩ_e where the result on element 'e' is kept in reference space
-# Note that ∂S/∂u = w(u) with entropy variables w
+# Note that ∂S/∂u = w(u) with entropy variables w.
+# This assumes that both du and u are already interpolated to the quadrature points
 function entropy_change_reference_element(du_values_local, u_values_local,
                                           mesh::DGMultiMesh, equations,
-                                          dg::DGMultiFluxDiff, cache)
+                                          dg::DGMulti, cache)
     rd = dg.basis
     @unpack Nq, wq = rd
 
@@ -154,8 +160,10 @@ end
 
 # calculate surface integral of func(u, normal_direction, equations) on the reference element.
 # For DGMulti, we loop over all faces of the element and integrate using face quadrature weights.
+# Restricted to `Polynomial` approximation type which requires interpolation to face quadrature nodes
 function surface_integral_reference_element(func::Func, u, element,
-                                            mesh::DGMultiMesh, equations, dg::DGMulti,
+                                            mesh::DGMultiMesh, equations,
+                                            dg::DGMulti,
                                             cache, args...) where {Func}
     rd = dg.basis
     @unpack Nfq, wf, Vf = rd
@@ -171,14 +179,11 @@ function surface_integral_reference_element(func::Func, u, element,
     surface_integral = zero(eltype(first(u)))
     # Loop over all face nodes for this element
     for i in 1:Nfq
-        # Get global face node index (across all elements' face nodes)
-        face_node_global = i + (element - 1) * Nfq
-
         # Get solution at this face node
         u_node = u_face_local[i]
 
         # Get face normal; nxyzJ stores components as (nxJ, nyJ, nxJ)
-        normal_direction = SVector(getindex.(nxyzJ, face_node_global))
+        normal_direction = SVector(getindex.(nxyzJ, i, element))
 
         # Multiply with face quadrature weight and accumulate
         surface_integral += wf[i] * func(u_node, normal_direction, equations)

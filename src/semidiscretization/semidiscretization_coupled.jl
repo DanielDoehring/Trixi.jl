@@ -10,7 +10,7 @@
 
 A struct used to bundle multiple semidiscretizations.
 [`semidiscretize`](@ref) will return an `ODEProblem` that synchronizes time steps between the semidiscretizations.
-Each call of `rhs!` will call `rhs!` for each semidiscretization individually.
+Each call of `rhs_hyperbolic!` will call `rhs_hyperbolic!` for each semidiscretization individually.
 The semidiscretizations can be coupled by gluing meshes together using [`BoundaryConditionCoupled`](@ref).
 
 !!! warning "Experimental code"
@@ -175,7 +175,7 @@ end
     return foreach_enumerate(func, remaining_collection, index + 1)
 end
 
-function rhs!(du_ode, u_ode, semi::SemidiscretizationCoupled, t)
+function rhs_hyperbolic!(du_ode, u_ode, semi::SemidiscretizationCoupled, t)
     @unpack u_indices = semi
 
     time_start = time_ns()
@@ -187,11 +187,11 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationCoupled, t)
         end
     end
 
-    # Call rhs! for each semidiscretization
+    # Call rhs_hyperbolic! for each semidiscretization
     foreach_enumerate(semi.semis) do (i, semi_)
         u_loc = get_system_u_ode(u_ode, i, semi)
         du_loc = get_system_u_ode(du_ode, i, semi)
-        return rhs!(du_loc, u_loc, semi_, t)
+        return rhs_hyperbolic!(du_loc, u_loc, semi_, t)
     end
 
     runtime = time_ns() - time_start
@@ -357,11 +357,12 @@ end
 ### StepsizeCallback
 ################################################################################
 # In case of coupled system, use minimum timestep over all systems
-function calculate_dt(u_ode, t, cfl_advective, cfl_diffusive,
+function calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic,
                       semi::SemidiscretizationCoupled)
     dt = minimum(eachsystem(semi)) do i
         u_ode_slice = get_system_u_ode(u_ode, i, semi)
-        return calculate_dt(u_ode_slice, t, cfl_advective, cfl_diffusive, semi.semis[i])
+        return calculate_dt(u_ode_slice, t, cfl_hyperbolic, cfl_parabolic,
+                            semi.semis[i])
     end
 
     return dt
@@ -420,7 +421,8 @@ This is currently only implemented for [`StructuredMesh`](@ref).
 - `other_semi_index`: the index in `SemidiscretizationCoupled` of the semidiscretization
                       from which the values are copied
 - `indices::Tuple`: node/cell indices at the boundary of the mesh in the other
-                    semidiscretization. See examples below.
+                    semidiscretization given as [`NodeIndex`](@ref) values.
+                    See examples below.
 - `uEltype::Type`: element type of solution
 - `coupling_converter::CouplingConverter`: function to call for converting the solution
                                            state of one system to the other system
@@ -429,13 +431,10 @@ This is currently only implemented for [`StructuredMesh`](@ref).
 ```julia
 # Connect the left boundary of mesh 2 to our boundary such that our positive
 # boundary direction will match the positive y direction of the other boundary
-BoundaryConditionCoupled(2, (:begin, :i), Float64, fun)
+BoundaryConditionCoupled(2, (NodeIndex.Begin, NodeIndex.IForward), Float64, fun)
 
 # Connect the same two boundaries oppositely oriented
-BoundaryConditionCoupled(2, (:begin, :i_backwards), Float64, fun)
-
-# Using this as y_neg boundary will connect `our_cells[i, 1, j]` to `other_cells[j, end-i, end]`
-BoundaryConditionCoupled(2, (:j, :i_backwards, :end), Float64, fun)
+BoundaryConditionCoupled(2, (NodeIndex.Begin, NodeIndex.IBackward), Float64, fun)
 ```
 
 !!! warning "Experimental code"
@@ -455,16 +454,17 @@ mutable struct BoundaryConditionCoupled{NDIMS,
     const indices            :: Indices
     const coupling_converter :: CouplingConverter
 
-    function BoundaryConditionCoupled(other_semi_index, indices, uEltype,
+    function BoundaryConditionCoupled(other_semi_index,
+                                      indices::Tuple{Vararg{NodeIndex.T}}, uEltype,
                                       coupling_converter)
         NDIMS = length(indices)
         u_boundary = Array{uEltype, NDIMS * 2 - 1}(undef, ntuple(_ -> 0, NDIMS * 2 - 1))
 
-        if indices[1] in (:begin, :end)
+        if indices[1] in (NodeIndex.Begin, NodeIndex.End)
             other_orientation = 1
-        elseif indices[2] in (:begin, :end)
+        elseif indices[2] in (NodeIndex.Begin, NodeIndex.End)
             other_orientation = 2
-        else # indices[3] in (:begin, :end)
+        else # indices[3] in (NodeIndex.Begin, NodeIndex.End)
             other_orientation = 3
         end
 
@@ -593,11 +593,7 @@ function copy_to_coupled_boundary!(boundary_condition::BoundaryConditionCoupled{
 
     linear_indices = LinearIndices(size(mesh_other))
 
-    if other_orientation == 1
-        cells = axes(mesh_other, 2)
-    else # other_orientation == 2
-        cells = axes(mesh_other, 1)
-    end
+    cells = other_orientation == 1 ? axes(mesh_other, 2) : axes(mesh_other, 1)
 
     # Copy solution data to the coupled boundary using "delayed indexing" with
     # a start value and a step size to get the correct face and orientation.
@@ -646,7 +642,7 @@ end
 ### DGSEM/structured
 ################################################################################
 
-@inline function calc_boundary_flux_by_direction!(surface_flux_values, u, t,
+@inline function calc_boundary_flux_by_direction!(surface_flux_values, t,
                                                   orientation,
                                                   boundary_condition::BoundaryConditionCoupled,
                                                   mesh::Union{StructuredMesh,
@@ -656,12 +652,15 @@ end
                                                   surface_integral, dg::DG, cache,
                                                   direction, node_indices,
                                                   surface_node_indices, element)
-    @unpack node_coordinates, contravariant_vectors, inverse_jacobian = cache.elements
+    @unpack node_coordinates, contravariant_vectors, inverse_jacobian, interfaces_u = cache.elements
+    # Boundary values are for `StructuredMesh` stored in the interface datastructure
+    boundaries_u = interfaces_u
     @unpack surface_flux = surface_integral
 
     cell_indices = get_boundary_indices(element, orientation, mesh)
 
-    u_inner = get_node_vars(u, equations, dg, node_indices..., element)
+    u_inner = get_node_vars(boundaries_u, equations, dg, surface_node_indices...,
+                            direction, element)
 
     # If the mapping is orientation-reversing, the contravariant vectors' orientation
     # is reversed as well. The normal vector must be oriented in the direction
@@ -686,7 +685,7 @@ end
     return nothing
 end
 
-@inline function calc_boundary_flux_by_direction!(surface_flux_values, u, t,
+@inline function calc_boundary_flux_by_direction!(surface_flux_values, t,
                                                   orientation,
                                                   boundary_condition::BoundaryConditionCoupled,
                                                   mesh::Union{StructuredMesh,
@@ -696,12 +695,15 @@ end
                                                   surface_integral, dg::DG, cache,
                                                   direction, node_indices,
                                                   surface_node_indices, element)
-    @unpack node_coordinates, contravariant_vectors, inverse_jacobian = cache.elements
+    @unpack node_coordinates, contravariant_vectors, inverse_jacobian, interfaces_u = cache.elements
+    # Boundary values are for `StructuredMesh` stored in the interface datastructure
+    boundaries_u = interfaces_u
     @unpack surface_flux = surface_integral
 
     cell_indices = get_boundary_indices(element, orientation, mesh)
 
-    u_inner = get_node_vars(u, equations, dg, node_indices..., element)
+    u_inner = get_node_vars(boundaries_u, equations, dg, surface_node_indices...,
+                            direction, element)
 
     # If the mapping is orientation-reversing, the contravariant vectors' orientation
     # is reversed as well. The normal vector must be oriented in the direction

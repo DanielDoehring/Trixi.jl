@@ -17,8 +17,8 @@ volume_integral = VolumeIntegralAdaptive(volume_integral_default = volume_integr
                                          indicator = indicator)
 
 dg = DGMulti(polydeg = 3,
-             element_type = Tri(), # `Tri()` makes flux differencing really(!) expensive
-             approximation_type = Polynomial(),
+             # `Tri()` and `Polynomial()` make flux differencing really(!) expensive
+             element_type = Tri(), approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(flux_hllc),
              volume_integral = volume_integral)
 
@@ -32,6 +32,7 @@ A version of the classical Kelvin-Helmholtz instability based on
   A Subcell Finite Volume Positivity-Preserving Limiter for DGSEM Discretizations
   of the Euler Equations
   [arXiv: 2102.06017](https://arxiv.org/abs/2102.06017)
+  [DOI: 10.23967/wccm-eccomas.2020.038](https://doi.org/10.23967/wccm-eccomas.2020.038)
 """
 function initial_condition_kelvin_helmholtz_instability(x, t,
                                                         equations::CompressibleEulerEquations2D)
@@ -55,9 +56,6 @@ mesh = DGMultiMesh(dg, cells_per_dimension; periodicity = true)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg;
                                     boundary_conditions = boundary_condition_periodic)
 
-tspan = (0.0, 3.0) # WF still stable until this time
-#tspan = (0.0, 3.4) # FD still stable until this time
-#tspan = (0.0, 4.3) # stable time for entropy-diffusive adaptive volume integral
 tspan = (0.0, 4.6) # stable time for limited entropy-increase adaptive volume integral
 
 ode = semidiscretize(semi, tspan)
@@ -68,7 +66,7 @@ alive_callback = AliveCallback(alive_interval = 50)
 stepsize_callback = StepsizeCallback(cfl = 1.0)
 
 analysis_interval = 10
-analysis_callback = AnalysisCallback(semi, interval = analysis_interval, uEltype = real(dg),
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = true,
                                      analysis_errors = Symbol[],
                                      extra_analysis_integrals = (entropy,))
@@ -85,5 +83,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
-            dt = 1.0, ode_default_options()..., callback = callbacks);
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
+            dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+            ode_default_options()..., callback = callbacks);
