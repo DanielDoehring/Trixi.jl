@@ -95,15 +95,13 @@ initial_condition = initial_condition_navier_stokes_convergence_test
 end
 
 volume_flux = flux_ranocha
-solver = DGSEM(polydeg = 3, 
-               #surface_flux = flux_hllc,
-               surface_flux = Trixi.flux_ausmplusup,
+solver = DGSEM(polydeg = 3, surface_flux = flux_hllc,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 coordinates_min = -1.0
 coordinates_max = 1.0
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 3,
+                initial_refinement_level = 4,
                 periodicity = true)
 
 semi = SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),

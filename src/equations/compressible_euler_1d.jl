@@ -928,15 +928,18 @@ Signal speeds: [DOI: 10.1137/S1064827593260140](https://doi.org/10.1137/S1064827
     return SVector(f1, f2, f3)
 end
 
-# TODO: Entry point AUSM+
+# AUSM+ flux. Equation numbers refer to
+# - Meng-Sing Liou (1996)
+#   A Sequel to AUSM: AUSM+
+#   [DOI: 10.1006/jcph.1996.0256](https://doi.org/10.1006/jcph.1996.0256)
 
-# eq. (19b)
-@inline function split_mach_beta_plus(mach, beta = 1/8)
+# Polynomial split Mach numbers M^±_(4) for |M| < 1, eq. (19b), with β = 1/8
+@inline function split_mach_beta_plus(mach, beta = 0.125f0)
     # Note: In the original paper there is a typo (0.5 instead of 0.25)
     return 0.25f0 * (mach + 1)^2 + beta * (mach^2 - 1)^2
 end
 # eq. (19a)
-@inline function split_mach_plus(mach, beta = 1/8)
+@inline function split_mach_plus(mach, beta = 0.125f0)
     mach_abs = abs(mach)
     if mach_abs >= 1
         return 0.5f0 * (mach + mach_abs)
@@ -946,12 +949,12 @@ end
 end
 
 # eq. (19b)
-@inline function split_mach_beta_minus(mach, beta = 1/8)
+@inline function split_mach_beta_minus(mach, beta = 0.125f0)
     # Note: In the original paper there is a typo (0.5 instead of 0.25)
     return -0.25f0 * (mach - 1)^2 - beta * (mach^2 - 1)^2
 end
 # eq. (19a)
-@inline function split_mach_minus(mach, beta = 1/8)
+@inline function split_mach_minus(mach, beta = 0.125f0)
     mach_abs = abs(mach)
     if mach_abs >= 1
         return 0.5f0 * (mach - mach_abs)
@@ -960,23 +963,24 @@ end
     end
 end
 
-@inline function split_pressure_alpha_plus(mach, alpha = 3/16)
-    return 0.25 * (mach + 1)^2 * (2 - mach) + alpha * mach * (mach^2 - 1)^2
+# Polynomial split pressure functions P^±_(5) for |M| < 1, with α = 3/16 in AUSM+
+@inline function split_pressure_alpha_plus(mach, alpha = 0.1875f0)
+    return 0.25f0 * (mach + 1)^2 * (2 - mach) + alpha * mach * (mach^2 - 1)^2
 end
-@inline function split_pressure_plus(mach, alpha = 3/16)
+@inline function split_pressure_plus(mach, alpha = 0.1875f0)
     if abs(mach) >= 1
-        return 0.5 * (1 + sign(mach))
+        return 0.5f0 * (1 + sign(mach))
     else
         return split_pressure_alpha_plus(mach, alpha)
     end
 end
 
-@inline function split_pressure_alpha_minus(mach, alpha = 3/16)
-    return 0.25 * (mach - 1)^2 * (2 + mach) - alpha * mach * (mach^2 - 1)^2
+@inline function split_pressure_alpha_minus(mach, alpha = 0.1875f0)
+    return 0.25f0 * (mach - 1)^2 * (2 + mach) - alpha * mach * (mach^2 - 1)^2
 end
-@inline function split_pressure_minus(mach, alpha = 3/16)
+@inline function split_pressure_minus(mach, alpha = 0.1875f0)
     if abs(mach) >= 1
-        return 0.5 * (1 - sign(mach))
+        return 0.5f0 * (1 - sign(mach))
     else
         return split_pressure_alpha_minus(mach, alpha)
     end
@@ -995,99 +999,67 @@ end
 
 # eq. (40)
 @inline function a_tilde(a_star, u_mag)
-    return a_star * a_star/max(a_star, u_mag)
+    return a_star * a_star / max(a_star, u_mag)
 end
 
-function flux_ausmplus(u_ll, u_rr, orientation::Integer,
-                       equations::CompressibleEulerEquations1D)
+# Interface speed of sound a_{1/2} of AUSM+, eq. (40), using |u_L| and |u_R|
+@inline function a_interface_ausm(rho_ll, v1_ll, p_ll, rho_rr, v1_rr, p_rr,
+                                  equations::CompressibleEulerEquations1D)
+    a_tilde_ll = a_tilde(a_star(rho_ll, v1_ll, p_ll, equations), abs(v1_ll))
+    a_tilde_rr = a_tilde(a_star(rho_rr, v1_rr, p_rr, equations), abs(v1_rr))
+    return min(a_tilde_ll, a_tilde_rr)
+end
+
+# Assemble the AUSM+ flux from the interface Mach number `mach_interface` (m_{1/2})
+# and pressure `p_interface` (p_{1/2}), eq. (A3).
+# Splitting m_{1/2} into m^± is equivalent to upwinding the mass flux
+# a_{1/2} m_{1/2} ρ_{L/R}.
+@inline function flux_ausm_assemble(u_ll, u_rr, p_ll, p_rr, a_interface,
+                                    mach_interface, p_interface)
+    mach_interface_abs = abs(mach_interface)
+    mach_interface_plus = 0.5f0 * (mach_interface + mach_interface_abs) # m_{1/2}^+
+    mach_interface_minus = 0.5f0 * (mach_interface - mach_interface_abs) # m_{1/2}^-
+
+    # Convective quantities Φ = (ρ, ρ v, ρ H) with ρ H = ρ e + p
+    phi_ll = SVector(u_ll[1], u_ll[2], u_ll[3] + p_ll)
+    phi_rr = SVector(u_rr[1], u_rr[2], u_rr[3] + p_rr)
+
+    return (a_interface * (mach_interface_plus * phi_ll + mach_interface_minus * phi_rr) +
+            SVector(zero(p_interface), p_interface, zero(p_interface)))
+end
+
+"""
+    flux_ausmplus(u_ll, u_rr, orientation::Integer,
+                  equations::CompressibleEulerEquations1D)
+
+Advection upstream splitting method AUSM+, which splits the flux into a convective part,
+upwinded with an interface Mach number, and a pressure part.
+This flux is not symmetric and can thus only be used as surface flux or in a finite volume
+setting, not as volume flux in flux differencing.
+
+References:
+- Meng-Sing Liou (1996)
+  A Sequel to AUSM: AUSM+
+  [DOI: 10.1006/jcph.1996.0256](https://doi.org/10.1006/jcph.1996.0256)
+"""
+@inline function flux_ausmplus(u_ll, u_rr, orientation::Integer,
+                               equations::CompressibleEulerEquations1D)
     rho_ll, v1_ll, p_ll = cons2prim(u_ll, equations)
     rho_rr, v1_rr, p_rr = cons2prim(u_rr, equations)
 
-    a_star_ll = a_star(rho_ll, v1_ll, p_ll, equations)
-    v1_ll_mag = abs(v1_ll)
-    a_tilde_ll = a_tilde(a_star_ll, v1_ll_mag)
-
-    a_star_rr = a_star(rho_rr, v1_rr, p_rr, equations)
-    v1_rr_mag = abs(v1_rr)
-    a_tilde_rr = a_tilde(a_star_rr, v1_rr_mag)
-
-    a_interface = min(a_tilde_ll, a_tilde_rr) # eq. (40)
+    a_interface = a_interface_ausm(rho_ll, v1_ll, p_ll, rho_rr, v1_rr, p_rr, equations)
 
     # (A1)
     mach_ll = v1_ll / a_interface # M_j
     mach_rr = v1_rr / a_interface # M_{j + 1}
 
     # (A2)
-    mach_split_interface = split_mach_plus(mach_ll) + split_mach_minus(mach_rr) # m_{j + 1/2}
-    mach_split_interface_abs = abs(mach_split_interface) # | m_{j + 1/2} |
+    mach_interface = split_mach_plus(mach_ll) + split_mach_minus(mach_rr) # m_{j + 1/2}
+    p_interface = (split_pressure_plus(mach_ll) * p_ll +
+                   split_pressure_minus(mach_rr) * p_rr) # p_{j + 1/2}
 
-    # (A2)
-    mach_split_interface_plus = 0.5 * (mach_split_interface + mach_split_interface_abs) # m_{j + 1/2}^+
-    mach_split_interface_minus = 0.5 * (mach_split_interface - mach_split_interface_abs) # m_{j + 1/2}^-
-
-    # (A2)
-    p_interface = split_pressure_plus(mach_ll) * p_ll + split_pressure_minus(mach_rr) * p_rr # p_{j + 1/2}
-
-    # (A3)
-    total_enthalpy_ll = u_ll[3] + p_ll
-    total_enthalpy_rr = u_rr[3] + p_rr
-
-    flux_ll_scaled = mach_split_interface_plus * SVector(u_ll[1], u_ll[2], total_enthalpy_ll)
-    flux_rr_scaled = mach_split_interface_minus * SVector(u_rr[1], u_rr[2], total_enthalpy_rr)
-
-    # (A3)
-    return a_interface * (flux_ll_scaled + flux_rr_scaled) + SVector(0, p_interface, 0)
-end
-
-function flux_ausmplusup(u_ll, u_rr, orientation::Integer,
-                         equations::CompressibleEulerEquations1D,
-                         K_u = 0.75) # TODO: somewhow possible to make this a true parameter?
-    rho_ll, v1_ll, p_ll = cons2prim(u_ll, equations)
-    rho_rr, v1_rr, p_rr = cons2prim(u_rr, equations)
-
-    a_star_ll = a_star(rho_ll, v1_ll, p_ll, equations)
-    v1_ll_mag = abs(v1_ll)
-    a_tilde_ll = a_tilde(a_star_ll, v1_ll_mag)
-
-    a_star_rr = a_star(rho_rr, v1_rr, p_rr, equations)
-    v1_rr_mag = abs(v1_rr)
-    a_tilde_rr = a_tilde(a_star_rr, v1_rr_mag) # TODO: Check (30): Introduce -sign for _rr?
-
-    a_interface = min(a_tilde_ll, a_tilde_rr)
-
-    mach_ll = v1_ll / a_interface # M_j
-    mach_rr = v1_rr / a_interface # M_{j + 1}
-
-    # (A2)
-    mach_split_interface = split_mach_plus(mach_ll) + split_mach_minus(mach_rr) # m_{j + 1/2}
-    mach_split_interface_abs = abs(mach_split_interface) # | m_{j + 1/2} |
-
-    # (A2)
-    mach_split_interface_plus = 0.5 * (mach_split_interface + mach_split_interface_abs) # m_{j + 1/2}^+
-    mach_split_interface_minus = 0.5 * (mach_split_interface - mach_split_interface_abs) # m_{j + 1/2}^-
-
-    # (A2): Standard AUSM+ pressure split
-    p_plus = split_pressure_plus(mach_ll) # \mathcal{P}^+
-    p_minus = split_pressure_minus(mach_ll) # \mathcal{P}^-
-    p_interface = p_plus * p_ll + p_minus * p_rr # p_{j + 1/2}
-
-    # AUSM+-up Low-Mach Correction
-    rho_interface = 0.5 * (rho_ll + rho_rr)
-    # TODO: If one follows eq. (28), this would be `a_interface`
-    a_star_interface = 0.5 * (a_star_ll + a_star_rr)
-    
-    # Pressure-velocity coupling correction (this is the "up" in AUSM+-up)
-    # TODO: Check with eq. (75). Questions: minus sign, rho_L + rho_R not divided by 2, factor fa
-    p_correction = K_u * p_plus * p_minus * rho_interface * a_star_interface * (v1_rr - v1_ll)
-    p_interface += p_correction
-
-    total_enthalpy_ll = u_ll[3] + p_ll
-    total_enthalpy_rr = u_rr[3] + p_rr
-
-    flux_ll_scaled = mach_split_interface_plus * SVector(u_ll[1], u_ll[2], total_enthalpy_ll)
-    flux_rr_scaled = mach_split_interface_minus * SVector(u_rr[1], u_rr[2], total_enthalpy_rr)
-
-    return a_interface * (flux_ll_scaled + flux_rr_scaled) + SVector(0, p_interface, 0)
+    return flux_ausm_assemble(u_ll, u_rr, p_ll, p_rr, a_interface,
+                              mach_interface, p_interface)
 end
 
 # While `normal_direction` isn't strictly necessary in 1D, certain solvers assume that

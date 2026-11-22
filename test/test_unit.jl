@@ -2402,6 +2402,50 @@ end
     end
 end
 
+@testitem "Unit: Consistency check for AUSM+ flux: CEE" setup=[Setup, UnitTests] tags=[:misc_part1] begin
+    equations = CompressibleEulerEquations1D(1.4)
+    orientation = 1
+
+    # Subsonic, sonic, and supersonic states in both directions
+    states = [SVector(1.1, 0.2, 2.5),
+        SVector(0.7, -0.4, 1.8),
+        SVector(1.0, 1.183216, 1.7), # |M| ≈ 1
+        SVector(1.0, 3.0, 5.0),
+        SVector(1.0, -3.0, 5.0)]
+
+    for u in states
+        @test Trixi.flux_ausmplus(u, u, orientation, equations) ≈
+              flux(u, orientation, equations)
+    end
+end
+
+@testitem "Unit: Properties of AUSM+ flux: CEE" setup=[Setup, UnitTests] tags=[:misc_part1] begin
+    using Trixi: flux_ausmplus
+    equations = CompressibleEulerEquations1D(1.4)
+    orientation = 1
+
+    # Different subsonic left and right states
+    u_ll = prim2cons(SVector(1.2, 0.3, 1.5), equations)
+    u_rr = prim2cons(SVector(0.8, -0.1, 0.9), equations)
+
+    # Invariance under reflection: swapping and mirroring the states (v -> -v) flips the
+    # sign of the mass and energy fluxes and keeps the momentum flux
+    mirror(u) = SVector(u[1], -u[2], u[3])
+    flip = SVector(-1, 1, -1)
+    @test flux_ausmplus(mirror(u_rr), mirror(u_ll), orientation, equations) ≈
+          flip .* flux_ausmplus(u_ll, u_rr, orientation, equations)
+
+    # Supersonic flow from the left/right: pure upwinding, i.e., the physical flux of
+    # the upwind state
+    u_supersonic_ll = prim2cons(SVector(1.0, 3.0, 1.0), equations)
+    u_supersonic_rr = prim2cons(SVector(0.5, 2.5, 0.7), equations)
+    @test flux_ausmplus(u_supersonic_ll, u_supersonic_rr, orientation, equations) ≈
+          flux(u_supersonic_ll, orientation, equations)
+    @test flux_ausmplus(mirror(u_supersonic_rr), mirror(u_supersonic_ll), orientation,
+                        equations) ≈
+          flux(mirror(u_supersonic_ll), orientation, equations)
+end
+
 @testitem "Unit: Consistency check for Godunov flux" setup=[Setup, UnitTests] tags=[:misc_part1] begin
     # Set up equations and dummy conservative variables state
     # Burgers' Equation

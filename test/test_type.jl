@@ -173,6 +173,12 @@ end
         @test eltype(@inferred flux_ranocha(u_ll, u_rr, orientation, equations)) ==
               RealT
 
+        # Use different subsonic states to exercise all terms of the AUSM+ flux
+        u_ausm_ll = SVector(one(RealT), RealT(0.1), RealT(2))
+        u_ausm_rr = SVector(RealT(0.5), RealT(-0.1), one(RealT))
+        @test eltype(@inferred Trixi.flux_ausmplus(u_ausm_ll, u_ausm_rr, orientation,
+                                                   equations)) == RealT
+
         @test eltype(eltype(@inferred splitting_steger_warming(u, orientation,
                                                                equations))) ==
               RealT
