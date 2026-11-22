@@ -36,10 +36,9 @@ function initial_condition_sedov_blast_wave(x, t, equations::CompressibleEulerEq
 end
 initial_condition = initial_condition_sedov_blast_wave
 
-surface_flux = flux_hllc
+surface_flux = Trixi.flux_ausmplus
 basis = LobattoLegendreBasis(3)
-volume_integral = VolumeIntegralPureLGLFiniteVolume(Trixi.flux_ausmplus)
-#volume_integral = VolumeIntegralPureLGLFiniteVolume(flux_hllc)
+volume_integral = VolumeIntegralPureLGLFiniteVolume(flux_hllc)
 solver = DGSEM(basis, surface_flux, volume_integral)
 
 coordinates_min = (-2.0,)
