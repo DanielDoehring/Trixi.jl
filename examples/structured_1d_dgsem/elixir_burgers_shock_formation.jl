@@ -8,7 +8,7 @@ equations = InviscidBurgersEquation1D()
 
 basis = LobattoLegendreBasis(3)
 # Use shock capturing techniques to suppress oscillations at discontinuities.
-# Note that this introduces additional numerical dissipation,
+# Note that this introduces (additional) numerical dissipation,
 # which causes the left and right states of the discontinuity to dampen out over time.
 indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_max = 1.0,
