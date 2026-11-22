@@ -18,7 +18,8 @@ a ramp-up of the time step.
 
 One can additionally supply a parabolic CFL number `cfl_parabolic` to
 limit the admissible timestep also respecting parabolic restrictions.
-This is only applicable for semidiscretizations of type [`SemidiscretizationHyperbolicParabolic`](@ref).
+This is only applicable for semidiscretizations of type
+[`SemidiscretizationHyperbolicParabolic`](@ref) and [`SemidiscretizationParabolic`](@ref).
 To enable checking for parabolic timestep restrictions, provide a value greater than zero for `cfl_parabolic`.
 By default, `cfl_parabolic` is set to zero which means that only the hyperbolic CFL number `cfl` is considered.
 The keyword argument `cfl_parabolic` must be either a `Real` number, corresponding to a constant
@@ -108,16 +109,19 @@ end
     semi = integrator.p
     @unpack cfl_hyperbolic, cfl_parabolic = stepsize_callback
 
+    backend = trixi_backend(u_ode)
     # Dispatch based on semidiscretization
-    dt = @trixi_timeit timer() "calculate dt" calculate_dt(u_ode, t, cfl_hyperbolic,
-                                                           cfl_parabolic, semi)
+    dt = @trixi_timeit_ext backend timer() "calculate dt" calculate_dt(u_ode, t,
+                                                                       cfl_hyperbolic,
+                                                                       cfl_parabolic,
+                                                                       semi)
 
     set_proposed_dt!(integrator, dt)
     integrator.opts.dtmax = dt
     integrator.dtcache = dt
 
     # avoid re-evaluating possible FSAL stages
-    u_modified!(integrator, false)
+    derivative_discontinuity!(integrator, false)
     return nothing
 end
 
@@ -147,6 +151,17 @@ function calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic,
     return cfl_hyperbolic(t) * max_dt(u, t, mesh,
                   have_constant_speed(equations), equations,
                   solver, cache)
+end
+
+# Case for a purely parabolic semidiscretization
+function calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic,
+                      semi::SemidiscretizationParabolic)
+    mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
+    u = wrap_array(u_ode, mesh, equations, solver, cache)
+
+    return cfl_parabolic(t) * max_dt(u, t, mesh,
+                  have_constant_diffusivity(equations), equations,
+                  equations, solver, cache)
 end
 
 # For Euler-Acoustic simulations with `EulerAcousticsCouplingCallback`
@@ -187,6 +202,8 @@ end
 function calc_max_scaled_speed(backend::Nothing, u, mesh, constant_speed, equations, dg,
                                cache)
     @unpack contravariant_vectors, inverse_jacobian = cache.elements
+    # `nothing` if the equations do not have auxiliary variables
+    aux = get_aux_vars(cache)
 
     max_scaled_speed = zero(eltype(u))
     @batch reduction=(max, max_scaled_speed) for element in eachelement(dg, cache)
@@ -194,6 +211,7 @@ function calc_max_scaled_speed(backend::Nothing, u, mesh, constant_speed, equati
                                                   equations, dg,
                                                   contravariant_vectors,
                                                   inverse_jacobian,
+                                                  aux,
                                                   element)
         # Use `Base.max` to prevent silent failures, as `max` from `@fastmath` doesn't propagate
         # `NaN`s properly. See https://github.com/trixi-framework/Trixi.jl/pull/2445#discussion_r2336812323
@@ -202,31 +220,28 @@ function calc_max_scaled_speed(backend::Nothing, u, mesh, constant_speed, equati
     return max_scaled_speed
 end
 
-function calc_max_scaled_speed(backend::Backend, u, mesh, constant_speed, equations, dg,
-                               cache)
+function calc_max_scaled_speed(backend::Backend, u, ::MeshT, constant_speed, equations,
+                               dg,
+                               cache) where {MeshT}
     @unpack contravariant_vectors, inverse_jacobian = cache.elements
+    # `nothing` if the equations do not have auxiliary variables
+    aux = get_aux_vars(cache)
 
     num_elements = nelements(dg, cache)
-    max_scaled_speeds = allocate(backend, eltype(u), num_elements)
+    init = neutral = AcceleratedKernels.neutral_element(Base.max, eltype(u))
 
-    kernel! = max_scaled_speed_KAkernel!(backend)
-    kernel!(max_scaled_speeds, u, typeof(mesh), constant_speed, equations, dg,
-            contravariant_vectors,
-            inverse_jacobian;
-            ndrange = num_elements)
+    # Provide a custom neutral and init element since we "reduce" over 1:num_elements
+    max_scaled_speed = mapreduce_accelerated(Base.max, 1:num_elements, backend;
+                                             init, neutral) do element
+        max_scaled_speed_per_element(u, MeshT, constant_speed,
+                                     equations, dg,
+                                     contravariant_vectors,
+                                     inverse_jacobian,
+                                     aux,
+                                     element)
+    end
 
-    return maximum(max_scaled_speeds)
-end
-
-@kernel function max_scaled_speed_KAkernel!(max_scaled_speeds, u, MeshT, constant_speed,
-                                            equations,
-                                            dg, contravariant_vectors, inverse_jacobian)
-    element = @index(Global)
-    max_scaled_speeds[element] = max_scaled_speed_per_element(u, MeshT, constant_speed,
-                                                              equations, dg,
-                                                              contravariant_vectors,
-                                                              inverse_jacobian,
-                                                              element)
+    return max_scaled_speed
 end
 
 include("stepsize_dg1d.jl")

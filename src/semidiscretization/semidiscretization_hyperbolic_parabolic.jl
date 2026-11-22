@@ -42,6 +42,14 @@ struct SemidiscretizationHyperbolicParabolic{Mesh, Equations, EquationsParabolic
 
     performance_counter::PerformanceCounterList{2}
 end
+
+# Reject a single default RHS for split hyperbolic-parabolic problems
+@inline function default_rhs(::SemidiscretizationHyperbolicParabolic)
+    throw(ArgumentError("`SemidiscretizationHyperbolicParabolic` has no single default " *
+                        "right-hand side; use `rhs_hyperbolic!` or `rhs_parabolic!` " *
+                        "explicitly."))
+end
+
 # We assume some properties of the fields of the semidiscretization, e.g.,
 # the `equations` and the `mesh` should have the same dimension. We check these
 # properties in the outer constructor defined below. While we could ensure
@@ -84,7 +92,7 @@ function SemidiscretizationHyperbolicParabolic(mesh, equations::Tuple,
 
     boundary_conditions, boundary_conditions_parabolic = boundary_conditions
 
-    cache = create_cache(mesh, equations, solver, RealT, uEltype)
+    cache = create_cache_hyperbolic(mesh, equations, solver, RealT, uEltype)
     _boundary_conditions = digest_boundary_conditions(boundary_conditions,
                                                       mesh, solver, cache)
     check_periodicity_mesh_boundary_conditions(mesh, _boundary_conditions)
@@ -124,6 +132,9 @@ function SemidiscretizationHyperbolicParabolic(mesh, equations::Tuple,
                                                                           performance_counter)
 end
 
+# @eval due to @muladd
+@eval Adapt.@adapt_structure(SemidiscretizationHyperbolicParabolic)
+
 # Create a new semidiscretization but change some parameters compared to the input.
 # `Base.similar` follows a related concept but would require us to `copy` the `mesh`,
 # which would impact the performance. Instead, `SciMLBase.remake` has exactly the
@@ -144,13 +155,15 @@ function remake(semi::SemidiscretizationHyperbolicParabolic;
     # TODO: Which parts do we want to `remake`? At least the solver needs some
     #       special care if shock-capturing volume integrals are used (because of
     #       the indicators and their own caches...).
-    return SemidiscretizationHyperbolicParabolic(mesh, (equations, equations_parabolic),
-                                                 initial_condition, solver;
-                                                 solver_parabolic, source_terms,
-                                                 source_terms_parabolic,
-                                                 boundary_conditions = (boundary_conditions,
-                                                                        boundary_conditions_parabolic),
-                                                 uEltype)
+    semi_new = SemidiscretizationHyperbolicParabolic(mesh,
+                                                     (equations, equations_parabolic),
+                                                     initial_condition, solver;
+                                                     solver_parabolic, source_terms,
+                                                     source_terms_parabolic,
+                                                     boundary_conditions = (boundary_conditions,
+                                                                            boundary_conditions_parabolic),
+                                                     uEltype)
+    return copy_tuning(semi_new, semi)
 end
 
 function Base.show(io::IO, semi::SemidiscretizationHyperbolicParabolic)
@@ -210,6 +223,10 @@ end
 
 @inline Base.real(semi::SemidiscretizationHyperbolicParabolic) = real(semi.solver)
 
+function storage_type(semi::SemidiscretizationHyperbolicParabolic)
+    return storage_type(semi.mesh, semi.cache)
+end
+
 # retain dispatch on hyperbolic equations only
 @inline function mesh_equations_solver_cache(semi::SemidiscretizationHyperbolicParabolic)
     @unpack mesh, equations, solver, cache = semi
@@ -250,10 +267,11 @@ end
                    colorvec_parabolic::Union{AbstractVector, Nothing} = nothing)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
-that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
+that can be passed to `solve` from the [SciML ecosystem](https://docs.sciml.ai/DiffEqDocs/stable/).
 The parabolic right-hand side is the first function of the split ODE problem and
 will be used by default by the implicit part of IMEX methods from the
 SciML ecosystem.
+The time span is converted to the real type `real(semi)` of the semidiscretization.
 
 Optional keyword arguments:
 - `jac_prototype_parabolic`: Expected to come from [SparseConnectivityTracer.jl](https://github.com/adrhill/SparseConnectivityTracer.jl).
@@ -275,11 +293,13 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
         Polyester.reset_threads!()
     end
 
+    tspan = convert_tspan(semi, tspan)
+
     u0_ode = compute_coefficients(first(tspan), semi)
     # TODO: MPI, do we want to synchronize loading and print debug statements, e.g. using
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
-    iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
+    iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs_hyperbolic!
 
     # Check if Jacobian prototype is provided for sparse Jacobian
     if jac_prototype_parabolic !== nothing
@@ -293,12 +313,13 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan;
         # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
         # first function implicitly and the second one explicitly. Thus, we pass the
         # (potentially) stiffer parabolic function first.
-        return SplitODEProblem{iip}(parabolic_ode, rhs!, u0_ode, tspan, semi)
+        return SplitODEProblem{iip}(parabolic_ode, rhs_hyperbolic!, u0_ode, tspan, semi)
     else
         # We could also construct an `ODEFunction` explicitly without the Jacobian here,
         # but we stick to the lean direct in-place functions `rhs_parabolic!` and
         # let OrdinaryDiffEq.jl handle the rest
-        return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+        return SplitODEProblem{iip}(rhs_parabolic!, rhs_hyperbolic!,
+                                    u0_ode, tspan, semi)
     end
 end
 
@@ -309,12 +330,13 @@ end
                    colorvec_parabolic::Union{AbstractVector, Nothing} = nothing)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
-that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
+that can be passed to `solve` from the [SciML ecosystem](https://docs.sciml.ai/DiffEqDocs/stable/).
 The parabolic right-hand side is the first function of the split ODE problem and
 will be used by default by the implicit part of IMEX methods from the
 SciML ecosystem.
 
 The initial condition etc. is taken from the `restart_file`.
+The time span is converted to the real type `real(semi)` of the semidiscretization.
 
 Optional keyword arguments:
 - `jac_prototype_parabolic`: Expected to come from [SparseConnectivityTracer.jl](https://github.com/adrhill/SparseConnectivityTracer.jl).
@@ -337,11 +359,12 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
         Polyester.reset_threads!()
     end
 
+    tspan = convert_tspan(semi, tspan)
     u0_ode = load_restart_file(semi, restart_file)
     # TODO: MPI, do we want to synchronize loading and print debug statements, e.g. using
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
     #       See https://github.com/trixi-framework/Trixi.jl/issues/328
-    iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs!
+    iip = true # is-inplace, i.e., we modify a vector when calling rhs_parabolic!, rhs_hyperbolic!
 
     # Check if Jacobian prototype is provided for sparse Jacobian
     if jac_prototype_parabolic !== nothing
@@ -355,25 +378,31 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic, tspan,
         # Note that the IMEX time integration methods of OrdinaryDiffEq.jl treat the
         # first function implicitly and the second one explicitly. Thus, we pass the
         # (potentially) stiffer parabolic function first.
-        return SplitODEProblem{iip}(parabolic_ode, rhs!, u0_ode, tspan, semi)
+        return SplitODEProblem{iip}(parabolic_ode, rhs_hyperbolic!, u0_ode, tspan, semi)
     else
         # We could also construct an `ODEFunction` explicitly without the Jacobian here,
         # but we stick to the lean direct in-place function `rhs_parabolic!` and
         # let OrdinaryDiffEq.jl handle the rest
-        return SplitODEProblem{iip}(rhs_parabolic!, rhs!, u0_ode, tspan, semi)
+        return SplitODEProblem{iip}(rhs_parabolic!, rhs_hyperbolic!,
+                                    u0_ode, tspan, semi)
     end
 end
 
-function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t)
+function rhs_hyperbolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabolic, t)
     @unpack mesh, equations, boundary_conditions, source_terms, solver, cache = semi
 
     u = wrap_array(u_ode, mesh, equations, solver, cache)
     du = wrap_array(du_ode, mesh, equations, solver, cache)
+    backend = trixi_backend(u)
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "rhs!" rhs!(du, u, t, mesh, equations,
-                                      boundary_conditions, source_terms, solver, cache)
+    @trixi_timeit_ext backend timer() "rhs_hyperbolic!" rhs_hyperbolic!(backend,
+                                                                        du, u, t,
+                                                                        mesh, equations,
+                                                                        boundary_conditions,
+                                                                        source_terms,
+                                                                        solver, cache)
     runtime = time_ns() - time_start
     put!(semi.performance_counter.counters[1], runtime)
 
@@ -385,15 +414,19 @@ function rhs_parabolic!(du_ode, u_ode, semi::SemidiscretizationHyperbolicParabol
 
     u = wrap_array(u_ode, mesh, equations_parabolic, solver, cache)
     du = wrap_array(du_ode, mesh, equations_parabolic, solver, cache)
+    backend = trixi_backend(u)
 
     # TODO: Taal decide, do we need to pass the mesh?
     time_start = time_ns()
-    @trixi_timeit timer() "parabolic rhs!" rhs_parabolic!(du, u, t, mesh,
-                                                          equations_parabolic,
-                                                          boundary_conditions_parabolic,
-                                                          source_terms_parabolic,
-                                                          solver, solver_parabolic,
-                                                          cache, cache_parabolic)
+    @trixi_timeit_ext backend timer() "parabolic rhs!" rhs_parabolic!(backend, du, u, t,
+                                                                      mesh,
+                                                                      equations_parabolic,
+                                                                      boundary_conditions_parabolic,
+                                                                      source_terms_parabolic,
+                                                                      solver,
+                                                                      solver_parabolic,
+                                                                      cache,
+                                                                      cache_parabolic)
     runtime = time_ns() - time_start
     put!(semi.performance_counter.counters[2], runtime)
 
@@ -427,37 +460,17 @@ function linear_structure(semi::SemidiscretizationHyperbolicParabolic;
         throw(ArgumentError("`linear_structure` expects linear equations."))
     end
 
-    # allocate memory
-    u_ode = allocate_coefficients(mesh_equations_solver_cache(semi)...)
-    du_ode = similar(u_ode)
-
-    # get the right hand side from boundary conditions and optional source terms
-    u_ode .= zero(eltype(u_ode))
-    rhs!(du_ode, u_ode, semi, t0)
-    b = -du_ode
-
-    # Repeat for parabolic part
-    rhs_parabolic!(du_ode, u_ode, semi, t0)
-    @. b -= du_ode
-
-    # Create a copy of `b` used internally to extract the linear part of `semi`.
-    # This is necessary to get everything correct when the user updates the
-    # returned vector `b`.
-    b_tmp = copy(b)
-
     # additional storage for parabolic part
-    dest_para = similar(du_ode)
+    dest_para = allocate_coefficients(mesh_equations_solver_cache(semi)...)
 
-    # wrap the linear operator
-    A = LinearMap(length(u_ode), ismutating = true) do dest, src
-        rhs!(dest, src, semi, t0)
+    apply_rhs! = function (dest, src)
+        rhs_hyperbolic!(dest, src, semi, t0)
         rhs_parabolic!(dest_para, src, semi, t0)
-
-        @. dest += dest_para + b_tmp
+        @. dest += dest_para
         return dest
     end
 
-    return A, b
+    return _linear_structure_from_rhs(semi, apply_rhs!)
 end
 
 function _jacobian_ad_forward(semi::SemidiscretizationHyperbolicParabolic, t0, u0_ode,
@@ -467,7 +480,7 @@ function _jacobian_ad_forward(semi::SemidiscretizationHyperbolicParabolic, t0, u
     du_ode_hyp = Vector{eltype(config)}(undef, length(du_ode))
     J = ForwardDiff.jacobian(du_ode, u0_ode, config) do du_ode, u_ode
         # Implementation of split ODE problem in OrdinaryDiffEq
-        rhs!(du_ode_hyp, u_ode, new_semi, t0)
+        rhs_hyperbolic!(du_ode_hyp, u_ode, new_semi, t0)
         rhs_parabolic!(du_ode, u_ode, new_semi, t0)
         return du_ode .+= du_ode_hyp
     end
@@ -514,29 +527,11 @@ function linear_structure_parabolic(semi::SemidiscretizationHyperbolicParabolic;
         throw(ArgumentError("`linear_structure_parabolic` expects equations with constant diffusive terms."))
     end
 
-    # allocate memory
-    u_ode = allocate_coefficients(mesh_equations_solver_cache(semi)...)
-    du_ode = similar(u_ode)
-
-    # get the parabolic right hand side from boundary conditions and optional source terms
-    u_ode .= zero(eltype(u_ode))
-    rhs_parabolic!(du_ode, u_ode, semi, t0)
-    b = -du_ode
-
-    # Create a copy of `b` used internally to extract the linear part of `semi`.
-    # This is necessary to get everything correct when the user updates the
-    # returned vector `b`.
-    b_tmp = copy(b)
-
-    # wrap the linear operator
-    A = LinearMap(length(u_ode), ismutating = true) do dest, src
-        rhs_parabolic!(dest, src, semi, t0)
-
-        @. dest += b_tmp
-        return dest
+    apply_rhs! = function (dest, src)
+        return rhs_parabolic!(dest, src, semi, t0)
     end
 
-    return A, b
+    return _linear_structure_from_rhs(semi, apply_rhs!)
 end
 
 """

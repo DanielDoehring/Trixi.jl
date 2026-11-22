@@ -52,14 +52,14 @@ The corresponding opposite directions are:
 The main sources for the base implementation were
 1. Misun Min, Taehun Lee, **A spectral-element discontinuous Galerkin lattice Boltzmann method for
    nearly incompressible flows**, Journal of Computational Physics 230(1), 2011
-   [doi:10.1016/j.jcp.2010.09.024](https://doi.org/10.1016/j.jcp.2010.09.024)
+   [DOI: 10.1016/j.jcp.2010.09.024](https://doi.org/10.1016/j.jcp.2010.09.024)
 2. Karsten Golly, **Anwendung der Lattice-Boltzmann Discontinuous Galerkin Spectral Element Method
    (LB-DGSEM) auf laminare und turbulente nahezu inkompressible Strömungen im dreidimensionalen
    Raum**, Master Thesis, University of Cologne, 2018.
 3. Dieter Hänel, **Molekulare Gasdynamik**, Springer-Verlag Berlin Heidelberg, 2004
-   [doi:10.1007/3-540-35047-0](https://doi.org/10.1007/3-540-35047-0)
+   [DOI: 10.1007/3-540-35047-0](https://doi.org/10.1007/3-540-35047-0)
 4. Timm Krüger et al., **The Lattice Boltzmann Method**, Springer International Publishing, 2017
-   [doi:10.1007/978-3-319-44649-3](https://doi.org/10.1007/978-3-319-44649-3)
+   [DOI: 10.1007/978-3-319-44649-3](https://doi.org/10.1007/978-3-319-44649-3)
 """
 struct LatticeBoltzmannEquations2D{RealT <: Real, CollisionOp} <:
        AbstractLatticeBoltzmannEquations{2, 9}
@@ -101,7 +101,7 @@ function LatticeBoltzmannEquations2D(; Ma, Re, collision_op = collision_bgk,
     # The relation between the isothermal speed of sound `c_s` and the mean thermal molecular velocity
     # `c` depends on the used phase space discretization, and is valid for D2Q9 (and others). For
     # details, see, e.g., [3] in the docstring above.
-    # c_s = c / sqrt(3) 
+    # c_s = c / sqrt(3)
 
     # Calculate missing quantities
     if isnothing(Ma)
@@ -131,6 +131,38 @@ function LatticeBoltzmannEquations2D(; Ma, Re, collision_op = collision_bgk,
     return LatticeBoltzmannEquations2D(c, c_s, rho0, Ma, u0, Re, L, nu,
                                        weights, v_alpha1, v_alpha2,
                                        collision_op)
+end
+
+# Together with our specialization of `Adapt.adapt_structure`,
+# this allows to move semidiscretizations and their components including
+# the equations to GPUs and adapt the floating point type, e.g.,
+# to `Float32` to improve performance on GPUs.
+function Base.similar(equations::LatticeBoltzmannEquations2D,
+                      ::Type{NewRealT}) where {NewRealT}
+    return LatticeBoltzmannEquations2D{NewRealT,
+                                       typeof(equations.collision_op)}(convert(NewRealT,
+                                                                               equations.c),
+                                                                       convert(NewRealT,
+                                                                               equations.c_s),
+                                                                       convert(NewRealT,
+                                                                               equations.rho0),
+                                                                       convert(NewRealT,
+                                                                               equations.Ma),
+                                                                       convert(NewRealT,
+                                                                               equations.u0),
+                                                                       convert(NewRealT,
+                                                                               equations.Re),
+                                                                       convert(NewRealT,
+                                                                               equations.L),
+                                                                       convert(NewRealT,
+                                                                               equations.nu),
+                                                                       SVector{9,
+                                                                               NewRealT}(equations.weights),
+                                                                       SVector{9,
+                                                                               NewRealT}(equations.v_alpha1),
+                                                                       SVector{9,
+                                                                               NewRealT}(equations.v_alpha2),
+                                                                       equations.collision_op)
 end
 
 function varnames(::typeof(cons2cons), equations::LatticeBoltzmannEquations2D)
@@ -251,7 +283,7 @@ end
 end
 
 """
-    flux_godunov(u_ll, u_rr, orientation, 
+    flux_godunov(u_ll, u_rr, orientation,
                  equations::LatticeBoltzmannEquations2D)
 
 Godunov (upwind) flux for the 2D Lattice-Boltzmann equations.

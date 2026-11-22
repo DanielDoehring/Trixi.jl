@@ -1,7 +1,14 @@
-# by default, return an empty tuple for volume integral caches
-function create_cache(mesh::DGMultiMesh{NDIMS}, equations,
-                      volume_integral::VolumeIntegralShockCapturingHGType,
-                      dg::DGMultiFluxDiff{<:GaussSBP}, RealT, uEltype) where {NDIMS}
+# Since `@muladd` can fuse multiply-add operations and thus improve performance in
+# the flux differencing loops, we opt-in explicitly.
+# See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
+@muladd begin
+#! format: noindent
+
+# Sparse low-order operators for the subcell finite volume scheme on the Gauss nodes
+function create_cache_volume_integral(mesh::DGMultiMesh{NDIMS}, equations,
+                                      volume_integral::VolumeIntegralShockCapturingHGType,
+                                      dg::DGMultiFluxDiff{<:GaussSBP}, cache_containers,
+                                      uEltype) where {NDIMS}
     (; volume_integral_default, volume_integral_blend_high_order) = volume_integral
     @assert volume_integral_default isa VolumeIntegralFluxDifferencing "DGMulti is currently only compatible with `VolumeIntegralFluxDifferencing` as `volume_integral_default`"
     @assert volume_integral_blend_high_order isa VolumeIntegralFluxDifferencing "DGMulti is currently only compatible with `VolumeIntegralFluxDifferencing` as `volume_integral_blend_high_order`"
@@ -12,40 +19,193 @@ function create_cache(mesh::DGMultiMesh{NDIMS}, equations,
     # create sparse hybridized operators for low order scheme
     Qrst, E = StartUpDG.sparse_low_order_SBP_operators(dg.basis)
     Brst = map(n -> Diagonal(n .* dg.basis.wf), dg.basis.nrstJ)
-    sparse_hybridized_SBP_operators = map((Q, B) -> 0.5 * [Q-Q' E'*B; -B*E zeros(size(B))],
-                                          Qrst, Brst)
+    sparse_SBP_operators = map((Q, B) -> 0.5f0 * [Q-Q' E'*B; -B*E zeros(size(B))],
+                               Qrst, Brst)
 
     # Find the joint sparsity pattern of the entire matrix. We store the sparsity pattern as
     # an adjoint for faster iteration through the rows.
-    sparsity_pattern = sum(map(A -> abs.(A)', sparse_hybridized_SBP_operators)) .>
+    sparsity_pattern = sum(map(A -> abs.(A)', sparse_SBP_operators)) .>
                        100 * eps()
 
-    return (; sparse_hybridized_SBP_operators, sparsity_pattern,
+    return (; sparse_SBP_operators, sparsity_pattern,
             element_to_element_connectivity)
 end
 
 # this method is used when the indicator is constructed as for shock-capturing volume integrals
-function create_cache(::Type{IndicatorHennemannGassner}, equations::AbstractEquations,
-                      basis::RefElemData{NDIMS}) where {NDIMS}
+function create_cache_indicator(::Type{IndicatorHennemannGassner},
+                                equations::AbstractEquations,
+                                basis::DGMultiBasis{NDIMS}) where {NDIMS}
     uEltype = real(basis)
     alpha = Vector{uEltype}()
     alpha_tmp = similar(alpha)
 
-    MVec = MVector{nnodes(basis), uEltype}
-    indicator_threaded = MVec[MVec(undef) for _ in 1:Threads.maxthreadid()]
-    modal_threaded = MVec[MVec(undef) for _ in 1:Threads.maxthreadid()]
+    MVec_nodes = MVector{nnodes(basis), uEltype}
+    indicator_threaded = MVec_nodes[MVec_nodes(undef) for _ in 1:Threads.maxthreadid()]
+    MVec_modes = MVector{nmodes(basis.N, basis.element_type), uEltype}
+    modal_threaded = MVec_modes[MVec_modes(undef) for _ in 1:Threads.maxthreadid()]
 
+    inverse_vandermonde = calc_inverse_vandermonde(basis)
+
+    return (; alpha, alpha_tmp, indicator_threaded, modal_threaded, inverse_vandermonde)
+end
+
+# calculates the inverse of the Vandermonde matrix for shock capturing purposes.
+# This version is for tensor product elements (Line, Quad, Hex)
+function calc_inverse_vandermonde(basis::DGMultiBasis{NDIMS, <:Union{Line, Quad, Hex}}) where {NDIMS}
     # initialize inverse Vandermonde matrices at Gauss-Legendre nodes
     (; N) = basis
     lobatto_node_coordinates_1D, _ = StartUpDG.gauss_lobatto_quad(0, 0, N)
     VDM_1D = StartUpDG.vandermonde(Line(), N, lobatto_node_coordinates_1D)
     inverse_vandermonde = SimpleKronecker(NDIMS, inv(VDM_1D))
 
-    return (; alpha, alpha_tmp, indicator_threaded, modal_threaded, inverse_vandermonde)
+    return inverse_vandermonde
+end
+
+# Total polynomial degrees of the orthonormal modal basis functions on triangles, in
+# the order used by NodesAndModes.jl (whose `vandermonde` is reused by StartUpDG.jl).
+# Note that this order is *not* hierarchical, e.g.,
+# the degrees are (0, 1, 2, 1, 2, 2) for N = 2.
+@inline function simplex_mode_degrees(N, ::Tri)
+    degrees = Vector{Int}(undef, nmodes(N, Tri()))
+    mode = 1
+    # Same loop structure as `NodesAndModes.basis(::Tri, N, r, s)`:
+    # The basis function with index `mode` has
+    # - degree `i` in the collapsed coordinate `a = 2 * (1 + r) / (1 - s) - 1`
+    # - degree `j` in the coordinate `b = s` (which is not collapsed).
+    for i in 0:N
+        for j in 0:(N - i)
+            degrees[mode] = i + j
+            mode += 1
+        end
+    end
+    return degrees
+end
+
+# calculates the inverse of the Vandermonde matrix for shock capturing purposes (only!).
+# This version is for nodal simplicial SBP elements. Note that the inverse Vandermonde
+# matrix first projects from solution values at SBP nodes to degree N polynomials,
+# and then returns the modal coefficients of that projected polynomial.
+# The modal coefficients are sorted by the total degree of the corresponding basis
+# functions, so that the first `nmodes(k, element_type)` coefficients are the ones of
+# the L2 projection onto polynomials of degree `k`.
+function calc_inverse_vandermonde(basis::DGMultiBasis{NDIMS, <:Union{Tri, Tet}, <:SBP}) where {NDIMS}
+    (; N, element_type, r, s, VDM, wq) = basis
+
+    interp_matrix_to_quad_points = StartUpDG.vandermonde(element_type, N, r, s) /
+                                   VDM
+
+    # note that this mass matrix is not necessarily diagonal
+    mass_matrix = interp_matrix_to_quad_points' * Diagonal(wq) *
+                  interp_matrix_to_quad_points
+
+    # construct quadrature-based L2 projection matrix
+    projection_matrix = mass_matrix \
+                        (interp_matrix_to_quad_points' * Diagonal(wq))
+
+    # invert Vandermonde matrix to recover modal coefficients from the
+    # quadrature-based L2 projection matrix.
+    inverse_vandermonde = VDM \ projection_matrix
+
+    # `sortperm` is stable in the sense that the existing order of modes of the same degree is retained
+    hierarchical_order = sortperm(simplex_mode_degrees(N, element_type))
+    return @view inverse_vandermonde[hierarchical_order, :]
 end
 
 function (indicator_hg::IndicatorHennemannGassner)(u, mesh::DGMultiMesh,
-                                                   equations, dg::DGMulti{NDIMS}, cache;
+                                                   equations,
+                                                   dg::DGMulti{NDIMS, <:Union{Tri, Tet},
+                                                               <:SBP},
+                                                   cache;
+                                                   kwargs...) where {NDIMS}
+    (; alpha_max, alpha_min, alpha_smooth, variable) = indicator_hg
+    (; alpha, alpha_tmp, indicator_threaded, modal_threaded, inverse_vandermonde) = indicator_hg.cache
+    (; N, element_type) = dg.basis # polynomial degree and element type
+
+    resize!(alpha, nelements(mesh, dg))
+    if alpha_smooth
+        resize!(alpha_tmp, nelements(mesh, dg))
+    end
+
+    # reuses the quad/hex "magic parameters".
+    # TODO: optimize, as these are likely not optimal for triangular/tetrahedral elements.
+    threshold = 0.5f0 * 10^(-1.8 * (N + 1)^0.25)
+    parameter_s = log((1 - 0.0001) / 0.0001)
+
+    @threaded for element in eachelement(mesh, dg)
+        indicator = indicator_threaded[Threads.threadid()]
+        modal = modal_threaded[Threads.threadid()]
+
+        # Calculate indicator variable at SBPnodes.
+        for i in eachnode(dg)
+            indicator[i] = variable(u[i, element], equations)
+        end
+
+        # multiply by invVDM
+        LinearAlgebra.mul!(modal, inverse_vandermonde, indicator)
+        total_energy = sum(abs2, modal)
+
+        # Calculate total energies for all modes, all modes minus the highest mode, and
+        # all modes without the two highest modes. For simplices, we cut off the "highest
+        # mode", which corresponds to the last "layer" of modes in a Pascal's triangle or
+        # simplex representation of the modal coefficients.
+        #
+        # For example, for a degree N=3 triangle, the modal coefficients are ordered
+        #
+        # 1
+        # 2 3
+        # 4 5 6
+        # 7 8 9 10
+        #
+        # The modal coefficients corresponding to degree 2 are then (1:6),
+        # while the modal coefficients for degree 1 are (1:3).
+        clip_1_range = 1:nmodes(N - 1, element_type)
+        clip_2_range = 1:nmodes(N - 2, element_type)
+        total_energy_clip1 = sum(abs2, view(modal, clip_1_range))
+        total_energy_clip2 = sum(abs2, view(modal, clip_2_range))
+
+        # Calculate energy in higher modes
+        if !(iszero(total_energy))
+            energy_frac_1 = (total_energy - total_energy_clip1) / total_energy
+        else
+            energy_frac_1 = zero(total_energy)
+        end
+        if !(iszero(total_energy_clip1))
+            energy_frac_2 = (total_energy_clip1 - total_energy_clip2) /
+                            total_energy_clip1
+        else
+            energy_frac_2 = zero(total_energy_clip1)
+        end
+        energy = max(energy_frac_1, energy_frac_2)
+
+        alpha_element = 1 / (1 + exp(-parameter_s / threshold * (energy - threshold)))
+
+        # Take care of the case close to pure DG
+        if alpha_element < alpha_min
+            alpha_element = zero(alpha_element)
+        end
+
+        # Take care of the case close to pure FV
+        if alpha_element > 1 - alpha_min
+            alpha_element = one(alpha_element)
+        end
+
+        # Clip the maximum amount of FV allowed
+        alpha[element] = min(alpha_max, alpha_element)
+    end
+
+    # smooth element indices after they're all computed
+    if alpha_smooth
+        apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache)
+    end
+
+    return alpha
+end
+
+function (indicator_hg::IndicatorHennemannGassner)(u, mesh::DGMultiMesh,
+                                                   equations,
+                                                   dg::DGMulti{NDIMS,
+                                                               <:Union{Line, Quad, Hex}},
+                                                   cache;
                                                    kwargs...) where {NDIMS}
     (; alpha_max, alpha_min, alpha_smooth, variable) = indicator_hg
     (; alpha, alpha_tmp, indicator_threaded, modal_threaded, inverse_vandermonde) = indicator_hg.cache
@@ -56,7 +216,7 @@ function (indicator_hg::IndicatorHennemannGassner)(u, mesh::DGMultiMesh,
     end
 
     # magic parameters
-    threshold = 0.5 * 10^(-1.8 * (dg.basis.N + 1)^0.25)
+    threshold = 0.5f0 * 10^(-1.8 * (dg.basis.N + 1)^0.25)
     parameter_s = log((1 - 0.0001) / 0.0001)
 
     @threaded for element in eachelement(mesh, dg)
@@ -101,7 +261,8 @@ function (indicator_hg::IndicatorHennemannGassner)(u, mesh::DGMultiMesh,
             energy_frac_1 = zero(total_energy)
         end
         if !(iszero(total_energy_clip1))
-            energy_frac_2 = (total_energy_clip1 - total_energy_clip2) / total_energy_clip1
+            energy_frac_2 = (total_energy_clip1 - total_energy_clip2) /
+                            total_energy_clip1
         else
             energy_frac_2 = zero(total_energy_clip1)
         end
@@ -134,15 +295,15 @@ end
 # Diffuse alpha values by setting each alpha to at least 50% of neighboring elements' alpha
 function apply_smoothing!(mesh::DGMultiMesh, alpha, alpha_tmp, dg::DGMulti, cache)
 
-    # Copy alpha values such that smoothing is indpedenent of the element access order
+    # Copy alpha values such that smoothing is independent of the element access order
     alpha_tmp .= alpha
 
     # smooth alpha with its neighboring value
-    for element in eachelement(mesh, dg)
+    @threaded for element in eachelement(mesh, dg)
         for face in Base.OneTo(StartUpDG.num_faces(dg.basis.element_type))
             neighboring_element = cache.element_to_element_connectivity[face, element]
             alpha_neighbor = alpha_tmp[neighboring_element]
-            alpha[element] = max(alpha[element], 0.5 * alpha_neighbor)
+            alpha[element] = max(alpha[element], 0.5f0 * alpha_neighbor)
         end
     end
 
@@ -194,16 +355,16 @@ function calc_volume_integral!(du, u, mesh::DGMultiMesh,
 end
 
 function get_sparse_operator_entries(i, j, mesh::DGMultiMesh{1}, cache)
-    return SVector(cache.sparse_hybridized_SBP_operators[1][i, j])
+    return SVector(cache.sparse_SBP_operators[1][i, j])
 end
 
 function get_sparse_operator_entries(i, j, mesh::DGMultiMesh{2}, cache)
-    Qr, Qs = cache.sparse_hybridized_SBP_operators
+    Qr, Qs = cache.sparse_SBP_operators
     return SVector(Qr[i, j], Qs[i, j])
 end
 
 function get_sparse_operator_entries(i, j, mesh::DGMultiMesh{3}, cache)
-    Qr, Qs, Qt = cache.sparse_hybridized_SBP_operators
+    Qr, Qs, Qt = cache.sparse_SBP_operators
     return SVector(Qr[i, j], Qs[i, j], Qt[i, j])
 end
 
@@ -244,7 +405,7 @@ function get_contravariant_matrix(i, element, mesh::DGMultiMesh{3}, cache)
 end
 
 function get_avg_contravariant_matrix(i, j, element, mesh::DGMultiMesh, cache)
-    return 0.5 * (get_contravariant_matrix(i, element, mesh, cache) +
+    return 0.5f0 * (get_contravariant_matrix(i, element, mesh, cache) +
             get_contravariant_matrix(j, element, mesh, cache))
 end
 
@@ -286,17 +447,30 @@ function volume_integral_kernel!(du, u, element, mesh::DGMultiMesh,
         u_i = u_local[i]
         du_i = zero(u_i)
         for id in nzrange(A_base, i)
+            # nonzero column indices for row i of the sparse operator.
+            # note that because Julia uses SparseMatrixCSC, rows[id]
+            # are efficient to access. We assume here that `sparsity_pattern`
+            # is symmetric (which is true since A_base is skew-symmetric),
+            # so nonzero row indices are the same as nonzero column indices.
             j = rows[id]
             u_j = u_local[j]
 
             # compute (Q_1[i,j], Q_2[i,j], ...) where Q_i = ∑_j dxidxhatj * Q̂_j
-            geometric_matrix = get_low_order_geometric_matrix(i, j, element, mesh, cache)
+            geometric_matrix = get_low_order_geometric_matrix(i, j, element,
+                                                              mesh, cache)
             reference_operator_entries = get_sparse_operator_entries(i, j, mesh, cache)
             normal_direction_ij = geometric_matrix * reference_operator_entries
 
             # note that we do not need to normalize `normal_direction_ij` since
             # it is typically normalized within the flux computation.
             f_ij = volume_flux_fv(u_i, u_j, normal_direction_ij, equations)
+
+            # the factor of 2 is for consistency; for example, if f_ij is the central
+            # flux, flux differencing with a differentiation matrix should recover the
+            # flux derivative via
+            #   \sum_j 2 * D_ij * f_ij = \sum_j 2 * D_ij * 0.5 * (f(u_i) + f(u_j))
+            #                          = f(u_i) \sum_j D_ij + \sum_j D_ij f(u_j)
+            #                          = 0 (since \sum_j D_ij = 0) + (D * f(u))_i
             du_i = du_i + 2 * f_ij
         end
         rhs_local[i] = du_i
@@ -305,3 +479,4 @@ function volume_integral_kernel!(du, u, element, mesh::DGMultiMesh,
     # TODO: factor this out to avoid calling it twice during calc_volume_integral!
     return project_rhs_to_gauss_nodes!(du, rhs_local, element, mesh, dg, cache, alpha)
 end
+end # @muladd

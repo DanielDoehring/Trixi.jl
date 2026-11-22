@@ -5,12 +5,12 @@
 @muladd begin
 #! format: noindent
 
-function create_cache(mesh::Union{TreeMesh{2}, StructuredMesh{2}, P4estMesh{2}},
-                      equations, volume_integral::VolumeIntegralSubcellLimiting,
-                      dg::DG, cache_containers, uEltype)
-    cache = create_cache(mesh, equations,
-                         VolumeIntegralPureLGLFiniteVolume(volume_integral.volume_flux_fv),
-                         dg, cache_containers, uEltype)
+function create_cache_subcell_limiting(mesh::Union{TreeMesh{2}, StructuredMesh{2},
+                                                   P4estMesh{2}},
+                                       equations,
+                                       volume_integral::VolumeIntegralSubcellLimiting,
+                                       dg::DG, cache_containers, uEltype)
+    cache = NamedTuple()
 
     fhat1_L_threaded, fhat1_R_threaded,
     fhat2_L_threaded, fhat2_R_threaded = create_f_threaded(mesh, equations, dg,
@@ -66,7 +66,8 @@ end
                                          volume_integral::VolumeIntegralSubcellLimiting,
                                          dg::DGSEM, cache)
     @unpack inverse_weights = dg.basis # Plays role of inverse DG-subcell sizes
-    @unpack volume_flux_dg, volume_flux_fv, limiter = volume_integral
+    @unpack volume_integral_low_order, volume_flux_dg, limiter = volume_integral
+    @unpack volume_flux_fv = volume_integral_low_order
 
     # high-order DG fluxes
     @unpack fhat1_L_threaded, fhat1_R_threaded, fhat2_L_threaded, fhat2_R_threaded = cache
@@ -86,7 +87,8 @@ end
     fstar2_L = fstar2_L_threaded[Threads.threadid()]
     fstar1_R = fstar1_R_threaded[Threads.threadid()]
     fstar2_R = fstar2_R_threaded[Threads.threadid()]
-    calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+    calcflux_fv!(volume_integral_low_order,
+                 fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
                  have_nonconservative_terms, equations, volume_flux_fv, dg, element,
                  cache)
 
@@ -195,8 +197,9 @@ end
 # The calculation of the non-conservative staggered "fluxes" requires non-conservative
 # terms that can be written as a product of local and a symmetric contributions. See, e.g.,
 #
-# - Rueda-Ramírez, Gassner (2023). A Flux-Differencing Formula for Split-Form Summation By Parts
-#   Discretizations of Non-Conservative Systems. https://arxiv.org/pdf/2211.14009.pdf.
+# - Rueda-Ramírez, Gassner (2024). A Flux-Differencing Formula for Split-Form Summation By Parts
+#   Discretizations of Non-Conservative Systems. https://arxiv.org/abs/2211.14009
+#   (DOI: https://doi.org/10.1016/j.jcp.2023.112607).
 #
 @inline function calcflux_fhat!(fhat1_L, fhat1_R, fhat2_L, fhat2_R, u,
                                 ::Type{<:TreeMesh{2}}, have_nonconservative_terms::True,
@@ -611,6 +614,27 @@ end
     end
 
     return nothing
+end
+
+@inline function calcflux_fv!(::VolumeIntegralPureLGLFiniteVolume,
+                              fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+                              have_nonconservative_terms, equations, volume_flux_fv, dg,
+                              element, cache)
+    return calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+                        have_nonconservative_terms, equations, volume_flux_fv, dg,
+                        element, cache)
+end
+
+@inline function calcflux_fv!(volume_integral_low_order::VolumeIntegralPureLGLFiniteVolumeO2,
+                              fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+                              have_nonconservative_terms, equations, volume_flux_fv, dg,
+                              element, cache)
+    (; sc_interface_coords, reconstruction_mode, slope_limiter, cons2recon, recon2cons) = volume_integral_low_order
+    return calcflux_fvO2!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
+                          have_nonconservative_terms, equations, volume_flux_fv, dg,
+                          element, cache,
+                          sc_interface_coords, reconstruction_mode, slope_limiter,
+                          cons2recon, recon2cons)
 end
 
 # Calculate the antidiffusive flux `antidiffusive_flux` as the subtraction between `fhat` and `fstar` for conservative systems.
