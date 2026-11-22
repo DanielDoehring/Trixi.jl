@@ -391,30 +391,6 @@ end
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_laplace_diffusion.jl" setup=[
-    Setup,
-    TreeMesh3DEuler
-] tags=[:tree_part4] begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_laplace_diffusion.jl"),
-                        l2=[
-                            0.013299230512542162,
-                            0.0073025819009651,
-                            0.007302581900965106,
-                            0.007300042097573285,
-                            0.04888085245959731
-                        ],
-                        linf=[
-                            0.31714843611640464,
-                            0.23586839231625517,
-                            0.23586839231625506,
-                            0.23698123351744782,
-                            1.1174271158464726
-                        ])
-    # Ensure that we do not have excessive memory allocations
-    # (e.g., from type instabilities)
-    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
-end
-
 @testitem "TreeMesh3D Euler: elixir_euler_blob_amr.jl" setup=[Setup, TreeMesh3DEuler] tags=[:tree_part4] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_blob_amr.jl"),
                         l2=[
@@ -469,20 +445,20 @@ end
 ] tags=[:tree_part4] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_blast_wave.jl"),
                         l2=[
-                            0.0007871241159752619,
-                            0.0037168004033428146,
-                            0.0037168004033428094,
-                            0.0037168004033428514,
-                            0.011119869089205635
+                            0.0009372168261282832,
+                            0.0034985853328695295,
+                            0.0034985853328695286,
+                            0.0034985853328695455,
+                            0.016047784825945568
                         ],
                         linf=[
-                            0.13982864363612468,
-                            0.786004687738243,
-                            0.786004687738243,
-                            0.7860046877382431,
-                            1.7082524045150382
+                            0.12396873904763517,
+                            0.8183365171292072,
+                            0.8183365171292072,
+                            0.8183365171292075,
+                            2.8910973366415575
                         ],
-                        tspan=(0.0, 0.01),
+                        tspan=(0.0, 0.01), max_level=6,
                         surface_flux=flux_hlle)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)

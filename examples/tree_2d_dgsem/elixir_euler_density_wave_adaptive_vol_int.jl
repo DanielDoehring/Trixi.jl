@@ -6,8 +6,9 @@ using Trixi
 equations = CompressibleEulerEquations2D(1.4)
 
 # We repeat test case for linear stability of EC fluxes from the paper
-# - Gregor J. Gassner, Magnus Svärd, Florian J. Hindenlang (2020)
+# - Gregor J. Gassner, Magnus Svärd, Florian J. Hindenlang (2022)
 #   Stability issues of entropy-stable and/or split-form high-order schemes
+#   [arXiv: 2007.09026](https://arxiv.org/abs/2007.09026)
 #   [DOI: 10.1007/s10915-021-01720-8](https://doi.org/10.1007/s10915-021-01720-8)
 initial_condition = initial_condition_density_wave
 
@@ -72,6 +73,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
             dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
             ode_default_options()..., callback = callbacks);

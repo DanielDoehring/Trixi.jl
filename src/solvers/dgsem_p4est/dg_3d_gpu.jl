@@ -22,14 +22,23 @@ end
                                        volume_integral::VolumeIntegralFluxDifferencing,
                                        dg::DGSEM, cache)
     nelements(dg, cache) == 0 && return nothing
+    # Explicit bounds check, which allows us to assume inbounds access in the kernel
+    @boundscheck begin
+        check_axes(u, mesh, equations, dg, cache)
+        check_axes(du, mesh, equations, dg, cache)
+        # Required, e.g., for the `contravariant_vectors` of curvilinear meshes
+        check_axes(cache.elements, equations, dg, cache)
+        check_axes_aux(get_aux_vars(cache), equations, dg, cache)
+    end
     @unpack derivative_split = dg.basis
     @unpack contravariant_vectors = cache.elements
     NNODES = nnodes(dg)
-    kernel_type = flux_differencing_kernel(backend, cache.flux_differencing_kernel)
+    kernel_type = flux_differencing_kernel(backend,
+                                           cache.tuning.flux_differencing_kernel)
     kernel! = flux_differencing_KAkernel!(backend,
                                           flux_differencing_workgroupsize_3d(kernel_type,
                                                                              Val(NNODES))...)
-    kernel!(du, u, equations,
+    kernel!(du, u, get_aux_vars(cache), equations,
             typeof(mesh),
             kernel_type,
             have_nonconservative_terms,
@@ -37,11 +46,35 @@ end
                                                             equations),
             dg,
             volume_integral.volume_flux, Val(NNODES), Val(nvariables(equations)),
+            Val(nauxvariables(equations)),
             derivative_split,
             contravariant_vectors,
-            ndrange = (NNODES, NNODES, NNODES, nelements(dg, cache)))
+            ndrange = (element_node_ndrange(mesh, dg)..., nelements(dg, cache)))
     return nothing
 end
+
+# Store the auxiliary variables of the node `(i, j, k)` of `element` in the shared memory
+# `aux_local` of the flux differencing kernels below.
+# Nothing is stored for equations without auxiliary variables.
+@inline function set_aux_node_vars_local!(aux_local, aux::Nothing, equations, dg,
+                                          i, j, k, element)
+    return nothing
+end
+
+Base.@propagate_inbounds function set_aux_node_vars_local!(aux_local, aux,
+                                                           equations, dg,
+                                                           i, j, k, element)
+    for v in eachauxvariable(equations)
+        aux_local[v, i, j, k] = aux[v, i, j, k, element]
+    end
+    return nothing
+end
+
+# Return the shared memory `aux_local` of the auxiliary variables, or `nothing` for
+# equations without auxiliary variables, such that it can be passed to
+# `get_aux_node_vars` in the same way as `aux`.
+@inline get_aux_vars_local(aux_local, aux::Nothing) = nothing
+@inline get_aux_vars_local(aux_local, aux) = aux_local
 
 # GPU kernel of the flux differencing volume integral, dispatching on `kernel_type`,
 # see [`HalfSweep`](@ref), [`FullSweep`](@ref), and [`FullSweepGlobal`](@ref).
@@ -58,23 +91,28 @@ end
 # contribution is weighted by 1/2 to avoid double counting.
 #
 # For details on the cyclic distribution see Section 4.1 (Eq. 6) of
-# - Waterhouse, Waruszewski, Wilcox, Giraldo (2026)
+# - Waterhouse, Waruszewski, Wilcox, Warburton, Giraldo (2027)
 #   GPU Performance of an Entropy-Stable Discontinuous Galerkin Euler Solver
 #   with Non-Conservative Terms
 #   [arXiv: 2605.16684](https://arxiv.org/abs/2605.16684)
-@kernel function flux_differencing_KAkernel!(du, u, equations,
-                                             MeshT::Type{<:Union{P4estMesh{3},
-                                                                 T8codeMesh{3}}},
-                                             ::HalfSweep,
-                                             have_nonconservative_terms::False,
-                                             combine_conservative_and_nonconservative_fluxes::False,
-                                             dg::DGSEM,
-                                             volume_flux,
-                                             ::Val{NNODES},
-                                             ::Val{NVARIABLES},
-                                             derivative_split,
-                                             contravariant_vectors) where {NNODES,
-                                                                           NVARIABLES}
+#   [DOI: 10.1016/j.jcp.2026.115543](https://doi.org/10.1016/j.jcp.2026.115543)
+@kernel inbounds=true function flux_differencing_KAkernel!(du, u, aux, equations,
+                                                           MeshT::Type{<:Union{P4estMesh{3},
+                                                                               T8codeMesh{3}}},
+                                                           ::HalfSweep,
+                                                           have_nonconservative_terms::False,
+                                                           combine_conservative_and_nonconservative_fluxes::False,
+                                                           dg::DGSEM,
+                                                           volume_flux,
+                                                           ::Val{NNODES},
+                                                           ::Val{NVARIABLES},
+                                                           ::Val{NAUX},
+                                                           derivative_split,
+                                                           contravariant_vectors) where {
+                                                                                         NNODES,
+                                                                                         NVARIABLES,
+                                                                                         NAUX
+                                                                                         }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -84,6 +122,7 @@ end
     flux_local = @localmem eltype(du) (NVARIABLES, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
 
     # pull the contravariant vectors in each coordinate direction
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -102,15 +141,17 @@ end
         # first coordinate direction: rotate the partner index along `i`
         ii = mod(i - 1 + offset, NNODES) + 1
         u_node_ii = get_node_vars(u, equations, dg, ii, j, k, element)
+        aux_node_ii = get_aux_node_vars(aux, equations, dg, ii, j, k, element)
         # pull the contravariant vectors and compute the average
         Ja1_node_ii = get_contravariant_vector(1, contravariant_vectors,
                                                ii, j, k, element)
         Ja1_avg = 0.5f0 * (Ja1_node + Ja1_node_ii)
         # compute the contravariant volume flux in the direction of the
         # averaged contravariant vector
-        fluxtilde1 = volume_flux(u_node, u_node_ii, Ja1_avg, equations)
+        fluxtilde1 = volume_flux(u_node, u_node_ii, aux_node..., aux_node_ii...,
+                                 Ja1_avg, equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde1[v]
         end
 
@@ -129,14 +170,16 @@ end
         # second coordinate direction: rotate the partner index along `j`
         jj = mod(j - 1 + offset, NNODES) + 1
         u_node_jj = get_node_vars(u, equations, dg, i, jj, k, element)
+        aux_node_jj = get_aux_node_vars(aux, equations, dg, i, jj, k, element)
         # pull the contravariant vectors and compute the average
         Ja2_node_jj = get_contravariant_vector(2, contravariant_vectors,
                                                i, jj, k, element)
         Ja2_avg = 0.5f0 * (Ja2_node + Ja2_node_jj)
         # compute the contravariant volume flux in the direction of the
         # averaged contravariant vector
-        fluxtilde2 = volume_flux(u_node, u_node_jj, Ja2_avg, equations)
-        @inbounds for v in 1:NVARIABLES
+        fluxtilde2 = volume_flux(u_node, u_node_jj, aux_node..., aux_node_jj...,
+                                 Ja2_avg, equations)
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde2[v]
         end
         @synchronize
@@ -153,14 +196,16 @@ end
         # third coordinate direction: rotate the partner index along `k`
         kk = mod(k - 1 + offset, NNODES) + 1
         u_node_kk = get_node_vars(u, equations, dg, i, j, kk, element)
+        aux_node_kk = get_aux_node_vars(aux, equations, dg, i, j, kk, element)
         # pull the contravariant vectors and compute the average
         Ja3_node_kk = get_contravariant_vector(3, contravariant_vectors,
                                                i, j, kk, element)
         Ja3_avg = 0.5f0 * (Ja3_node + Ja3_node_kk)
         # compute the contravariant volume flux in the direction of the
         # averaged contravariant vector
-        fluxtilde3 = volume_flux(u_node, u_node_kk, Ja3_avg, equations)
-        @inbounds for v in 1:NVARIABLES
+        fluxtilde3 = volume_flux(u_node, u_node_kk, aux_node..., aux_node_kk...,
+                                 Ja3_avg, equations)
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde3[v]
         end
         @synchronize
@@ -174,19 +219,23 @@ end
     set_node_vars!(du, du_local, equations, dg, i, j, k, element)
 end
 
-@kernel function flux_differencing_KAkernel!(du, u, equations,
-                                             MeshT::Type{<:Union{P4estMesh{3},
-                                                                 T8codeMesh{3}}},
-                                             ::HalfSweep,
-                                             have_nonconservative_terms::True,
-                                             combine_conservative_and_nonconservative_fluxes::True,
-                                             dg::DGSEM,
-                                             volume_flux,
-                                             ::Val{NNODES},
-                                             ::Val{NVARIABLES},
-                                             derivative_split,
-                                             contravariant_vectors) where {NNODES,
-                                                                           NVARIABLES}
+@kernel inbounds=true function flux_differencing_KAkernel!(du, u, aux, equations,
+                                                           MeshT::Type{<:Union{P4estMesh{3},
+                                                                               T8codeMesh{3}}},
+                                                           ::HalfSweep,
+                                                           have_nonconservative_terms::True,
+                                                           combine_conservative_and_nonconservative_fluxes::True,
+                                                           dg::DGSEM,
+                                                           volume_flux,
+                                                           ::Val{NNODES},
+                                                           ::Val{NVARIABLES},
+                                                           ::Val{NAUX},
+                                                           derivative_split,
+                                                           contravariant_vectors) where {
+                                                                                         NNODES,
+                                                                                         NVARIABLES,
+                                                                                         NAUX
+                                                                                         }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -196,6 +245,7 @@ end
     flux_local = @localmem eltype(du) (NVARIABLES, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
 
     # pull the contravariant vectors in each coordinate direction
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -214,16 +264,18 @@ end
         # first coordinate direction: rotate the partner index along `i`
         ii = mod(i - 1 + offset, NNODES) + 1
         u_node_ii = get_node_vars(u, equations, dg, ii, j, k, element)
+        aux_node_ii = get_aux_node_vars(aux, equations, dg, ii, j, k, element)
         # pull the contravariant vectors and compute the average
         Ja1_node_ii = get_contravariant_vector(1, contravariant_vectors,
                                                ii, j, k, element)
         Ja1_avg = 0.5f0 * (Ja1_node + Ja1_node_ii)
         # compute the contravariant volume flux in the direction of the
         # averaged contravariant vector
-        fluxtilde1_left, fluxtilde1_right = volume_flux(u_node, u_node_ii, Ja1_avg,
-                                                        equations)
+        fluxtilde1_left, fluxtilde1_right = volume_flux(u_node, u_node_ii,
+                                                        aux_node..., aux_node_ii...,
+                                                        Ja1_avg, equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde1_right[v]
         end
         @synchronize
@@ -241,15 +293,17 @@ end
         # second coordinate direction: rotate the partner index along `j`
         jj = mod(j - 1 + offset, NNODES) + 1
         u_node_jj = get_node_vars(u, equations, dg, i, jj, k, element)
+        aux_node_jj = get_aux_node_vars(aux, equations, dg, i, jj, k, element)
         # pull the contravariant vectors and compute the average
         Ja2_node_jj = get_contravariant_vector(2, contravariant_vectors,
                                                i, jj, k, element)
         Ja2_avg = 0.5f0 * (Ja2_node + Ja2_node_jj)
         # compute the contravariant volume flux in the direction of the
         # averaged contravariant vector
-        fluxtilde2_left, fluxtilde2_right = volume_flux(u_node, u_node_jj, Ja2_avg,
-                                                        equations)
-        @inbounds for v in 1:NVARIABLES
+        fluxtilde2_left, fluxtilde2_right = volume_flux(u_node, u_node_jj,
+                                                        aux_node..., aux_node_jj...,
+                                                        Ja2_avg, equations)
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde2_right[v]
         end
         @synchronize
@@ -267,15 +321,17 @@ end
         # third coordinate direction: rotate the partner index along `k`
         kk = mod(k - 1 + offset, NNODES) + 1
         u_node_kk = get_node_vars(u, equations, dg, i, j, kk, element)
+        aux_node_kk = get_aux_node_vars(aux, equations, dg, i, j, kk, element)
         # pull the contravariant vectors and compute the average
         Ja3_node_kk = get_contravariant_vector(3, contravariant_vectors,
                                                i, j, kk, element)
         Ja3_avg = 0.5f0 * (Ja3_node + Ja3_node_kk)
         # compute the contravariant volume flux in the direction of the
         # averaged contravariant vector
-        fluxtilde3_left, fluxtilde3_right = volume_flux(u_node, u_node_kk, Ja3_avg,
-                                                        equations)
-        @inbounds for v in 1:NVARIABLES
+        fluxtilde3_left, fluxtilde3_right = volume_flux(u_node, u_node_kk,
+                                                        aux_node..., aux_node_kk...,
+                                                        Ja3_avg, equations)
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde3_right[v]
         end
         @synchronize
@@ -293,19 +349,23 @@ end
 # GPU kernel of the flux differencing volume integral, dispatching on `kernel_type`,
 # see [`HalfSweep`](@ref), [`FullSweep`](@ref), and [`FullSweepGlobal`](@ref).
 # See the documentation of [`HalfSweep`](@ref) for details on the trade-offs.
-@kernel function flux_differencing_KAkernel!(du, u, equations,
-                                             MeshT::Type{<:Union{P4estMesh{3},
-                                                                 T8codeMesh{3}}},
-                                             ::FullSweep,
-                                             have_nonconservative_terms::False,
-                                             combine_conservative_and_nonconservative_fluxes::False,
-                                             dg::DGSEM,
-                                             volume_flux,
-                                             ::Val{NNODES},
-                                             ::Val{NVARIABLES},
-                                             derivative_split,
-                                             contravariant_vectors) where {NNODES,
-                                                                           NVARIABLES}
+@kernel inbounds=true function flux_differencing_KAkernel!(du, u, aux, equations,
+                                                           MeshT::Type{<:Union{P4estMesh{3},
+                                                                               T8codeMesh{3}}},
+                                                           ::FullSweep,
+                                                           have_nonconservative_terms::False,
+                                                           combine_conservative_and_nonconservative_fluxes::False,
+                                                           dg::DGSEM,
+                                                           volume_flux,
+                                                           ::Val{NNODES},
+                                                           ::Val{NVARIABLES},
+                                                           ::Val{NAUX},
+                                                           derivative_split,
+                                                           contravariant_vectors) where {
+                                                                                         NNODES,
+                                                                                         NVARIABLES,
+                                                                                         NAUX
+                                                                                         }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -313,14 +373,19 @@ end
     i, j, k, element = @index(Global, NTuple)
 
     u_local = @localmem eltype(du) (NVARIABLES, NNODES, NNODES, NNODES)
+    # Without auxiliary variables, `NAUX == 0` and nothing is stored.
+    aux_local = @localmem eltype(du) (NAUX, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
-    @inbounds for v in 1:NVARIABLES
+    for v in 1:NVARIABLES
         u_local[v, i, j, k] = u_node[v]
     end
+    set_aux_node_vars_local!(aux_local, aux, equations, dg, i, j, k, element)
     @synchronize
 
+    aux_shared = get_aux_vars_local(aux_local, aux)
     u_node = get_node_vars(u_local, equations, dg, i, j, k)
+    aux_node = get_aux_node_vars(aux_shared, equations, dg, i, j, k)
     du_local = zero(SVector{NVARIABLES, eltype(du)})
 
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -332,8 +397,10 @@ end
         # compute the contravariant volume flux in the direction of the
         # averaged contravariant vector
         fluxtilde1 = volume_flux(u_node,
-                                 get_node_vars(u_local, equations, dg, ii, j,
-                                               k),
+                                 get_node_vars(u_local, equations, dg, ii, j, k),
+                                 aux_node...,
+                                 get_aux_node_vars(aux_shared, equations, dg,
+                                                   ii, j, k)...,
                                  Ja1_avg, equations)
         du_local = du_local + derivative_split[i, ii] * fluxtilde1
     end
@@ -344,8 +411,10 @@ end
                    get_contravariant_vector(2, contravariant_vectors,
                                             i, jj, k, element))
         fluxtilde2 = volume_flux(u_node,
-                                 get_node_vars(u_local, equations, dg, i, jj,
-                                               k),
+                                 get_node_vars(u_local, equations, dg, i, jj, k),
+                                 aux_node...,
+                                 get_aux_node_vars(aux_shared, equations, dg,
+                                                   i, jj, k)...,
                                  Ja2_avg, equations)
         du_local = du_local + derivative_split[j, jj] * fluxtilde2
     end
@@ -356,8 +425,10 @@ end
                    get_contravariant_vector(3, contravariant_vectors,
                                             i, j, kk, element))
         fluxtilde3 = volume_flux(u_node,
-                                 get_node_vars(u_local, equations, dg, i, j,
-                                               kk),
+                                 get_node_vars(u_local, equations, dg, i, j, kk),
+                                 aux_node...,
+                                 get_aux_node_vars(aux_shared, equations, dg,
+                                                   i, j, kk)...,
                                  Ja3_avg, equations)
         du_local = du_local + derivative_split[k, kk] * fluxtilde3
     end
@@ -365,19 +436,23 @@ end
     set_node_vars!(du, du_local, equations, dg, i, j, k, element)
 end
 
-@kernel function flux_differencing_KAkernel!(du, u, equations,
-                                             MeshT::Type{<:Union{P4estMesh{3},
-                                                                 T8codeMesh{3}}},
-                                             ::FullSweep,
-                                             have_nonconservative_terms::True,
-                                             combine_conservative_and_nonconservative_fluxes::True,
-                                             dg::DGSEM,
-                                             volume_flux,
-                                             ::Val{NNODES},
-                                             ::Val{NVARIABLES},
-                                             derivative_split,
-                                             contravariant_vectors) where {NNODES,
-                                                                           NVARIABLES}
+@kernel inbounds=true function flux_differencing_KAkernel!(du, u, aux, equations,
+                                                           MeshT::Type{<:Union{P4estMesh{3},
+                                                                               T8codeMesh{3}}},
+                                                           ::FullSweep,
+                                                           have_nonconservative_terms::True,
+                                                           combine_conservative_and_nonconservative_fluxes::True,
+                                                           dg::DGSEM,
+                                                           volume_flux,
+                                                           ::Val{NNODES},
+                                                           ::Val{NVARIABLES},
+                                                           ::Val{NAUX},
+                                                           derivative_split,
+                                                           contravariant_vectors) where {
+                                                                                         NNODES,
+                                                                                         NVARIABLES,
+                                                                                         NAUX
+                                                                                         }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -385,14 +460,19 @@ end
     i, j, k, element = @index(Global, NTuple)
 
     u_local = @localmem eltype(du) (NVARIABLES, NNODES, NNODES, NNODES)
+    # Without auxiliary variables, `NAUX == 0` and nothing is stored.
+    aux_local = @localmem eltype(du) (NAUX, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
-    @inbounds for v in 1:NVARIABLES
+    for v in 1:NVARIABLES
         u_local[v, i, j, k] = u_node[v]
     end
+    set_aux_node_vars_local!(aux_local, aux, equations, dg, i, j, k, element)
     @synchronize
 
+    aux_shared = get_aux_vars_local(aux_local, aux)
     u_node = get_node_vars(u_local, equations, dg, i, j, k)
+    aux_node = get_aux_node_vars(aux_shared, equations, dg, i, j, k)
     du_local = zero(SVector{NVARIABLES, eltype(du)})
 
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -403,6 +483,9 @@ end
         fluxtilde1_left, _ = volume_flux(u_node,
                                          get_node_vars(u_local, equations, dg,
                                                        ii, j, k),
+                                         aux_node...,
+                                         get_aux_node_vars(aux_shared, equations, dg,
+                                                           ii, j, k)...,
                                          Ja1_avg, equations)
         du_local = du_local + derivative_split[i, ii] * fluxtilde1_left
     end
@@ -415,6 +498,9 @@ end
         fluxtilde2_left, _ = volume_flux(u_node,
                                          get_node_vars(u_local, equations, dg,
                                                        i, jj, k),
+                                         aux_node...,
+                                         get_aux_node_vars(aux_shared, equations, dg,
+                                                           i, jj, k)...,
                                          Ja2_avg, equations)
         du_local = du_local + derivative_split[j, jj] * fluxtilde2_left
     end
@@ -427,6 +513,9 @@ end
         fluxtilde3_left, _ = volume_flux(u_node,
                                          get_node_vars(u_local, equations, dg,
                                                        i, j, kk),
+                                         aux_node...,
+                                         get_aux_node_vars(aux_shared, equations, dg,
+                                                           i, j, kk)...,
                                          Ja3_avg, equations)
         du_local = du_local + derivative_split[k, kk] * fluxtilde3_left
     end
@@ -439,19 +528,23 @@ end
 # See the documentation of [`HalfSweep`](@ref) for details on the trade-offs.
 # This is the least efficient version, but it is also the most flexible one since
 # it is not restricted by shared memory or workgroup size limits.
-@kernel function flux_differencing_KAkernel!(du, u, equations,
-                                             MeshT::Type{<:Union{P4estMesh{3},
-                                                                 T8codeMesh{3}}},
-                                             ::FullSweepGlobal,
-                                             have_nonconservative_terms::False,
-                                             combine_conservative_and_nonconservative_fluxes::False,
-                                             dg::DGSEM,
-                                             volume_flux,
-                                             ::Val{NNODES},
-                                             ::Val{NVARIABLES},
-                                             derivative_split,
-                                             contravariant_vectors) where {NNODES,
-                                                                           NVARIABLES}
+@kernel inbounds=true function flux_differencing_KAkernel!(du, u, aux, equations,
+                                                           MeshT::Type{<:Union{P4estMesh{3},
+                                                                               T8codeMesh{3}}},
+                                                           ::FullSweepGlobal,
+                                                           have_nonconservative_terms::False,
+                                                           combine_conservative_and_nonconservative_fluxes::False,
+                                                           dg::DGSEM,
+                                                           volume_flux,
+                                                           ::Val{NNODES},
+                                                           ::Val{NVARIABLES},
+                                                           ::Val{NAUX},
+                                                           derivative_split,
+                                                           contravariant_vectors) where {
+                                                                                         NNODES,
+                                                                                         NVARIABLES,
+                                                                                         NAUX
+                                                                                         }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -459,6 +552,7 @@ end
     i, j, k, element = @index(Global, NTuple)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
     du_local = zero(SVector{NVARIABLES, eltype(du)})
 
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -471,6 +565,9 @@ end
         # averaged contravariant vector
         fluxtilde1 = volume_flux(u_node,
                                  get_node_vars(u, equations, dg, ii, j, k, element),
+                                 aux_node...,
+                                 get_aux_node_vars(aux, equations, dg,
+                                                   ii, j, k, element)...,
                                  Ja1_avg, equations)
         du_local = du_local + derivative_split[i, ii] * fluxtilde1
     end
@@ -482,6 +579,9 @@ end
                                             i, jj, k, element))
         fluxtilde2 = volume_flux(u_node,
                                  get_node_vars(u, equations, dg, i, jj, k, element),
+                                 aux_node...,
+                                 get_aux_node_vars(aux, equations, dg,
+                                                   i, jj, k, element)...,
                                  Ja2_avg, equations)
         du_local = du_local + derivative_split[j, jj] * fluxtilde2
     end
@@ -493,6 +593,9 @@ end
                                             i, j, kk, element))
         fluxtilde3 = volume_flux(u_node,
                                  get_node_vars(u, equations, dg, i, j, kk, element),
+                                 aux_node...,
+                                 get_aux_node_vars(aux, equations, dg,
+                                                   i, j, kk, element)...,
                                  Ja3_avg, equations)
         du_local = du_local + derivative_split[k, kk] * fluxtilde3
     end
@@ -500,19 +603,23 @@ end
     set_node_vars!(du, du_local, equations, dg, i, j, k, element)
 end
 
-@kernel function flux_differencing_KAkernel!(du, u, equations,
-                                             MeshT::Type{<:Union{P4estMesh{3},
-                                                                 T8codeMesh{3}}},
-                                             ::FullSweepGlobal,
-                                             have_nonconservative_terms::True,
-                                             combine_conservative_and_nonconservative_fluxes::True,
-                                             dg::DGSEM,
-                                             volume_flux,
-                                             ::Val{NNODES},
-                                             ::Val{NVARIABLES},
-                                             derivative_split,
-                                             contravariant_vectors) where {NNODES,
-                                                                           NVARIABLES}
+@kernel inbounds=true function flux_differencing_KAkernel!(du, u, aux, equations,
+                                                           MeshT::Type{<:Union{P4estMesh{3},
+                                                                               T8codeMesh{3}}},
+                                                           ::FullSweepGlobal,
+                                                           have_nonconservative_terms::True,
+                                                           combine_conservative_and_nonconservative_fluxes::True,
+                                                           dg::DGSEM,
+                                                           volume_flux,
+                                                           ::Val{NNODES},
+                                                           ::Val{NVARIABLES},
+                                                           ::Val{NAUX},
+                                                           derivative_split,
+                                                           contravariant_vectors) where {
+                                                                                         NNODES,
+                                                                                         NVARIABLES,
+                                                                                         NAUX
+                                                                                         }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -520,6 +627,7 @@ end
     i, j, k, element = @index(Global, NTuple)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
     du_local = zero(SVector{NVARIABLES, eltype(du)})
 
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -528,8 +636,11 @@ end
                    get_contravariant_vector(1, contravariant_vectors,
                                             ii, j, k, element))
         fluxtilde1_left, _ = volume_flux(u_node,
-                                         get_node_vars(u, equations, dg, ii, j, k,
-                                                       element),
+                                         get_node_vars(u, equations, dg,
+                                                       ii, j, k, element),
+                                         aux_node...,
+                                         get_aux_node_vars(aux, equations, dg,
+                                                           ii, j, k, element)...,
                                          Ja1_avg, equations)
         du_local = du_local + derivative_split[i, ii] * fluxtilde1_left
     end
@@ -540,8 +651,11 @@ end
                    get_contravariant_vector(2, contravariant_vectors,
                                             i, jj, k, element))
         fluxtilde2_left, _ = volume_flux(u_node,
-                                         get_node_vars(u, equations, dg, i, jj, k,
-                                                       element),
+                                         get_node_vars(u, equations, dg,
+                                                       i, jj, k, element),
+                                         aux_node...,
+                                         get_aux_node_vars(aux, equations, dg,
+                                                           i, jj, k, element)...,
                                          Ja2_avg, equations)
         du_local = du_local + derivative_split[j, jj] * fluxtilde2_left
     end
@@ -552,8 +666,11 @@ end
                    get_contravariant_vector(3, contravariant_vectors,
                                             i, j, kk, element))
         fluxtilde3_left, _ = volume_flux(u_node,
-                                         get_node_vars(u, equations, dg, i, j, kk,
-                                                       element),
+                                         get_node_vars(u, equations, dg,
+                                                       i, j, kk, element),
+                                         aux_node...,
+                                         get_aux_node_vars(aux, equations, dg,
+                                                           i, j, kk, element)...,
                                          Ja3_avg, equations)
         du_local = du_local + derivative_split[k, kk] * fluxtilde3_left
     end
@@ -567,11 +684,20 @@ end
                                        volume_integral::VolumeIntegralFluxDifferencing{<:FluxTurbo},
                                        dg::DGSEM, cache)
     nelements(dg, cache) == 0 && return nothing
+    # Explicit bounds check, which allows us to assume inbounds access in the kernel
+    @boundscheck begin
+        check_axes(u, mesh, equations, dg, cache)
+        check_axes(du, mesh, equations, dg, cache)
+        # Required, e.g., for the `contravariant_vectors` of curvilinear meshes
+        check_axes(cache.elements, equations, dg, cache)
+        check_axes_aux(get_aux_vars(cache), equations, dg, cache)
+    end
     @unpack derivative_split = dg.basis
     @unpack contravariant_vectors = cache.elements
     @unpack numerical_flux = volume_integral.volume_flux
     NNODES = nnodes(dg)
-    kernel_type = flux_differencing_kernel(backend, cache.flux_differencing_kernel)
+    kernel_type = flux_differencing_kernel(backend,
+                                           cache.tuning.flux_differencing_kernel)
 
     # Fallback for FullSweepGlobal when wrapped with FluxTurbo.
     if kernel_type isa FullSweepGlobal
@@ -584,7 +710,7 @@ end
     kernel! = flux_differencing_KAkernel_turbo!(backend,
                                                 flux_differencing_workgroupsize_3d(kernel_type,
                                                                                    Val(NNODES))...)
-    kernel!(du, u, equations,
+    kernel!(du, u, get_aux_vars(cache), equations,
             typeof(mesh),
             kernel_type,
             have_nonconservative_terms,
@@ -593,28 +719,32 @@ end
             nturbovars(numerical_flux, equations),
             derivative_split,
             contravariant_vectors,
-            ndrange = (NNODES, NNODES, NNODES, nelements(dg, cache)))
+            ndrange = (element_node_ndrange(mesh, dg)..., nelements(dg, cache)))
     return nothing
 end
 
 # Variant of `flux_differencing_KAkernel!` for volume fluxes wrapped in a
-# [`FluxTurbo`](@ref). The `NAUX` precomputed variables of `Trixi.cons2turbo` are
+# [`FluxTurbo`](@ref). The `NTURBO` precomputed variables of `Trixi.cons2turbo` are
 # evaluated once per node instead of once per two-point flux evaluation and stored
 # in shared memory for [`HalfSweep`](@ref) and [`FullSweep`](@ref) kernels.
-@kernel function flux_differencing_KAkernel_turbo!(du, u, equations,
-                                                   MeshT::Type{<:Union{P4estMesh{3},
-                                                                       T8codeMesh{3}}},
-                                                   ::HalfSweep,
-                                                   have_nonconservative_terms::False,
-                                                   dg::DGSEM,
-                                                   numerical_flux,
-                                                   ::Val{NNODES},
-                                                   ::Val{NVARIABLES},
-                                                   ::Val{NAUX},
-                                                   derivative_split,
-                                                   contravariant_vectors) where {NNODES,
-                                                                                 NVARIABLES,
-                                                                                 NAUX}
+@kernel inbounds=true function flux_differencing_KAkernel_turbo!(du, u, aux,
+                                                                 equations,
+                                                                 MeshT::Type{<:Union{P4estMesh{3},
+                                                                                     T8codeMesh{3}}},
+                                                                 ::HalfSweep,
+                                                                 have_nonconservative_terms::False,
+                                                                 dg::DGSEM,
+                                                                 numerical_flux::NumericalFlux,
+                                                                 ::Val{NNODES},
+                                                                 ::Val{NVARIABLES},
+                                                                 ::Val{NTURBO},
+                                                                 derivative_split,
+                                                                 contravariant_vectors) where {
+                                                                                               NumericalFlux,
+                                                                                               NNODES,
+                                                                                               NVARIABLES,
+                                                                                               NTURBO
+                                                                                               }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -622,16 +752,19 @@ end
     i, j, k, element = @index(Global, NTuple)
 
     flux_local = @localmem eltype(du) (NVARIABLES, NNODES, NNODES, NNODES)
-    turbo_local = @localmem eltype(du) (NAUX, NNODES, NNODES, NNODES)
+    turbo_local = @localmem eltype(du) (NTURBO, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
-    turbo_node = cons2turbo(numerical_flux, u_node..., equations)
-    @inbounds for v in 1:NAUX
+    # The auxiliary variables are passed to `cons2turbo` as scalars after the conserved
+    # variables such that they can be part of the precomputed variables
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
+    turbo_node = cons2turbo(numerical_flux, vcat(u_node, aux_node...)..., equations)
+    for v in 1:NTURBO
         turbo_local[v, i, j, k] = turbo_node[v]
     end
     @synchronize
 
-    turbo_node = get_node_turbo(turbo_local, Val(NAUX), i, j, k)
+    turbo_node = get_node_turbo(turbo_local, Val(NTURBO), i, j, k)
 
     # pull the contravariant vectors in each coordinate direction
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -657,11 +790,10 @@ end
         # contravariant vector, using the precomputed variables of both nodes
         fluxtilde1 = flux_turbo(numerical_flux,
                                 turbo_node...,
-                                get_node_turbo(turbo_local, Val(NAUX), ii, j, k)...,
-                                Ja1_avg[1], Ja1_avg[2], Ja1_avg[3],
-                                equations)
+                                get_node_turbo(turbo_local, Val(NTURBO), ii, j, k)...,
+                                Ja1_avg..., equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde1[v]
         end
 
@@ -687,11 +819,10 @@ end
         # contravariant vector, using the precomputed variables of both nodes
         fluxtilde2 = flux_turbo(numerical_flux,
                                 turbo_node...,
-                                get_node_turbo(turbo_local, Val(NAUX), i, jj, k)...,
-                                Ja2_avg[1], Ja2_avg[2], Ja2_avg[3],
-                                equations)
+                                get_node_turbo(turbo_local, Val(NTURBO), i, jj, k)...,
+                                Ja2_avg..., equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde2[v]
         end
 
@@ -717,11 +848,10 @@ end
         # contravariant vector, using the precomputed variables of both nodes
         fluxtilde3 = flux_turbo(numerical_flux,
                                 turbo_node...,
-                                get_node_turbo(turbo_local, Val(NAUX), i, j, kk)...,
-                                Ja3_avg[1], Ja3_avg[2], Ja3_avg[3],
-                                equations)
+                                get_node_turbo(turbo_local, Val(NTURBO), i, j, kk)...,
+                                Ja3_avg..., equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde3[v]
         end
 
@@ -736,20 +866,24 @@ end
     set_node_vars!(du, du_local, equations, dg, i, j, k, element)
 end
 
-@kernel function flux_differencing_KAkernel_turbo!(du, u, equations,
-                                                   MeshT::Type{<:Union{P4estMesh{3},
-                                                                       T8codeMesh{3}}},
-                                                   ::HalfSweep,
-                                                   have_nonconservative_terms::True,
-                                                   dg::DGSEM,
-                                                   numerical_flux,
-                                                   ::Val{NNODES},
-                                                   ::Val{NVARIABLES},
-                                                   ::Val{NAUX},
-                                                   derivative_split,
-                                                   contravariant_vectors) where {NNODES,
-                                                                                 NVARIABLES,
-                                                                                 NAUX}
+@kernel inbounds=true function flux_differencing_KAkernel_turbo!(du, u, aux,
+                                                                 equations,
+                                                                 MeshT::Type{<:Union{P4estMesh{3},
+                                                                                     T8codeMesh{3}}},
+                                                                 ::HalfSweep,
+                                                                 have_nonconservative_terms::True,
+                                                                 dg::DGSEM,
+                                                                 numerical_flux::NumericalFlux,
+                                                                 ::Val{NNODES},
+                                                                 ::Val{NVARIABLES},
+                                                                 ::Val{NTURBO},
+                                                                 derivative_split,
+                                                                 contravariant_vectors) where {
+                                                                                               NumericalFlux,
+                                                                                               NNODES,
+                                                                                               NVARIABLES,
+                                                                                               NTURBO
+                                                                                               }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -757,16 +891,19 @@ end
     i, j, k, element = @index(Global, NTuple)
 
     flux_local = @localmem eltype(du) (NVARIABLES, NNODES, NNODES, NNODES)
-    turbo_local = @localmem eltype(du) (NAUX, NNODES, NNODES, NNODES)
+    turbo_local = @localmem eltype(du) (NTURBO, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
-    turbo_node = cons2turbo(numerical_flux, u_node..., equations)
-    @inbounds for v in 1:NAUX
+    # The auxiliary variables are passed to `cons2turbo` as scalars after the conserved
+    # variables such that they can be part of the precomputed variables
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
+    turbo_node = cons2turbo(numerical_flux, vcat(u_node, aux_node...)..., equations)
+    for v in 1:NTURBO
         turbo_local[v, i, j, k] = turbo_node[v]
     end
     @synchronize
 
-    turbo_node = get_node_turbo(turbo_local, Val(NAUX), i, j, k)
+    turbo_node = get_node_turbo(turbo_local, Val(NTURBO), i, j, k)
 
     # pull the contravariant vectors in each coordinate direction
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -793,13 +930,11 @@ end
         fluxtilde1_left, fluxtilde1_right = flux_turbo(numerical_flux,
                                                        turbo_node...,
                                                        get_node_turbo(turbo_local,
-                                                                      Val(NAUX), ii, j,
-                                                                      k)...,
-                                                       Ja1_avg[1], Ja1_avg[2],
-                                                       Ja1_avg[3],
-                                                       equations)
+                                                                      Val(NTURBO),
+                                                                      ii, j, k)...,
+                                                       Ja1_avg..., equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde1_right[v]
         end
 
@@ -828,13 +963,11 @@ end
         fluxtilde2_left, fluxtilde2_right = flux_turbo(numerical_flux,
                                                        turbo_node...,
                                                        get_node_turbo(turbo_local,
-                                                                      Val(NAUX), i, jj,
-                                                                      k)...,
-                                                       Ja2_avg[1], Ja2_avg[2],
-                                                       Ja2_avg[3],
-                                                       equations)
+                                                                      Val(NTURBO),
+                                                                      i, jj, k)...,
+                                                       Ja2_avg..., equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde2_right[v]
         end
 
@@ -863,13 +996,11 @@ end
         fluxtilde3_left, fluxtilde3_right = flux_turbo(numerical_flux,
                                                        turbo_node...,
                                                        get_node_turbo(turbo_local,
-                                                                      Val(NAUX), i, j,
-                                                                      kk)...,
-                                                       Ja3_avg[1], Ja3_avg[2],
-                                                       Ja3_avg[3],
-                                                       equations)
+                                                                      Val(NTURBO),
+                                                                      i, j, kk)...,
+                                                       Ja3_avg..., equations)
 
-        @inbounds for v in 1:NVARIABLES
+        for v in 1:NVARIABLES
             flux_local[v, i, j, k] = fluxtilde3_right[v]
         end
 
@@ -886,20 +1017,24 @@ end
     set_node_vars!(du, du_local, equations, dg, i, j, k, element)
 end
 
-@kernel function flux_differencing_KAkernel_turbo!(du, u, equations,
-                                                   MeshT::Type{<:Union{P4estMesh{3},
-                                                                       T8codeMesh{3}}},
-                                                   ::FullSweep,
-                                                   have_nonconservative_terms::False,
-                                                   dg::DGSEM,
-                                                   numerical_flux,
-                                                   ::Val{NNODES},
-                                                   ::Val{NVARIABLES},
-                                                   ::Val{NAUX},
-                                                   derivative_split,
-                                                   contravariant_vectors) where {NNODES,
-                                                                                 NVARIABLES,
-                                                                                 NAUX}
+@kernel inbounds=true function flux_differencing_KAkernel_turbo!(du, u, aux,
+                                                                 equations,
+                                                                 MeshT::Type{<:Union{P4estMesh{3},
+                                                                                     T8codeMesh{3}}},
+                                                                 ::FullSweep,
+                                                                 have_nonconservative_terms::False,
+                                                                 dg::DGSEM,
+                                                                 numerical_flux::NumericalFlux,
+                                                                 ::Val{NNODES},
+                                                                 ::Val{NVARIABLES},
+                                                                 ::Val{NTURBO},
+                                                                 derivative_split,
+                                                                 contravariant_vectors) where {
+                                                                                               NumericalFlux,
+                                                                                               NNODES,
+                                                                                               NVARIABLES,
+                                                                                               NTURBO
+                                                                                               }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -908,16 +1043,19 @@ end
 
     # We do not need `u_local` as in the regular `FullSweep` flux differencing
     # kernel but only the local turbo variables.
-    turbo_local = @localmem eltype(du) (NAUX, NNODES, NNODES, NNODES)
+    turbo_local = @localmem eltype(du) (NTURBO, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
-    turbo_node = cons2turbo(numerical_flux, u_node..., equations)
-    @inbounds for v in 1:NAUX
+    # The auxiliary variables are passed to `cons2turbo` as scalars after the conserved
+    # variables such that they can be part of the precomputed variables
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
+    turbo_node = cons2turbo(numerical_flux, vcat(u_node, aux_node...)..., equations)
+    for v in 1:NTURBO
         turbo_local[v, i, j, k] = turbo_node[v]
     end
     @synchronize
 
-    turbo_node = get_node_turbo(turbo_local, Val(NAUX), i, j, k)
+    turbo_node = get_node_turbo(turbo_local, Val(NTURBO), i, j, k)
     du_local = zero(SVector{NVARIABLES, eltype(du)})
 
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -930,10 +1068,8 @@ end
         # contravariant vector, using the precomputed variables of both nodes
         fluxtilde1 = flux_turbo(numerical_flux,
                                 turbo_node...,
-                                get_node_turbo(turbo_local, Val(NAUX),
-                                               ii, j, k)...,
-                                Ja1_avg[1], Ja1_avg[2], Ja1_avg[3],
-                                equations)
+                                get_node_turbo(turbo_local, Val(NTURBO), ii, j, k)...,
+                                Ja1_avg..., equations)
         du_local = du_local +
                    derivative_split[i, ii] * fluxtilde1
     end
@@ -945,10 +1081,8 @@ end
                                             i, jj, k, element))
         fluxtilde2 = flux_turbo(numerical_flux,
                                 turbo_node...,
-                                get_node_turbo(turbo_local, Val(NAUX),
-                                               i, jj, k)...,
-                                Ja2_avg[1], Ja2_avg[2], Ja2_avg[3],
-                                equations)
+                                get_node_turbo(turbo_local, Val(NTURBO), i, jj, k)...,
+                                Ja2_avg..., equations)
         du_local = du_local +
                    derivative_split[j, jj] * fluxtilde2
     end
@@ -960,10 +1094,8 @@ end
                                             i, j, kk, element))
         fluxtilde3 = flux_turbo(numerical_flux,
                                 turbo_node...,
-                                get_node_turbo(turbo_local, Val(NAUX),
-                                               i, j, kk)...,
-                                Ja3_avg[1], Ja3_avg[2], Ja3_avg[3],
-                                equations)
+                                get_node_turbo(turbo_local, Val(NTURBO), i, j, kk)...,
+                                Ja3_avg..., equations)
         du_local = du_local +
                    derivative_split[k, kk] * fluxtilde3
     end
@@ -971,20 +1103,24 @@ end
     set_node_vars!(du, du_local, equations, dg, i, j, k, element)
 end
 
-@kernel function flux_differencing_KAkernel_turbo!(du, u, equations,
-                                                   MeshT::Type{<:Union{P4estMesh{3},
-                                                                       T8codeMesh{3}}},
-                                                   ::FullSweep,
-                                                   have_nonconservative_terms::True,
-                                                   dg::DGSEM,
-                                                   numerical_flux,
-                                                   ::Val{NNODES},
-                                                   ::Val{NVARIABLES},
-                                                   ::Val{NAUX},
-                                                   derivative_split,
-                                                   contravariant_vectors) where {NNODES,
-                                                                                 NVARIABLES,
-                                                                                 NAUX}
+@kernel inbounds=true function flux_differencing_KAkernel_turbo!(du, u, aux,
+                                                                 equations,
+                                                                 MeshT::Type{<:Union{P4estMesh{3},
+                                                                                     T8codeMesh{3}}},
+                                                                 ::FullSweep,
+                                                                 have_nonconservative_terms::True,
+                                                                 dg::DGSEM,
+                                                                 numerical_flux::NumericalFlux,
+                                                                 ::Val{NNODES},
+                                                                 ::Val{NVARIABLES},
+                                                                 ::Val{NTURBO},
+                                                                 derivative_split,
+                                                                 contravariant_vectors) where {
+                                                                                               NumericalFlux,
+                                                                                               NNODES,
+                                                                                               NVARIABLES,
+                                                                                               NTURBO
+                                                                                               }
     # In contrast to the regular (CPU) code, this kernel does not
     # include an additional factor `alpha` scaling the update
     # since we use `set_node_vars!` instead of `add_to_node_vars!`
@@ -993,16 +1129,19 @@ end
 
     # We do not need `u_local` as in the regular `FullSweep` flux differencing
     # kernel but only the local turbo variables.
-    turbo_local = @localmem eltype(du) (NAUX, NNODES, NNODES, NNODES)
+    turbo_local = @localmem eltype(du) (NTURBO, NNODES, NNODES, NNODES)
 
     u_node = get_node_vars(u, equations, dg, i, j, k, element)
-    turbo_node = cons2turbo(numerical_flux, u_node..., equations)
-    @inbounds for v in 1:NAUX
+    # The auxiliary variables are passed to `cons2turbo` as scalars after the conserved
+    # variables such that they can be part of the precomputed variables
+    aux_node = get_aux_node_vars(aux, equations, dg, i, j, k, element)
+    turbo_node = cons2turbo(numerical_flux, vcat(u_node, aux_node...)..., equations)
+    for v in 1:NTURBO
         turbo_local[v, i, j, k] = turbo_node[v]
     end
     @synchronize
 
-    turbo_node = get_node_turbo(turbo_local, Val(NAUX), i, j, k)
+    turbo_node = get_node_turbo(turbo_local, Val(NTURBO), i, j, k)
     du_local = zero(SVector{NVARIABLES, eltype(du)})
 
     Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, k, element)
@@ -1015,10 +1154,9 @@ end
         # contravariant vector, using the precomputed variables of both nodes
         fluxtilde1_left, _ = flux_turbo(numerical_flux,
                                         turbo_node...,
-                                        get_node_turbo(turbo_local, Val(NAUX),
+                                        get_node_turbo(turbo_local, Val(NTURBO),
                                                        ii, j, k)...,
-                                        Ja1_avg[1], Ja1_avg[2], Ja1_avg[3],
-                                        equations)
+                                        Ja1_avg..., equations)
         du_local = du_local +
                    derivative_split[i, ii] *
                    fluxtilde1_left
@@ -1031,10 +1169,9 @@ end
                                             i, jj, k, element))
         fluxtilde2_left, _ = flux_turbo(numerical_flux,
                                         turbo_node...,
-                                        get_node_turbo(turbo_local, Val(NAUX),
+                                        get_node_turbo(turbo_local, Val(NTURBO),
                                                        i, jj, k)...,
-                                        Ja2_avg[1], Ja2_avg[2], Ja2_avg[3],
-                                        equations)
+                                        Ja2_avg..., equations)
         du_local = du_local +
                    derivative_split[j, jj] *
                    fluxtilde2_left
@@ -1047,10 +1184,9 @@ end
                                             i, j, kk, element))
         fluxtilde3_left, _ = flux_turbo(numerical_flux,
                                         turbo_node...,
-                                        get_node_turbo(turbo_local, Val(NAUX),
+                                        get_node_turbo(turbo_local, Val(NTURBO),
                                                        i, j, kk)...,
-                                        Ja3_avg[1], Ja3_avg[2], Ja3_avg[3],
-                                        equations)
+                                        Ja3_avg..., equations)
         du_local = du_local +
                    derivative_split[k, kk] *
                    fluxtilde3_left
@@ -1069,9 +1205,18 @@ function prolong2interfaces_and_calc_interface_flux!(backend::Backend,
     @unpack neighbor_ids, node_indices = cache.interfaces
     @unpack contravariant_vectors = cache.elements
     ninterfaces(cache.interfaces) == 0 && return nothing
+    # Explicit bounds check, which allows us to assume inbounds access in the kernel
+    @boundscheck begin
+        check_axes(u, mesh, equations, dg, cache)
+        check_axes(cache.interfaces, equations, dg, cache)
+        check_axes(cache.elements, equations, dg, cache)
+        check_axes_surface_flux_values(surface_flux_values, mesh, equations, dg, cache)
+        check_axes_aux_interface(get_aux_interface_vars(cache), equations, dg, cache)
+    end
     index_range = eachnode(dg)
     kernel! = prolong2interfaces_and_calc_interface_flux_KAkernel!(backend)
-    kernel!(surface_flux_values, u, typeof(mesh), have_nonconservative_terms, equations,
+    kernel!(surface_flux_values, u, get_aux_interface_vars(cache), typeof(mesh),
+            have_nonconservative_terms, equations,
             surface_integral, dg, neighbor_ids, node_indices, contravariant_vectors,
             index_range,
             ndrange = (nnodes(dg), nnodes(dg), ninterfaces(cache.interfaces)))
@@ -1079,18 +1224,22 @@ function prolong2interfaces_and_calc_interface_flux!(backend::Backend,
     return nothing
 end
 
-@kernel function prolong2interfaces_and_calc_interface_flux_KAkernel!(surface_flux_values,
-                                                                      u, MeshT,
-                                                                      have_nonconservative_terms,
-                                                                      equations,
-                                                                      surface_integral,
-                                                                      dg,
-                                                                      neighbor_ids,
-                                                                      node_indices,
-                                                                      contravariant_vectors,
-                                                                      index_range)
+@kernel inbounds=true function prolong2interfaces_and_calc_interface_flux_KAkernel!(surface_flux_values,
+                                                                                    u,
+                                                                                    aux_interface,
+                                                                                    MeshT::Type{<:Union{P4estMesh{3},
+                                                                                                        T8codeMesh{3}}},
+                                                                                    have_nonconservative_terms,
+                                                                                    equations,
+                                                                                    surface_integral,
+                                                                                    dg,
+                                                                                    neighbor_ids,
+                                                                                    node_indices,
+                                                                                    contravariant_vectors,
+                                                                                    index_range)
     i, j, interface = @index(Global, NTuple)
-    prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values, u, MeshT,
+    prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values, u,
+                                                         aux_interface, MeshT,
                                                          have_nonconservative_terms,
                                                          equations,
                                                          surface_integral, dg,
@@ -1105,9 +1254,12 @@ end
     return start + ((i - 1) + (j - 1) * n) * step_i + (j - 1) * step_j
 end
 
-@inline function get_interface_values(u, equations, dg, neighbor_ids,
-                                      node_indices, contravariant_vectors,
-                                      index_range, i, j, interface)
+# Compute the elements, directions, and volume node indices on both sides of an
+# interface for the surface node `(i, j)` (counted along the primary side) as
+# well as the surface node indices `(i_secondary, j_secondary)` on the secondary
+# element, which might run backwards or be transposed for flipped sides.
+Base.@propagate_inbounds function get_interface_indices(neighbor_ids, node_indices,
+                                                        index_range, i, j, interface)
     n = length(index_range)
 
     primary_element = neighbor_ids[1, interface]
@@ -1155,6 +1307,23 @@ end
     j_secondary = delayed_index_3d(j_secondary_step_start, j_secondary_step_start_i,
                                    j_secondary_step_start_j, i, j, n)
 
+    return (primary_direction, primary_element, i_primary, j_primary, k_primary,
+            i_secondary, j_secondary, secondary_direction, secondary_element,
+            i_secondary_node, j_secondary_node, k_secondary_node)
+end
+
+Base.@propagate_inbounds function get_interface_values(u, equations, dg, neighbor_ids,
+                                                       node_indices,
+                                                       contravariant_vectors,
+                                                       index_range, i, j, interface)
+    (primary_direction, primary_element, i_primary, j_primary, k_primary,
+    i_secondary, j_secondary, secondary_direction, secondary_element,
+    i_secondary_node, j_secondary_node, k_secondary_node) = get_interface_indices(neighbor_ids,
+                                                                                  node_indices,
+                                                                                  index_range,
+                                                                                  i, j,
+                                                                                  interface)
+
     u_ll = get_node_vars(u, equations, dg, i_primary, j_primary, k_primary,
                          primary_element)
     u_rr = get_node_vars(u, equations, dg, i_secondary_node, j_secondary_node,
@@ -1168,19 +1337,22 @@ end
             i_secondary, j_secondary, secondary_direction, secondary_element)
 end
 
-@inline function prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values,
-                                                                      u,
-                                                                      MeshT::Type{<:Union{P4estMesh{3},
-                                                                                          T8codeMesh{3}}},
-                                                                      have_nonconservative_terms::False,
-                                                                      equations,
-                                                                      surface_integral,
-                                                                      dg,
-                                                                      neighbor_ids,
-                                                                      node_indices,
-                                                                      contravariant_vectors,
-                                                                      index_range,
-                                                                      i, j, interface)
+Base.@propagate_inbounds function prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values,
+                                                                                       u,
+                                                                                       aux_interface,
+                                                                                       MeshT::Type{<:Union{P4estMesh{3},
+                                                                                                           T8codeMesh{3}}},
+                                                                                       have_nonconservative_terms::False,
+                                                                                       equations,
+                                                                                       surface_integral,
+                                                                                       dg,
+                                                                                       neighbor_ids,
+                                                                                       node_indices,
+                                                                                       contravariant_vectors,
+                                                                                       index_range,
+                                                                                       i,
+                                                                                       j,
+                                                                                       interface)
     @unpack surface_flux = surface_integral
 
     u_ll, u_rr, normal_direction, primary_direction, primary_element,
@@ -1195,7 +1367,12 @@ end
                                                                                             j,
                                                                                             interface)
 
-    flux_ = surface_flux(u_ll, u_rr, normal_direction, equations)
+    # Auxiliary variables on both sides of the interface at the surface node `(i, j)`,
+    # counted along the primary side as for `surface_flux_values`
+    aux_node = get_aux_surface_node_vars(aux_interface, equations, typeof(dg),
+                                         i, j, interface)
+
+    flux_ = surface_flux(u_ll, u_rr, aux_node..., normal_direction, equations)
     for v in eachvariable(equations)
         surface_flux_values[v, i, j, primary_direction, primary_element] = flux_[v]
         surface_flux_values[v, i_secondary, j_secondary, secondary_direction,
@@ -1204,20 +1381,24 @@ end
     return nothing
 end
 
-@inline function prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values,
-                                                                      u,
-                                                                      MeshT::Type{<:Union{P4estMesh{3},
-                                                                                          T8codeMesh{3}}},
-                                                                      have_nonconservative_terms::True,
-                                                                      equations,
-                                                                      surface_integral,
-                                                                      dg,
-                                                                      neighbor_ids,
-                                                                      node_indices,
-                                                                      contravariant_vectors,
-                                                                      index_range,
-                                                                      i, j, interface)
-    prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values, u, MeshT,
+Base.@propagate_inbounds function prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values,
+                                                                                       u,
+                                                                                       aux_interface,
+                                                                                       MeshT::Type{<:Union{P4estMesh{3},
+                                                                                                           T8codeMesh{3}}},
+                                                                                       have_nonconservative_terms::True,
+                                                                                       equations,
+                                                                                       surface_integral,
+                                                                                       dg,
+                                                                                       neighbor_ids,
+                                                                                       node_indices,
+                                                                                       contravariant_vectors,
+                                                                                       index_range,
+                                                                                       i,
+                                                                                       j,
+                                                                                       interface)
+    prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values, u,
+                                                         aux_interface, MeshT,
                                                          have_nonconservative_terms,
                                                          combine_conservative_and_nonconservative_fluxes(surface_integral.surface_flux,
                                                                                                          equations),
@@ -1230,20 +1411,23 @@ end
     return nothing
 end
 
-@inline function prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values,
-                                                                      u,
-                                                                      MeshT::Type{<:Union{P4estMesh{3},
-                                                                                          T8codeMesh{3}}},
-                                                                      have_nonconservative_terms::True,
-                                                                      combine_conservative_and_nonconservative_fluxes::True,
-                                                                      equations,
-                                                                      surface_integral,
-                                                                      dg,
-                                                                      neighbor_ids,
-                                                                      node_indices,
-                                                                      contravariant_vectors,
-                                                                      index_range,
-                                                                      i, j, interface)
+Base.@propagate_inbounds function prolong2interfaces_and_calc_interface_flux_per_node!(surface_flux_values,
+                                                                                       u,
+                                                                                       aux_interface,
+                                                                                       MeshT::Type{<:Union{P4estMesh{3},
+                                                                                                           T8codeMesh{3}}},
+                                                                                       have_nonconservative_terms::True,
+                                                                                       combine_conservative_and_nonconservative_fluxes::True,
+                                                                                       equations,
+                                                                                       surface_integral,
+                                                                                       dg,
+                                                                                       neighbor_ids,
+                                                                                       node_indices,
+                                                                                       contravariant_vectors,
+                                                                                       index_range,
+                                                                                       i,
+                                                                                       j,
+                                                                                       interface)
     @unpack surface_flux = surface_integral
 
     u_ll, u_rr, normal_direction, primary_direction, primary_element,
@@ -1258,7 +1442,13 @@ end
                                                                                             j,
                                                                                             interface)
 
-    flux_left, flux_right = surface_flux(u_ll, u_rr, normal_direction, equations)
+    # Auxiliary variables on both sides of the interface at the surface node `(i, j)`,
+    # counted along the primary side as for `surface_flux_values`
+    aux_node = get_aux_surface_node_vars(aux_interface, equations, typeof(dg),
+                                         i, j, interface)
+
+    flux_left, flux_right = surface_flux(u_ll, u_rr, aux_node...,
+                                         normal_direction, equations)
     for v in eachvariable(equations)
         surface_flux_values[v, i, j, primary_direction, primary_element] = flux_left[v]
         surface_flux_values[v, i_secondary, j_secondary, secondary_direction,
@@ -1271,6 +1461,11 @@ end
     return (nnodes(dg), nnodes(dg))
 end
 
+# Nodes of one element, see the 2D version
+@inline function element_node_ndrange(mesh::Union{P4estMesh{3}, T8codeMesh{3}}, dg)
+    return (nnodes(dg), nnodes(dg), nnodes(dg))
+end
+
 function prolong2boundaries!(backend::Backend, cache, u,
                              mesh::Union{P4estMesh, T8codeMesh},
                              equations, dg::DG)
@@ -1278,6 +1473,11 @@ function prolong2boundaries!(backend::Backend, cache, u,
     @unpack neighbor_ids, node_indices = boundaries
     nboundaries = length(eachboundary(dg, cache))
     nboundaries == 0 && return nothing
+    # Explicit bounds check, which allows us to assume inbounds access in the kernel
+    @boundscheck begin
+        check_axes(u, mesh, equations, dg, cache)
+        check_axes(boundaries, equations, dg, cache)
+    end
     index_range = eachnode(dg)
     kernel! = prolong2boundaries_kernel!(backend)
     kernel!(u, typeof(mesh), equations, dg, index_range, boundaries.u, neighbor_ids,
@@ -1285,23 +1485,26 @@ function prolong2boundaries!(backend::Backend, cache, u,
     return nothing
 end
 
-@kernel function prolong2boundaries_kernel!(u,
-                                            MeshT::Type{<:Union{P4estMesh{3},
-                                                                T8codeMesh{3}}},
-                                            equations, dg, index_range,
-                                            u_boundaries, neighbor_ids, node_indices)
+@kernel inbounds=true function prolong2boundaries_kernel!(u,
+                                                          MeshT::Type{<:Union{P4estMesh{3},
+                                                                              T8codeMesh{3}}},
+                                                          equations, dg, index_range,
+                                                          u_boundaries, neighbor_ids,
+                                                          node_indices)
     i, j, boundary = @index(Global, NTuple)
     prolong2boundaries_per_node!(u, MeshT, equations, dg, index_range, u_boundaries,
                                  neighbor_ids, node_indices, i, j, boundary)
 end
 
-@inline function prolong2boundaries_per_node!(u,
-                                              MeshT::Type{<:Union{P4estMesh{3},
-                                                                  T8codeMesh{3}}},
-                                              equations, dg::DG, index_range,
-                                              u_boundaries,
-                                              neighbor_ids, node_indices, i, j,
-                                              boundary)
+Base.@propagate_inbounds function prolong2boundaries_per_node!(u,
+                                                               MeshT::Type{<:Union{P4estMesh{3},
+                                                                                   T8codeMesh{3}}},
+                                                               equations, dg::DG,
+                                                               index_range,
+                                                               u_boundaries,
+                                                               neighbor_ids,
+                                                               node_indices, i, j,
+                                                               boundary)
     # Copy solution data from the element using "delayed indexing" with
     # a start value and a step size to get the correct face and orientation.
     element = neighbor_ids[boundary]
@@ -1365,29 +1568,43 @@ function calc_boundary_flux_by_type!(backend::Backend, cache, t,
                                      node_coordinates, contravariant_vectors)
     boundary_condition = first(BCs)
     boundary_condition_indices = first(BC_indices)
-    length(boundary_condition_indices) == 0 && return nothing
-    @unpack boundaries = cache
-    @unpack neighbor_ids, node_indices = boundaries
 
-    index_range = eachnode(dg)
+    # A boundary condition type without any boundaries (e.g., in parallel
+    # runs, where not every rank owns boundaries of every name) must not stop
+    # the processing of the remaining boundary condition types below.
     n_boundaries = length(boundary_condition_indices)
-    kernel_cache = kernel_filter_cache(cache)
-    kernel! = calc_boundary_flux_kernel!(backend)
-    kernel!(boundaries.u,
-            cache.elements.surface_flux_values,
-            boundary_condition_indices,
-            neighbor_ids,
-            node_indices,
-            t,
-            boundary_condition,
-            index_range,
-            typeof(mesh),
-            equations,
-            surface_integral,
-            dg,
-            kernel_cache, node_coordinates, contravariant_vectors;
-            ndrange = (boundary_node_ndrange(mesh, dg)..., n_boundaries))
+    if n_boundaries > 0
+        @unpack boundaries = cache
+        @unpack neighbor_ids, node_indices = boundaries
+        # Explicit bounds check, which allows us to assume inbounds access in the kernel
+        @boundscheck begin
+            check_axes(boundaries, equations, dg, cache)
+            check_axes(cache.elements, equations, dg, cache)
+            check_axes_surface_flux_values(cache.elements.surface_flux_values, mesh,
+                                           equations, dg, cache)
+            check_axes_aux(get_aux_vars(cache), equations, dg, cache)
+        end
 
+        index_range = eachnode(dg)
+        kernel_cache = kernel_filter_cache(cache)
+        kernel! = calc_boundary_flux_kernel!(backend)
+        kernel!(boundaries.u,
+                cache.elements.surface_flux_values,
+                boundary_condition_indices,
+                neighbor_ids,
+                node_indices,
+                t,
+                boundary_condition,
+                index_range,
+                typeof(mesh),
+                equations,
+                surface_integral,
+                dg,
+                kernel_cache, node_coordinates, contravariant_vectors;
+                ndrange = (boundary_node_ndrange(mesh, dg)..., n_boundaries))
+    end
+
+    # Recursively call this method with the unprocessed boundary types
     calc_boundary_flux_by_type!(backend, cache, t,
                                 Base.tail(BCs),
                                 Base.tail(BC_indices),
@@ -1396,21 +1613,21 @@ function calc_boundary_flux_by_type!(backend::Backend, cache, t,
     return nothing
 end
 
-@kernel function calc_boundary_flux_kernel!(u,
-                                            surface_flux_values,
-                                            boundary_condition_indices,
-                                            neighbor_ids,
-                                            node_indices_arr,
-                                            t,
-                                            boundary_condition,
-                                            index_range,
-                                            MeshT::Type{<:Union{P4estMesh,
-                                                                T8codeMesh}},
-                                            equations,
-                                            surface_integral,
-                                            dg,
-                                            cache, node_coordinates,
-                                            contravariant_vectors)
+@kernel inbounds=true function calc_boundary_flux_kernel!(u,
+                                                          surface_flux_values,
+                                                          boundary_condition_indices,
+                                                          neighbor_ids,
+                                                          node_indices_arr,
+                                                          t,
+                                                          boundary_condition::BC,
+                                                          index_range,
+                                                          MeshT::Type{<:Union{P4estMesh{3},
+                                                                              T8codeMesh{3}}},
+                                                          equations,
+                                                          surface_integral,
+                                                          dg,
+                                                          cache, node_coordinates,
+                                                          contravariant_vectors) where {BC}
     i, j, local_index = @index(Global, NTuple)
 
     if local_index <= length(boundary_condition_indices)
@@ -1425,17 +1642,20 @@ end
     end
 end
 
-@inline function calc_boundary_flux_per_node!(u,
-                                              surface_flux_values, t,
-                                              boundary_condition,
-                                              MeshT::Type{<:Union{P4estMesh{3},
-                                                                  T8codeMesh{3}}},
-                                              equations, surface_integral, dg,
-                                              cache,
-                                              boundary, neighbor_ids,
-                                              node_indices_arr,
-                                              index_range, node_coordinates,
-                                              contravariant_vectors, i, j)
+Base.@propagate_inbounds function calc_boundary_flux_per_node!(u,
+                                                               surface_flux_values, t,
+                                                               boundary_condition,
+                                                               MeshT::Type{<:Union{P4estMesh{3},
+                                                                                   T8codeMesh{3}}},
+                                                               equations,
+                                                               surface_integral, dg,
+                                                               cache,
+                                                               boundary, neighbor_ids,
+                                                               node_indices_arr,
+                                                               index_range,
+                                                               node_coordinates,
+                                                               contravariant_vectors, i,
+                                                               j)
 
     # Get information on the adjacent element, compute the surface fluxes,
     # and store them
@@ -1462,16 +1682,19 @@ end
 end
 
 # inlined version of the boundary flux calculation along a physical interface
-@inline function calc_boundary_flux!(u, surface_flux_values, t, boundary_condition,
-                                     MeshT::Type{<:Union{P4estMesh{3},
-                                                         T8codeMesh{3}}},
-                                     have_nonconservative_terms::False, equations,
-                                     surface_integral, dg, cache,
-                                     i_index, j_index, k_index, i_node_index,
-                                     j_node_index,
-                                     direction_index, element_index,
-                                     boundary_index, node_coordinates,
-                                     contravariant_vectors)
+Base.@propagate_inbounds function calc_boundary_flux!(u, surface_flux_values, t,
+                                                      boundary_condition,
+                                                      MeshT::Type{<:Union{P4estMesh{3},
+                                                                          T8codeMesh{3}}},
+                                                      have_nonconservative_terms::False,
+                                                      equations,
+                                                      surface_integral, dg, cache,
+                                                      i_index, j_index, k_index,
+                                                      i_node_index,
+                                                      j_node_index,
+                                                      direction_index, element_index,
+                                                      boundary_index, node_coordinates,
+                                                      contravariant_vectors)
     @unpack surface_flux = surface_integral
 
     # Extract solution data from boundary container
@@ -1486,7 +1709,13 @@ end
     x = get_node_coords(node_coordinates, equations, dg,
                         i_index, j_index, k_index, element_index)
 
-    flux_ = boundary_condition(u_inner, normal_direction, x, t, surface_flux, equations)
+    # Auxiliary variables inside the domain. There are no separate auxiliary variables
+    # on the outside of the boundary.
+    aux_inner = get_aux_node_vars(get_aux_vars(cache), equations, dg,
+                                  i_index, j_index, k_index, element_index)
+
+    flux_ = boundary_condition(u_inner, aux_inner..., normal_direction, x, t,
+                               surface_flux, equations)
 
     # Copy flux to element storage in the correct orientation
     for v in eachvariable(equations)
@@ -1494,15 +1723,20 @@ end
     end
 end
 
-@inline function calc_boundary_flux!(u, surface_flux_values, t, boundary_condition,
-                                     MeshT::Type{<:Union{P4estMesh{3},
-                                                         T8codeMesh{3}}},
-                                     have_nonconservative_terms::True, equations,
-                                     surface_integral, dg, cache, i_index, j_index,
-                                     k_index, i_node_index, j_node_index,
-                                     direction_index,
-                                     element_index, boundary_index, node_coordinates,
-                                     contravariant_vectors)
+Base.@propagate_inbounds function calc_boundary_flux!(u, surface_flux_values, t,
+                                                      boundary_condition,
+                                                      MeshT::Type{<:Union{P4estMesh{3},
+                                                                          T8codeMesh{3}}},
+                                                      have_nonconservative_terms::True,
+                                                      equations,
+                                                      surface_integral, dg, cache,
+                                                      i_index, j_index,
+                                                      k_index, i_node_index,
+                                                      j_node_index,
+                                                      direction_index,
+                                                      element_index, boundary_index,
+                                                      node_coordinates,
+                                                      contravariant_vectors)
     calc_boundary_flux!(u, surface_flux_values, t, boundary_condition, MeshT,
                         have_nonconservative_terms,
                         combine_conservative_and_nonconservative_fluxes(surface_integral.surface_flux,
@@ -1515,17 +1749,21 @@ end
     return nothing
 end
 
-@inline function calc_boundary_flux!(u, surface_flux_values, t, boundary_condition,
-                                     MeshT::Type{<:Union{P4estMesh{3},
-                                                         T8codeMesh{3}}},
-                                     have_nonconservative_terms::True,
-                                     combine_conservative_and_nonconservative_fluxes::True,
-                                     equations,
-                                     surface_integral, dg::DG, cache, i_index, j_index,
-                                     k_index, i_node_index, j_node_index,
-                                     direction_index,
-                                     element_index, boundary_index, node_coordinates,
-                                     contravariant_vectors)
+Base.@propagate_inbounds function calc_boundary_flux!(u, surface_flux_values, t,
+                                                      boundary_condition,
+                                                      MeshT::Type{<:Union{P4estMesh{3},
+                                                                          T8codeMesh{3}}},
+                                                      have_nonconservative_terms::True,
+                                                      combine_conservative_and_nonconservative_fluxes::True,
+                                                      equations,
+                                                      surface_integral, dg::DG, cache,
+                                                      i_index, j_index,
+                                                      k_index, i_node_index,
+                                                      j_node_index,
+                                                      direction_index,
+                                                      element_index, boundary_index,
+                                                      node_coordinates,
+                                                      contravariant_vectors)
     @unpack surface_flux = surface_integral
 
     # Extract solution data from boundary container
@@ -1540,9 +1778,14 @@ end
     x = get_node_coords(node_coordinates, equations, dg,
                         i_index, j_index, k_index, element_index)
 
+    # Auxiliary variables inside the domain. There are no separate auxiliary variables
+    # on the outside of the boundary.
+    aux_inner = get_aux_node_vars(get_aux_vars(cache), equations, dg,
+                                  i_index, j_index, k_index, element_index)
+
     # Call pointwise numerical flux functions for the conservative and nonconservative part
     # in the normal direction on the boundary
-    flux = boundary_condition(u_inner, normal_direction, x, t,
+    flux = boundary_condition(u_inner, aux_inner..., normal_direction, x, t,
                               surface_flux, equations)
 
     # Copy flux to element storage in the correct orientation
@@ -1552,6 +1795,400 @@ end
     end
 
     return nothing
+end
+
+function prolong2mortars!(backend::Backend, cache, u,
+                          mesh::Union{P4estMesh{3}, T8codeMesh{3}},
+                          equations,
+                          mortar_l2::LobattoLegendreMortarL2,
+                          dg::DGSEM{<:LobattoLegendreBasis})
+    nmortars(dg, cache) == 0 && return nothing
+    # Explicit bounds check, which allows us to assume inbounds access in the kernel
+    @boundscheck begin
+        check_axes(u, mesh, equations, dg, cache)
+        check_axes_mortar_container(cache.mortars, equations, dg, cache)
+    end
+
+    @unpack neighbor_ids, node_indices = cache.mortars
+
+    index_range = eachnode(dg)
+    nvars = nvariables(equations)
+
+    kernel! = prolong2mortars_KAkernel!(backend)
+    kernel!(cache.mortars.u, u, typeof(mesh),
+            neighbor_ids, node_indices,
+            mortar_l2.forward_lower, mortar_l2.forward_upper,
+            index_range, Val(nvars),
+            ndrange = (nnodes(dg), nnodes(dg), nmortars(dg, cache)))
+
+    return nothing
+end
+
+@kernel inbounds=true function prolong2mortars_KAkernel!(mortars_u, u,
+                                                         MeshT::Type{<:Union{P4estMesh{3},
+                                                                             T8codeMesh{3}}},
+                                                         neighbor_ids,
+                                                         node_indices,
+                                                         forward_lower,
+                                                         forward_upper,
+                                                         index_range,
+                                                         val_vars::Val{nvars}) where {nvars}
+    i, j, mortar = @index(Global, NTuple)
+
+    prolong2mortars_per_node!(mortars_u, u, MeshT, neighbor_ids, node_indices,
+                              forward_lower, forward_upper, i, j, mortar, index_range,
+                              val_vars)
+end
+
+Base.@propagate_inbounds function prolong2mortars_per_node!(mortars_u, u,
+                                                            MeshT::Type{<:Union{P4estMesh{3},
+                                                                                T8codeMesh{3}}},
+                                                            neighbor_ids,
+                                                            node_indices,
+                                                            forward_lower,
+                                                            forward_upper,
+                                                            i, j, mortar, index_range,
+                                                            ::Val{nvars}) where {nvars}
+    n = length(index_range)
+
+    # Copy solution data from the small elements using "delayed indexing" with
+    # a start value and two step sizes to get the correct face and orientation.
+    small_indices = node_indices[1, mortar]
+
+    i_small_start, i_small_step_i, i_small_step_j = index_to_start_step_3d(small_indices[1],
+                                                                           index_range)
+    j_small_start, j_small_step_i, j_small_step_j = index_to_start_step_3d(small_indices[2],
+                                                                           index_range)
+    k_small_start, k_small_step_i, k_small_step_j = index_to_start_step_3d(small_indices[3],
+                                                                           index_range)
+
+    i_small = delayed_index_3d(i_small_start, i_small_step_i, i_small_step_j, i, j, n)
+    j_small = delayed_index_3d(j_small_start, j_small_step_i, j_small_step_j, i, j, n)
+    k_small = delayed_index_3d(k_small_start, k_small_step_i, k_small_step_j, i, j, n)
+
+    for position in 1:4
+        element = neighbor_ids[position, mortar]
+        for v in 1:nvars
+            mortars_u[1, v, position, i, j, mortar] = u[v, i_small, j_small, k_small,
+                                                        element]
+        end
+    end
+
+    # Interpolate large element face data to small face locations
+    # In contrast to the CPU version, we do not buffer the data
+    large_indices = node_indices[2, mortar]
+    element = neighbor_ids[5, mortar]
+
+    i_large_start, i_large_step_i, i_large_step_j = index_to_start_step_3d(large_indices[1],
+                                                                           index_range)
+    j_large_start, j_large_step_i, j_large_step_j = index_to_start_step_3d(large_indices[2],
+                                                                           index_range)
+    k_large_start, k_large_step_i, k_large_step_j = index_to_start_step_3d(large_indices[3],
+                                                                           index_range)
+
+    # This is what the four multiply_dimensionwise! calls do in the CPU version.
+    # The positions of the small elements are
+    # 1: (lower, lower), 2: (upper, lower), 3: (lower, upper), 4: (upper, upper)
+    # in the two surface coordinate directions.
+    for v in 1:nvars
+        res_1 = zero(eltype(u))
+        res_2 = zero(eltype(u))
+        res_3 = zero(eltype(u))
+        res_4 = zero(eltype(u))
+        for jj in index_range, ii in index_range
+            i_large = delayed_index_3d(i_large_start, i_large_step_i, i_large_step_j,
+                                       ii, jj, n)
+            j_large = delayed_index_3d(j_large_start, j_large_step_i, j_large_step_j,
+                                       ii, jj, n)
+            k_large = delayed_index_3d(k_large_start, k_large_step_i, k_large_step_j,
+                                       ii, jj, n)
+            u_large = u[v, i_large, j_large, k_large, element]
+
+            lower_i = forward_lower[i, ii]
+            upper_i = forward_upper[i, ii]
+            lower_j = forward_lower[j, jj]
+            upper_j = forward_upper[j, jj]
+            res_1 += (lower_i * lower_j) * u_large
+            res_2 += (upper_i * lower_j) * u_large
+            res_3 += (lower_i * upper_j) * u_large
+            res_4 += (upper_i * upper_j) * u_large
+        end
+        mortars_u[2, v, 1, i, j, mortar] = res_1
+        mortars_u[2, v, 2, i, j, mortar] = res_2
+        mortars_u[2, v, 3, i, j, mortar] = res_3
+        mortars_u[2, v, 4, i, j, mortar] = res_4
+    end
+    return nothing
+end
+
+function calc_mortar_flux!(backend::Backend, surface_flux_values,
+                           mesh::Union{P4estMesh{3}, T8codeMesh{3}},
+                           have_nonconservative_terms, equations,
+                           mortar_l2::LobattoLegendreMortarL2, surface_integral,
+                           dg::DGSEM{<:LobattoLegendreBasis}, cache)
+    nmortars(dg, cache) == 0 && return nothing
+    # Explicit bounds check, which allows us to assume inbounds access in the kernel
+    @boundscheck begin
+        check_axes_mortar_container(cache.mortars, equations, dg, cache)
+        check_axes(cache.elements, equations, dg, cache)
+        check_axes_surface_flux_values(surface_flux_values, mesh, equations, dg, cache)
+    end
+
+    @unpack neighbor_ids, node_indices = cache.mortars
+    @unpack contravariant_vectors = cache.elements
+    @unpack surface_flux = surface_integral
+
+    index_range = eachnode(dg)
+    nvars = nvariables(equations)
+
+    kernel! = calc_mortar_flux_KAkernel!(backend)
+    kernel!(cache.mortars.u, surface_flux_values, typeof(mesh),
+            have_nonconservative_terms, equations,
+            surface_flux, typeof(dg),
+            neighbor_ids, node_indices, contravariant_vectors,
+            (mortar_l2.reverse_lower, mortar_l2.reverse_upper),
+            index_range, Val(nvars),
+            ndrange = (nnodes(dg), nnodes(dg), nmortars(dg, cache)))
+
+    return nothing
+end
+
+@kernel inbounds=true function calc_mortar_flux_KAkernel!(mortars_u,
+                                                          surface_flux_values,
+                                                          MeshT::Type{<:Union{P4estMesh{3},
+                                                                              T8codeMesh{3}}},
+                                                          have_nonconservative_terms,
+                                                          equations,
+                                                          surface_flux::SurfaceFlux,
+                                                          ::Type{SolverT},
+                                                          neighbor_ids,
+                                                          node_indices,
+                                                          contravariant_vectors,
+                                                          reverse_matrices,
+                                                          index_range,
+                                                          val_vars::Val{nvars}) where {
+                                                                                       SurfaceFlux,
+                                                                                       SolverT,
+                                                                                       nvars
+                                                                                       }
+    i, j, mortar = @index(Global, NTuple)
+
+    calc_mortar_flux_small_per_node!(surface_flux_values, MeshT,
+                                     have_nonconservative_terms, equations,
+                                     surface_flux, SolverT, neighbor_ids, node_indices,
+                                     contravariant_vectors, mortars_u,
+                                     index_range, mortar, i, j, val_vars)
+
+    calc_mortar_flux_large_per_node!(surface_flux_values, MeshT,
+                                     have_nonconservative_terms, equations,
+                                     surface_flux, SolverT, neighbor_ids, node_indices,
+                                     contravariant_vectors, mortars_u,
+                                     reverse_matrices,
+                                     index_range, mortar, i, j, val_vars)
+end
+
+Base.@propagate_inbounds function calc_mortar_flux_small_per_node!(surface_flux_values,
+                                                                   MeshT::Type{<:Union{P4estMesh{3},
+                                                                                       T8codeMesh{3}}},
+                                                                   have_nonconservative_terms,
+                                                                   equations,
+                                                                   surface_flux,
+                                                                   SolverT,
+                                                                   neighbor_ids,
+                                                                   node_indices,
+                                                                   contravariant_vectors,
+                                                                   mortars_u,
+                                                                   index_range, mortar,
+                                                                   i, j,
+                                                                   ::Val{nvars}) where {nvars}
+    n = length(index_range)
+
+    # Get index information on the small elements
+    small_indices = node_indices[1, mortar]
+    small_direction = indices2direction(small_indices)
+
+    i_small_start, i_small_step_i, i_small_step_j = index_to_start_step_3d(small_indices[1],
+                                                                           index_range)
+    j_small_start, j_small_step_i, j_small_step_j = index_to_start_step_3d(small_indices[2],
+                                                                           index_range)
+    k_small_start, k_small_step_i, k_small_step_j = index_to_start_step_3d(small_indices[3],
+                                                                           index_range)
+
+    i_small = delayed_index_3d(i_small_start, i_small_step_i, i_small_step_j, i, j, n)
+    j_small = delayed_index_3d(j_small_start, j_small_step_i, j_small_step_j, i, j, n)
+    k_small = delayed_index_3d(k_small_start, k_small_step_i, k_small_step_j, i, j, n)
+
+    for position in 1:4
+        element = neighbor_ids[position, mortar]
+        # Get the normal direction on the small element.
+        # Note, contravariant vectors at interfaces in negative coordinate direction
+        # are pointing inwards. This is handled by `get_normal_direction`.
+        normal_direction = get_normal_direction(small_direction,
+                                                contravariant_vectors,
+                                                i_small, j_small, k_small, element)
+
+        fstar_primary, _ = calc_mortar_flux_node(MeshT,
+                                                 have_nonconservative_terms,
+                                                 combine_conservative_and_nonconservative_fluxes(surface_flux,
+                                                                                                 equations),
+                                                 equations,
+                                                 surface_flux, SolverT, mortars_u,
+                                                 mortar, position, normal_direction,
+                                                 i, j)
+
+        # Write to small sides
+        for v in 1:nvars
+            surface_flux_values[v, i, j, small_direction, element] = fstar_primary[v]
+        end
+    end
+    return nothing
+end
+
+Base.@propagate_inbounds function calc_mortar_flux_large_per_node!(surface_flux_values,
+                                                                   MeshT::Type{<:Union{P4estMesh{3},
+                                                                                       T8codeMesh{3}}},
+                                                                   have_nonconservative_terms,
+                                                                   equations,
+                                                                   surface_flux,
+                                                                   SolverT,
+                                                                   neighbor_ids,
+                                                                   node_indices,
+                                                                   contravariant_vectors,
+                                                                   mortars_u,
+                                                                   reverse_matrices,
+                                                                   index_range, mortar,
+                                                                   i, j,
+                                                                   ::Val{nvars}) where {nvars}
+    n = length(index_range)
+
+    # Get index information on the small elements
+    small_indices = node_indices[1, mortar]
+    small_direction = indices2direction(small_indices)
+
+    i_small_start, i_small_step_i, i_small_step_j = index_to_start_step_3d(small_indices[1],
+                                                                           index_range)
+    j_small_start, j_small_step_i, j_small_step_j = index_to_start_step_3d(small_indices[2],
+                                                                           index_range)
+    k_small_start, k_small_step_i, k_small_step_j = index_to_start_step_3d(small_indices[3],
+                                                                           index_range)
+
+    # This is what the `multiply_dimensionwise!` and `add_multiply_dimensionwise!`
+    # calls in `mortar_fluxes_to_elements!` do in the CPU version.
+    # In contrast to the CPU version, the fluxes on the small elements are not
+    # buffered but recomputed by each thread.
+    # The positions of the small elements are
+    # 1: (lower, lower), 2: (upper, lower), 3: (lower, upper), 4: (upper, upper)
+    # in the two surface coordinate directions.
+    flux_large = zero(SVector{nvars, eltype(mortars_u)})
+
+    KernelAbstractions.Extras.@unroll for position in 1:4
+        reverse_matrix_i = reverse_matrices[isodd(position) ? 1 : 2]
+        reverse_matrix_j = reverse_matrices[position <= 2 ? 1 : 2]
+        element = neighbor_ids[position, mortar]
+
+        for jj in index_range, ii in index_range
+            i_small = delayed_index_3d(i_small_start, i_small_step_i, i_small_step_j,
+                                       ii, jj, n)
+            j_small = delayed_index_3d(j_small_start, j_small_step_i, j_small_step_j,
+                                       ii, jj, n)
+            k_small = delayed_index_3d(k_small_start, k_small_step_i, k_small_step_j,
+                                       ii, jj, n)
+
+            # Get the normal direction on the small element.
+            # Note, contravariant vectors at interfaces in negative coordinate direction
+            # are pointing inwards. This is handled by `get_normal_direction`.
+            normal_direction = get_normal_direction(small_direction,
+                                                    contravariant_vectors,
+                                                    i_small, j_small, k_small,
+                                                    element)
+
+            _, fstar_secondary = calc_mortar_flux_node(MeshT,
+                                                       have_nonconservative_terms,
+                                                       combine_conservative_and_nonconservative_fluxes(surface_flux,
+                                                                                                       equations),
+                                                       equations, surface_flux, SolverT,
+                                                       mortars_u, mortar, position,
+                                                       normal_direction, ii, jj)
+
+            factor = reverse_matrix_i[i, ii] * reverse_matrix_j[j, jj]
+            flux_large = flux_large + factor * fstar_secondary
+        end
+    end
+
+    # Copy interpolated flux values to the large element face in the correct
+    # orientation.
+    # Note that the indices of the small sides will always run forward but
+    # the large indices might need to run backwards for flipped sides.
+    large_element = neighbor_ids[5, mortar]
+    large_indices = node_indices[2, mortar]
+    large_direction = indices2direction(large_indices)
+    large_surface_indices = surface_indices(large_indices)
+
+    i_large_start, i_large_step_i, i_large_step_j = index_to_start_step_3d(large_surface_indices[1],
+                                                                           index_range)
+    j_large_start, j_large_step_i, j_large_step_j = index_to_start_step_3d(large_surface_indices[2],
+                                                                           index_range)
+
+    i_large = delayed_index_3d(i_large_start, i_large_step_i, i_large_step_j, i, j, n)
+    j_large = delayed_index_3d(j_large_start, j_large_step_i, j_large_step_j, i, j, n)
+
+    # The flux is calculated in the outward direction of the small elements,
+    # so the sign must be switched to get the flux in outward direction
+    # of the large element.
+    # The contravariant vectors of the large element (and therefore the normal
+    # vectors of the large element as well) are four times as large as the
+    # contravariant vectors of the small elements. Therefore, the flux needs
+    # to be scaled by a factor of 4 to obtain the flux of the large element.
+    for v in 1:nvars
+        surface_flux_values[v, i_large, j_large,
+        large_direction, large_element] = -4 * flux_large[v]
+    end
+    return nothing
+end
+
+# Mortar flux computation at a single node of a small element for conservation laws.
+# In contrast to the CPU version, the fluxes for the small (primary) and large
+# (secondary) side are returned instead of being stored in buffers.
+Base.@propagate_inbounds function calc_mortar_flux_node(MeshT::Type{<:Union{P4estMesh{3},
+                                                                            T8codeMesh{3}}},
+                                                        have_nonconservative_terms::False,
+                                                        combine_conservative_and_nonconservative_fluxes,
+                                                        equations,
+                                                        surface_flux,
+                                                        SolverT::Type{<:DG},
+                                                        mortars_u,
+                                                        mortar_index, position_index,
+                                                        normal_direction,
+                                                        i_node_index, j_node_index)
+    u_ll, u_rr = get_surface_node_vars(mortars_u, equations, SolverT, position_index,
+                                       i_node_index, j_node_index, mortar_index)
+
+    flux = surface_flux(u_ll, u_rr, normal_direction, equations)
+
+    return flux, flux
+end
+
+# Mortar flux computation at a single node of a small element for equations with
+# conservative and nonconservative terms.
+# In contrast to the CPU version, the fluxes for the small (primary) and large
+# (secondary) side are returned instead of being stored in buffers.
+Base.@propagate_inbounds function calc_mortar_flux_node(MeshT::Type{<:Union{P4estMesh{3},
+                                                                            T8codeMesh{3}}},
+                                                        have_nonconservative_terms::True,
+                                                        combine_conservative_and_nonconservative_fluxes::True,
+                                                        equations,
+                                                        surface_flux,
+                                                        SolverT::Type{<:DG},
+                                                        mortars_u,
+                                                        mortar_index, position_index,
+                                                        normal_direction,
+                                                        i_node_index, j_node_index)
+    u_ll, u_rr = get_surface_node_vars(mortars_u, equations, SolverT, position_index,
+                                       i_node_index, j_node_index, mortar_index)
+
+    # Compute combined fluxes
+    flux_left, flux_right = surface_flux(u_ll, u_rr, normal_direction, equations)
+    return flux_left, flux_right
 end
 
 function calc_surface_integral_and_apply_jacobian_and_calc_sources!(backend::Backend,
@@ -1566,31 +2203,42 @@ function calc_surface_integral_and_apply_jacobian_and_calc_sources!(backend::Bac
     nelements(dg, cache) == 0 && return nothing
     @unpack inverse_weights = dg.basis
     @unpack surface_flux_values, inverse_jacobian, node_coordinates = cache.elements
+    # Explicit bounds check, which allows us to assume inbounds access in the kernel
+    @boundscheck begin
+        check_axes(du, mesh, equations, dg, cache)
+        check_axes(u, mesh, equations, dg, cache)
+        check_axes(cache.elements, equations, dg, cache)
+        check_axes_surface_flux_values(surface_flux_values, mesh, equations, dg, cache)
+        check_axes_aux(get_aux_vars(cache), equations, dg, cache)
+    end
     kernel_cache = kernel_filter_cache(cache)
     NNODES = nnodes(dg)
     kernel! = calc_surface_integral_and_apply_jacobian_and_calc_sources_KAkernel!(backend)
     kernel!(du, u, t, source_terms, node_coordinates, typeof(mesh), equations,
             inverse_weights[1], Val(NNODES), surface_flux_values, dg, inverse_jacobian,
             kernel_cache,
-            ndrange = (NNODES, NNODES, NNODES, nelements(dg, cache)))
+            ndrange = (element_node_ndrange(mesh, dg)..., nelements(dg, cache)))
 
     return nothing
 end
 
-@kernel function calc_surface_integral_and_apply_jacobian_and_calc_sources_KAkernel!(du,
-                                                                                     u,
-                                                                                     t,
-                                                                                     source_terms,
-                                                                                     node_coordinates,
-                                                                                     MeshT::Type{<:Union{P4estMesh{3},
-                                                                                                         T8codeMesh{3}}},
-                                                                                     equations::AbstractEquations{3},
-                                                                                     factor,
-                                                                                     ::Val{NNODES},
-                                                                                     surface_flux_values,
-                                                                                     dg::DGSEM,
-                                                                                     inverse_jacobian,
-                                                                                     cache) where {NNODES}
+@kernel inbounds=true function calc_surface_integral_and_apply_jacobian_and_calc_sources_KAkernel!(du,
+                                                                                                   u,
+                                                                                                   t,
+                                                                                                   source_terms::Source,
+                                                                                                   node_coordinates,
+                                                                                                   MeshT::Type{<:Union{P4estMesh{3},
+                                                                                                                       T8codeMesh{3}}},
+                                                                                                   equations::AbstractEquations{3},
+                                                                                                   factor,
+                                                                                                   ::Val{NNODES},
+                                                                                                   surface_flux_values,
+                                                                                                   dg::DGSEM,
+                                                                                                   inverse_jacobian,
+                                                                                                   cache) where {
+                                                                                                                 NNODES,
+                                                                                                                 Source
+                                                                                                                 }
     i, j, k, element = @index(Global, NTuple)
     # Note that all fluxes have been computed with outward-pointing normal vectors.
     # This computes the **negative** surface integral contribution,
@@ -1610,19 +2258,27 @@ end
     z_face = ifelse(k == 1, 5, 6)
     _zero = zero(eltype(du))
     surface_node = SVector(ntuple(@inline(v->ifelse(x_node_interface,
-                                                    surface_flux_values[v, j, k, x_face,
-                                                                        element],
+                                                    @inbounds(surface_flux_values[v, j,
+                                                                                  k,
+                                                                                  x_face,
+                                                                                  element]),
                                                     _zero) +
                                              ifelse(y_node_interface,
-                                                    surface_flux_values[v, i, k, y_face,
-                                                                        element],
+                                                    @inbounds(surface_flux_values[v, i,
+                                                                                  k,
+                                                                                  y_face,
+                                                                                  element]),
                                                     _zero) +
                                              ifelse(z_node_interface,
-                                                    surface_flux_values[v, i, j, z_face,
-                                                                        element], _zero)),
+                                                    @inbounds(surface_flux_values[v, i,
+                                                                                  j,
+                                                                                  z_face,
+                                                                                  element]),
+                                                    _zero)),
                                   Val(nvariables(equations))))
-    source_node = calc_source_terms_node(u, t, source_terms, node_coordinates,
-                                         equations, dg, i, j, k, element)
+    source_node = calc_source_terms_node(u, get_aux_vars(cache), t, source_terms,
+                                         node_coordinates, equations, dg,
+                                         i, j, k, element)
     jacobian_factor = inverse_jacobian[i, j, k, element]
     du_local = get_node_vars(du, equations, dg, i, j, k, element) +
                factor * surface_node

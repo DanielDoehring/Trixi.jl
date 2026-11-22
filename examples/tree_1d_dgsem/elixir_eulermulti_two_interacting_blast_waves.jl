@@ -13,7 +13,9 @@ equations = CompressibleEulerMulticomponentEquations1D(gammas = (1.4, 1.4, 1.4),
 A multicomponent two interacting blast wave test taken from
 - T. Plewa & E. Müller (1999)
   The consistent multi-fluid advection method
-  [arXiv: 9807241](https://arxiv.org/pdf/astro-ph/9807241.pdf)
+  Astronomy and Astrophysics 342, 179-191
+  [arXiv: astro-ph/9807241](https://arxiv.org/abs/astro-ph/9807241)
+  [Bibcode: 1999A&A...342..179P](https://ui.adsabs.harvard.edu/abs/1999A%26A...342..179P)
 """
 function initial_condition_two_interacting_blast_waves(x, t,
                                                        equations::CompressibleEulerMulticomponentEquations1D)
@@ -113,6 +115,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
+sol = solve(ode,
+            CarpenterKennedy2N54(williamson_condition = false, thread = Trixi.Threaded());
             dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
             ode_default_options()..., callback = callbacks);

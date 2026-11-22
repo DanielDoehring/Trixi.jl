@@ -54,6 +54,29 @@ end
     end
 end
 
+@testitem "T8codeMesh2D: coarsen only complete families marked for coarsening" setup=[
+    Setup,
+    T8codeMesh2D
+] tags=[:t8code_part1] begin
+    using Trixi: Trixi, T8codeMesh
+
+    # A single tree refined once, i.e., one family of four elements.
+    # Each element of the family has to be marked for coarsening
+    # (indicator value -1), as on the `P4estMesh`.
+    function adapt_family(indicators)
+        mesh = T8codeMesh((1, 1), polydeg = 1,
+                          coordinates_min = (-1.0, -1.0), coordinates_max = (1.0, 1.0),
+                          initial_refinement_level = 1)
+        difference = Trixi.trixi_t8_adapt!(mesh, indicators)
+        return Trixi.ncells(mesh), difference
+    end
+
+    @test adapt_family([-1, -1, -1, -1]) == (1, [-1, -1, -1, -1])
+    @test adapt_family([-1, 0, 0, 0]) == (4, [0, 0, 0, 0])
+    @test adapt_family([0, -1, -1, -1]) == (4, [0, 0, 0, 0])
+    @test adapt_family([-1, -1, -1, 1]) == (7, [0, 0, 0, 1])
+end
+
 @testitem "T8codeMesh2D: elixir_advection_basic.jl" setup=[Setup, T8codeMesh2D] tags=[:t8code_part1] begin
     # This test is identical to the one in `test_p4est_2d.jl`.
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
@@ -92,8 +115,8 @@ end
 ] tags=[:t8code_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_advection_amr_unstructured_flag.jl"),
-                        l2=[0.002019623611753929],
-                        linf=[0.03542375961299987])
+                        l2=[0.0012808538770534917],
+                        linf=[0.017526900166598143])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
@@ -248,36 +271,35 @@ end
 @testitem "T8codeMesh2D: elixir_mhd_alfven_wave.jl" setup=[Setup, T8codeMesh2D] tags=[:t8code_part1] begin
     # This test is identical to the one in `test_p4est_2d.jl`.
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_alfven_wave.jl"),
-                        l2=[1.0513414461545583e-5, 1.0517900957166411e-6,
-                            1.0517900957304043e-6, 1.511816606372376e-6,
-                            1.0443997728645063e-6, 7.879639064990798e-7,
-                            7.879639065049896e-7, 1.0628631669056271e-6,
-                            4.3382328912336153e-7],
-                        linf=[4.255466285174592e-5, 1.0029706745823264e-5,
-                            1.0029706747467781e-5, 1.2122265939010224e-5,
-                            5.4791097160444835e-6, 5.18922042269665e-6,
-                            5.189220422141538e-6, 9.552667261422676e-6,
-                            1.4237578427628152e-6])
+                        l2=[1.135275409344563e-5, 1.1131529892185112e-6,
+                            1.1131529891853978e-6, 1.5243969617557254e-6,
+                            1.0425407379970379e-6, 7.001768083966741e-7,
+                            7.001768084007916e-7, 1.0339820547486087e-6,
+                            8.082448662048011e-7],
+                        linf=[4.7482150605904216e-5, 1.0143434492182468e-5,
+                            1.014343449248778e-5, 1.2038055884802668e-5,
+                            4.137108093882347e-6, 5.41892914218689e-6,
+                            5.418929141076667e-6, 9.162969510631558e-6,
+                            3.68738615623937e-6])
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
 @testitem "T8codeMesh2D: elixir_mhd_rotor.jl" setup=[Setup, T8codeMesh2D] tags=[:t8code_part1] begin
-    # This test is identical to the one in `test_p4est_2d.jl` besides minor
-    # deviations in the expected error norms.
+    # This test is identical to the one in `test_p4est_2d.jl`.
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_rotor.jl"),
-                        l2=[0.4419337424073218, 0.8804938551016932, 0.8258185723720365,
+                        l2=[0.15077720513548795, 0.40971672165769757, 0.39929779245008895,
                             0.0,
-                            0.961220188718187, 0.10397273631386837, 0.15408979488125943,
+                            0.35419782031671293, 0.060941724778874995, 0.1010717121078255,
                             0.0,
-                            2.66769410449947e-5],
-                        linf=[10.053140536236942, 18.17070117006211, 9.549208389448738,
+                            0.0007111513401867172],
+                        linf=[3.7551368898150956, 8.050018281646318, 4.896322852173753,
                             0.0,
-                            19.676151923191583, 1.3896544044814965, 1.8153256887969416,
+                            8.18212387717509, 1.0737243649810042, 1.9039664986949623,
                             0.0,
-                            0.0022030404596184786],
-                        tspan=(0.0, 0.02))
+                            0.04316282709001302],
+                        tspan=(0.0, 0.01))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
@@ -286,16 +308,16 @@ end
 @testitem "T8codeMesh2D: elixir_euler_weak_blast_wave_amr.jl" setup=[Setup, T8codeMesh2D] tags=[:t8code_part1] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_weak_blast_wave_amr.jl"),
                         l2=[
-                            0.10823279736983638,
-                            0.1158152939803735,
-                            0.11633970342992006,
-                            0.751152651902375
+                            0.11134260363848145,
+                            0.1175235709180422,
+                            0.11829112104640771,
+                            0.7557891142955037
                         ],
                         linf=[
-                            0.5581611332828653,
-                            0.8354026029724041,
-                            0.834485181423738,
-                            3.923553028014343
+                            0.5728647031475103,
+                            0.835313297767029,
+                            0.8266797080712254,
+                            3.979250623054833
                         ],
                         tspan=(0.0, 0.1))
     # Ensure that we do not have excessive memory allocations

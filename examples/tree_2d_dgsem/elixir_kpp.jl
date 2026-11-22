@@ -1,6 +1,6 @@
 using Trixi
 using OrdinaryDiffEqSSPRK
-using LinearAlgebra
+using LinearAlgebra: norm
 
 ###############################################################################
 # Definition of the 2D scalar "KPP equation"
@@ -149,4 +149,5 @@ callbacks = CallbackSet(summary_callback,
 
 ###############################################################################
 # run the simulation
-sol = solve(ode, SSPRK43(); ode_default_options()..., callback = callbacks)
+sol = solve(ode, SSPRK43(thread = Trixi.Threaded());
+            ode_default_options()..., callback = callbacks)

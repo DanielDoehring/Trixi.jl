@@ -77,11 +77,13 @@ function SemidiscretizationHyperbolicSplit(mesh, equations::Tuple,
     source_terms_stiff, source_terms_nonstiff = source_terms
 
     cache_stiff = (;
-                   create_cache(mesh, equations_stiff, solver_stiff,
-                                RealT, uEltype)..., initial_cache_stiff...)
+                   create_cache_hyperbolic(mesh, equations_stiff, solver_stiff,
+                                           RealT, uEltype)...,
+                   initial_cache_stiff...)
     cache_nonstiff = (;
-                      create_cache(mesh, equations_nonstiff, solver_nonstiff,
-                                   RealT, uEltype)..., initial_cache_nonstiff...)
+                      create_cache_hyperbolic(mesh, equations_nonstiff, solver_nonstiff,
+                                              RealT, uEltype)...,
+                      initial_cache_nonstiff...)
 
     _boundary_conditions_stiff = digest_boundary_conditions(boundary_conditions_stiff,
                                                             mesh, solver_stiff,
@@ -149,6 +151,10 @@ end
 
 @inline Base.ndims(semi::SemidiscretizationHyperbolicSplit) = ndims(semi.mesh)
 
+@inline function Base.real(semi::SemidiscretizationHyperbolicSplit)
+    return promote_type(real(semi.solver_stiff), real(semi.solver_nonstiff))
+end
+
 # retain dispatch on hyperbolic non-stiff equations only
 @inline function mesh_equations_solver_cache(semi::SemidiscretizationHyperbolicSplit)
     @unpack mesh, equations_nonstiff, solver_nonstiff, cache_nonstiff = semi
@@ -164,10 +170,11 @@ end
     semidiscretize(semi::SemidiscretizationHyperbolicSplit, tspan)
 
 Wrap the semidiscretization `semi` as a split ODE problem in the time interval `tspan`
-that can be passed to `solve` from the [SciML ecosystem](https://diffeq.sciml.ai/latest/).
+that can be passed to `solve` from the [SciML ecosystem](https://docs.sciml.ai/DiffEqDocs/stable/).
 The stiff hyperbolic right-hand side is the first function of the split ODE problem and
 will be used by default by the implicit part of IMEX methods from the
 SciML ecosystem.
+The time span is converted to the real type `real(semi)` of the semidiscretization.
 """
 function semidiscretize(semi::SemidiscretizationHyperbolicSplit, tspan;
                         reset_threads = true)
@@ -177,6 +184,7 @@ function semidiscretize(semi::SemidiscretizationHyperbolicSplit, tspan;
     if reset_threads
         Trixi.Polyester.reset_threads!()
     end
+    tspan = convert_tspan(semi, tspan)
     u0_ode = compute_coefficients(first(tspan), semi)
     # TODO: MPI, do we want to synchronize loading and print debug statements, e.g. using
     #       mpi_isparallel() && MPI.Barrier(mpi_comm())
